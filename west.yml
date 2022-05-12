@@ -1,0 +1,23 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+manifest:
+  self:
+    path: aspeed-zephyr-sdk
+
+  remotes:
+    - name: gerrit
+      url-base: ssh://gerrit.aspeed.com:29418
+    - name: github
+      url-base: https://github.com/AspeedTech-BMC
+
+  projects:
+    - name: zephyr
+      remote: gerrit
+      revision: HEAD
+      import:
+        name-whitelist:
+          - mcumgr
+          - cmsis
+          - mcuboot
+          - mbedtls
