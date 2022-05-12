@@ -1,3 +1,8 @@
 # Copyright (c) 2022 ASPEED Technology Inc.
 # SPDX-License-Identifier: MIT
 
+menu "Additional libraries"
+rsource "modules/Kconfig"
+rsource "lib/smf/Kconfig"
+rsource "lib/hrot_hal/Kconfig"
+endmenu

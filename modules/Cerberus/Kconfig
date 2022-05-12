@@ -1,5 +1,10 @@
 # Copyright (c) 2022 ASPEED Technology Inc.
 # SPDX-License-Identifier: MIT
 
-add_subdirectory(lib)
-add_subdirectory(modules)
+config CERBERUS
+	bool "Cerberus support"
+
+if CERBERUS
+
+
+endif

@@ -21,3 +21,7 @@ manifest:
           - cmsis
           - mcuboot
           - mbedtls
+    - name: cerberus
+      remote: gerrit
+      revision: WDT_TYPO
+      path: middlewares/cerberus
