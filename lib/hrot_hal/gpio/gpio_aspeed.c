@@ -49,7 +49,11 @@ int BMCBootHold()
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
+#if 0
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
+#else
+	spim_ext_mux_config(dev_m, SPIM_MASTER_MODE);
+#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -78,8 +82,11 @@ int PCHBootHold()
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
+#if 0
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
-
+#else
+	spim_ext_mux_config(dev_m, SPIM_MASTER_MODE);
+#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -108,9 +115,12 @@ int BMCBootRelease()
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
+#if 0
 	aspeed_spi_monitor_sw_rst(dev_m);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-
+#else
+	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
+#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -139,8 +149,11 @@ int PCHBootRelease()
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
+#if 0
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-
+#else
+	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
+#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 

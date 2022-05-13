@@ -22,8 +22,13 @@ void SPI_Monitor_Enable(char* dev_name,bool enabled)
 	dev_m = device_get_binding(dev_name);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
+#if 0
 	aspeed_spi_monitor_sw_rst(dev_m);
-	spim_ext_mux_config(dev_m, 1);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
+#else
+
+	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
+#endif
 	spim_monitor_enable(dev_m,enabled);	
 }
 

@@ -1,4 +1,6 @@
 / {
+#if 0
+	/* For v01.00.06 */
 	resources {
 		compatible = "demo,gpio_basic_api";
 		bmc-srst-ctrl-out-gpios = <&gpio0_m_p 5 0>; /* GPIO_M5 */
@@ -12,6 +14,14 @@
 		cpu0-flash-pwr-out-gpios = <&gpio0_i_l 26 0>; /* GPIO_L2 */
 		cpu1-flash-pwr-out-gpios = <&gpio0_i_l 27 0>; /* GPIO_L3 */
 	};
+#else
+	/* For v01.00.05 */
+	resources {
+		compatible = "demo,gpio_basic_api";
+		out-gpios = <&gpio0_m_p 5 0>;
+		in-gpios = <&gpio0_m_p 19 0>;
+	};
+#endif
 };
 
 &i2cfilter {
