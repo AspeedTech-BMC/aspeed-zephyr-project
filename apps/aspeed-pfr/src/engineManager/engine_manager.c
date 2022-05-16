@@ -16,6 +16,12 @@
 uint8_t signature[RSA_MAX_KEY_LENGTH];          /**< Buffer for the manifest signature. */
 uint8_t platform_id[256];                       /**< Cache for the platform ID. */
 
+#if defined(CONFIG_ASPEED_DC_SCM)
+#define SPIM_NUM  3
+#else
+#define SPIM_NUM  4
+#endif
+
 static int initialize_I2cSlave(/*struct engine_instances *engineInstances*/)
 {
 	int status = I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
@@ -84,9 +90,11 @@ void init_SPI_RW_Region(int spi_device_id)
 {
 
 	int status = 0;
-	static char *spim_devs[4] = {
+	static char *spim_devs[SPIM_NUM] = {
 		"spi_m1",
+#if !defined(CONFIG_ASPEED_DC_SCM)
 		"spi_m2",
+#endif
 		"spi_m3",
 		"spi_m4"
 	};

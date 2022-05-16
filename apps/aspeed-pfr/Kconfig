@@ -1,0 +1,10 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# # SPDX-License-Identifier: MIT
+
+config ASPEED_DC_SCM
+        default n
+        bool "ASPEED DC-SCM board"
+        help
+          Enable ASPEED DC-SCM board basic settings.
+
+source "Kconfig.zephyr"

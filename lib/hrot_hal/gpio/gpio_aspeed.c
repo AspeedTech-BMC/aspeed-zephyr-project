@@ -49,11 +49,12 @@ int BMCBootHold(void)
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
-#if 0
+#if defined(CONFIG_ASPEED_DC_SCM)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
+	pfr_bmc_srst_enable_ctrl(true);
+	pfr_bmc_extrst_enable_ctrl(true);
 #else
 	spim_ext_mux_config(dev_m, SPIM_MASTER_MODE);
-#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -70,6 +71,7 @@ int BMCBootHold(void)
 
 	k_busy_wait(10000); /* 10ms */
 
+#endif
 	return 0;
 }
 
@@ -81,11 +83,11 @@ int PCHBootHold(void)
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
-#if 0
+#if defined(CONFIG_ASPEED_DC_SCM)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
+	pfr_pch_rst_enable_ctrl(true);
 #else
 	spim_ext_mux_config(dev_m, SPIM_MASTER_MODE);
-#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -102,6 +104,7 @@ int PCHBootHold(void)
 
 	k_busy_wait(10000); /* 10ms */
 
+#endif
 	return 0;
 }
 
@@ -113,12 +116,15 @@ int BMCBootRelease(void)
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
-#if 0
+#if defined(CONFIG_ASPEED_DC_SCM)
+	printk("release BMC\n\n");
 	aspeed_spi_monitor_sw_rst(dev_m);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
+	pfr_bmc_srst_enable_ctrl(false);
+	pfr_bmc_extrst_enable_ctrl(false);
 #else
 	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
-#endif
+
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -134,7 +140,7 @@ int BMCBootRelease(void)
 	gpio_pin_set(gpio_dev, BMC_SRST, 1);
 
 	k_busy_wait(20000); /* 10ms */
-
+#endif
 	return 0;
 }
 
@@ -146,11 +152,11 @@ int PCHBootRelease(void)
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
-#if 0
+#if defined(CONFIG_ASPEED_DC_SCM)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
+	pfr_pch_rst_enable_ctrl(false);
 #else
 	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
-#endif
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -167,6 +173,7 @@ int PCHBootRelease(void)
 
 	k_busy_wait(10000); /* 10ms */
 
+#endif
 	return 0;
 }
 

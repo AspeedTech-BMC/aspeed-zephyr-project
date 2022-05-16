@@ -24,7 +24,7 @@ void SPI_Monitor_Enable(char *dev_name, bool enabled)
 	}
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
-#if 0
+#if defined(CONFIG_ASPEED_DC_SCM)
 	aspeed_spi_monitor_sw_rst(dev_m);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
 #else

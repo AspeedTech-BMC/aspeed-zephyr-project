@@ -36,7 +36,6 @@ int StartHrotStateMachine(void)
 
 	/* Run the state machine */
 	do {
-
 		/* State machine terminates if a non-zero value is returned */
 		ret = smf_run_state(SMF_CTX(&context));
 		if (ret) {
@@ -110,8 +109,6 @@ static void run_i2c(void *context)
 	// Event
 	process_i2c_command(sm_static_data, event_ctx);
 	// PchBmcCommands(event_ctx, 0);
-
-
 	// printk("Leaving run_i2c\r\n");
 }
 

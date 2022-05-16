@@ -627,7 +627,6 @@ void handlePostUpdateSuccess(void *AoData)
 
 	if (ActiveObjectData->type == ROT_TYPE)
 		pfr_cpld_update_reboot();
-
 }
 
 void handlePostUpdateFailure(void *AoData)
@@ -651,7 +650,11 @@ void T0Transition(int releaseBmc, int releasePCH)
 			AspeedPFR_EnableTimer(BMC_EVENT);
 		}
 		if (releasePCH) {
+#if defined(CONFIG_ASPEED_DC_SCM)
+			init_SPI_RW_Region(2);
+#else
 			init_SPI_RW_Region(1);
+#endif
 			AspeedPFR_EnableTimer(PCH_EVENT);
 		}
 	}
