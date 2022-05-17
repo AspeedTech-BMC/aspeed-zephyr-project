@@ -21,35 +21,35 @@
 #endif
 
 int authentication_image(void *AoData, void *EventContext){
-    
-    int status = 0;
-    AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
+
+	int status = 0;
+	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
-    // init_pfr_manifest();
+	// init_pfr_manifest();
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
-	
-    pfr_manifest->state = VERIFY;
 
-    if(EventData->image == BMC_EVENT){
-        //BMC SPI
-        DEBUG_PRINTF("Image Type: BMC \r\n");
-        pfr_manifest->image_type = BMC_TYPE;
+	pfr_manifest->state = VERIFY;
 
-    }else{
-        //PCH SPI
-        DEBUG_PRINTF("Image Type: PCH \r\n");
-        pfr_manifest->image_type = PCH_TYPE;
-    }
-    
-    if(EventData->operation == VERIFY_BACKUP){  
-        status = pfr_manifest->recovery_base->verify(pfr_manifest, pfr_manifest->hash, pfr_manifest->verification->base, pfr_manifest->pfr_hash->hash_out, pfr_manifest->pfr_hash->length, pfr_manifest->recovery_pfm);
-        // status = pfr_recovery_verify(pfr_manifest);
-    }else if(EventData->operation == VERIFY_ACTIVE){
-        status = pfr_manifest->active_image_base->verify(pfr_manifest);
-    }
-    
-    return status;
+	if(EventData->image == BMC_EVENT){
+		//BMC SPI
+		DEBUG_PRINTF("Image Type: BMC \r\n");
+		pfr_manifest->image_type = BMC_TYPE;
+
+	}else{
+		//PCH SPI
+		DEBUG_PRINTF("Image Type: PCH \r\n");
+		pfr_manifest->image_type = PCH_TYPE;
+	}
+
+	if(EventData->operation == VERIFY_BACKUP){
+		status = pfr_manifest->recovery_base->verify(pfr_manifest, pfr_manifest->hash, pfr_manifest->verification->base, pfr_manifest->pfr_hash->hash_out, pfr_manifest->pfr_hash->length, pfr_manifest->recovery_pfm);
+		// status = pfr_recovery_verify(pfr_manifest);
+	}else if(EventData->operation == VERIFY_ACTIVE){
+		status = pfr_manifest->active_image_base->verify(pfr_manifest);
+	}
+
+	return status;
 }
 
 /**
@@ -67,9 +67,9 @@ int authentication_image(void *AoData, void *EventContext){
  * @return 0 if the manifest is valid or an error code.
  */
 int manifest_verify (struct manifest *manifest, struct hash_engine *hash,
-    struct signature_verification *verification, uint8_t *hash_out, size_t hash_length){
+		struct signature_verification *verification, uint8_t *hash_out, size_t hash_length){
 
-    return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
+	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
 
 /**
@@ -81,11 +81,11 @@ int manifest_verify (struct manifest *manifest, struct hash_engine *hash,
  * @return 0 if the ID was successfully retrieved or an error code.
  */
 int manifest_get_id (struct manifest *manifest, uint32_t *id){
-    
-    ARG_UNUSED(manifest);
+
+	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
 
-    return Success;
+	return Success;
 }
 
 /**
@@ -103,12 +103,12 @@ int manifest_get_id (struct manifest *manifest, uint32_t *id){
  * @return 0 if the platform ID was retrieved successfully or an error code.
  */
 int manifest_get_platform_id (struct manifest *manifest, char **id, size_t length){
-    
-    ARG_UNUSED(manifest);
-	ARG_UNUSED(id);
-    ARG_UNUSED(length);
 
-    return Success;
+	ARG_UNUSED(manifest);
+	ARG_UNUSED(id);
+	ARG_UNUSED(length);
+
+	return Success;
 }
 
 /**
@@ -119,11 +119,11 @@ int manifest_get_platform_id (struct manifest *manifest, char **id, size_t lengt
  * @param id The platform identifier to free.
  */
 void manifest_free_platform_id(struct manifest *manifest, char *id){
-    
-    ARG_UNUSED(manifest);
+
+	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
 
-    return Success;
+	return Success;
 }
 
 /**
@@ -139,9 +139,9 @@ void manifest_free_platform_id(struct manifest *manifest, char *id){
  * ROT_IS_ERROR to check the return value.
  */
 int manifest_get_hash (struct manifest *manifest, struct hash_engine *hash, uint8_t *hash_out,
-    size_t hash_length){
-    
-    return get_hash(manifest, hash, hash_out, hash_length);
+		size_t hash_length){
+
+	return get_hash(manifest, hash, hash_out, hash_length);
 }
 
 /**
@@ -155,12 +155,12 @@ int manifest_get_hash (struct manifest *manifest, struct hash_engine *hash, uint
  * value.
  */
 int manifest_get_signature(struct manifest *manifest, uint8_t *signature, size_t length){
-    
-    ARG_UNUSED(manifest);
-    ARG_UNUSED(signature);
-    ARG_UNUSED(length);
 
-    return Success;
+	ARG_UNUSED(manifest);
+	ARG_UNUSED(signature);
+	ARG_UNUSED(length);
+
+	return Success;
 }
 
 /**
@@ -173,21 +173,21 @@ int manifest_get_signature(struct manifest *manifest, uint8_t *signature, size_t
  * @return 1 if the manifest is empty, 0 if it is not, or an error code.
  */
 int is_manifest_empty (struct manifest *manifest){
-    ARG_UNUSED(manifest);
-    return Success;
+	ARG_UNUSED(manifest);
+	return Success;
 }
 
 void init_manifest(struct manifest *manifest){
-    manifest->verify = manifest_verify;
-    manifest->get_id = manifest_get_id;
-    manifest->get_platform_id = manifest_get_platform_id;
-    manifest->free_platform_id = manifest_free_platform_id;
-    manifest->get_hash = manifest_get_hash;
-    manifest->get_signature = manifest_get_signature;
-    manifest->is_empty = is_manifest_empty;
-} 
+	manifest->verify = manifest_verify;
+	manifest->get_id = manifest_get_id;
+	manifest->get_platform_id = manifest_get_platform_id;
+	manifest->free_platform_id = manifest_free_platform_id;
+	manifest->get_hash = manifest_get_hash;
+	manifest->get_signature = manifest_get_signature;
+	manifest->is_empty = is_manifest_empty;
+}
 
 
 void init_signature_verifcation(struct signature_verification *signature_verification){
-    signature_verification->verify_signature = verify_signature;
+	signature_verification->verify_signature = verify_signature;
 }

@@ -23,7 +23,7 @@
 #define SECONDARY_FLASH_REGION	2
 
 uint8_t gReadOnlyRfAddress[READ_ONLY_RF_COUNT] = {0x1, 0x2, 0x3, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x14, 0x15, 0x16, 0x17,
-        0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F};
+	0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F};
 uint8_t gReadAndWriteRfAddress[READ_WRITE_RF_COUNT] = {0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E};
 extern struct st_pfr_instance pfr_instance;
 EVENT_CONTEXT DataContext;
@@ -65,12 +65,10 @@ void ResetMailBox(void) {
 	set_provision_commandTrigger(0x00);
 }
 /**
-    Function to Erase th UFM
-
-    @Param  NULL
-
-    @retval NULL
-**/
+ * Function to Erase th UFM
+ * @Param  NULL
+ * @retval NULL
+ **/
 unsigned char erase_provision_flash(){
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -79,11 +77,10 @@ unsigned char erase_provision_flash(){
 	return status;
 }
 /**
-    Function to Initialize Smbus Mailbox with default value
-
-    @Param  NULL
-    @retval NULL
-**/
+ * Function to Initialize Smbus Mailbox with default value
+ * @Param  NULL
+ * @retval NULL
+ **/
 void get_provision_data_in_flash(uint32_t addr,uint8_t *DataBuffer, uint32_t length)
 {
 	uint8_t status;
@@ -125,16 +122,16 @@ unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uin
 }
 void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion)
 {
-		uint8_t status;
-		PFM_STRUCTURE Buffer;
+	uint8_t status;
+	PFM_STRUCTURE Buffer;
 
-		struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-		spi_flash->spi.device_id[0] = image_id; //Internal UFM SPI
-		status = spi_flash->spi.base.read(&spi_flash->spi,address, &Buffer,sizeof(PFM_STRUCTURE));
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	spi_flash->spi.device_id[0] = image_id; //Internal UFM SPI
+	status = spi_flash->spi.base.read(&spi_flash->spi,address, &Buffer,sizeof(PFM_STRUCTURE));
 
-		*SVN = Buffer.SVN;
-		*MajorVersion = Buffer.MarjorVersion;
-		*MinorVersion = Buffer.MinorVersion;
+	*SVN = Buffer.SVN;
+	*MajorVersion = Buffer.MarjorVersion;
+	*MinorVersion = Buffer.MinorVersion;
 }
 
 void InitializeSmbusMailbox(void) {
@@ -270,8 +267,8 @@ byte GetPanicEventCount(void) {
 }
 
 void IncPanicEventCount(void) {
-    gSmbusMailboxData.PanicEventCount++;
-    //UpdateMailboxRegisterFile(PanicEventCount, (uint8_t)gSmbusMailboxData.PanicEventCount);
+	gSmbusMailboxData.PanicEventCount++;
+	//UpdateMailboxRegisterFile(PanicEventCount, (uint8_t)gSmbusMailboxData.PanicEventCount);
 }
 
 byte GetLastPanicReason(void) {
@@ -333,10 +330,7 @@ bool IsUfmStatusPITL2CompleteSuccess(void) {
 byte get_provision_status( ) {
 	uint8_t UfmStatus = 0;
 
-	//if(gBmcFlag)
 	UfmStatus = gSmbusMailboxData.UfmStatusValue;
-	/*else
-		ReadFromMailbox(UfmStatusValue, &UfmStatus);*/
 	if(gProvisionCount == 3)
 		gProvisinDoneFlag = TRUE;
 
@@ -353,8 +347,6 @@ byte get_provision_command() {
 
 	if(gBmcFlag)
 		UfmCommandData = gSmbusMailboxData.UfmCommand;
-	/*else
-		ReadFromMailbox(UfmCommand, &UfmCommandData);*/
 
 	return UfmCommandData;
 }
@@ -714,12 +706,10 @@ void ReadBmcOffets()
 	memcpy(gReadFifoData, gBmcOffsets, sizeof(gBmcOffsets));
 }
 /**
-    Function to process th UFM command operations
-
-    @Param  NULL
-
-    @retval NULL
-**/
+ * Function to process th UFM command operations
+ * @Param  NULL
+ * @retval NULL
+ **/
 void process_provision_command(void)
 {
 	byte UfmCommandData;
@@ -736,71 +726,71 @@ void process_provision_command(void)
 
 	UfmCommandData = get_provision_command();
 	switch(UfmCommandData){
-	case ERASE_CURRENT:
-		set_provision_status(COMMAND_BUSY);
-		Status = erase_provision_flash();
-		if(Status == Success){
-			gProvisionCount = 0;
+		case ERASE_CURRENT:
+			set_provision_status(COMMAND_BUSY);
+			Status = erase_provision_flash();
+			if(Status == Success){
+				gProvisionCount = 0;
+				set_provision_status(COMMAND_DONE);
+			}
+			else
+				set_provision_status(COMMAND_ERROR);
+			break;
+		case PROVISION_ROOT_KEY:
+			set_provision_status(COMMAND_BUSY);
+			memcpy(gRootKeyHash,gUfmFifoData, SHA256_DIGEST_LENGTH);
+			gProvisionCount++;
+			gProvisionData = 1;
 			set_provision_status(COMMAND_DONE);
-		}
-		else
-			set_provision_status(COMMAND_ERROR);
-		break;
-	case PROVISION_ROOT_KEY:
-		set_provision_status(COMMAND_BUSY);
-		memcpy(gRootKeyHash,gUfmFifoData, SHA256_DIGEST_LENGTH);
-		gProvisionCount++;
-		gProvisionData = 1;
-		set_provision_status(COMMAND_DONE);
 
-		break;
-	case PROVISION_PIT_KEY:
-		//Update password to provsioned UFM
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
-		break;
-	case PROVISION_PCH_OFFSET:
-		set_provision_status(COMMAND_BUSY);
-		memcpy(gPchOffsets, gUfmFifoData, sizeof(gPchOffsets));
-		gProvisionCount++;
-		gProvisionData = 1;
-		set_provision_status(COMMAND_DONE);
+			break;
+		case PROVISION_PIT_KEY:
+			//Update password to provsioned UFM
+			DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
+			break;
+		case PROVISION_PCH_OFFSET:
+			set_provision_status(COMMAND_BUSY);
+			memcpy(gPchOffsets, gUfmFifoData, sizeof(gPchOffsets));
+			gProvisionCount++;
+			gProvisionData = 1;
+			set_provision_status(COMMAND_DONE);
 
-		break;
-	case PROVISION_BMC_OFFSET:
-		set_provision_status(COMMAND_BUSY);
-		memcpy(gBmcOffsets, gUfmFifoData, sizeof(gPchOffsets));
-		gProvisionCount++;
-		gProvisionData = 1;
-		set_provision_status(COMMAND_DONE);
+			break;
+		case PROVISION_BMC_OFFSET:
+			set_provision_status(COMMAND_BUSY);
+			memcpy(gBmcOffsets, gUfmFifoData, sizeof(gPchOffsets));
+			gProvisionCount++;
+			gProvisionData = 1;
+			set_provision_status(COMMAND_DONE);
 
-		break;
-	case LOCK_UFM:
-		//lock ufm
-		lock_provision_flash();
-		set_provision_status(COMMAND_DONE|UFM_LOCKED);
-		break;
-	case READ_ROOT_KEY:
-		ReadRootKey();
-		set_provision_status(COMMAND_DONE);
-		break;
-	case READ_PCH_OFFSET:
-		ReadPchOfsets();
-		set_provision_status(COMMAND_DONE);
-		break;
-	case READ_BMC_OFFSET:
-		ReadBmcOffets();
-		set_provision_status(COMMAND_DONE | UFM_PROVISIONED);
-		//set_provision_status(COMMAND_DONE);
-		break;
+			break;
+		case LOCK_UFM:
+			//lock ufm
+			lock_provision_flash();
+			set_provision_status(COMMAND_DONE|UFM_LOCKED);
+			break;
+		case READ_ROOT_KEY:
+			ReadRootKey();
+			set_provision_status(COMMAND_DONE);
+			break;
+		case READ_PCH_OFFSET:
+			ReadPchOfsets();
+			set_provision_status(COMMAND_DONE);
+			break;
+		case READ_BMC_OFFSET:
+			ReadBmcOffets();
+			set_provision_status(COMMAND_DONE | UFM_PROVISIONED);
+			//set_provision_status(COMMAND_DONE);
+			break;
 
-	case ENABLE_PIT_LEVEL_1_PROTECTION:
-		//EnablePitLevel1();
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
-		break;
-	case ENABLE_PIT_LEVEL_2_PROTECTION:
-		//EnablePitLevel2();
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
-		break;
+		case ENABLE_PIT_LEVEL_1_PROTECTION:
+			//EnablePitLevel1();
+			DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
+			break;
+		case ENABLE_PIT_LEVEL_2_PROTECTION:
+			//EnablePitLevel2();
+			DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
+			break;
 	}
 	if((gProvisionCount == 3) && (gProvisionData == 1))
 	{
@@ -841,12 +831,10 @@ void process_provision_command(void)
 }
 
 /**
-    Function to update the Bmc Checkpoint
-
-    @Param  NULL
-
-    @retval NULL
-**/
+ * Function to update the Bmc Checkpoint
+ * @Param  NULL
+ * @retval NULL
+ **/
 void UpdateBmcCheckpoint(byte Data)
 {
 	if(gBmcBootDone == FALSE) {
@@ -956,38 +944,38 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 
 	if(Data & UpdateAtReset){
 		//Getting cpld status from UFM
-		
+
 		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 		if(Data & PchActiveUpdate){
-				cpld_update_status.PchStatus = 1;
-				cpld_update_status.Region[2].ActiveRegion = 1;
-			}
-			if(Data & PchRecoveryUpdate){
-				cpld_update_status.PchStatus = 1;
-				cpld_update_status.Region[2].Recoveryregion = 1;
-			}
-			if(Data & HROTActiveUpdate){
-				cpld_update_status.CpldStatus = 1;
-				cpld_update_status.CpldRecovery = 1;
-				cpld_update_status.Region[0].ActiveRegion = 1;
-			}
-			if(Data & BmcActiveUpdate){
-				cpld_update_status.BmcStatus = 1;
-				cpld_update_status.Region[1].ActiveRegion = 1;
-			}
-			if(Data & BmcRecoveryUpdate){
-				cpld_update_status.BmcStatus = 1;
-				cpld_update_status.Region[1].Recoveryregion = 1;
-			}
-			if(Data & HROTRecoveryUpdate){
-				DEBUG_PRINTF("HROTRecoveryUpdate not supported\r\n");
-			}
-			if(Data & DymanicUpdate){
-				DEBUG_PRINTF("DymanicUpdate not supported\r\n");
-			}
-			//Setting updated cpld status to ufm
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+			cpld_update_status.PchStatus = 1;
+			cpld_update_status.Region[2].ActiveRegion = 1;
 		}
+		if(Data & PchRecoveryUpdate){
+			cpld_update_status.PchStatus = 1;
+			cpld_update_status.Region[2].Recoveryregion = 1;
+		}
+		if(Data & HROTActiveUpdate){
+			cpld_update_status.CpldStatus = 1;
+			cpld_update_status.CpldRecovery = 1;
+			cpld_update_status.Region[0].ActiveRegion = 1;
+		}
+		if(Data & BmcActiveUpdate){
+			cpld_update_status.BmcStatus = 1;
+			cpld_update_status.Region[1].ActiveRegion = 1;
+		}
+		if(Data & BmcRecoveryUpdate){
+			cpld_update_status.BmcStatus = 1;
+			cpld_update_status.Region[1].Recoveryregion = 1;
+		}
+		if(Data & HROTRecoveryUpdate){
+			DEBUG_PRINTF("HROTRecoveryUpdate not supported\r\n");
+		}
+		if(Data & DymanicUpdate){
+			DEBUG_PRINTF("DymanicUpdate not supported\r\n");
+		}
+		//Setting updated cpld status to ufm
+		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+	}
 	else {
 		if(Data & PchActiveUpdate){
 			if((Data & PchActiveUpdate) && (Data & PchRecoveryUpdate)){
@@ -1045,8 +1033,8 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 }
 
 /**
- Function to Check if system boots fine based on TimerISR
- Returns Status
+ * Function to Check if system boots fine based on TimerISR
+ * Returns Status
  */
 bool WatchDogTimer(int ImageType) {
 	DEBUG_PRINTF("WDT Update Tiggers\r\n");
@@ -1072,141 +1060,141 @@ uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
 	byte DataToSend = 0;
 	uint8_t i=0;
 	switch(CipherText[0]){
-	case CpldIdentifier:
-		DataToSend = GetCpldIdentifier();
-		break;
-	case CpldReleaseVersion:
-		DataToSend = GetCpldReleaseVersion();
-		break;
-	case CpldRoTSVN:
-		DataToSend = GetCpldRotSvn();
-		break;
-	case PlatformState:
-		DataToSend = GetPlatformState();
-		break;
-	case Recoverycount:
-		DataToSend = GetRecoveryCount();
-		break;
-	case LastRecoveryReason:
-		DataToSend = GetLastRecoveryReason();
-		break;
-	case PanicEventCount:
-		DataToSend = GetPanicEventCount();
-		break;
-	case LastPanicReason:
-		DataToSend = GetLastPanicReason();
-		break;
-	case MajorErrorCode:
-		DataToSend = GetMajorErrorCode();
-		break;
-	case MinorErrorCode:
-		DataToSend = GetMinorErrorCode();
-		break;
-	case UfmStatusValue:
-		DataToSend = get_provision_status();
-		break;
-	case UfmCommand:
-		if (ReadFlag == TRUE)
-			DataToSend = get_provision_command();
-		else
-			set_provision_command(CipherText[1]);
+		case CpldIdentifier:
+			DataToSend = GetCpldIdentifier();
+			break;
+		case CpldReleaseVersion:
+			DataToSend = GetCpldReleaseVersion();
+			break;
+		case CpldRoTSVN:
+			DataToSend = GetCpldRotSvn();
+			break;
+		case PlatformState:
+			DataToSend = GetPlatformState();
+			break;
+		case Recoverycount:
+			DataToSend = GetRecoveryCount();
+			break;
+		case LastRecoveryReason:
+			DataToSend = GetLastRecoveryReason();
+			break;
+		case PanicEventCount:
+			DataToSend = GetPanicEventCount();
+			break;
+		case LastPanicReason:
+			DataToSend = GetLastPanicReason();
+			break;
+		case MajorErrorCode:
+			DataToSend = GetMajorErrorCode();
+			break;
+		case MinorErrorCode:
+			DataToSend = GetMinorErrorCode();
+			break;
+		case UfmStatusValue:
+			DataToSend = get_provision_status();
+			break;
+		case UfmCommand:
+			if (ReadFlag == TRUE)
+				DataToSend = get_provision_command();
+			else
+				set_provision_command(CipherText[1]);
 
-		break;
-	case UfmCmdTriggerValue:
-		if(ReadFlag == TRUE){
-			DataToSend = get_provision_commandTrigger();
-		}else{
-			if (CipherText[1] & EXECUTE_UFM_COMMAND){// If bit 0 set
-				//Execute command specified at UFM/Provisioning Command register
-				process_provision_command();
+			break;
+		case UfmCmdTriggerValue:
+			if(ReadFlag == TRUE){
+				DataToSend = get_provision_commandTrigger();
+			}else{
+				if (CipherText[1] & EXECUTE_UFM_COMMAND){// If bit 0 set
+					//Execute command specified at UFM/Provisioning Command register
+					process_provision_command();
+				}
+				else if(CipherText[1] & FLUSH_WRITE_FIFO){//Flush Write FIFO
+					// Need to read UFM Write FIFO offest
+					memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
+					gFifoData = 0;
+				}
+				else if(CipherText[1] & FLUSH_READ_FIFO){//flush Read FIFO
+					// Need to read UFM Read FIFO offest
+					memset(&gReadFifoData, 0, sizeof(gReadFifoData));
+					gFifoData = 0;
+					mailBox_index = 0;
+				}
 			}
-			else if(CipherText[1] & FLUSH_WRITE_FIFO){//Flush Write FIFO
-				// Need to read UFM Write FIFO offest
-				memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
-				gFifoData = 0;
-			}
-			else if(CipherText[1] & FLUSH_READ_FIFO){//flush Read FIFO
-				// Need to read UFM Read FIFO offest
-				memset(&gReadFifoData, 0, sizeof(gReadFifoData));
-				gFifoData = 0;
-				mailBox_index = 0;
-			}
-		}
 
-		break;
-	case UfmWriteFIFO:
-		gUfmFifoData[gFifoData++] = CipherText[1];
-		break;
-	case UfmReadFIFO:
-		DataToSend = gReadFifoData[mailBox_index];
-		mailBox_index++;
-		break;
-	case BmcCheckpoint:
-		UpdateBmcCheckpoint(CipherText[1]);
-		break;
-	case AcmCheckpoint:
-		//UpdateAcmCheckpoint(CipherText[1]);
-		break;
-	case BiosCheckpoint:
-		UpdateBiosCheckpoint(CipherText[1]);
-		break;
-	case PchUpdateIntentValue:
-		if (!ReadFlag) {
-			SetPchUpdateIntent(CipherText[1]);
-			UpdateIntentHandle(CipherText[1], PchUpdateIntentValue);
-		}
-		break;
-	case BmcUpdateIntentValue:
-		if (!ReadFlag) {
-			SetBmcUpdateIntent(CipherText[1]);
-			UpdateIntentHandle(CipherText[1], BmcUpdateIntentValue);
-		}
-		break;
-	case PchPFMActiveSVN:
-		DataToSend = GetPchPfmActiveSvn();
-		break;
-	case PchPFMActiveMajorVersion:
-		DataToSend = GetPchPfmActiveMajorVersion();
-		break;
-	case PchPFMActiveMinorVersion:
-		DataToSend = GetPchPfmActiveMinorVersion();
-		break;
-	case BmcPFMActiveSVN:
-		DataToSend = GetBmcPfmActiveSvn();
-		break;
-	case BmcPFMActiveMajorVersion:
-		DataToSend = GetBmcPfmActiveMajorVersion();
-		break;
-	case BmcPFMActiveMinorVersion:
-		DataToSend = GetBmcPfmActiveMinorVersion();
-		break;
-	case PchPFMRecoverSVN:
-		DataToSend = GetPchPfmRecoverSvn();
-		break;
-	case PchPFMRecoverMajorVersion:
-		DataToSend = GetPchPfmRecoverMajorVersion();
-		break;
-	case PchPFMRecoverMinorVersion:
-		DataToSend = GetPchPfmRecoverMinorVersion();
-		break;
-	case BmcPFMRecoverSVN:
-		DataToSend = GetBmcPfmRecoverSvn();
-		break;
-	case BmcPFMRecoverMajorVersion:
-		DataToSend = GetBmcPfmRecoverMajorVersion();
-		break;
-	case BmcPFMRecoverMinorVersion:
-		DataToSend = GetBmcPfmRecoverMinorVersion();
-		break;
-	case CpldFPGARoTHash:
-		break;
-	case AcmBiosScratchPad:
-		break;
-	case BmcScratchPad:
-		break;
-	default :
-		DEBUG_PRINTF("Mailbox command not found\r\n");
-		break;
+			break;
+		case UfmWriteFIFO:
+			gUfmFifoData[gFifoData++] = CipherText[1];
+			break;
+		case UfmReadFIFO:
+			DataToSend = gReadFifoData[mailBox_index];
+			mailBox_index++;
+			break;
+		case BmcCheckpoint:
+			UpdateBmcCheckpoint(CipherText[1]);
+			break;
+		case AcmCheckpoint:
+			//UpdateAcmCheckpoint(CipherText[1]);
+			break;
+		case BiosCheckpoint:
+			UpdateBiosCheckpoint(CipherText[1]);
+			break;
+		case PchUpdateIntentValue:
+			if (!ReadFlag) {
+				SetPchUpdateIntent(CipherText[1]);
+				UpdateIntentHandle(CipherText[1], PchUpdateIntentValue);
+			}
+			break;
+		case BmcUpdateIntentValue:
+			if (!ReadFlag) {
+				SetBmcUpdateIntent(CipherText[1]);
+				UpdateIntentHandle(CipherText[1], BmcUpdateIntentValue);
+			}
+			break;
+		case PchPFMActiveSVN:
+			DataToSend = GetPchPfmActiveSvn();
+			break;
+		case PchPFMActiveMajorVersion:
+			DataToSend = GetPchPfmActiveMajorVersion();
+			break;
+		case PchPFMActiveMinorVersion:
+			DataToSend = GetPchPfmActiveMinorVersion();
+			break;
+		case BmcPFMActiveSVN:
+			DataToSend = GetBmcPfmActiveSvn();
+			break;
+		case BmcPFMActiveMajorVersion:
+			DataToSend = GetBmcPfmActiveMajorVersion();
+			break;
+		case BmcPFMActiveMinorVersion:
+			DataToSend = GetBmcPfmActiveMinorVersion();
+			break;
+		case PchPFMRecoverSVN:
+			DataToSend = GetPchPfmRecoverSvn();
+			break;
+		case PchPFMRecoverMajorVersion:
+			DataToSend = GetPchPfmRecoverMajorVersion();
+			break;
+		case PchPFMRecoverMinorVersion:
+			DataToSend = GetPchPfmRecoverMinorVersion();
+			break;
+		case BmcPFMRecoverSVN:
+			DataToSend = GetBmcPfmRecoverSvn();
+			break;
+		case BmcPFMRecoverMajorVersion:
+			DataToSend = GetBmcPfmRecoverMajorVersion();
+			break;
+		case BmcPFMRecoverMinorVersion:
+			DataToSend = GetBmcPfmRecoverMinorVersion();
+			break;
+		case CpldFPGARoTHash:
+			break;
+		case AcmBiosScratchPad:
+			break;
+		case BmcScratchPad:
+			break;
+		default :
+			DEBUG_PRINTF("Mailbox command not found\r\n");
+			break;
 	}
 
 	return DataToSend;

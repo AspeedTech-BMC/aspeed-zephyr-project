@@ -25,86 +25,86 @@ struct spi_filter_engine_wrapper spiFilterEngineWrapper;
 
 uint8_t hashStorage[hashStorageLength];
 
-bool gBootCheckpointReceived = false;
+bool gBootCheckpointReceived;
 int gBMCWatchDogTimer = -1;
 int gPCHWatchDogTimer = -1;
 uint32_t gMaxTimeout = MAX_BIOS_BOOT_TIME;
 
-struct flash *getFlashDeviceInstance()
+struct flash *getFlashDeviceInstance(void)
 {
 	flashDevice = spiEngineWrapper.spi.base;
-	
+
 	return &flashDevice;
 }
 
-struct flash_master *getFlashMasterInstance()
+struct flash_master *getFlashMasterInstance(void)
 {
 	return &flashMaster;
 }
 
-struct hash_engine *get_hash_engine_instance()
+struct hash_engine *get_hash_engine_instance(void)
 {
 	return &hashEngine;
 }
 
-struct host_state_manager *getHostStateManagerInstance()
+struct host_state_manager *getHostStateManagerInstance(void)
 {
 	return &hostStateManager;
 }
 
-struct manifest_flash *getManifestFlashInstance()
+struct manifest_flash *getManifestFlashInstance(void)
 {
 	return &manifestFlash;
 }
 
-struct pfm_flash *getPfmFlashInstance()
+struct pfm_flash *getPfmFlashInstance(void)
 {
 	return &pfmFlash;
 }
 
-struct pfm_manager_flash *getPfmManagerFlashInstance()
+struct pfm_manager_flash *getPfmManagerFlashInstance(void)
 {
 	return &pfmManagerFlash;
 }
 
-struct signature_verification *getSignatureVerificationInstance()
+struct signature_verification *getSignatureVerificationInstance(void)
 {
 	return &signatureVerification;
 }
 
-struct spi_flash *getSpiFlashInstance()
+struct spi_flash *getSpiFlashInstance(void)
 {
 	return &spiFlash;
 }
 
-struct rsa_engine_wrapper *getRsaEngineInstance()
+struct rsa_engine_wrapper *getRsaEngineInstance(void)
 {
 	return &rsaEngineWrapper;
 }
 
-struct spi_engine_wrapper *getSpiEngineWrapper()
+struct spi_engine_wrapper *getSpiEngineWrapper(void)
 {
 	return &spiEngineWrapper;
 }
 
-struct flash_master_wrapper *getFlashEngineWrapper()
+struct flash_master_wrapper *getFlashEngineWrapper(void)
 {
 	return &flashEngineWrapper;
 }
 
-struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance()
+struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void)
 {
 	return &I2cSlaveEnginWrapper.base;
 }
 
-uint8_t *getNewHashStorage()
+uint8_t *getNewHashStorage(void)
 {
 	memset(hashStorage, 0, hashStorageLength);
 
 	return hashStorage;
 }
 
-struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper()
+struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper(void)
 {
 	return &spiFilterEngineWrapper;
 }

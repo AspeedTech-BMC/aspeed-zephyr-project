@@ -27,28 +27,28 @@ int handle_update_image_action(int image_type, void *AoData, void* EventContext)
 {
 	CPLD_STATUS cpld_update_status;
 	int status;
-	
+
 	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	if (status != Success)
 		return status;
 
 	BMCBootHold();
 	PCHBootHold();
-	 
+
 
 #if SMBUS_MAILBOX_SUPPORT
-		SetPlatformState(image_type == BMC_TYPE? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
-		if (image_type != CPLD_FW_UPDATE) {
-			SetLastPanicReason(lastPanicReason(image_type));
-			IncPanicEventCount();
-		}
+	SetPlatformState(image_type == BMC_TYPE? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
+	if (image_type != CPLD_FW_UPDATE) {
+		SetLastPanicReason(lastPanicReason(image_type));
+		IncPanicEventCount();
+	}
 #endif
-	
-    status = update_firmware_image(image_type, AoData,EventContext);
-    if(status != Success)
-        return Failure;
 
-    return Success;
+	status = update_firmware_image(image_type, AoData,EventContext);
+	if(status != Success)
+		return Failure;
+
+	return Success;
 }
 
 

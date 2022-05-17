@@ -37,14 +37,14 @@ AO_DATA BmcActiveObjectData, PchActiveObjectData;
 
 static void wdt_callback_bmc_timeout()
 {
-		printk("enter wdt_callback_bmc_timeout \n");
-		SetLastPanicReason(BMC_WDT_EXPIRE);
+	printk("enter wdt_callback_bmc_timeout \n");
+	SetLastPanicReason(BMC_WDT_EXPIRE);
 }
 
 static void wdt_callback_pch_timeout()
 {
-		printk("enter wdt_callback_pch_timeout \n");
-		SetLastPanicReason(ACM_WDT_EXPIRE);
+	printk("enter wdt_callback_pch_timeout \n");
+	SetLastPanicReason(ACM_WDT_EXPIRE);
 }
 
 void AspeedPFR_EnableTimer(int type)
@@ -67,7 +67,7 @@ void AspeedPFR_EnableTimer(int type)
 	} else if (type == PCH_EVENT) {
 		DEBUG_PRINTF("---------------------------------------\r\n");
 		DEBUG_PRINTF("     Start PCH Timer\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");		
+		DEBUG_PRINTF("---------------------------------------\r\n");
 		wdt_config->wdt_cfg.window.max = BIOS_MAXTIMEOUT;
 		wdt_config->wdt_cfg.callback = wdt_callback_pch_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
@@ -94,7 +94,7 @@ void AspeedPFR_DisableTimer(int type)
 	} else if (type == PCH_EVENT) {
 		DEBUG_PRINTF("---------------------------------------\r\n");
 		DEBUG_PRINTF("     Disable PCH Timer\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");	
+		DEBUG_PRINTF("---------------------------------------\r\n");
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
 
 	}
@@ -122,13 +122,11 @@ int StartPchAOWithEvent(void)
 }
 
 /**
-    Function to Update the BMC data with verify signal to
-    publish the signal
-
-    @Param NIL.
-
-    @retval NILL
-**/
+ * Function to Update the BMC data with verify signal to
+ * publish the signal
+ * @Param NIL.
+ * @retval NILL
+ **/
 void PublishBmcEvents(void)
 {
 	// Assigning default value
@@ -152,13 +150,11 @@ void PublishBmcEvents(void)
 }
 
 /**
-    Function to Update the PCH data with verify signal to
-    publish the signal
-
-    @Param NIL.
-
-    @retval NILL
-**/
+ * Function to Update the PCH data with verify signal to
+ * publish the signal
+ * @Param NIL.
+ * @retval NILL
+ **/
 void PublishPchEvents(void)
 {
 	PchActiveObjectData.ActiveImageStatus = 1;
@@ -183,11 +179,11 @@ void PublishInitialEvents()
 	byte provision_state = get_provision_status();
 	if(provision_state == UFM_PROVISIONED){
 		check_staging_area();
-		#if BMC_SUPPORT
-			PublishBmcEvents();
-    	#else
-			PublishPchEvents();
-		#endif
+#if BMC_SUPPORT
+		PublishBmcEvents();
+#else
+		PublishPchEvents();
+#endif
 	}else{
 		// T0
 		int releaseBmc = 1;
@@ -202,9 +198,9 @@ void PublishInitialEvents()
 void handleLockDownState(void *AoData)
 {
 	((AO_DATA *)AoData)->InLockdown = 1; // Indicate lock down status
-	#if SMBUS_MAILBOX_SUPPORT
-    	SetPlatformState(LOCKDOWN_ON_AUTH_FAIL);
-	#endif
+#if SMBUS_MAILBOX_SUPPORT
+	SetPlatformState(LOCKDOWN_ON_AUTH_FAIL);
+#endif
 	// Perform Any Other Cleanup
 }
 
@@ -232,16 +228,16 @@ void CheckAndReleasePlatform( void *AoData, void *EventContext)
 	if(EventData->image == BMC_EVENT){
 		release_bmc = 1;
 		DEBUG_PRINTF("---------------------------------------\r\n");
-        DEBUG_PRINTF("     BMC authentication success\r\n");
-        DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("     BMC authentication success\r\n");
+		DEBUG_PRINTF("---------------------------------------\r\n");
 		PublishPchEvents();
 	}
 	if(EventData->image == PCH_EVENT){
 		release_pch = 1;
 		release_bmc = 1;
 		DEBUG_PRINTF("---------------------------------------\r\n");
-        DEBUG_PRINTF("     PCH authentication success\r\n");
-        DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("     PCH authentication success\r\n");
+		DEBUG_PRINTF("---------------------------------------\r\n");
 		T0Transition(release_bmc, release_pch);
 	}
 
@@ -260,7 +256,7 @@ void handlePostVerifySuccess(void *AoData, void *EventContext)
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
 	if((ActiveObjectData->ActiveImageStatus == Success ) &&
-		(ActiveObjectData->RecoveryImageStatus == Success))
+			(ActiveObjectData->RecoveryImageStatus == Success))
 	{
 		ActiveObjectData->RestrictActiveUpdate = 0;
 		CheckAndReleasePlatform(AoData, EventContext);
@@ -300,9 +296,9 @@ void handleVerifyEntryState(void *data, void *event_context)
 	AO_DATA *ao_data = (AO_DATA *)data;
 	int type = ao_data->type;
 	//AspeedPFR_DisableTimer(type);
-	#if SMBUS_MAILBOX_SUPPORT
-		SetPlatformState(type == BMC_EVENT? BMC_FLASH_AUTH : PCH_FLASH_AUTH);
-	#endif
+#if SMBUS_MAILBOX_SUPPORT
+	SetPlatformState(type == BMC_EVENT? BMC_FLASH_AUTH : PCH_FLASH_AUTH);
+#endif
 }
 
 /**
@@ -319,16 +315,14 @@ void handleVerifyInitState(int type, void *data)
 }
 
 /**
-    Function to perform image verification
-
-    @Param int          Image type from AO
-    @Param void*        Active object Data from the Framework
-    @Param void*        Event Data from the Framework
-
-    @retval int         Returns the verification status
-                        1 - Verification success
-                        0 - Verification failed
-**/
+ * Function to perform image verification
+ * @Param int          Image type from AO
+ * @Param void*        Active object Data from the Framework
+ * @Param void*        Event Data from the Framework
+ * @retval int         Returns the verification status
+ * 1 - Verification success
+ * 0 - Verification failed
+ **/
 int handleImageVerification(void *AoData, void *EventContext)
 {
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
@@ -426,11 +420,11 @@ void handleRecoveryEntryState(void *data)
 	AO_DATA *ao_data = (AO_DATA *)data;
 	int type = ao_data->type;
 	//AspeedPFR_DisableTimer(type);
-	#if SMBUS_MAILBOX_SUPPORT
-		SetPlatformState(T_MINUS_1_FW_RECOVERY);
-		SetLastRecoveryReason(lastRecoveryReason(type, data));
-        IncRecoveryCount();
-	#endif
+#if SMBUS_MAILBOX_SUPPORT
+	SetPlatformState(T_MINUS_1_FW_RECOVERY);
+	SetLastRecoveryReason(lastRecoveryReason(type, data));
+	IncRecoveryCount();
+#endif
 }
 
 /**
@@ -478,9 +472,9 @@ void handlePostRecoveryFailure(void *AoData, void *EventContext)
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
 	if(ActiveObjectData->ActiveImageStatus != Success &&
-		ActiveObjectData->RecoveryImageStatus != Success){
-			ActiveObjectData->InLockdown = 1;
-			LockDownPlatform(AoData);
+			ActiveObjectData->RecoveryImageStatus != Success){
+		ActiveObjectData->InLockdown = 1;
+		LockDownPlatform(AoData);
 	}
 
 	if(ActiveObjectData->ActiveImageStatus != Success){
@@ -492,23 +486,21 @@ void handlePostRecoveryFailure(void *AoData, void *EventContext)
 
 	if(ActiveObjectData->ActiveImageStatus == Success){
 		if(ActiveObjectData->RecoveryImageStatus != Success){
-				CheckAndReleasePlatform(AoData, EventData);
+			CheckAndReleasePlatform(AoData, EventData);
 		}
 	}
 
 }
 
 /**
-    Function to perform image recovery verify
-
-    @Param int          Image type from AO
-    @Param void*        Active object Data from the Framework
-    @Param void*        Event Data from the Framework
-
-    @retval int         Returns the recovery verification status
-                        0 - Recovery image Verification success
-                        1 - Recovery image Verification failed
-**/
+ * Function to perform image recovery verify
+ * @Param int          Image type from AO
+ * @Param void*        Active object Data from the Framework
+ * @Param void*        Event Data from the Framework
+ * @retval int         Returns the recovery verification status
+ * 0 - Recovery image Verification success
+ * 1 - Recovery image Verification failed
+ **/
 int handleRecoveryAction(void *AoData, void *EventContext)
 {
 	int status = 0;
@@ -570,13 +562,13 @@ void handleUpdateEntryState(void *data)
 	AO_DATA *ao_data = (AO_DATA *)data;
 	int type = ao_data->type;
 	//AspeedPFR_DisableTimer(type);
-	#if SMBUS_MAILBOX_SUPPORT
-		SetPlatformState(type == BMC_EVENT? BMC_FW_UPDATE : (PCH_EVENT ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
-		if (type != CPLD_FW_UPDATE) {
-			SetLastPanicReason(lastPanicReason(type));
-			IncPanicEventCount();
-		}
-	#endif
+#if SMBUS_MAILBOX_SUPPORT
+	SetPlatformState(type == BMC_EVENT? BMC_FW_UPDATE : (PCH_EVENT ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
+	if (type != CPLD_FW_UPDATE) {
+		SetLastPanicReason(lastPanicReason(type));
+		IncPanicEventCount();
+	}
+#endif
 }
 
 /**
@@ -596,17 +588,14 @@ void handleUpdateExitState(int type, void *data)
 }
 
 /**
-    Function to perform image Update
-
-    @Param int          Image type from AO
-    @Param void*        Active object Data from the Framework
-    @Param void*        Event Data from the Framework
-
-
-    @retval int         Returns the Update status
-                        1 - Update success
-                        0 - update failed
-**/
+ * Function to perform image Update
+ * @Param int          Image type from AO
+ * @Param void*        Active object Data from the Framework
+ * @Param void*        Event Data from the Framework
+ * @retval int         Returns the Update status
+ * 1 - Update success
+ * 0 - update failed
+ **/
 
 int handleUpdateImageAction(void *AoData, void *EventContext)
 {
@@ -619,7 +608,7 @@ int handleUpdateImageAction(void *AoData, void *EventContext)
 			image_type = BMC_TYPE;
 		else if(EventData->image == PCH_EVENT)
 			image_type = PCH_TYPE;
-		else 
+		else
 			image_type = ROT_TYPE;
 
 		status = handle_update_image_action(image_type, AoData,EventContext);
@@ -629,12 +618,10 @@ int handleUpdateImageAction(void *AoData, void *EventContext)
 	return status;
 }
 /**
-    Function that indicates current I2C command status
-
-    @Param int*
-
-    @retval NULL
-**/
+ * Function that indicates current I2C command status
+ * @Param int*
+ * @retval NULL
+ **/
 void handlePostUpdateSuccess(void *AoData)
 {
 	// if (IsBmcUpdateIntentCpldActive() || IsPchUpdateIntentCpldActive())
@@ -649,7 +636,7 @@ void handlePostUpdateSuccess(void *AoData)
 	if(ActiveObjectData->type == ROT_TYPE){
 		pfr_cpld_update_reboot();
 	}
-	
+
 }
 
 void handlePostUpdateFailure(void *AoData)

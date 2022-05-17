@@ -46,41 +46,41 @@ typedef struct _EVENT_CONTEXT{
 	unsigned char retries;
 	/* BMC image or PCH Image*/
 	unsigned int image;
-	/* Active or Backup Region to Verify.
-	 * 1 - Active
-	 * 2 - Backup
-	 * Identifies region to recover
-	 * 0 - primary->secondary
-	 * 1 - secondary->primary */
+	// Active or Backup Region to Verify.
+	// 1 - Active
+	// 2 - Backup
+	// Identifies region to recover
+	// 0 - primary->secondary
+	// 1 - secondary->primary
 	unsigned int flash;
 	unsigned int *i2c_data;
 }EVENT_CONTEXT;
 
 typedef struct _AO_DATA{
 	int type;
-    union {
-        struct {
-            unsigned int ActiveImageVerified: 1;
-            unsigned int RecoveryImageVerified: 1;
-            unsigned int StagingImageVerified: 1;
-            unsigned int InLockdown: 1;
-            unsigned int ActiveImageStatus: 1;
-            unsigned int RecoveryImageStatus: 1;
-            unsigned int RestrictActiveUpdate: 1;
-            unsigned int PreviousState: 2;
+	union {
+		struct {
+			unsigned int ActiveImageVerified: 1;
+			unsigned int RecoveryImageVerified: 1;
+			unsigned int StagingImageVerified: 1;
+			unsigned int InLockdown: 1;
+			unsigned int ActiveImageStatus: 1;
+			unsigned int RecoveryImageStatus: 1;
+			unsigned int RestrictActiveUpdate: 1;
+			unsigned int PreviousState: 2;
 			unsigned int BootPlatform: 1;
 			unsigned int ProcessNewCommand: 1;
 			unsigned int processOnce: 1;
-        };
-        unsigned int flag; 
-    };
+		};
+		unsigned int flag;
+	};
 }AO_DATA;
 
 static enum SystemState{
-    Initial = 1,
-    Verify,
-    Recovery,
-    Update
+	Initial = 1,
+	Verify,
+	Recovery,
+	Update
 }SystemState;
 
 static enum OPERATIONS{

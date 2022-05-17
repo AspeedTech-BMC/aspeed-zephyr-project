@@ -6,7 +6,7 @@
 
 #include "pfr_recovery.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "state_machine/common_smc.h" 
+#include "state_machine/common_smc.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "include/SmbusMailBoxCom.h"
@@ -20,67 +20,67 @@
 
 int recover_image(void *AoData, void *EventContext){
 
-    int status = 0;
-    AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
+	int status = 0;
+	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
-    // init_pfr_manifest();
+	// init_pfr_manifest();
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
-	
-    pfr_manifest->state = RECOVERY;
 
-    if(EventData->image == BMC_EVENT){
-        //BMC SPI
-        DEBUG_PRINTF("Image Type: BMC \r\n");
-        pfr_manifest->image_type = BMC_TYPE;
+	pfr_manifest->state = RECOVERY;
 
-    }else{
-        //PCH SPI
-        DEBUG_PRINTF("Image Type: PCH \r\n");
-        pfr_manifest->image_type = PCH_TYPE;
-    }
-        
-    if(ActiveObjectData->RecoveryImageStatus != Success){
-        // status = pfr_staging_verify(pfr_manifest);
-        status = status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
-        if(status != Success){
-            DEBUG_PRINTF("PFR Staging Area Corrupted\r\n");
-            if (ActiveObjectData ->ActiveImageStatus != Success){
-                SetMajorErrorCode(pfr_manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
-                SetMinorErrorCode(ACTIVE_RECOVERY_STAGING_AUTH_FAIL);
-                if (pfr_manifest->image_type == PCH_TYPE) {
-                    status = pfr_staging_pch_staging(pfr_manifest);
-                    if(status != Success)
-                        return Failure;
-                }else{
-                    return Failure;
-                }
-            }else{
-                return Failure;
-            }
-        }
-        if(ActiveObjectData ->ActiveImageStatus == Success){
-            status = pfr_active_recovery_svn_validation(pfr_manifest);
-            if(status != Success)
-                return Failure;               
-        }
+	if(EventData->image == BMC_EVENT){
+		//BMC SPI
+		DEBUG_PRINTF("Image Type: BMC \r\n");
+		pfr_manifest->image_type = BMC_TYPE;
 
-        status = pfr_recover_recovery_region(pfr_manifest->image_type, pfr_manifest->address, pfr_manifest->recovery_address);
-        if(status != Success)
-            return Failure;
-        ActiveObjectData->RecoveryImageStatus = Success;
-        return VerifyRecovery;
-    }
-    
-    if(ActiveObjectData->ActiveImageStatus != Success){
-        status = pfr_recover_active_region(pfr_manifest);
-        if(status != Success)
-            return Failure;
-        ActiveObjectData->ActiveImageStatus = Success;
-        return VerifyActive;
-    }
+	}else{
+		//PCH SPI
+		DEBUG_PRINTF("Image Type: PCH \r\n");
+		pfr_manifest->image_type = PCH_TYPE;
+	}
 
-    return Success;
+	if(ActiveObjectData->RecoveryImageStatus != Success){
+		// status = pfr_staging_verify(pfr_manifest);
+		status = status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
+		if(status != Success){
+			DEBUG_PRINTF("PFR Staging Area Corrupted\r\n");
+			if (ActiveObjectData ->ActiveImageStatus != Success){
+				SetMajorErrorCode(pfr_manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
+				SetMinorErrorCode(ACTIVE_RECOVERY_STAGING_AUTH_FAIL);
+				if (pfr_manifest->image_type == PCH_TYPE) {
+					status = pfr_staging_pch_staging(pfr_manifest);
+					if(status != Success)
+						return Failure;
+				}else{
+					return Failure;
+				}
+			}else{
+				return Failure;
+			}
+		}
+		if(ActiveObjectData ->ActiveImageStatus == Success){
+			status = pfr_active_recovery_svn_validation(pfr_manifest);
+			if(status != Success)
+				return Failure;
+		}
+
+		status = pfr_recover_recovery_region(pfr_manifest->image_type, pfr_manifest->address, pfr_manifest->recovery_address);
+		if(status != Success)
+			return Failure;
+		ActiveObjectData->RecoveryImageStatus = Success;
+		return VerifyRecovery;
+	}
+
+	if(ActiveObjectData->ActiveImageStatus != Success){
+		status = pfr_recover_active_region(pfr_manifest);
+		if(status != Success)
+			return Failure;
+		ActiveObjectData->ActiveImageStatus = Success;
+		return VerifyActive;
+	}
+
+	return Success;
 }
 
 /**
@@ -97,10 +97,10 @@ int recover_image(void *AoData, void *EventContext){
  * @return 0 if the recovery image is valid or an error code.
  */
 int recovery_verify (struct recovery_image *image, struct hash_engine *hash,
-    struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
-    struct pfm_manager *pfm){
-        
-    return intel_pfr_recovery_verify (image,hash,verification, hash_out, hash_length, pfm);
+		struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
+		struct pfm_manager *pfm){
+
+	return intel_pfr_recovery_verify (image,hash,verification, hash_out, hash_length, pfm);
 }
 
 /**
@@ -114,14 +114,14 @@ int recovery_verify (struct recovery_image *image, struct hash_engine *hash,
  * @return 0 if the hash was calculated successfully or an error code.
  */
 int recovery_get_hash(struct recovery_image *image, struct hash_engine *hash, uint8_t *hash_out,
-    size_t hash_length){
+		size_t hash_length){
 
-    ARG_UNUSED(image);
+	ARG_UNUSED(image);
 	ARG_UNUSED(hash);
-    ARG_UNUSED(hash_out);
-    ARG_UNUSED(hash_length);
+	ARG_UNUSED(hash_out);
+	ARG_UNUSED(hash_length);
 
-    return Success;
+	return Success;
 }
 
 /**
@@ -135,11 +135,11 @@ int recovery_get_hash(struct recovery_image *image, struct hash_engine *hash, ui
  */
 int recovery_get_version (struct recovery_image *image, char *version, size_t len){
 
-    ARG_UNUSED(image);
-    ARG_UNUSED(version);
-    ARG_UNUSED(len);
+	ARG_UNUSED(image);
+	ARG_UNUSED(version);
+	ARG_UNUSED(len);
 
-    return Success;
+	return Success;
 }
 
 /**
@@ -152,17 +152,17 @@ int recovery_get_version (struct recovery_image *image, char *version, size_t le
  * @return 0 if applying the recovery image to host flash was successful or an error code.
  */
 int recovery_apply_to_flash (struct recovery_image *image, struct spi_flash *flash){
-    
-    int status  = 0;        
-    struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
 
-    return intel_pfr_recover_update_action(pfr_manifest);
+	int status  = 0;
+	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
+
+	return intel_pfr_recover_update_action(pfr_manifest);
 }
 
 void init_recovery_manifest(struct recovery_image *image){
-    image->verify = recovery_verify;
-    image->get_hash = recovery_get_hash;
-    image->get_version = recovery_get_version;
-    image->apply_to_flash = recovery_apply_to_flash;
+	image->verify = recovery_verify;
+	image->get_hash = recovery_get_hash;
+	image->get_version = recovery_get_version;
+	image->apply_to_flash = recovery_apply_to_flash;
 
 }

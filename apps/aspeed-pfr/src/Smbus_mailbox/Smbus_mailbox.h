@@ -33,11 +33,6 @@ typedef char byte;
 //BMC I2c Commands
 #define  LOGMESSAGE 0x05
 
-/*uint8_t gUfmFifoData[32];
-uint8_t gReadFifoData[32];
-uint8_t gRootKeyHash[33];
-uint8_t gPchOffsets[13];
-uint8_t gBmcOffsets[13];*/
 #define READ_ONLY 24
 #define WRITE_ONLY 6
 
@@ -125,42 +120,42 @@ typedef struct _SMBUS_MAIL_BOX_ {
 } SMBUS_MAIL_BOX;
 
 typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY{
-    CpldIdentifier,
-    CpldReleaseVersion,
-    CpldRoTSVN,
-    PlatformState,
-    Recoverycount,
-    LastRecoveryReason,
-    PanicEventCount,
-    LastPanicReason,
-    MajorErrorCode,
-    MinorErrorCode,
-    UfmStatusValue,
-    UfmCommand,
-    UfmCmdTriggerValue,
-    UfmWriteFIFO,
-    UfmReadFIFO,
-    BmcCheckpoint,
-    AcmCheckpoint,
-    BiosCheckpoint,
-    PchUpdateIntentValue,
-    BmcUpdateIntentValue,
-    PchPFMActiveSVN,
-    PchPFMActiveMajorVersion,
-    PchPFMActiveMinorVersion,
-    BmcPFMActiveSVN,
-    BmcPFMActiveMajorVersion,
-    BmcPFMActiveMinorVersion,
-    PchPFMRecoverSVN,
-    PchPFMRecoverMajorVersion,
-    PchPFMRecoverMinorVersion,
-    BmcPFMRecoverSVN,
-    BmcPFMRecoverMajorVersion,
-    BmcPFMRecoverMinorVersion,
-    CpldFPGARoTHash,
-    Reserved = 0x63,
-    AcmBiosScratchPad = 0x80,
-    BmcScratchPad = 0xc0,
+	CpldIdentifier,
+	CpldReleaseVersion,
+	CpldRoTSVN,
+	PlatformState,
+	Recoverycount,
+	LastRecoveryReason,
+	PanicEventCount,
+	LastPanicReason,
+	MajorErrorCode,
+	MinorErrorCode,
+	UfmStatusValue,
+	UfmCommand,
+	UfmCmdTriggerValue,
+	UfmWriteFIFO,
+	UfmReadFIFO,
+	BmcCheckpoint,
+	AcmCheckpoint,
+	BiosCheckpoint,
+	PchUpdateIntentValue,
+	BmcUpdateIntentValue,
+	PchPFMActiveSVN,
+	PchPFMActiveMajorVersion,
+	PchPFMActiveMinorVersion,
+	BmcPFMActiveSVN,
+	BmcPFMActiveMajorVersion,
+	BmcPFMActiveMinorVersion,
+	PchPFMRecoverSVN,
+	PchPFMRecoverMajorVersion,
+	PchPFMRecoverMinorVersion,
+	BmcPFMRecoverSVN,
+	BmcPFMRecoverMajorVersion,
+	BmcPFMRecoverMinorVersion,
+	CpldFPGARoTHash,
+	Reserved = 0x63,
+	AcmBiosScratchPad = 0x80,
+	BmcScratchPad = 0xc0,
 } SMBUS_MAILBOX_RF_ADDRESS;
 
 typedef enum _EXECUTION_CHECKPOINT{
@@ -203,14 +198,14 @@ typedef enum _UPDATE_INTENT{
 
 typedef struct _PFM_STRUCTURE
 {
-    uint32_t PfmTag;
-    uint8_t  SVN;
-    uint8_t  BkcVersion;
+	uint32_t PfmTag;
+	uint8_t  SVN;
+	uint8_t  BkcVersion;
 	uint8_t MarjorVersion;
 	uint8_t MinorVersion;
-    uint32_t Reserved;
-    uint8_t  OemSpecificData[16];
-    uint32_t Length;
+	uint32_t Reserved;
+	uint8_t  OemSpecificData[16];
+	uint32_t Length;
 }PFM_STRUCTURE;
 
 static SMBUS_MAIL_BOX gSmbusMailboxData = {0};

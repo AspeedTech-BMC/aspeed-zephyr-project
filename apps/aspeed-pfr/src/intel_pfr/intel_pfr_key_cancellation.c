@@ -41,35 +41,35 @@ int get_cancellation_policy_offset(uint32_t pc_type)
 	else if( (pc_type == BMC_CAPSULE_CANCELLATION) || (pc_type == PFR_BMC_UPDATE_CAPSULE) || (pc_type == DECOMMISSION_CAPSULE) )
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_UPDATE_CAPSULE;
 
-    return 0;
+	return 0;
 }
 
 int validate_key_cancellation_flag(struct pfr_manifest *manifest){
 
-    uint32_t status = 0;
-    uint32_t key_id = 0;
-    uint32_t block1_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0);
+	uint32_t status = 0;
+	uint32_t key_id = 0;
+	uint32_t block1_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0);
 
-    if( (manifest->pc_type == CPLD_CAPSULE_CANCELLATION) || (manifest->pc_type == PCH_PFM_CANCELLATION) || (manifest->pc_type == PCH_CAPSULE_CANCELLATION)
-        		|| (manifest->pc_type == BMC_PFM_CANCELLATION) || (manifest->pc_type == BMC_CAPSULE_CANCELLATION) ){
-    	manifest->kc_flag = TRUE;
-    }
-    else{
-    	//Read Csk key ID
-        status = pfr_spi_read(manifest->image_type,block1_address + CSK_KEY_ID_ADDRESS, sizeof(key_id), &key_id);
-        if(status != Success)
-            return Failure;
+	if( (manifest->pc_type == CPLD_CAPSULE_CANCELLATION) || (manifest->pc_type == PCH_PFM_CANCELLATION) || (manifest->pc_type == PCH_CAPSULE_CANCELLATION)
+			|| (manifest->pc_type == BMC_PFM_CANCELLATION) || (manifest->pc_type == BMC_CAPSULE_CANCELLATION) ){
+		manifest->kc_flag = TRUE;
+	}
+	else{
+		//Read Csk key ID
+		status = pfr_spi_read(manifest->image_type,block1_address + CSK_KEY_ID_ADDRESS, sizeof(key_id), &key_id);
+		if(status != Success)
+			return Failure;
 
 		status = manifest->keystore->kc_flag->verify_kc_flag(manifest, key_id);
-    	if(status != Success)
-    		return Failure;
+		if(status != Success)
+			return Failure;
 
-    	manifest->kc_flag = FALSE;
-    }
+		manifest->kc_flag = FALSE;
+	}
 
 	DEBUG_PRINTF("KeyCancellationFlag : %x \r\n", manifest->kc_flag);
 
-    return Success;
+	return Success;
 }
 
 int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
@@ -85,7 +85,7 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 		return Success;
 
 	if(!ufm_offset)
-		 return Failure;
+		return Failure;
 
 	status = ufm_read(PROVISION_UFM,ufm_offset, old_key_id, sizeof(old_key_id));
 	if (status != Success)
@@ -99,7 +99,7 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 
 	if (!(new_key_id & old_key_id[key_id / 8])){
 		DEBUG_PRINTF("This PFR CSK Key Was cancelled..!Can't Proceed with verify with this key Id: %d\r\n",key_id);
-        return Failure;
+		return Failure;
 	}
 
 	return Success;
@@ -118,10 +118,10 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 
 	uint8_t policy_data = 0;
 
-    if(!ufm_offset){
-    	DEBUG_PRINTF("Invalid provisioned UFM offset for key cancellation\r\n");
-    	 return Failure;
-    }
+	if(!ufm_offset){
+		DEBUG_PRINTF("Invalid provisioned UFM offset for key cancellation\r\n");
+		return Failure;
+	}
 
 	byte_no = key_id / 8;
 	bit_no = key_id % 8;
@@ -136,7 +136,7 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 	}
 
 	policy_data = policy_data & ~(0x01 << bit_no);
-	
+
 	status = ufm_write(PROVISION_UFM, ufm_offset, &policy_data, 1);
 	if(status != Success)
 	{

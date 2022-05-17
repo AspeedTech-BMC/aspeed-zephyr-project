@@ -34,9 +34,6 @@ enum {
  * Logging messages for command handling.
  *
  */
-/*enum {
-
-};*/
 
 struct pfmInfo {
 	// TBD Fix Void* to point to the correct structure

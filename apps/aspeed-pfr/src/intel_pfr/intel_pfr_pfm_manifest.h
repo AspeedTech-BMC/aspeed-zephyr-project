@@ -15,58 +15,58 @@
 
 typedef struct PFMSPIDEFINITION
 {
-    uint8_t PFMDefinitionType;
-    struct
-    {
-        uint8_t ReadAllowed : 1;
-        uint8_t WriteAllowed :1;
-        uint8_t RecoverOnFirstRecovery : 1;
-        uint8_t RecoverOnSecondRecovery : 1;
-        uint8_t RecoverOnThirdRecovery : 1;
-        uint8_t Reserved : 3;
-    }ProtectLevelMask;
-    struct
-    {
-        uint16_t SHA256HashPresent : 1;
-        uint16_t SHA384HashPresent :1;
-        uint16_t Reserved : 14;
-    }HashAlgorithmInfo;
-    uint32_t Reserved;
-    uint32_t RegionStartAddress;
-    uint32_t RegionEndAddress;
+	uint8_t PFMDefinitionType;
+	struct
+	{
+		uint8_t ReadAllowed : 1;
+		uint8_t WriteAllowed :1;
+		uint8_t RecoverOnFirstRecovery : 1;
+		uint8_t RecoverOnSecondRecovery : 1;
+		uint8_t RecoverOnThirdRecovery : 1;
+		uint8_t Reserved : 3;
+	}ProtectLevelMask;
+	struct
+	{
+		uint16_t SHA256HashPresent : 1;
+		uint16_t SHA384HashPresent :1;
+		uint16_t Reserved : 14;
+	}HashAlgorithmInfo;
+	uint32_t Reserved;
+	uint32_t RegionStartAddress;
+	uint32_t RegionEndAddress;
 }PFM_SPI_DEFINITION;
 
 typedef enum {
-    manifest_success,
-    manifest_failure,
-    manifest_unsupported
+	manifest_success,
+	manifest_failure,
+	manifest_unsupported
 }Manifest_Status;
 
 typedef struct _PFM_SPI_REGION
 {
-    uint8_t PfmDefType;
-    uint8_t ProtectLevelMask;
-    struct {
-        uint16_t Sha256Present :1;
-        uint16_t Sha384Present :1;
-        uint16_t Reserved :14;
-    }HashAlgorithmInfo;
-    uint32_t Reserved;
-    uint32_t StartOffset;
-    uint32_t EndOffset;
+	uint8_t PfmDefType;
+	uint8_t ProtectLevelMask;
+	struct {
+		uint16_t Sha256Present :1;
+		uint16_t Sha384Present :1;
+		uint16_t Reserved :14;
+	}HashAlgorithmInfo;
+	uint32_t Reserved;
+	uint32_t StartOffset;
+	uint32_t EndOffset;
 }PFM_SPI_REGION;
 
 
 
 typedef struct _PFM_STRUCTURE_1
 {
-    uint32_t PfmTag;
-    uint8_t  SVN;
-    uint8_t  BkcVersion;
-    uint16_t PfmRevision;
-    uint32_t Reserved;
-    uint8_t  OemSpecificData[16];
-    uint32_t Length;
+	uint32_t PfmTag;
+	uint8_t  SVN;
+	uint8_t  BkcVersion;
+	uint16_t PfmRevision;
+	uint32_t Reserved;
+	uint8_t  OemSpecificData[16];
+	uint32_t Length;
 }PFM_STRUCTURE_1;
 
 typedef struct _FVM_STRUCTURE

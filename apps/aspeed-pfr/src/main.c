@@ -48,10 +48,10 @@ void main(void)
 	//I2CSlaveEngine->InitSlaveDev(I2CSlaveEngine,"I2C_2",0x38);
 	I2CSlaveEngine->InitSlaveDev(I2CSlaveEngine,"I2C_1",0x38);
 
-	#if SMBUS_MAILBOX_SUPPORT
-    	InitializeSmbusMailbox();
-    	SetPlatformState(ENTER_T_MINUS_1);
-	#endif
+#if SMBUS_MAILBOX_SUPPORT
+	InitializeSmbusMailbox();
+	SetPlatformState(ENTER_T_MINUS_1);
+#endif
 
 	StartHrotStateMachine();
 }

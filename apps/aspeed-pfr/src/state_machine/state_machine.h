@@ -11,10 +11,10 @@
 #include "common_smc.h"
 
 struct _smc_fifo_event{
-    void *fifo_reserved;
-    int new_event_state;
+	void *fifo_reserved;
+	int new_event_state;
 	void *new_sm_static_data;
-    void *new_event_ctx;
+	void *new_event_ctx;
 };
 
 struct hrot_smc_context {

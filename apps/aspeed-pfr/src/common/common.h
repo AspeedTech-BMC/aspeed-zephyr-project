@@ -39,16 +39,16 @@
 
 #define hashStorageLength 256
 
-struct flash *getFlashDeviceInstance();
-struct flash_master *getFlashMasterInstance();
-struct hash_engine *get_hash_engine_instance();
-struct host_state_manager *getHostStateManagerInstance();
-struct pfm_flash *getPfmFlashInstance();
-struct signature_verification *getSignatureVerificationInstance();
-struct spi_flash *getSpiFlashInstance();
-struct rsa_engine_wrapper *getRsaEngineInstance();
-struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance();
-struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper();
+struct flash *getFlashDeviceInstance(void);
+struct flash_master *getFlashMasterInstance(void);
+struct hash_engine *get_hash_engine_instance(void);
+struct host_state_manager *getHostStateManagerInstance(void);
+struct pfm_flash *getPfmFlashInstance(void);
+struct signature_verification *getSignatureVerificationInstance(void);
+struct spi_flash *getSpiFlashInstance(void);
+struct rsa_engine_wrapper *getRsaEngineInstance(void);
+struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void);
+struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper(void);
 
 #endif /* ZEPHYR_ASPEED_PFR_SRC_COMMON_COMMON_H_ */
 

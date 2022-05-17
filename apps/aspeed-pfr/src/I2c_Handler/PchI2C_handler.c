@@ -15,12 +15,12 @@ extern uint8_t gBmcFlag;
 
 
 /*	* i2c_1060_slave_cb1_write_requested
-	* callback function for I2C_1 write requested
-	*
-	* @param config i2c_slave_config
-	*
-	* @return 0
-*/
+ * callback function for I2C_1 write requested
+ *
+ * @param config i2c_slave_config
+ *
+ * @return 0
+ */
 int i2c_1060_slave_pch_write_requested(struct i2c_slave_config *config)
 {
 	gI2cSlaveProcess.operation = MASTER_CMD_READ;
@@ -29,15 +29,15 @@ int i2c_1060_slave_pch_write_requested(struct i2c_slave_config *config)
 }
 
 /*	* i2c_1060_slave_cb1_read_requested
-	* callback function for I2C_1 read requested
-	*
-	* @param config i2c_slave_config
-	* 		 val 	pointer to store mailbox register vaule
-	*
-	* @return 0
-*/
+ * callback function for I2C_1 read requested
+ *
+ * @param config i2c_slave_config
+ * 		 val 	pointer to store mailbox register vaule
+ *
+ * @return 0
+ */
 int i2c_1060_slave_pch_read_requested(struct i2c_slave_config *config,
-				       uint8_t *val)
+		uint8_t *val)
 {
 	if(gI2cSlaveProcess.operation == MASTER_DATA_READ_SLAVE_DATA_SEND)
 	{
@@ -50,15 +50,15 @@ int i2c_1060_slave_pch_read_requested(struct i2c_slave_config *config,
 }
 
 /*	* i2c_1060_slave_cb1_write_received
-	* callback function for I2C_1 write received
-	*
-	* @param config i2c_slave_config
-	* 		 val 	value which receive from master device
-	*
-	* @return 0
-*/
+ * callback function for I2C_1 write received
+ *
+ * @param config i2c_slave_config
+ * 		 val 	value which receive from master device
+ *
+ * @return 0
+ */
 int i2c_1060_slave_pch_write_received(struct i2c_slave_config *config,
-				       uint8_t val)
+		uint8_t val)
 {
 	printk("i2c_1060_slave_cb1_write_received write_received val = %x\n",val);
 	//read protocol to read master command
@@ -80,27 +80,27 @@ int i2c_1060_slave_pch_write_received(struct i2c_slave_config *config,
 }
 
 /*	* i2c_1060_slave_cb1_read_processed
-	* callback function for I2C_1 read processed
-	*
-	* @param config i2c_slave_config
-	* 		 val 	value send to master device
-	*
-	* @return 0
-*/
+ * callback function for I2C_1 read processed
+ *
+ * @param config i2c_slave_config
+ * 		 val 	value send to master device
+ *
+ * @return 0
+ */
 int i2c_1060_slave_pch_read_processed(struct i2c_slave_config *config,
-				       uint8_t *val)
+		uint8_t *val)
 {
 	printk("i2c_1060_slave_cb1_read_processed read_processed *val = %x\n",val);
 	return 0;
 }
 
 /*	* i2c_1060_slave_cb1_stop
-	* callback function for I2C_1 stop
-	*
-	* @param config i2c_slave_config
-	*
-	* @return 0
-*/
+ * callback function for I2C_1 stop
+ *
+ * @param config i2c_slave_config
+ *
+ * @return 0
+ */
 int i2c_1060_slave_pch_stop(struct i2c_slave_config *config)
 {
 	printk("i2c_1060_slave_cb1_stop stop\n");
@@ -108,8 +108,8 @@ int i2c_1060_slave_pch_stop(struct i2c_slave_config *config)
 }
 
 /*	* i2c_1060_callbacks_1
-	* callback function for I2C_1
-*/
+ * callback function for I2C_1
+ */
 struct i2c_slave_callbacks i2c_1060_callbacks_pch =
 {
 	.write_requested = i2c_1060_slave_pch_write_requested,

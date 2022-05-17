@@ -14,7 +14,7 @@
 void verify_initialize()
 {
 	initializeEngines();
-   	initializeManifestProcessor();
+	initializeManifestProcessor();
 }
 
 void verify_uninitialize()
@@ -32,7 +32,7 @@ int read_rsa_public_key(struct rsa_public_key *public_key){
 
 	flash_device->read(flash_device, PFM_FLASH_MANIFEST_ADDRESS,&manifestFlash.header,sizeof (manifestFlash.header));
 	flash_device->read(flash_device, PFM_FLASH_MANIFEST_ADDRESS+manifestFlash.header.length,&module_length,sizeof (module_length));
-	
+
 	public_key_offset = PFM_FLASH_MANIFEST_ADDRESS + manifestFlash.header.length + sizeof (module_length);
 	public_key->mod_length = module_length;
 
@@ -43,12 +43,12 @@ int read_rsa_public_key(struct rsa_public_key *public_key){
 	exponent_offset = public_key_offset + public_key->mod_length;
 	flash_device->read(flash_device, exponent_offset ,&exponent_length,sizeof(exponent_length));
 	flash_device->read(flash_device,exponent_offset+sizeof(exponent_length) ,&public_key->exponent,exponent_length);
-	
+
 	return 0;
 }
 
 int rsa_verify_signature (struct signature_verification *verification,
-	const uint8_t *digest, size_t length, const uint8_t *signature, size_t sig_length)
+		const uint8_t *digest, size_t length, const uint8_t *signature, size_t sig_length)
 {
 	struct rsa_public_key rsa_public;
 	read_rsa_public_key(&rsa_public);
@@ -71,7 +71,7 @@ int perform_image_verification()
 {
 	int status = 0;
 	uint8_t flash_signature[256];
-	uint32_t firmware_offset; 
+	uint32_t firmware_offset;
 	int i;
 	struct manifest_toc_entry entry;
 	struct manifest_platform_id plat_id_header;
@@ -86,7 +86,7 @@ int perform_image_verification()
 
 	// 4 bytes
 	manifest_flash->flash->read (manifest_flash->flash, firmware_offset, (uint8_t*) &manifest_flash->toc_header,
-		sizeof (manifest_flash->toc_header));
+			sizeof (manifest_flash->toc_header));
 	firmware_offset += sizeof (manifest_flash->toc_header);
 
 	// 8 * 4 bytes
@@ -103,14 +103,14 @@ int perform_image_verification()
 	firmware_offset += manifest_flash->toc_hash_length;
 
 	manifest_flash->flash->read (manifest_flash->flash, firmware_offset, &plat_id_header,
-		sizeof (plat_id_header));
+			sizeof (plat_id_header));
 
 	//4 bytes
 	firmware_offset += sizeof (plat_id_header);
 
 	//10 bytes
 	firmware_offset += plat_id_header.id_length;
-	
+
 	//alignment 2 bytes
 	firmware_offset += 2;
 
@@ -118,7 +118,7 @@ int perform_image_verification()
 	firmware_offset += sizeof(struct manifest_flash_device);
 
 	manifest_flash->flash->read (manifest_flash->flash, firmware_offset, &fw_header,
-		sizeof (fw_header));			
+			sizeof (fw_header));
 
 	//fw_elements 8 bytes
 	firmware_offset += sizeof (fw_header) + fw_header.fw_id_length + sizeof(fw_element.alignment);
@@ -126,7 +126,7 @@ int perform_image_verification()
 	struct allowable_fw allow_firmware;
 
 	manifest_flash->flash->read (manifest_flash->flash, firmware_offset, &allow_firmware,
-		sizeof (allow_firmware));
+			sizeof (allow_firmware));
 
 
 	firmware_offset += sizeof (allow_firmware);
@@ -144,19 +144,19 @@ int perform_image_verification()
 
 		memset(&firmware_info, 0, sizeof(firmware_info));
 		manifest_flash->flash->read (manifest_flash->flash, firmware_offset, &firmware_info,sizeof (struct signature_firmware_region));
-	
+
 		status = flash_verify_contents(manifest_flash->flash,
-										*((uint32_t*) firmware_info.start_address),
-										*((uint32_t*) firmware_info.end_address)-*((uint32_t*) firmware_info.start_address)+sizeof(uint8_t),
-										get_hash_engine_instance(),
-										1,
-										getRsaEngineInstance(),
-										firmware_info.signature,
-										256,
-										&pub_key,
-										hashStorage,
-										256
-										);
+				*((uint32_t*) firmware_info.start_address),
+				*((uint32_t*) firmware_info.end_address)-*((uint32_t*) firmware_info.start_address)+sizeof(uint8_t),
+				get_hash_engine_instance(),
+				1,
+				getRsaEngineInstance(),
+				firmware_info.signature,
+				256,
+				&pub_key,
+				hashStorage,
+				256
+				);
 
 		if(status){
 			printk("Active Verification Fail\n");
@@ -167,6 +167,6 @@ int perform_image_verification()
 		}
 		firmware_offset += sizeof (firmware_info);
 	}
-	
+
 	return status;
 }

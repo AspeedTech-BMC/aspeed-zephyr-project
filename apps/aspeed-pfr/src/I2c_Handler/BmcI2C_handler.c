@@ -41,28 +41,28 @@ uint8_t gDataReceived = 0;
 EVENT_CONTEXT I2CData;
 AO_DATA I2CActiveObjectData;
 /*	* I2c slave device callback function.
-	* there are 5 callback function need to creat and link into I2c slave device when initial I2c device as slave device 
-	* and callback function structure is 
-	* i2c_slave_write_requested_cb_t write_requested;
-	* i2c_slave_read_requested_cb_t read_requested;
-	* i2c_slave_write_received_cb_t write_received;
-	* i2c_slave_read_processed_cb_t read_processed;
-	* i2c_slave_stop_cb_t stop;
-	* 
-	* in I2C read byte protcol, the slave callback function will in the following order
-	* write_requested->->write_receive(receive mailbox register address)->read_requested(return mailbox register value)
-	*  
-	* in I2C write byte protcol, the slave callback function will in the following order
-	* write_requested->write_receive(receive mailbox register address)->write_receive(receive mailbox command)
-*/
+ * there are 5 callback function need to creat and link into I2c slave device when initial I2c device as slave device
+ * and callback function structure is
+ * i2c_slave_write_requested_cb_t write_requested;
+ * i2c_slave_read_requested_cb_t read_requested;
+ * i2c_slave_write_received_cb_t write_received;
+ * i2c_slave_read_processed_cb_t read_processed;
+ * i2c_slave_stop_cb_t stop;
+ *
+ * in I2C read byte protcol, the slave callback function will in the following order
+ * write_requested->->write_receive(receive mailbox register address)->read_requested(return mailbox register value)
+ *
+ * in I2C write byte protcol, the slave callback function will in the following order
+ * write_requested->write_receive(receive mailbox register address)->write_receive(receive mailbox command)
+ */
 
 /*	* i2c_1060_slave_cb2_write_requested
-	* callback function for I2C_2 write requested
-	*
-	* @param config i2c_slave_config
-	*
-	* @return 0
-*/
+ * callback function for I2C_2 write requested
+ *
+ * @param config i2c_slave_config
+ *
+ * @return 0
+ */
 int i2c_1060_slave_bmc_write_requested(struct i2c_slave_config *config)
 {
 	gI2cSlaveProcess.operation = MASTER_CMD_READ;
@@ -71,15 +71,15 @@ int i2c_1060_slave_bmc_write_requested(struct i2c_slave_config *config)
 }
 
 /*	* i2c_1060_slave_cb2_read_requested
-	* callback function for I2C_2 read requested
-	*
-	* @param config i2c_slave_config
-	* 		 val 	pointer to store mailbox register vaule
-	*
-	* @return 0
-*/
+ * callback function for I2C_2 read requested
+ *
+ * @param config i2c_slave_config
+ * 		 val 	pointer to store mailbox register vaule
+ *
+ * @return 0
+ */
 int i2c_1060_slave_bmc_read_requested(struct i2c_slave_config *config,
-				       uint8_t *val)
+		uint8_t *val)
 {
 	if(gI2cSlaveProcess.operation == MASTER_DATA_READ_SLAVE_DATA_SEND)
 	{
@@ -94,15 +94,15 @@ int i2c_1060_slave_bmc_read_requested(struct i2c_slave_config *config,
 }
 
 /*	* i2c_1060_slave_cb2_write_received
-	* callback function for I2C_2 write received
-	*
-	* @param config i2c_slave_config
-	* 		 val 	value which receive from master device
-	*
-	* @return 0
-*/
+ * callback function for I2C_2 write received
+ *
+ * @param config i2c_slave_config
+ * 		 val 	value which receive from master device
+ *
+ * @return 0
+ */
 int i2c_1060_slave_bmc_write_received(struct i2c_slave_config *config,
-				       uint8_t val)
+		uint8_t val)
 {
 	//read protocol to read master command
 	if(gI2cSlaveProcess.operation == MASTER_CMD_READ)
@@ -132,32 +132,32 @@ int i2c_1060_slave_bmc_write_received(struct i2c_slave_config *config,
 
 		gDataReceived = 0;
 	}
-	
+
 	return 0;
 }
 
 /*	* i2c_1060_slave_cb2_read_processed
-	* callback function for I2C_2 read processed
-	*
-	* @param config i2c_slave_config
-	* 		 val 	value send to master device
-	*
-	* @return 0
-*/
+ * callback function for I2C_2 read processed
+ *
+ * @param config i2c_slave_config
+ * 		 val 	value send to master device
+ *
+ * @return 0
+ */
 int i2c_1060_slave_bmc_read_processed(struct i2c_slave_config *config,
-				       uint8_t *val)
+		uint8_t *val)
 {
 	//printk("i2c_1060_slave_cb2_read_processed read_processed *val = %x\n",val);
 	return 0;
 }
 
 /*	* i2c_1060_slave_cb2_stop
-	* callback function for I2C_2 stop
-	*
-	* @param config i2c_slave_config
-	*
-	* @return 0
-*/
+ * callback function for I2C_2 stop
+ *
+ * @param config i2c_slave_config
+ *
+ * @return 0
+ */
 int i2c_1060_slave_bmc_stop(struct i2c_slave_config *config)
 {
 	// printk("i2c_1060_slave_cb2_stop stop\n");
@@ -167,16 +167,16 @@ int i2c_1060_slave_bmc_stop(struct i2c_slave_config *config)
 
 static int bmc_mailbox_register(const struct device *dev)
 {
-        struct i2c_bmc_mailbox_data *data = dev->data;
+	struct i2c_bmc_mailbox_data *data = dev->data;
 	printk("bmc_mailbox_register\n");
-        return i2c_slave_register(data->i2c_controller, &data->config);
+	return i2c_slave_register(data->i2c_controller, &data->config);
 }
 
 static int bmc_mailbox_unregister(const struct device *dev)
 {
-        struct i2c_bmc_mailbox_data *data = dev->data;
+	struct i2c_bmc_mailbox_data *data = dev->data;
 	printk("bmc_mailbox_unregister\n");
-        return i2c_slave_unregister(data->i2c_controller, &data->config);
+	return i2c_slave_unregister(data->i2c_controller, &data->config);
 }
 
 
@@ -186,8 +186,8 @@ static const struct i2c_slave_driver_api api_funcs = {
 };
 
 /*	* i2c_1060_callbacks_2
-	* callback function for I2C_2
-*/
+ * callback function for I2C_2
+ */
 struct i2c_slave_callbacks i2c_1060_callbacks_bmc =
 {
 	.write_requested = i2c_1060_slave_bmc_write_requested,
@@ -207,7 +207,7 @@ static int i2c_bmc_mailbox_init(const struct device *dev)
 
 	if (!data->i2c_controller) {
 		LOG_ERR("i2c controller not found: %s",
-			cfg->controller_dev_name);
+				cfg->controller_dev_name);
 		return -EINVAL;
 	}
 
@@ -219,14 +219,14 @@ static int i2c_bmc_mailbox_init(const struct device *dev)
 
 #define I2C_BMC_MAILBOX_INIT(inst)					\
 	static struct i2c_bmc_mailbox_data				\
-		i2c_bmc_mailbox_##inst##_dev_data;			\
-									\
+	i2c_bmc_mailbox_##inst##_dev_data;			\
+	\
 	static const struct i2c_bmc_mailbox_config			\
-		i2c_bmc_mailbox_##inst##_cfg = {			\
+	i2c_bmc_mailbox_##inst##_cfg = {			\
 		.controller_dev_name = DT_INST_BUS_LABEL(inst),		\
 		.address = DT_INST_REG_ADDR(inst),			\
 	};								\
-									\
+	\
 	DEVICE_DT_INST_DEFINE(inst,					\
 			&i2c_bmc_mailbox_init,				\
 			NULL,						\
