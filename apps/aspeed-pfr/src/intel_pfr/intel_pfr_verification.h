@@ -11,65 +11,65 @@
 
 #define INTEL_PFR_BLOCK_0_TAG 0xB6EAFD19
 
-#define DECOMMISSION_CAPSULE		 0x200
-#define KEY_CANCELLATION_CAPSULE	 0x300
+#define DECOMMISSION_CAPSULE             0x200
+#define KEY_CANCELLATION_CAPSULE         0x300
 
-#define FALSE				 0
-#define TRUE				 1
-#define START				 2
+#define FALSE                            0
+#define TRUE                             1
+#define START                            2
 #define BLOCK0_PCTYPE_ADDRESS       8
 #define CSK_KEY_ID_ADDRESS          160
-#define CSK_KEY_ID_ADDRESS_3K		580
-#define CSK_START_ADDRESS          	148
-#define CSK_ENTRY_PC_SIZE	        128
-#define KEY_SIZE					48
-#define KEY_SIZE_3K					512
-#define HROT_UPDATE_RESERVED	32
-#define MAX_BIOS_BOOT_TIME			300
-#define MAX_ERASE_SIZE 				0x1000
-#define MAX_READ_SIZE 				0x100
-#define MAX_WRITE_SIZE 				0x100
+#define CSK_KEY_ID_ADDRESS_3K           580
+#define CSK_START_ADDRESS               148
+#define CSK_ENTRY_PC_SIZE               128
+#define KEY_SIZE                                        48
+#define KEY_SIZE_3K                                     512
+#define HROT_UPDATE_RESERVED    32
+#define MAX_BIOS_BOOT_TIME                      300
+#define MAX_ERASE_SIZE                          0x1000
+#define MAX_READ_SIZE                           0x100
+#define MAX_WRITE_SIZE                          0x100
 
-#define RANDOM_KEY_MAGIC_TAG					0x52414E44
-#define RANDOM_KEY_ADDRESS_IN_UFM 				(PROVISION_UFM_SIZE * 16) - (2*SHA384_SIZE)
-#define ROOT_PUB_KEY_LOC_IN_UFM					RANDOM_KEY_ADDRESS_IN_UFM - (2*SHA384_SIZE)
-#define MAGIC_TAG_SIZE							4
+#define RANDOM_KEY_MAGIC_TAG                                    0x52414E44
+#define RANDOM_KEY_ADDRESS_IN_UFM                               ((PROVISION_UFM_SIZE * 16) - (2 * SHA384_SIZE))
+#define ROOT_PUB_KEY_LOC_IN_UFM                                 (RANDOM_KEY_ADDRESS_IN_UFM - (2 * SHA384_SIZE))
+#define MAGIC_TAG_SIZE                                                  4
 
 
 #pragma pack(1)
 
-typedef struct _PFR_AUTHENTICATION_BLOCK0{
+typedef struct _PFR_AUTHENTICATION_BLOCK0 {
 	// Block 0
 	uint32_t Block0Tag;
 	uint32_t PcLength;
 	uint32_t PcType;
 	uint32_t Reserved1;
-	uint8_t  Sha256Pc[32];
-	uint8_t  Sha384Pc[48];
-	uint8_t  Reserved2[32];
+	uint8_t Sha256Pc[32];
+	uint8_t Sha384Pc[48];
+	uint8_t Reserved2[32];
 } PFR_AUTHENTICATION_BLOCK0;
 
-typedef struct _PFR_AUTHENTICATION_BLOCK0_3K{
+typedef struct _PFR_AUTHENTICATION_BLOCK0_3K {
 	// Block 0
 	uint32_t Block0Tag;
 	uint32_t PcLength;
 	uint32_t PcType;
 	uint32_t Reserved1;
-	uint8_t  Sha256Pc[32];
-	uint8_t  Sha384Pc[48];
-	uint8_t  Sha512Pc[64];
-	uint8_t  Reserved2[96];
+	uint8_t Sha256Pc[32];
+	uint8_t Sha384Pc[48];
+	uint8_t Sha512Pc[64];
+	uint8_t Reserved2[96];
 } PFR_AUTHENTICATION_BLOCK0_3K;
 
-typedef struct _RootEntry{
+typedef struct _RootEntry {
 	uint32_t Tag;
 	uint32_t PubCurveMagic;
 	uint32_t KeyPermission;
 	uint32_t KeyId;
-	uint8_t  PubKeyX[KEY_SIZE];
-	uint8_t  PubKeyY[KEY_SIZE];
-	uint8_t  Reserved[20];
-}KEY_ENTRY;
+	uint8_t PubKeyX[KEY_SIZE];
+	uint8_t PubKeyY[KEY_SIZE];
+	uint8_t Reserved[20];
+} KEY_ENTRY;
 
 
 typedef struct _RootEntry_3k {
@@ -89,16 +89,16 @@ typedef struct _RootEntry_3k {
 	uint8_t Reserved[20];
 } KEY_ENTRY_3K;
 
-//CSK Entry
-typedef struct _CSKENTRY{
+// CSK Entry
+typedef struct _CSKENTRY {
 	KEY_ENTRY CskEntryInitial;
 	uint32_t CskSignatureMagic;
-	uint8_t  CskSignatureR[KEY_SIZE];
-	uint8_t  CskSignatureS[KEY_SIZE];
-}CSKENTRY;
+	uint8_t CskSignatureR[KEY_SIZE];
+	uint8_t CskSignatureS[KEY_SIZE];
+} CSKENTRY;
 
-//CSK Entry For 3K Block Structure
-typedef struct _CSKENTRY_3K{
+// CSK Entry For 3K Block Structure
+typedef struct _CSKENTRY_3K {
 	KEY_ENTRY_3K CskEntryInitial;
 	uint32_t CskSignatureMagic;
 	union {
@@ -109,18 +109,18 @@ typedef struct _CSKENTRY_3K{
 		};
 		uint8_t Modulus[KEY_SIZE_3K];
 	};
-}CSKENTRY_3K;
+} CSKENTRY_3K;
 
 // Block 0 Entry
-typedef struct _BLOCK0ENTRY{
+typedef struct _BLOCK0ENTRY {
 	uint32_t TagBlock0Entry;
 	uint32_t Block0SignatureMagic;
-	uint8_t  Block0SignatureR[KEY_SIZE];
-	uint8_t  Block0SignatureS[KEY_SIZE];
-}BLOCK0ENTRY;
+	uint8_t Block0SignatureR[KEY_SIZE];
+	uint8_t Block0SignatureS[KEY_SIZE];
+} BLOCK0ENTRY;
 
 // Block 0 Entry for 3K Block Structure
-typedef struct _BLOCK0ENTRY_3K{
+typedef struct _BLOCK0ENTRY_3K {
 	uint32_t TagBlock0Entry;
 	uint32_t Block0SignatureMagic;
 	union {
@@ -131,29 +131,29 @@ typedef struct _BLOCK0ENTRY_3K{
 		};
 		uint8_t Modulus[KEY_SIZE_3K];
 	};
-}BLOCK0ENTRY_3K;
+} BLOCK0ENTRY_3K;
 
-typedef struct _PFR_AUTHENTICATION_BLOCK1{
+typedef struct _PFR_AUTHENTICATION_BLOCK1 {
 	// Block 1
 	uint32_t TagBlock1;
-	uint8_t  ReservedBlock1[12];
-	//-----------Signature chain---------
-	KEY_ENTRY   RootEntry; //132byte
-	CSKENTRY    CskEntry;
+	uint8_t ReservedBlock1[12];
+	// -----------Signature chain---------
+	KEY_ENTRY RootEntry;   // 132byte
+	CSKENTRY CskEntry;
 	BLOCK0ENTRY Block0Entry;
 
-}PFR_AUTHENTICATION_BLOCK1;
+} PFR_AUTHENTICATION_BLOCK1;
 
-typedef struct _PFR_AUTHENTICATION_BLOCK1_3K{
+typedef struct _PFR_AUTHENTICATION_BLOCK1_3K {
 	// Block 1
 	uint32_t TagBlock1;
-	uint8_t  ReservedBlock1[12];
-	//-----------Signature chain---------
-	KEY_ENTRY_3K   RootEntry; //132byte
-	CSKENTRY_3K    CskEntry;
+	uint8_t ReservedBlock1[12];
+	// -----------Signature chain---------
+	KEY_ENTRY_3K RootEntry;   // 132byte
+	CSKENTRY_3K CskEntry;
 	BLOCK0ENTRY_3K Block0Entry;
 
-}PFR_AUTHENTICATION_BLOCK1_3K;
+} PFR_AUTHENTICATION_BLOCK1_3K;
 
 struct key_entry_descriptor {
 	uint32_t magic;
@@ -175,12 +175,11 @@ struct csk_entry_descriptor {
 struct block_0_entry {
 	uint32_t magic;
 	uint32_t signature_magic;
-	uint8_t  signature_r[48];
-	uint8_t  signature_s[48];
+	uint8_t signature_r[48];
+	uint8_t signature_s[48];
 };
 
-enum
-{
+enum {
 	PFR_CPLD_UPDATE_CAPSULE = 0x00,
 	PFR_PCH_PFM,
 	PFR_PCH_UPDATE_CAPSULE,
@@ -199,9 +198,8 @@ enum rsa_Curve {
 	rsa4k512,
 };
 
-//Key Cancellation Enum
-enum
-{
+// Key Cancellation Enum
+enum {
 	CPLD_CAPSULE_CANCELLATION = 0x100,
 	PCH_PFM_CANCELLATION,
 	PCH_CAPSULE_CANCELLATION,
@@ -210,7 +208,7 @@ enum
 	SEAMLESS_CAPSULE_CANCELLATION
 };
 
-struct pfr_authentication{
+struct pfr_authentication {
 	int (*validate_pctye)(struct pfr_manifest *manifest, uint32_t pc_type);
 	int (*validate_kc)(struct pfr_manifest *manifest);
 	int (*block1_block0_entry_verify)(struct pfr_manifest *manifest);
@@ -222,6 +220,6 @@ struct pfr_authentication{
 
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
+			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
 #endif /*INTEL_PFR_VERIFICATION_H*/

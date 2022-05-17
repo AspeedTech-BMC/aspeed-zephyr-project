@@ -14,7 +14,7 @@
 void handleVerifyEntryState(/* TBD */);
 void handleVerifyExitState(/* TBD */);
 
-int perform_image_verification();
+int perform_image_verification(void);
 int signature_verification_init(struct signature_verification *verification);
 int read_rsa_public_key(struct rsa_public_key *public_key);
 #endif /* ZEPHYR_ASPEED_PFR_SRC_IMAGEVERIFICATION_IMAGE_VERIFY_H_ */
