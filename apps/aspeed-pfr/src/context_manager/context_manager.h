@@ -30,5 +30,5 @@ struct Context_Manager {
 
 int app_context_init(struct app_context *context);
 struct app_context *getappcontextInstance(void);
-static int save_cpld_context (struct app_context *context);
+static int save_cpld_context(struct app_context *context);
 #endif  //  #ifndef CONTEXT_MANAGER_H_

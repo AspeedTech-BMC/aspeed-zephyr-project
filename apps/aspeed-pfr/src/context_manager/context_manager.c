@@ -39,7 +39,7 @@ void get_context_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t leng
 	uint8_t status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; //Internal UFM SPI
+	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read(&spi_flash->spi, addr, DataBuffer, length);
 }
 
@@ -51,24 +51,24 @@ unsigned char set_context_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE;
 
-	//Read Intel State
-	status = spi_flash->spi.base.read(&spi_flash->spi, 0, buffer, sizeof(buffer)/sizeof(buffer[0]));
+	// Read Intel State
+	status = spi_flash->spi.base.read(&spi_flash->spi, 0, buffer, sizeof(buffer) / sizeof(buffer[0]));
 
 	if (status == Success) {
 		status = erase_context_data_flash();
 
 		if (status == Success) {
-			for (int i = addr; i < DataSize+addr; i++)
-				buffer[i] = DataBuffer[i-addr];
+			for (int i = addr; i < DataSize + addr; i++)
+				buffer[i] = DataBuffer[i - addr];
 
-			memcpy(buffer+addr, DataBuffer, DataSize);
+			memcpy(buffer + addr, DataBuffer, DataSize);
 
-			status = spi_flash->spi.base.write(&spi_flash->spi, 0, buffer, sizeof(buffer)/sizeof(buffer[0]));
+			status = spi_flash->spi.base.write(&spi_flash->spi, 0, buffer, sizeof(buffer) / sizeof(buffer[0]));
 		}
 	}
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
-	status = spi_flash->spi.base.read(&spi_flash->spi, 0, buffer, sizeof(buffer)/sizeof(buffer[0]));
+	status = spi_flash->spi.base.read(&spi_flash->spi, 0, buffer, sizeof(buffer) / sizeof(buffer[0]));
 
 	return status;
 }
@@ -85,8 +85,9 @@ static int save_cpld_context(struct app_context *context)
 	int status = 0;
 	uint8_t Readbuffer[sizeof(context_manager)];
 
-	if (context == NULL)
+	if (context == NULL) {
 		return APP_CONTEXT_INVALID_ARGUMENT;
+	}
 	// Add code to save the App Context context_manager
 	status = set_context_data_in_flash(0, (uint8_t *)&context_manager, sizeof(context_manager));
 
@@ -95,10 +96,11 @@ static int save_cpld_context(struct app_context *context)
 
 int app_context_init(struct app_context *context)
 {
-	if (context == NULL)
+	if (context == NULL) {
 		return APP_CONTEXT_INVALID_ARGUMENT;
+	}
 
-	memset(context, 0, sizeof (struct app_context));
+	memset(context, 0, sizeof(struct app_context));
 
 	context->save = save_cpld_context;
 
