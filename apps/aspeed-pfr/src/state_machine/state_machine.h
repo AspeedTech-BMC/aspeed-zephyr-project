@@ -10,7 +10,7 @@
 #include <smf.h>
 #include "common_smc.h"
 
-struct _smc_fifo_event{
+struct _smc_fifo_event {
 	void *fifo_reserved;
 	int new_event_state;
 	void *new_sm_static_data;
@@ -24,10 +24,9 @@ struct hrot_smc_context {
 	void *event_ctx;
 };
 
-int StartHrotStateMachine();
-int post_smc_action(int new_state, void* static_data, void* event);
-int execute_next_smc_action(int new_state, void* static_data, void* event_ctx);
-
-void PublishInitialEvents();
+int StartHrotStateMachine(void);
+int post_smc_action(int new_state, void *static_data, void *event);
+int execute_next_smc_action(int new_state, void *static_data, void *event_ctx);
+void PublishInitialEvents(void);
 
 #endif // #ifndef ZEPHYR_STATE_MACHINE_H

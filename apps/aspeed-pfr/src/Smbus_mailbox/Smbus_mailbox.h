@@ -7,7 +7,7 @@
 #define PFR_SMBUS_MAILBOX_H_
 #include <stdbool.h>
 #include <stdint.h>
-//#include <HrotStateMachine.h>
+// #include <HrotStateMachine.h>
 #include "include/SmbusMailBoxCom.h"
 #include "state_machine/common_smc.h"
 #include "StateMachineAction/StateMachineActions.h"
@@ -19,18 +19,18 @@ extern int gPublishCount;
 typedef struct {
 	int signal;
 	void *context;
-}TUPLE;
+} TUPLE;
 
 #pragma pack(1)
 
-//enum HRoT_state { IDLE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
+// enum HRoT_state { IDLE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
 
 typedef char byte;
 #define  BIT2     0x00000004
 #define ACM_MAXTIMEOUT 50000
 #define BMC_MAXTIMEOUT 175000
 #define BIOS_MAXTIMEOUT 900000
-//BMC I2c Commands
+// BMC I2c Commands
 #define  LOGMESSAGE 0x05
 
 #define READ_ONLY 24
@@ -49,24 +49,24 @@ typedef struct _SMBUS_MAIL_BOX_ {
 	byte MinorErrorCode;
 	union {
 		struct {
-			byte CommandBusy :1;
-			byte CommandDone :1;
-			byte CommandError :1;
-			byte UfmStatusReserved :1;
-			byte UfmLocked :1;
-			byte Ufmprovisioned :1;
-			byte PITlevel1enforced :1;
-			byte PITL2CompleteSuccess :1;
+			byte CommandBusy : 1;
+			byte CommandDone : 1;
+			byte CommandError : 1;
+			byte UfmStatusReserved : 1;
+			byte UfmLocked : 1;
+			byte Ufmprovisioned : 1;
+			byte PITlevel1enforced : 1;
+			byte PITL2CompleteSuccess : 1;
 		};
 		byte UfmStatusValue;
 	};
 	byte UfmCommand;
 	union {
 		struct {
-			byte ExecuteCmd :1;
-			byte FlushWriteFIFO :1;
-			byte FlushReadFIFO :1;
-			byte UfmCmdTriggerReserved :4;
+			byte ExecuteCmd : 1;
+			byte FlushWriteFIFO : 1;
+			byte FlushReadFIFO : 1;
+			byte UfmCmdTriggerReserved : 4;
 		};
 		byte UfmCmdTriggerValue;
 	};
@@ -119,7 +119,7 @@ typedef struct _SMBUS_MAIL_BOX_ {
 	byte BmcScratchPad[0x40];
 } SMBUS_MAIL_BOX;
 
-typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY{
+typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	CpldIdentifier,
 	CpldReleaseVersion,
 	CpldRoTSVN,
@@ -153,12 +153,12 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY{
 	BmcPFMRecoverMajorVersion,
 	BmcPFMRecoverMinorVersion,
 	CpldFPGARoTHash,
-	Reserved = 0x63,
-	AcmBiosScratchPad = 0x80,
-	BmcScratchPad = 0xc0,
+	Reserved                = 0x63,
+	AcmBiosScratchPad       = 0x80,
+	BmcScratchPad           = 0xc0,
 } SMBUS_MAILBOX_RF_ADDRESS;
 
-typedef enum _EXECUTION_CHECKPOINT{
+typedef enum _EXECUTION_CHECKPOINT {
 	ExecutionBlockStrat = 0x01,
 	NextExeBlockAuthenticationPass,
 	NextExeBlockAuthenticationFail,
@@ -171,51 +171,50 @@ typedef enum _EXECUTION_CHECKPOINT{
 	EnteredManagementMode,
 	LeavingManagementMode,
 	ReadToBootOS = 0x80
-}EXECUTION_CHECKPOINT;
+} EXECUTION_CHECKPOINT;
 
-typedef enum _UPDATE_INTENT{
-	PchActiveUpdate = 0x01,
+typedef enum _UPDATE_INTENT {
+	PchActiveUpdate                         = 0x01,
 	PchRecoveryUpdate,
 	PchActiveAndRecoveryUpdate,
 	HROTActiveUpdate,
-	BmcActiveUpdate = 0x08,
-	BmcRecoveryUpdate = 0x10,
-	HROTRecoveryUpdate = 0x20,
-	DymanicUpdate = 0x40,
-	UpdateAtReset = 0x80,
-	PchActiveAndRecoveryUpdateAtReset = 0x83,
-	PchActiveDynamicUpdate = 0x41,
-	PchActiveAndDynamicUpdateAtReset = 0xc1,
-	HROTActiveAndRecoveryUpdate = 0x24,
-	BmcActiveAndRecoveryUpdate = 0x18,
-	PchActiveAndBmcActiveUpdate = 0x09,
-	PchRecoveryAndBmcRecvoeryUpdate = 0x12,
-	PchFwAndBmcFwUpdate = 0x1B,
-	PchBmcHROTActiveAndRecoveryUpdate = 0x3f,
-	BmcActiveAndDynamicUpdate = 0x48,
-	ExceptBmcActiveUpdate = 0x37
-}UPDATE_INTENT;
+	BmcActiveUpdate                         = 0x08,
+	BmcRecoveryUpdate                       = 0x10,
+	HROTRecoveryUpdate                      = 0x20,
+	DymanicUpdate                           = 0x40,
+	UpdateAtReset                           = 0x80,
+	PchActiveAndRecoveryUpdateAtReset       = 0x83,
+	PchActiveDynamicUpdate                  = 0x41,
+	PchActiveAndDynamicUpdateAtReset        = 0xc1,
+	HROTActiveAndRecoveryUpdate             = 0x24,
+	BmcActiveAndRecoveryUpdate              = 0x18,
+	PchActiveAndBmcActiveUpdate             = 0x09,
+	PchRecoveryAndBmcRecvoeryUpdate         = 0x12,
+	PchFwAndBmcFwUpdate                     = 0x1B,
+	PchBmcHROTActiveAndRecoveryUpdate       = 0x3f,
+	BmcActiveAndDynamicUpdate               = 0x48,
+	ExceptBmcActiveUpdate                   = 0x37
+} UPDATE_INTENT;
 
-typedef struct _PFM_STRUCTURE
-{
+typedef struct _PFM_STRUCTURE {
 	uint32_t PfmTag;
-	uint8_t  SVN;
-	uint8_t  BkcVersion;
+	uint8_t SVN;
+	uint8_t BkcVersion;
 	uint8_t MarjorVersion;
 	uint8_t MinorVersion;
 	uint32_t Reserved;
-	uint8_t  OemSpecificData[16];
+	uint8_t OemSpecificData[16];
 	uint32_t Length;
-}PFM_STRUCTURE;
+} PFM_STRUCTURE;
 
-static SMBUS_MAIL_BOX gSmbusMailboxData = {0};
+static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);
-void get_provision_data_in_flash(uint32_t addr,uint8_t *DataBuffer, uint32_t length);
-//void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
-unsigned char erase_provision_data_in_flash();
-void GetUpdateStatus(uint8_t *DataBuffer,uint8_t DataSize);
-void SetUpdateStatus(uint8_t *DataBuffer,uint8_t DataSize);
+void get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
+// void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
+unsigned char erase_provision_data_in_flash(void);
+void GetUpdateStatus(uint8_t *DataBuffer, uint8_t DataSize);
+void SetUpdateStatus(uint8_t *DataBuffer, uint8_t DataSize);
 
 void ResetMailBox(void);
 void InitializeSmbusMailbox(void);
@@ -246,9 +245,9 @@ bool IsUfmStatusLocked(void);
 bool IsUfmStatusUfmProvisioned(void);
 bool IsUfmStatusPitLevel1Enforced(void);
 bool IsUfmStatusPITL2CompleteSuccess(void);
-byte get_provision_status();
+byte get_provision_status(void);
 void set_provision_status(byte UfmStatus);
-byte get_provision_command();
+byte get_provision_command(void);
 void set_provision_command(byte UfmCommandValue);
 void set_provision_commandTrigger(byte UfmCommandTrigger);
 byte GetBmcCheckPoint(void);
@@ -299,14 +298,14 @@ byte GetBmcPfmRecoverMajorVersion(void);
 void SetBmcPfmRecoverMajorVersion(byte RecoverMajorVersion);
 byte GetBmcPfmRecoverMinorVersion(void);
 void SetBmcPfmRecoverMinorVersion(byte RecoverMinorVersion);
-byte* GetCpldFpgaRotHash(void);
-void SetCpldFpgaRotHash(byte* HashData);
-byte* GetAcmBiosScratchPad(void);
-void SetAcmBiosScratchPad(byte* AcmBiosScratchPad);
-byte* GetBmcScratchPad(void);
-void SetBmcScratchPad(byte* BmcScratchPad);
+byte *GetCpldFpgaRotHash(void);
+void SetCpldFpgaRotHash(byte *HashData);
+byte *GetAcmBiosScratchPad(void);
+void SetAcmBiosScratchPad(byte *AcmBiosScratchPad);
+byte *GetBmcScratchPad(void);
+void SetBmcScratchPad(byte *BmcScratchPad);
 void HandleSmbusMailBoxWrite(unsigned char MailboxAddress, unsigned char ValueToWrite, int ImageType);
-void HandleSmbusMailBoxRead(int MailboxOffset,int ImageType);
+void HandleSmbusMailBoxRead(int MailboxOffset, int ImageType);
 void process_provision_command(void);
 void UpdateBiosCheckpoint(byte Data);
 void UpdateBmcCheckpoint(byte Data);

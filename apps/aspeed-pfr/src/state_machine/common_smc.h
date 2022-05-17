@@ -10,8 +10,7 @@
 /* List of HRoT states */
 enum HRoT_state { IDLE, INITIALIZE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
 
-typedef enum
-{
+typedef enum {
 	Success,
 	Failure,
 	ManifestCorruption,
@@ -20,7 +19,7 @@ typedef enum
 	UnSupported,
 	Decommission_Success,
 	Lockdown
-}Verification_Status;
+} Verification_Status;
 
 enum _hrot_event {
 	BMC_EVENT = 1,
