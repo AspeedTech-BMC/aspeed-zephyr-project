@@ -149,7 +149,7 @@ void init_SPI_RW_Region(int spi_device_id)
 				pfm_region_Start = pfm_region_Start + 48;
 			else
 				pfm_region_Start = pfm_region_Start + 16;
-		else
+		} else
 			break;
 		if (pfm_region_Start > pfm_read_address + 0x400 + pfm_record_length)
 			break;
