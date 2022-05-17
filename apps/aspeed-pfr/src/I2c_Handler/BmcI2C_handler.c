@@ -4,14 +4,36 @@
  * SPDX-License-Identifier: MIT
  */
 
+#define DT_DRV_COMPAT bmcmbx
+
 #include <drivers/i2c.h>
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include <../../lib/hrot_hal/i2c/I2C_Slave_aspeed.h>
-//extern struct i2c_slave_callbacks i2c_1060_callbacks_pch;
+
+#define LOG_LEVEL CONFIG_I2C_LOG_LEVEL
+#include <logging/log.h>
+LOG_MODULE_REGISTER(i2c_bmcmbx);
+
+struct i2c_bmc_mailbox_data {
+	const struct device *i2c_controller;
+	struct i2c_slave_config config;
+};
+
+struct i2c_bmc_mailbox_config {
+	char *controller_dev_name;
+	uint8_t address;
+};
+
+/* convenience defines */
+#define DEV_CFG(dev)							\
+	((const struct i2c_bmc_mailbox_config * const)(dev)->config)
+#define DEV_DATA(dev)							\
+	((struct i2c_bmc_mailbox_data * const)(dev)->data)
+
+
 extern I2C_Slave_Process gI2cSlaveProcess;
-//extern struct i2c_slave_callbacks i2c_1060_callbacks_bmc;
 extern uint8_t gBmcFlag;
 extern uint8_t gProvisinDoneFlag;
 uint8_t gI2CReadFlag;
@@ -143,6 +165,26 @@ int i2c_1060_slave_bmc_stop(struct i2c_slave_config *config)
 	return 0;
 }
 
+static int bmc_mailbox_register(const struct device *dev)
+{
+        struct i2c_bmc_mailbox_data *data = dev->data;
+	printk("bmc_mailbox_register\n");
+        return i2c_slave_register(data->i2c_controller, &data->config);
+}
+
+static int bmc_mailbox_unregister(const struct device *dev)
+{
+        struct i2c_bmc_mailbox_data *data = dev->data;
+	printk("bmc_mailbox_unregister\n");
+        return i2c_slave_unregister(data->i2c_controller, &data->config);
+}
+
+
+static const struct i2c_slave_driver_api api_funcs = {
+	.driver_register = bmc_mailbox_register,
+	.driver_unregister = bmc_mailbox_unregister,
+};
+
 /*	* i2c_1060_callbacks_2
 	* callback function for I2C_2
 */
@@ -150,7 +192,48 @@ struct i2c_slave_callbacks i2c_1060_callbacks_bmc =
 {
 	.write_requested = i2c_1060_slave_bmc_write_requested,
 	.read_requested = i2c_1060_slave_bmc_read_requested,
-	.write_received =i2c_1060_slave_bmc_write_received,
+	.write_received = i2c_1060_slave_bmc_write_received,
 	.read_processed = i2c_1060_slave_bmc_read_processed,
 	.stop = i2c_1060_slave_bmc_stop,
 };
+
+static int i2c_bmc_mailbox_init(const struct device *dev)
+{
+	struct i2c_bmc_mailbox_data *data = DEV_DATA(dev);
+	const struct i2c_bmc_mailbox_config *cfg = DEV_CFG(dev);
+
+	LOG_INF("i2c_bmc_mailbox_init[%s]: init %s\n", dev->name, cfg->controller_dev_name);
+	data->i2c_controller = device_get_binding(cfg->controller_dev_name);
+
+	if (!data->i2c_controller) {
+		LOG_ERR("i2c controller not found: %s",
+			cfg->controller_dev_name);
+		return -EINVAL;
+	}
+
+	data->config.address = cfg->address;
+	data->config.callbacks = &i2c_1060_callbacks_bmc;
+
+	return 0;
+}
+
+#define I2C_BMC_MAILBOX_INIT(inst)					\
+	static struct i2c_bmc_mailbox_data				\
+		i2c_bmc_mailbox_##inst##_dev_data;			\
+									\
+	static const struct i2c_bmc_mailbox_config			\
+		i2c_bmc_mailbox_##inst##_cfg = {			\
+		.controller_dev_name = DT_INST_BUS_LABEL(inst),		\
+		.address = DT_INST_REG_ADDR(inst),			\
+	};								\
+									\
+	DEVICE_DT_INST_DEFINE(inst,					\
+			&i2c_bmc_mailbox_init,				\
+			NULL,						\
+			&i2c_bmc_mailbox_##inst##_dev_data,		\
+			&i2c_bmc_mailbox_##inst##_cfg,			\
+			POST_KERNEL,					\
+			CONFIG_I2C_SLAVE_INIT_PRIORITY,			\
+			&api_funcs);
+
+DT_INST_FOREACH_STATUS_OKAY(I2C_BMC_MAILBOX_INIT)
