@@ -10,7 +10,7 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_authentication.h"
-#include "pfr/pfr_verifcation.h"
+#include "pfr/pfr_verification.h"
 #include "pfr/pfr_update.h"
 #include "flash/flash_aspeed.h"
 #include <watchdog/watchdog_aspeed.h>

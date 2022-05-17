@@ -9,7 +9,7 @@
 
 #include <zephyr.h>
 
-int initializeManifestProcessor();
-int processPfmFlashManifest();
+int initializeManifestProcessor(void);
+int processPfmFlashManifest(void);
 
 #endif /* ZEPHYR_ASPEED_PFR_SRC_MANIFESTPROCESSOR_MANIFESTPROCESSOR_H_ */

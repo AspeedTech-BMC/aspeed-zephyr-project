@@ -11,38 +11,37 @@
 #include "common/common.h"
 #include "firmware/app_image.h"
 
-int initializeManifestProcessor()
+int initializeManifestProcessor(void)
 {
 	int status = 0;
 
 	status = manifest_flash_init(getManifestFlashInstance(), getFlashDeviceInstance(), PFM_FLASH_MANIFEST_ADDRESS, PFM_V2_MAGIC_NUM);
-	if(status)
+	if (status)
 		return status;
 
 	init_pfr_manifest();
-	//status = pfm_manager_flash_init(getPfmManagerFlashInstance(), getPfmFlashInstance(), getPfmFlashInstance(),
-	//getHostStateManagerInstance(), get_hash_engine_instance(), getSignatureVerificationInstance());
+	// status = pfm_manager_flash_init(getPfmManagerFlashInstance(), getPfmFlashInstance(), getPfmFlashInstance(),
+	// getHostStateManagerInstance(), get_hash_engine_instance(), getSignatureVerificationInstance());
 
 	return status;
 }
 
-void uninitializeManifestProcessor()
+void uninitializeManifestProcessor(void)
 {
-	manifest_flash_release (getManifestFlashInstance());
+	manifest_flash_release(getManifestFlashInstance());
 }
 
-int processPfmFlashManifest()
+int processPfmFlashManifest(void)
 {
 	int status = 0;
 	uint8_t *hashStorage = getNewHashStorage();
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 
-	//printk("Manifest Verification\n");
+	// printk("Manifest Verification\n");
 	status = manifest_flash_verify(manifest_flash, get_hash_engine_instance(),
-			getSignatureVerificationInstance(), hashStorage, hashStorageLength);
+				       getSignatureVerificationInstance(), hashStorage, hashStorageLength);
 
-	if(true == manifest_flash->manifest_valid)
-	{
+	if (true == manifest_flash->manifest_valid) {
 		printk("Manifest Verificaation Successful\n");
 
 		status = perform_image_verification();
