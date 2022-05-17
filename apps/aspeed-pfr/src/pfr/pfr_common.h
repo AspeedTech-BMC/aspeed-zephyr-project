@@ -30,33 +30,31 @@ struct pfr_manifest {
 	struct pfr_authentication *pfr_authentication;
 	struct pfr_hash *pfr_hash;
 
-	uint32_t image_type;                                // BMC or PCH
-	uint32_t state;                                     // VERIFY, UPDATE, RECOVERY
-	uint32_t region;                                    // active, recovery, update
-	uint32_t flash_id;                                  // spi a or b
-	uint32_t address;                                   // START ADDRESS
-	uint32_t recovery_address;                          // Recovery address
-	uint32_t staging_address;                           // Staging Address
-	uint32_t pc_length;                                 // Protected Content Size
-	uint32_t pc_type;                                   // manifest protected content type
-	uint32_t kc_flag;                                   // Key Cancellation flag
-	uint32_t hash_curve;                                // Hash Curve
+	uint32_t image_type;                                    // BMC or PCH
+	uint32_t state;                                         // VERIFY, UPDATE, RECOVERY
+	uint32_t region;                                        // active, recovery, update
+	uint32_t flash_id;                                      // spi a or b
+	uint32_t address;                                       // START ADDRESS
+	uint32_t recovery_address;                              // Recovery address
+	uint32_t staging_address;                               // Staging Address
+	uint32_t pc_length;                                     // Protected Content Size
+	uint32_t pc_type;                                       // manifest protected content type
+	uint32_t kc_flag;                                       // Key Cancellation flag
+	uint32_t hash_curve;                                    // Hash Curve
 
 };
 
-struct active_image{
+struct active_image {
 	int (*verify)(struct pfr_manifest *manifest);
 };
 
-struct pfr_firmware_image{
+struct pfr_firmware_image {
 	struct firmware_image *base;
 	uint32_t pc_length;
 	uint32_t pfm_length;
 };
 
-
-
-struct pfr_signature_verification{
+struct pfr_signature_verification {
 	struct signature_verification *base;
 	struct pfr_pubkey *pubkey;
 	uint32_t signature_type;                             // 0 -RSA, 1 - ECDSA, etc
@@ -70,26 +68,26 @@ struct pfr_pubkey {
 	uint8_t signature_s[SHA512_HASH_LENGTH];
 };
 
-struct pfr_hash{
+struct pfr_hash {
 	uint32_t type;
 	uint32_t start_address;
 	uint32_t length;
 	uint8_t hash_out[2 * SHA512_HASH_LENGTH];
 };
 
-struct key_cancellation_flag{
-	int (*verify_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);              // verifies key id
+struct key_cancellation_flag {
+	int (*verify_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);           // verifies key id
 	int (*set_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);              // set key id
-	int (*cancel_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);               // cancel key id
+	int (*cancel_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);           // cancel key id
 	int (*erase_all_flag)(struct pfr_manifest *manifest);
 };
 
-struct pfr_keystore{
+struct pfr_keystore {
 	struct keystore *base;
 	struct key_cancellation_flag *kc_flag;
 };
 
-void init_pfr_manifest();
-struct pfr_manifest *get_pfr_manifest();
+void init_pfr_manifest(void);
+struct pfr_manifest *get_pfr_manifest(void);
 
 #endif /* PFR_COMMON_H_ */

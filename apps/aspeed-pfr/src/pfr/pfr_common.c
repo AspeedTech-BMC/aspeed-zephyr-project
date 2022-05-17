@@ -16,26 +16,26 @@
 
 struct pfr_manifest pfr_manifest;
 
-//Block0-Block1 verifcation
+// Block0-Block1 verifcation
 struct active_image pfr_active_image;
 
 // PFR_SIGNATURE
 struct signature_verification pfr_verification;
-struct pfr_pubkey  pubkey;
+struct pfr_pubkey pubkey;
 struct pfr_signature_verification verification;
 
-//PFR_MANIFEST
+// PFR_MANIFEST
 struct manifest manifest_base;
 
-//PFR RECOVERY
+// PFR RECOVERY
 struct recovery_image recovery_base;
 struct pfm_manager recovery_pfm;
 
-//PFR UPDATE
+// PFR UPDATE
 struct firmware_image update_base;
 struct pfr_firmware_image update_fw;
 
-//PFR_KEYSTORE
+// PFR_KEYSTORE
 struct keystore keystore;
 struct key_cancellation_flag kc_flag;
 struct pfr_keystore pfr_keystore;
@@ -43,97 +43,116 @@ struct pfr_keystore pfr_keystore;
 struct pfr_authentication pfr_authentication;
 struct pfr_hash pfr_hash;
 
-struct pfr_manifest *get_pfr_manifest(){
+struct pfr_manifest *get_pfr_manifest(void)
+{
 	return &pfr_manifest;
 }
 
-struct active_image *get_active_image(){
+struct active_image *get_active_image(void)
+{
 	return &pfr_active_image;
 }
 
-static struct manifest *get_manifest(){
+static struct manifest *get_manifest(void)
+{
 	return &manifest_base;
 }
 
-static struct verifcation *get_signature_verification(){
+static struct verifcation *get_signature_verification(void)
+{
 	return &pfr_verification;
 }
 
-static struct pfr_pubkey *get_pubkey(){
+static struct pfr_pubkey *get_pubkey(void)
+{
 	return &pubkey;
 }
 
-static struct pfr_signature_verification *get_pfr_signature_verification(){
+static struct pfr_signature_verification *get_pfr_signature_verification(void)
+{
 	return &verification;
 }
 
-static struct keystore *get_keystore(){
+static struct keystore *get_keystore(void)
+{
 	return &keystore;
 }
 
-static struct key_cancellation_flag *get_kc_flag(){
+static struct key_cancellation_flag *get_kc_flag(void)
+{
 	return &kc_flag;
 }
 
-static struct pfr_keystore *get_pfr_keystore(){
+static struct pfr_keystore *get_pfr_keystore(void)
+{
 	return &pfr_keystore;
 }
 
-static struct pfr_authentication *get_pfr_authentication(){
+static struct pfr_authentication *get_pfr_authentication(void)
+{
 	return &pfr_authentication;
 }
 
-static struct pfr_hash *get_pfr_hash(){
+static struct pfr_hash *get_pfr_hash(void)
+{
 	return &pfr_hash;
 }
 
-static struct hash_engine *get_pfr_hash_engine()
+static struct hash_engine *get_pfr_hash_engine(void)
 {
 	return get_hash_engine_instance();
 }
 
-static struct spi_flash *get_pfr_spi_flash(){
+static struct spi_flash *get_pfr_spi_flash(void)
+{
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+
 	return &spi_flash->spi;
 }
 
-static struct recovery_image *get_recovery_base(){
+static struct recovery_image *get_recovery_base(void)
+{
 	return &recovery_base;
 }
 
 
-static struct pfm_manager *get_recovery_pfm(){
+static struct pfm_manager *get_recovery_pfm(void)
+{
 	return &recovery_pfm;
 }
 
-static struct pfr_firmware_image *get_update_fw_base(){
+static struct pfr_firmware_image *get_update_fw_base(void)
+{
 	return &update_fw;
 }
 
-static struct firmware_image *get_update_base(){
+static struct firmware_image *get_update_base(void)
+{
 	return &update_base;
 }
 
-static void init_pfr_firmware_image(struct pfr_firmware_image *update_fw, struct firmware_image *update_base){
+static void init_pfr_firmware_image(struct pfr_firmware_image *update_fw, struct firmware_image *update_base)
+{
 	update_fw->base = update_base;
 }
 
-void init_active_image(struct active_image *active_image){
+void init_active_image(struct active_image *active_image)
+{
 	active_image->verify = pfr_active_verify;
 }
 
 static int init_intel_pfr_manifest(struct pfr_manifest *pfr_manifest,
-		struct manifest *manifest,
-		struct hash_engine *hash,
-		struct pfr_signature_verification *verification,
-		struct spi_flash *flash,
-		struct pfr_keystore *keystore,
-		struct pfr_authentication *pfr_authentication,
-		struct pfr_hash *pfr_hash,
-		struct recovery_image *recovery_base,
-		struct pfm_manager *recovery_pfm,
-		struct pfr_firmware_image *update_fw,
-		struct active_image *active_image)
+				   struct manifest *manifest,
+				   struct hash_engine *hash,
+				   struct pfr_signature_verification *verification,
+				   struct spi_flash *flash,
+				   struct pfr_keystore *keystore,
+				   struct pfr_authentication *pfr_authentication,
+				   struct pfr_hash *pfr_hash,
+				   struct recovery_image *recovery_base,
+				   struct pfm_manager *recovery_pfm,
+				   struct pfr_firmware_image *update_fw,
+				   struct active_image *active_image)
 {
 	int status = 0;
 
@@ -167,21 +186,25 @@ static int init_intel_pfr_manifest(struct pfr_manifest *pfr_manifest,
 	return status;
 }
 
-static int init_pfr_signature(struct signature_verification *verification, struct pfr_pubkey *pubkey){
+static int init_pfr_signature(struct signature_verification *verification, struct pfr_pubkey *pubkey)
+{
 	int status = 0;
 
 	struct pfr_signature_verification *pfr_verification = get_pfr_signature_verification();
+
 	pfr_verification->base = verification;
 	pfr_verification->pubkey = pubkey;
 
 	return status;
 }
 
-static int init_pfr_keystore(struct keystore *keystore, struct key_cancellation_flag *kc_flag){
+static int init_pfr_keystore(struct keystore *keystore, struct key_cancellation_flag *kc_flag)
+{
 
 	int status = 0;
 
 	struct pfr_keystore *pfr_keystore = get_pfr_keystore();
+
 	pfr_keystore->base = keystore;
 	pfr_keystore->kc_flag = kc_flag;
 
@@ -191,7 +214,8 @@ static int init_pfr_keystore(struct keystore *keystore, struct key_cancellation_
 	return status;
 }
 
-void init_pfr_manifest(){
+void init_pfr_manifest(void)
+{
 
 	init_pfr_keystore(get_keystore(), get_kc_flag());
 
@@ -200,17 +224,16 @@ void init_pfr_manifest(){
 	init_pfr_firmware_image(get_update_fw_base(), get_update_base());
 
 	init_intel_pfr_manifest(get_pfr_manifest(),
-			get_manifest(),
-			get_pfr_hash_engine(),
-			get_pfr_signature_verification(),
-			get_pfr_spi_flash(),
-			get_pfr_keystore(),
-			get_pfr_authentication(),
-			get_pfr_hash(),
-			get_recovery_base(),
-			get_recovery_pfm(),
-			get_update_fw_base(),
-			get_active_image());
+				get_manifest(),
+				get_pfr_hash_engine(),
+				get_pfr_signature_verification(),
+				get_pfr_spi_flash(),
+				get_pfr_keystore(),
+				get_pfr_authentication(),
+				get_pfr_hash(),
+				get_recovery_base(),
+				get_recovery_pfm(),
+				get_update_fw_base(),
+				get_active_image());
 
 }
-

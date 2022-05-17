@@ -23,7 +23,7 @@
 #define DEBUG_PRINTF(...)
 #endif
 
-int handle_update_image_action(int image_type, void *AoData, void* EventContext)
+int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 {
 	CPLD_STATUS cpld_update_status;
 	int status;
@@ -37,15 +37,15 @@ int handle_update_image_action(int image_type, void *AoData, void* EventContext)
 
 
 #if SMBUS_MAILBOX_SUPPORT
-	SetPlatformState(image_type == BMC_TYPE? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
+	SetPlatformState(image_type == BMC_TYPE ? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
 	if (image_type != CPLD_FW_UPDATE) {
 		SetLastPanicReason(lastPanicReason(image_type));
 		IncPanicEventCount();
 	}
 #endif
 
-	status = update_firmware_image(image_type, AoData,EventContext);
-	if(status != Success)
+	status = update_firmware_image(image_type, AoData, EventContext);
+	if (status != Success)
 		return Failure;
 
 	return Success;
@@ -61,12 +61,13 @@ int handle_update_image_action(int image_type, void *AoData, void* EventContext)
  *
  * @return 0 if the image reference was updated successfully or an error code.  Load-time
  * validation errors will generate one of the following errors:
- * 		- FIRMWARE_IMAGE_INVALID_FORMAT
- * 		- FIRMWARE_IMAGE_BAD_CHECKSUM
- * 		- KEY_MANIFEST_INVALID_FORMAT
- * 		- FIRMWARE_HEADER validation errors
+ *              - FIRMWARE_IMAGE_INVALID_FORMAT
+ *              - FIRMWARE_IMAGE_BAD_CHECKSUM
+ *              - KEY_MANIFEST_INVALID_FORMAT
+ *              - FIRMWARE_HEADER validation errors
  */
-int firmware_image_load (struct firmware_image *fw, struct flash *flash, uint32_t base_addr){
+int firmware_image_load(struct firmware_image *fw, struct flash *flash, uint32_t base_addr)
+{
 	return Success;
 }
 
@@ -80,7 +81,8 @@ int firmware_image_load (struct firmware_image *fw, struct flash *flash, uint32_
  *
  * @return 0 if the firmware image is valid or an error code.
  */
-int firmware_image_verify (struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa){
+int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
+{
 	return intel_pfr_update_verify(fw, hash, rsa);
 }
 
@@ -92,7 +94,8 @@ int firmware_image_verify (struct firmware_image *fw, struct hash_engine *hash, 
  * @return The size of the firmware image or an error code.  Use ROT_IS_ERROR to check the
  * return value.
  */
-int firmware_image_get_image_size(struct firmware_image *fw){
+int firmware_image_get_image_size(struct firmware_image *fw)
+{
 	ARG_UNUSED(fw);
 	return Success;
 }
@@ -106,7 +109,8 @@ int firmware_image_get_image_size(struct firmware_image *fw){
  * manifest is managed by the firmware image instance and is only guaranteed to be valid until
  * the next call to 'load'.
  */
-struct key_manifest* firmware_imag_eget_key_manifest (struct firmware_image *fw){
+struct key_manifest *firmware_imag_eget_key_manifest(struct firmware_image *fw)
+{
 	ARG_UNUSED(fw);
 	return NULL;
 }
@@ -120,12 +124,14 @@ struct key_manifest* firmware_imag_eget_key_manifest (struct firmware_image *fw)
  * is managed by the firmware image instance and is only guaranteed to be valid until the next
  * call to 'load'.
  */
-struct firmware_header* firmware_image_get_firmware_header (struct firmware_image *fw){
+struct firmware_header *firmware_image_get_firmware_header(struct firmware_image *fw)
+{
 	ARG_UNUSED(fw);
 	return NULL;
 }
 
-void init_update_fw_manifest(struct firmware_image *fw){
+void init_update_fw_manifest(struct firmware_image *fw)
+{
 	// fw->load = firmware_image_load;
 	fw->verify = firmware_image_verify;
 	// fw->get_image_size = firmware_image_get_image_size;
