@@ -341,13 +341,9 @@ void PchBmcProcessCommands(unsigned char *CipherText)
  */
 int ast_i2c_slave_dev_init(const struct device *dev, uint8_t slave_addr)
 {
-
-	struct i2c_slave_config slave_cfg;
-
 	printk("%s\n", __func__);
-	slave_cfg.address = slave_addr;
 
-	if (i2c_slave_register(dev, &slave_cfg))
+	if (i2c_slave_driver_register(dev))
 		printk("I2C: Slave Device driver %s not found.", dev->name);
 
 	SetCpldIdentifier(0xDE);	//initial CpldIdentifier to 0xDE for test

@@ -44,8 +44,10 @@ void main(void)
 	struct I2CSlave_engine_wrapper *I2cSlaveEngineWrapper;
 
 	status = I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
-	// I2CSlaveEngine->InitSlaveDev(I2CSlaveEngine,"I2C_2",0x38);
-	I2CSlaveEngine->InitSlaveDev(I2CSlaveEngine, "I2C_1", 0x38);
+	//I2CSlaveEngine->InitSlaveDev(I2CSlaveEngine,"I2C_2",0x38);
+
+	/* TODO: Discard slave address */
+	I2CSlaveEngine->InitSlaveDev(I2CSlaveEngine,"BMCMBX_0", 0x38); 
 
 #if SMBUS_MAILBOX_SUPPORT
 	InitializeSmbusMailbox();
