@@ -41,7 +41,7 @@ static void GPIO_dump_buf(uint8_t *buf, uint32_t len)
 	printk("\n");
 }
 
-int BMCBootHold()
+int BMCBootHold(void)
 {
 	const struct device *gpio_dev = NULL;
 	const struct device *dev_m = NULL;
@@ -57,8 +57,7 @@ int BMCBootHold()
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
-	if (gpio_dev == NULL)
-	{
+	if (gpio_dev == NULL) {
 		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
@@ -74,7 +73,7 @@ int BMCBootHold()
 	return 0;
 }
 
-int PCHBootHold()
+int PCHBootHold(void)
 {
 	const struct device *gpio_dev = NULL;
 	const struct device *dev_m = NULL;
@@ -90,8 +89,7 @@ int PCHBootHold()
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
-	if (gpio_dev == NULL)
-	{
+	if (gpio_dev == NULL) {
 		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
@@ -107,7 +105,7 @@ int PCHBootHold()
 	return 0;
 }
 
-int BMCBootRelease()
+int BMCBootRelease(void)
 {
 	const struct device *gpio_dev = NULL;
 	const struct device *dev_m = NULL;
@@ -124,8 +122,7 @@ int BMCBootRelease()
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
-	if (gpio_dev == NULL)
-	{
+	if (gpio_dev == NULL) {
 		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
@@ -141,7 +138,7 @@ int BMCBootRelease()
 	return 0;
 }
 
-int PCHBootRelease()
+int PCHBootRelease(void)
 {
 	const struct device *gpio_dev = NULL;
 	const struct device *dev_m = NULL;
@@ -157,8 +154,7 @@ int PCHBootRelease()
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
-	if (gpio_dev == NULL)
-	{
+	if (gpio_dev == NULL) {
 		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}

@@ -9,18 +9,17 @@
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <device.h>
-/*typedef struct _SMBUS_MAIL_BOX
-{
-    uint8_t CpldIdentifier;				//00h 
-    uint8_t CpldReleaseVersion;			//01h
-	uint8_t CpldRoTSVN;					//02h
-	uint8_t PlatformState;				//03h
-	uint8_t Recoverycount;				//04h
-	uint8_t LastRecoveryReason;			//05h
-	uint8_t PanicEventCount;			//06h
-	uint8_t LastPanicReason;			//07h
-	uint8_t MajorErrorCode;				//08h
-	uint8_t MinorErrorCode;				//09h
+/*typedef struct _SMBUS_MAIL_BOX {
+	uint8_t CpldIdentifier;		//00h
+	uint8_t CpldReleaseVersion;	//01h
+	uint8_t CpldRoTSVN;		//02h
+	uint8_t PlatformState;		//03h
+	uint8_t Recoverycount;		//04h
+	uint8_t LastRecoveryReason;	//05h
+	uint8_t PanicEventCount;	//06h
+	uint8_t LastPanicReason;	//07h
+	uint8_t MajorErrorCode;		//08h
+	uint8_t MinorErrorCode;		//09h
 	union {
 		struct {
 			uint8_t CommandBusy :1;
@@ -32,9 +31,9 @@
 			uint8_t PITlevel1enforced :1;
 			uint8_t PITL2CompleteSuccess :1;
 		};
-		uint8_t UfmStatusValue;			//0Ah
+		uint8_t UfmStatusValue; //0Ah
 	};
-	uint8_t UfmCommand;					//0Bh
+	uint8_t UfmCommand; //0Bh
 	union {
 		struct {
 			uint8_t ExecuteCmd :1;
@@ -145,27 +144,25 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY{
     BmcScratchPad = 0xc0,
 } SMBUS_MAILBOX_RF_ADDRESS;*/
 
-typedef struct _I2C_Slave_Process
-{
+typedef struct _I2C_Slave_Process {
 	uint8_t InProcess;
 	uint8_t operation;
 	uint8_t DataBuf[2];
-}I2C_Slave_Process;
+} I2C_Slave_Process;
 
-enum 
-{
+enum {
 	SLAVE_IDLE,
 	MASTER_CMD_READ,
-	MASTER_DATA_READ_SLAVE_DATA_SEND, 
+	MASTER_DATA_READ_SLAVE_DATA_SEND,
 };
 
-#define SLAVE_BUF_INDEX0			0x00
-#define SLAVE_BUF_INDEX1			0x01
+#define SLAVE_BUF_INDEX0 0x00
+#define SLAVE_BUF_INDEX1 0x01
 
-#define SlaveDataReceiveComplete 	0x02
-#define I2CInProcess_Flag			0x01
+#define SlaveDataReceiveComplete 0x02
+#define I2CInProcess_Flag 0x01
 
-int ast_i2c_slave_dev_init(const struct device *dev,uint8_t slave_addr);
+int ast_i2c_slave_dev_init(const struct device *dev, uint8_t slave_addr);
 //void PchBmcProcessCommands(unsigned char *CipherText);
 
 #define SLAVE_BUF_DMA_MODE 0

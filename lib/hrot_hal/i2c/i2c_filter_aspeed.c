@@ -16,21 +16,16 @@ static void i2c_filter_get_dev_name(uint8_t *string_buf, uint8_t filter_sel)
 	uint8_t flt_num[I2C_FILTER_MIDDLEWARE_DEV_NAME_SIZE];
 
 	memcpy(string_buf, I2C_FILTER_MIDDLEWARE_PREFIX, sizeof(I2C_FILTER_MIDDLEWARE_PREFIX));
-
 	sprintf(flt_num, "%d", filter_sel);
-
 	strcat(string_buf, flt_num);
-
-	return;
 }
 
-static const struct device* i2c_filter_get_device(uint8_t filter_sel)
+static const struct device *i2c_filter_get_device(uint8_t filter_sel)
 {
 	const struct device *dev;
 	uint8_t flt_name[I2C_FILTER_MIDDLEWARE_DEV_NAME_SIZE];
 
 	i2c_filter_get_dev_name(flt_name, filter_sel);
-
 	dev = device_get_binding(flt_name);
 
 	if (!dev)
@@ -39,7 +34,7 @@ static const struct device* i2c_filter_get_device(uint8_t filter_sel)
 	return dev;
 }
 
-/**	 
+/**
  * @brief Setup whitelist on specific slave address with provided offset and I2C filter device number.
  *
  * @param filter_sel Selection of I2C filter device
@@ -65,11 +60,11 @@ int i2c_filter_middleware_set_whitelist(uint8_t filter_sel, uint8_t whitelist_tb
 
 	if (ret)
 		printk("I2C PFR : FLT Device Update failed.");
-	
+
 	return ret;
 }
 
-/**	 
+/**
  * @brief Enable /disable specific I2C filter device.
  *
  * @param filter_sel Selection of I2C filter device
@@ -96,7 +91,7 @@ int i2c_filter_middleware_en(uint8_t filter_sel, bool en)
 	return ret;
 }
 
-/**	 
+/**
  * @brief Initializes specific I2C filter device.
  *
  * @param filter_sel Selection of I2C filter device

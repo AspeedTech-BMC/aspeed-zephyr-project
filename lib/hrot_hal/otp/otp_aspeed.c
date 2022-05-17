@@ -11,24 +11,24 @@
 #include <ctype.h>
 #include <sys/util.h>
 
-#define OTP_PASSWD				0x349fe38a
+#define OTP_PASSWD		0x349fe38a
 
-#define OTP_BASE				0x7e6f2000
-#define OTP_PROTECT_KEY			OTP_BASE
-#define OTP_COMMAND				OTP_BASE + 0x4
-#define OTP_TIMING				OTP_BASE + 0x8
-#define OTP_ADDR				OTP_BASE + 0x10
-#define OTP_STATUS				OTP_BASE + 0x14
-#define OTP_COMPARE_1			OTP_BASE + 0x20
-#define OTP_COMPARE_2			OTP_BASE + 0x24
-#define OTP_COMPARE_3			OTP_BASE + 0x28
-#define OTP_COMPARE_4			OTP_BASE + 0x2c
-#define SW_REV_ID0				OTP_BASE + 0x68
-#define SW_REV_ID1				OTP_BASE + 0x6c
-#define SEC_KEY_NUM				OTP_BASE + 0x78
+#define OTP_BASE		0x7e6f2000
+#define OTP_PROTECT_KEY		OTP_BASE
+#define OTP_COMMAND		(OTP_BASE + 0x4)
+#define OTP_TIMING		(OTP_BASE + 0x8)
+#define OTP_ADDR		(OTP_BASE + 0x10)
+#define OTP_STATUS		(OTP_BASE + 0x14)
+#define OTP_COMPARE_1		(OTP_BASE + 0x20)
+#define OTP_COMPARE_2		(OTP_BASE + 0x24)
+#define OTP_COMPARE_3		(OTP_BASE + 0x28)
+#define OTP_COMPARE_4		(OTP_BASE + 0x2c)
+#define SW_REV_ID0		(OTP_BASE + 0x68)
+#define SW_REV_ID1		(OTP_BASE + 0x6c)
+#define SEC_KEY_NUM		(OTP_BASE + 0x78)
 
-#define ASPEED_REVISION_ID0		0x7e6e2004
-#define ASPEED_REVISION_ID1		0x7e6e2014
+#define ASPEED_REVISION_ID0	0x7e6e2004
+#define ASPEED_REVISION_ID1	0x7e6e2014
 
 #define ID0_AST1030A0	0x80000000
 #define ID1_AST1030A0	0x80000000
@@ -41,17 +41,17 @@
 #define OTP_AST1030A1	2
 #define OTP_AST1060A1	3
 
-#define OTP_USAGE				-1
-#define OTP_FAILURE				-2
-#define OTP_SUCCESS				0
+#define OTP_USAGE	-1
+#define OTP_FAILURE	-2
+#define OTP_SUCCESS	0
 
 #define OTP_KEY_TYPE_RSA_PUB	1
 #define OTP_KEY_TYPE_RSA_PRIV	2
-#define OTP_KEY_TYPE_AES		3
-#define OTP_KEY_TYPE_VAULT		4
-#define OTP_KEY_TYPE_HMAC		5
-#define OTP_KEY_ECDSA384		6
-#define OTP_KEY_ECDSA384P		7
+#define OTP_KEY_TYPE_AES	3
+#define OTP_KEY_TYPE_VAULT	4
+#define OTP_KEY_TYPE_HMAC	5
+#define OTP_KEY_ECDSA384	6
+#define OTP_KEY_ECDSA384P	7
 
 struct otp_pro_sts {
 	char mem_lock;
@@ -214,7 +214,7 @@ static int ast_otp_init(void)
 		info_cb.key_info = ast10xxa0_key_type;
 		info_cb.key_info_len = ARRAY_SIZE(ast10xxa0_key_type);
 		sprintf(info_cb.ver_name, "AST1030A0");
-        //printk("\r\n OTP init: the SOC version is AST1030A0 \r\n");
+		//printk("\r\n OTP init: the SOC version is AST1030A0\r\n");
 		break;
 	case OTP_AST1030A1:
 		info_cb.version = OTP_AST1030A1;
@@ -225,7 +225,7 @@ static int ast_otp_init(void)
 		info_cb.key_info = ast10xxa1_key_type;
 		info_cb.key_info_len = ARRAY_SIZE(ast10xxa1_key_type);
 		sprintf(info_cb.ver_name, "AST1030A1");
-        //printk("\r\n OTP init: the SOC version is AST1030A1 \r\n");
+		//printk("\r\n OTP init: the SOC version is AST1030A1\r\n");
 		break;
 	case OTP_AST1060A1:
 		info_cb.version = OTP_AST1060A1;
@@ -236,7 +236,7 @@ static int ast_otp_init(void)
 		info_cb.key_info = ast10xxa1_key_type;
 		info_cb.key_info_len = ARRAY_SIZE(ast10xxa1_key_type);
 		sprintf(info_cb.ver_name, "AST1060A1");
-        //printk("\r\n OTP init: the SOC version is AST1060A1 \r\n");
+		//printk("\r\n OTP init: the SOC version is AST1060A1\r\n");
 		break;
 	default:
 		printk("SOC is not supported\n");
@@ -399,13 +399,14 @@ static int otp_print_conf(uint32_t offset, uint32_t dw_count, uint32_t *buf)
 {
 	int i;
 	uint32_t ret[1];
+
 	if (offset + dw_count > 32)
 		return OTP_USAGE;
 	otp_soak(0);
 	for (i = offset; i < offset + dw_count; i++) {
 		otp_read_conf(i, ret);
 		//printk("OTPCFG0x%X: 0x%08X\n", i, ret[0]);
-        buf[i-offset] = ret[0];
+		buf[i-offset] = ret[0];
 	}
 	return OTP_SUCCESS;
 }
@@ -413,6 +414,7 @@ static int otp_print_conf(uint32_t offset, uint32_t dw_count, uint32_t *buf)
 int do_otpread_conf(uint32_t offset, uint32_t count, uint32_t *buf)
 {
 	int ret;
+
 	ret = ast_otp_init();
 	if (ret)
 		goto end;
@@ -432,16 +434,16 @@ static int otp_print_data(uint32_t offset, uint32_t dw_count, uint32_t *buf)
 		return OTP_USAGE;
 	otp_soak(0);
 	for (i = offset; i < offset + dw_count; i += 2) {
-        //printk(i);
+		//printk(i);
 		otp_read_data(i, ret);
-        /*
+	/*
 		if (i % 4 == 0)
 			printk("%03X: %08X %08X ", i * 4, ret[0], ret[1]);
 		else
 			printk("%08X %08X\n", ret[0], ret[1]);
-        */
-        buf[i-offset] = ret[0];
-        buf[i-offset+1] = ret[1];
+	*/
+		buf[i-offset] = ret[0];
+		buf[i-offset+1] = ret[1];
 	}
 	return OTP_SUCCESS;
 }
@@ -449,6 +451,7 @@ static int otp_print_data(uint32_t offset, uint32_t dw_count, uint32_t *buf)
 int do_otpread_data(uint32_t offset, uint32_t count, uint32_t *buf)
 {
 	int ret;
+
 	ret = ast_otp_init();
 	if (ret)
 		goto end;
@@ -462,6 +465,7 @@ end:
 int do_otpread_strap(uint32_t offset, uint32_t count, struct otpstrap_status *strap_status)
 {
 	int ret;
+
 	ret = ast_otp_init();
 	if (ret)
 		goto end;
@@ -541,7 +545,7 @@ static int otp_print_conf_info(int input_offset)
 	return OTP_SUCCESS;
 }
 
-static int do_otpinfo_conf()
+static int do_otpinfo_conf(void)
 {
 	int ret;
 
@@ -631,7 +635,7 @@ static int otp_print_strap_info(int view)
 	return OTP_SUCCESS;
 }
 */
-static int do_otpinfo_strap()
+static int do_otpinfo_strap(void)
 {
 	int ret;
 
@@ -639,7 +643,7 @@ static int do_otpinfo_strap()
 	if (ret)
 		goto end;
 
-    otp_print_strap_info(1);
+	otp_print_strap_info(1);
 
 end:
 	ast_otp_finish();
