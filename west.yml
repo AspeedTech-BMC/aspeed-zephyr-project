@@ -23,5 +23,5 @@ manifest:
           - mbedtls
     - name: cerberus
       remote: gerrit
-      revision: WDT_TYPO
+      revision: aspeed-dev
       path: middlewares/cerberus
