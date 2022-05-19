@@ -256,24 +256,123 @@
 	status = "okay";
 };
 
+/* "SPI1_CS0" used to access flash connected to SPI_Monitor_1,
+ * "SPI2_CS0" used to access flash connected to SPI_Monitor_3,
+ * "SPI2_CS1" is used to access flash connected to SPI_Monitor_4,
+ */
+
 &spi1_cs0 {
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
-};
 
-/* Use AST1060 SPI2 as the internal SPI master to
- * to access the SPI flashes connected to SPI monitors
- * Here,
- * "SPI2_CS0" used to access flash connected to SPI_Monitor_2,
- * "SPI2_CS1" is used to access flash connected to SPI_Monitor_3,
- * "SPI2_CS2" is used to access flash connected to SPI_Monitor_4,
- */
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/* 896KB */
+		bmc_uboot_partition: partition@0 {
+			label = "bmc-uboot";
+			reg = <0x00000000 0x000e0000>;
+		};
+
+		/* 128KB */
+		bmc_pfm_partition: partition@e0000{
+			reg = <0x000e0000 0x00020000>;
+			label = "bmc-pfm";
+		};
+
+		/* 128KB */
+		bmc_ub_env_partition: partition@100000{
+			reg = <0x00100000 0x00020000>;
+			label = "bmc-ub-env";
+		};
+
+		/* 2048KB */
+		bmc_sofs_partition: partition@120000{
+			reg = <0x00120000 0x00200000>;
+			label = "bmc-sofs";
+		};
+
+		/* 8064KB */
+		bmc_rwfs_partition: partition@320000{
+			label = "bmc-rwfs";
+			reg = <0x00320000 0x007e0000>;
+		};
+
+		/* 31744KB */
+		bmc_fitimg_partition: partition@b00000{
+			label = "bmc-fitimg";
+			reg = <0x00b00000 0x01f00000>;
+		};
+
+		/* 32768KB  */
+		bmc_rc_image_partition: partition@2a00000{
+			label = "bmc-rc-image";
+			reg = <0x02a00000 0x02000000>;
+		};
+
+		/* 32768KB */
+		bmc_stg_partition: partition@4a00000{
+			label = "bmc-stg";
+			reg = <0x04a00000 0x02000000>;
+		};
+
+		/* 16384KB */
+		bmc_pch_stg_partition: partition@6a00000{
+			label = "bmc-pch-stg";
+			reg = <0x06a00000 0x01000000>;
+		};
+
+		/* 5120KB */
+		bmc_pfr_stg_partition: partition@7a00000{
+			label = "bmc-pfr-stg";
+			reg = <0x07a00000 0x00500000>;
+		};
+
+		/* 1024KB */
+		bmc_pfr_rc_partition: partition@7f00000{
+			label = "bmc-pfr-rc";
+			reg = <0x07f00000 0x00100000>;
+		};
+	};
+};
 
 &spi2_cs0 {
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/* 8MB */
+		pch_active_partition: partition@0 {
+			label = "pch-act";
+			reg = <0x00000000 0x00800000>;
+		};
+
+		/* 8MB compressed pch recovery image */
+		pch_recovery_partition: partition@800000 {
+			label = "pch-rc";
+			reg = <0x00800000 0x00800000>;
+		};
+
+		/* 8MB compressed pch staging image */
+		pch_staging_partition: partition@1000000 {
+			label = "pch-stg";
+			reg = <0x01000000 0x00800000>;
+		};
+
+		/* 4MB */
+		pch_pfm_partition: partition@1800000 {
+			label = "pch-pfm";
+			reg = <0x01800000 0x00400000>;
+		};
+	};
 };
 
 &spi2_cs1 {
@@ -305,6 +404,10 @@
 	flash-device = <&spi1_cs0>;
 	ext-mux-sel = <1>;
 	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x10000000
+	>;
 };
 
 &spim3 {
@@ -317,6 +420,9 @@
 	flash-device = <&spi2_cs0>;
 	ext-mux-sel = <1>;
 	status = "okay";
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
 };
 
 &spim4 {
