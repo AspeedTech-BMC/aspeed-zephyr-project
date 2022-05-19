@@ -157,6 +157,7 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 
 	if ((PfmSpiDefinition->HashAlgorithmInfo.SHA256HashPresent == 1) ||
 	    (PfmSpiDefinition->HashAlgorithmInfo.SHA384HashPresent == 1)) {
+		DEBUG_PRINTF("Digest verification start\r\n");
 
 		uint8_t sha256_buffer[SHA384_DIGEST_LENGTH] = { 0 };
 		uint32_t hash_length = 0;
@@ -177,11 +178,13 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 		pfr_manifest->base->get_hash(pfr_manifest, pfr_manifest->hash, sha256_buffer, SHA256_DIGEST_LENGTH);
 
 		status = compare_buffer(pfm_spi_Hash, sha256_buffer, SHA256_DIGEST_LENGTH);
-		if (status != Success)
+		if (status != Success) {
+			DEBUG_PRINTF("Digest verification failed\r\n");
 			return Failure;
+		}
+		DEBUG_PRINTF("Digest verification succeeded\r\n");
 	}
 
-	DEBUG_PRINTF("Digest verification success\r\n");
 
 	return Success;
 }
