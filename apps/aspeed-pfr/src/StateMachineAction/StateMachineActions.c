@@ -177,7 +177,7 @@ void PublishPchEvents(void)
 
 void PublishInitialEvents(void)
 {
-	byte provision_state = get_provision_status();
+	byte provision_state = GetUfmStatusValue();
 
 	if (provision_state == UFM_PROVISIONED) {
 		check_staging_area();
@@ -642,7 +642,7 @@ void T0Transition(int releaseBmc, int releasePCH)
 	int provision_status;
 
 	SetPlatformState(ENTER_T0);
-	provision_status = get_provision_status();
+	provision_status = GetUfmStatusValue();
 	if (provision_status == UFM_PROVISIONED) {
 		// enable spi filtering
 		if (releaseBmc) {

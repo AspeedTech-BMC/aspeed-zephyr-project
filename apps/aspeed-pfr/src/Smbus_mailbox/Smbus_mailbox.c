@@ -9,6 +9,8 @@
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
+#include <drivers/i2c.h>
+#include <drivers/i2c/pfr/swmbx.h>
 
 #if SMBUS_MAILBOX_DEBUG
 #define DEBUG_PRINTF printk
@@ -22,6 +24,7 @@
 #define PRIMARY_FLASH_REGION    1
 #define SECONDARY_FLASH_REGION  2
 
+struct device *gSwMbxDev = NULL;
 uint8_t gReadOnlyRfAddress[READ_ONLY_RF_COUNT] = { 0x1, 0x2, 0x3, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x14, 0x15, 0x16, 0x17,
 						   0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
 uint8_t gReadAndWriteRfAddress[READ_WRITE_RF_COUNT] = { 0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E };
@@ -62,8 +65,8 @@ AO_DATA UpdateActiveObject;
 void ResetMailBox(void)
 {
 	memset(&gSmbusMailboxData, 0, sizeof(gSmbusMailboxData));
-	set_provision_status(COMMAND_DONE);   // reset ufm status
-	set_provision_commandTrigger(0x00);
+	SetUfmStatusValue(COMMAND_DONE);   // reset ufm status
+	SetUfmCmdTriggerValue(0x00);
 }
 /**
  * Function to Erase th UFM
@@ -137,9 +140,168 @@ void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *Ma
 	*MinorVersion = Buffer.MinorVersion;
 }
 
+#define SWMBX_NOTIFYEE_STACK_SIZE 1024
+struct k_thread swmbx_notifyee_thread;
+K_THREAD_STACK_DEFINE(swmbx_notifyee_stack, SWMBX_NOTIFYEE_STACK_SIZE);
+K_SEM_DEFINE(ufm_write_fifo_state_sem, 0, 1);
+K_SEM_DEFINE(ufm_write_fifo_data_sem, 0, 1);
+K_SEM_DEFINE(ufm_read_fifo_state_sem, 0, 1);
+K_SEM_DEFINE(ufm_provision_trigger_sem, 0, 1);
+K_SEM_DEFINE(bmc_update_intent_sem, 0, 1);
+K_SEM_DEFINE(pch_update_intent_sem, 0, 1);
+K_SEM_DEFINE(bmc_checkpoint_sem, 0, 1);
+K_SEM_DEFINE(acm_checkpoint_sem, 0, 1);
+K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
+
+void swmbx_notifyee_main(void *a, void *b, void *c)
+{
+	struct k_poll_event events[8];
+	AO_DATA aodata[8];
+	EVENT_CONTEXT evt_ctx[8];
+	uint8_t buffer[8][2] = {{0}};
+	k_poll_event_init(&events[0], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_write_fifo_data_sem);
+	k_poll_event_init(&events[1], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_read_fifo_state_sem);
+	k_poll_event_init(&events[2], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_provision_trigger_sem);
+	k_poll_event_init(&events[3], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_update_intent_sem);
+	k_poll_event_init(&events[4], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &pch_update_intent_sem);
+	k_poll_event_init(&events[5], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_checkpoint_sem);
+	k_poll_event_init(&events[6], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &acm_checkpoint_sem);
+	k_poll_event_init(&events[7], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bios_checkpoint_sem);
+
+	int ret;
+	while(1) {
+		ret = k_poll(events, 8, K_FOREVER);
+		if (ret < 0) {
+			printk("%s: k_poll error ret=%d\n", ret);
+			continue;
+		}
+
+		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* UFM Write FIFO from BMC/PCH */
+			k_sem_take(events[0].sem, K_NO_WAIT);
+			//TODO: race condition
+			do {
+				uint8_t c;
+				ret = swmbx_read(gSwMbxDev, true, UfmWriteFIFO, &c);
+				if (!ret) {
+					gUfmFifoData[gFifoData++] = c;
+				}
+			} while(!ret);
+		}
+		else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* UFM Read FIFO empty prepare next data */
+			k_sem_take(events[1].sem, K_NO_WAIT);
+		}
+		else if (events[2].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* UFM Provision Trigger */
+			k_sem_take(events[2].sem, K_NO_WAIT);
+			aodata[2].ProcessNewCommand = 1;
+			aodata[2].type = I2C_EVENT;
+			evt_ctx[2].operation = I2C_HANDLE;
+			evt_ctx[2].i2c_data = buffer[2];
+			buffer[2][0] = UfmCmdTriggerValue;
+			swmbx_get_msg(0, UfmCmdTriggerValue, &buffer[2][1]);
+
+			post_smc_action(I2C, &aodata[2], &evt_ctx[2]);
+		}
+		else if (events[3].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* BMC Update Intent */
+			k_sem_take(events[3].sem, K_NO_WAIT);
+			aodata[3].ProcessNewCommand = 1;
+			aodata[3].type = I2C_EVENT;
+			evt_ctx[3].operation = I2C_HANDLE;
+			evt_ctx[3].i2c_data = buffer[3];
+			buffer[3][0] = BmcUpdateIntent;
+			swmbx_get_msg(0, BmcUpdateIntent, &buffer[3][1]);
+
+			post_smc_action(I2C, &aodata[3], &evt_ctx[3]);
+		}
+		else if (events[4].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* PCH Update Intent */
+			k_sem_take(events[4].sem, K_NO_WAIT);
+		}
+		else if (events[5].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* BMC Checkpoint */
+			k_sem_take(events[5].sem, K_NO_WAIT);
+			aodata[5].ProcessNewCommand = 1;
+			aodata[5].type = I2C_EVENT;
+			evt_ctx[5].operation = I2C_HANDLE;
+			evt_ctx[5].i2c_data = buffer[5];
+			buffer[5][0] = BmcCheckpoint;
+			swmbx_get_msg(0, BmcCheckpoint, &buffer[5][1]);
+
+			post_smc_action(I2C, &aodata[5], &evt_ctx[5]);
+		}
+		else if (events[6].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* ACM Checkpoint */
+			k_sem_take(events[6].sem, K_NO_WAIT);
+		}
+		else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* BIOS Checkpoint */
+			k_sem_take(events[7].sem, K_NO_WAIT);
+		}
+
+		for (size_t i = 0; i<8; ++i)
+			events[i].state = K_POLL_STATE_NOT_READY;
+	}
+}
+
+void InitializeSoftwareMailbox(void)
+{
+	/* Top level mailbox device driver */
+	const struct device *swmbx_dev = NULL;
+	swmbx_dev = device_get_binding("SWMBX");
+	if (swmbx_dev == NULL) {
+		printk("%s: fail to bind %s\n", "SWMBX");
+		return;
+	}
+	gSwMbxDev = swmbx_dev;
+
+	/* Enable mailbox read/write notifiaction and FIFO */
+	swmbx_enable_behavior(swmbx_dev, SWMBX_NOTIFY | SWMBX_FIFO, 1);
+
+	/* Register mailbox notification semphore */
+	swmbx_update_fifo(swmbx_dev, &ufm_write_fifo_state_sem, 0, UfmWriteFIFO, 0x40, SWMBX_FIFO_NOTIFY_STOP, true);
+	swmbx_update_fifo(swmbx_dev, &ufm_read_fifo_state_sem, 1, UfmReadFIFO, 0x40, SWMBX_FIFO_NOTIFY_STOP, true);
+
+	/* swmbx_update_notify(dev, port, sem, addr, enable) */
+	swmbx_update_notify(swmbx_dev, 0x0, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &bmc_update_intent_sem, BmcUpdateIntent, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &pch_update_intent_sem, PchPfmActiveSvn, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &acm_checkpoint_sem, AcmCheckpoint, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &bios_checkpoint_sem, BiosCheckpoint, true);
+
+	/* Register slave device to bus device */
+	const struct device *dev = NULL;
+	dev = device_get_binding("SWMBX_SLAVE_BMC");
+	if (dev) {
+		i2c_slave_driver_register(dev);
+	}
+
+	/* TODO: CPU0 */
+	dev = device_get_binding("SWMBX_SLAVE_CPU");
+	if (dev) {
+		i2c_slave_driver_register(dev);
+	}
+
+	k_tid_t swmbx_tid = k_thread_create(
+			&swmbx_notifyee_thread,
+			swmbx_notifyee_stack,
+			SWMBX_NOTIFYEE_STACK_SIZE,
+			swmbx_notifyee_main,
+			NULL, NULL, NULL,
+			5, 0, K_NO_WAIT);
+	k_thread_name_set(swmbx_tid, "Software Mailbox Handler");
+
+}
+
 void InitializeSmbusMailbox(void)
 {
+	InitializeSoftwareMailbox();
 	ResetMailBox();
+
 	SetCpldIdentifier(0xDE);
 	SetCpldReleaseVersion(CPLD_RELEASE_VERSION);
 	uint8_t CurrentSvn = 0;
@@ -159,7 +321,7 @@ void InitializeSmbusMailbox(void)
 	uint8_t provision_flag = root_key_provision_flag | bmc_provision_flag | pch_provision_flag;
 
 	if (memcmp(UfmStatus & provision_flag, 0) == 0)
-		set_provision_status(UFM_PROVISIONED);
+		SetUfmStatusValue(UFM_PROVISIONED);
 
 	if (memcmp(UfmStatus & pch_provision_flag, 0) == 0) {
 		uint8_t PCHActiveMajorVersion, PCHActiveMinorVersion;
@@ -216,112 +378,66 @@ void InitializeSmbusMailbox(void)
 	SetCpldRotSvn(current_svn);
 }
 
-void SetCpldIdentifier(byte Data)
-{
-	gSmbusMailboxData.CpldIdentifier = Data;
-	////UpdateMailboxRegisterFile(CpldIdentifier,(uint8_t)gSmbusMailboxData.CpldIdentifier);
-}
-byte GetCpldIdentifier(void)
-{
-	return gSmbusMailboxData.CpldIdentifier;
-}
+#define MBX_REG_SETTER(REG) \
+	void Set##REG(byte Data) \
+	{ \
+		swmbx_write(gSwMbxDev, false, REG, &Data); \
+	} 
 
-void SetCpldReleaseVersion(byte Data)
-{
-	gSmbusMailboxData.CpldReleaseVersion = Data;
-	////UpdateMailboxRegisterFile(CpldReleaseVersion,(uint8_t)gSmbusMailboxData.CpldReleaseVersion);
-}
-byte GetCpldReleaseVersion(void)
-{
-	return gSmbusMailboxData.CpldReleaseVersion;
-}
+#define MBX_REG_INC(REG) \
+	void Inc##REG() \
+	{ \
+		byte data; \
+		swmbx_read(gSwMbxDev, false, REG, &data); \
+		++data; \
+		swmbx_write(gSwMbxDev, false, REG, &data); \
+	} 
 
-void SetCpldRotSvn(byte Data)
-{
-	gSmbusMailboxData.CpldRoTSVN = Data;
-	////UpdateMailboxRegisterFile(CpldRoTSVN,(uint8_t)gSmbusMailboxData.CpldRoTSVN);
-}
-byte GetCpldRotSvn(void)
-{
-	return gSmbusMailboxData.CpldRoTSVN;
-}
+#define MBX_REG_GETTER(REG) \
+	byte Get##REG(void) \
+	{ \
+		byte data; \
+		swmbx_read(gSwMbxDev, false, REG, &data); \
+		return data; \
+	}
 
-byte GetPlatformState(void)
-{
-	return gSmbusMailboxData.PlatformState;
-}
+#define MBX_REG_SETTER_GETTER(REG) \
+	MBX_REG_SETTER(REG) \
+	MBX_REG_GETTER(REG)
 
-void SetPlatformState(byte PlatformStateData)
-{
-	gSmbusMailboxData.PlatformState = PlatformStateData;
-	////UpdateMailboxRegisterFile(PlatformState, (uint8_t)gSmbusMailboxData.PlatformState);
-}
+#define MBX_REG_INC_GETTER(REG) \
+	MBX_REG_INC(REG) \
+	MBX_REG_GETTER(REG)
 
-byte GetRecoveryCount(void)
-{
-	return gSmbusMailboxData.Recoverycount;
-}
-
-void IncRecoveryCount(void)
-{
-	gSmbusMailboxData.Recoverycount++;
-	////UpdateMailboxRegisterFile(Recoverycount, (uint8_t)gSmbusMailboxData.Recoverycount);
-}
-
-byte GetLastRecoveryReason(void)
-{
-	return gSmbusMailboxData.LastRecoveryReason;
-}
-
-void SetLastRecoveryReason(LAST_RECOVERY_REASON_VALUE LastRecoveryReasonValue)
-{
-	gSmbusMailboxData.LastRecoveryReason = LastRecoveryReasonValue;
-	////UpdateMailboxRegisterFile(LastRecoveryReason, (uint8_t)gSmbusMailboxData.LastRecoveryReason);
-}
-
-byte GetPanicEventCount(void)
-{
-	return gSmbusMailboxData.PanicEventCount;
-}
-
-void IncPanicEventCount(void)
-{
-	gSmbusMailboxData.PanicEventCount++;
-	// UpdateMailboxRegisterFile(PanicEventCount, (uint8_t)gSmbusMailboxData.PanicEventCount);
-}
-
-byte GetLastPanicReason(void)
-{
-	return gSmbusMailboxData.LastPanicReason;
-}
-
-void SetLastPanicReason(LAST_PANIC_REASON_VALUE LastPanicReasonValue)
-{
-	gSmbusMailboxData.LastPanicReason = LastPanicReasonValue;
-	// UpdateMailboxRegisterFile(LastPanicReason, (uint8_t)gSmbusMailboxData.LastPanicReason);
-}
-
-byte GetMajorErrorCode(void)
-{
-	return gSmbusMailboxData.MajorErrorCode;
-}
-
-void SetMajorErrorCode(MAJOR_ERROR_CODE_VALUE MajorErrorCodeValue)
-{
-	gSmbusMailboxData.MajorErrorCode = MajorErrorCodeValue;
-	// UpdateMailboxRegisterFile(MajorErrorCode, (uint8_t)gSmbusMailboxData.MajorErrorCode);
-}
-
-byte GetMinorErrorCode(void)
-{
-	return gSmbusMailboxData.MinorErrorCode;
-}
-
-void SetMinorErrorCode(MINOR_ERROR_CODE_VALUE MinorErrorCodeValue)
-{
-	gSmbusMailboxData.MinorErrorCode = MinorErrorCodeValue;
-	// UpdateMailboxRegisterFile(MinorErrorCode,(uint8_t)gSmbusMailboxData.MinorErrorCode);
-}
+MBX_REG_SETTER_GETTER(CpldIdentifier);
+MBX_REG_SETTER_GETTER(CpldReleaseVersion);
+MBX_REG_SETTER_GETTER(CpldRotSvn);
+MBX_REG_SETTER_GETTER(PlatformState);
+MBX_REG_INC_GETTER(RecoveryCount);
+MBX_REG_SETTER_GETTER(LastRecoveryReason);
+MBX_REG_INC_GETTER(PanicEventCount);
+MBX_REG_SETTER_GETTER(LastPanicReason);
+MBX_REG_SETTER_GETTER(MajorErrorCode);
+MBX_REG_SETTER_GETTER(MinorErrorCode);
+MBX_REG_SETTER_GETTER(UfmStatusValue);
+MBX_REG_GETTER(UfmCommand);
+MBX_REG_SETTER_GETTER(UfmCmdTriggerValue);
+MBX_REG_SETTER_GETTER(BmcCheckpoint);
+MBX_REG_SETTER_GETTER(AcmCheckpoint);
+MBX_REG_SETTER_GETTER(BiosCheckpoint);
+MBX_REG_SETTER_GETTER(BmcUpdateIntent);
+MBX_REG_SETTER_GETTER(PchPfmActiveSvn);
+MBX_REG_SETTER_GETTER(PchPfmActiveMajorVersion);
+MBX_REG_SETTER_GETTER(PchPfmActiveMinorVersion);
+MBX_REG_SETTER_GETTER(BmcPfmActiveSvn);
+MBX_REG_SETTER_GETTER(BmcPfmActiveMajorVersion);
+MBX_REG_SETTER_GETTER(BmcPfmActiveMinorVersion);
+MBX_REG_SETTER_GETTER(PchPfmRecoverSvn);
+MBX_REG_SETTER_GETTER(PchPfmRecoverMajorVersion);
+MBX_REG_SETTER_GETTER(PchPfmRecoverMinorVersion);
+MBX_REG_SETTER_GETTER(BmcPfmRecoverSvn);
+MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
+MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
 
 // UFM Status
 bool IsUfmStatusCommandBusy(void)
@@ -357,75 +473,6 @@ bool IsUfmStatusPitLevel1Enforced(void)
 bool IsUfmStatusPITL2CompleteSuccess(void)
 {
 	return gSmbusMailboxData.PITL2CompleteSuccess ? true : false;
-}
-
-byte get_provision_status(void)
-{
-	uint8_t UfmStatus = 0;
-
-	UfmStatus = gSmbusMailboxData.UfmStatusValue;
-	if (gProvisionCount == 3)
-		gProvisinDoneFlag = TRUE;
-
-	return UfmStatus;
-}
-
-void set_provision_status(byte UfmStatus)
-{
-	gSmbusMailboxData.UfmStatusValue = UfmStatus;
-	// UpdateMailboxRegisterFile(UfmStatusValue, (uint8_t)gSmbusMailboxData.UfmStatusValue);
-}
-
-byte get_provision_command(void)
-{
-	uint8_t UfmCommandData = 0;
-
-	if (gBmcFlag)
-		UfmCommandData = gSmbusMailboxData.UfmCommand;
-
-	return UfmCommandData;
-}
-
-void set_provision_command(byte UfmCommandValue)
-{
-	gSmbusMailboxData.UfmCommand = UfmCommandValue;
-	// UpdateMailboxRegisterFile(UfmCommand, (uint8_t)gSmbusMailboxData.UfmCommand);
-}
-
-void set_provision_commandTrigger(byte UfmCommandTrigger)
-{
-	gSmbusMailboxData.UfmCmdTriggerValue = UfmCommandTrigger;
-	// UpdateMailboxRegisterFile(UfmCmdTriggerValue, (uint8_t)gSmbusMailboxData.UfmCmdTriggerValue);
-}
-
-byte get_provision_commandTrigger(void)
-{
-	return gSmbusMailboxData.UfmCmdTriggerValue;
-}
-
-byte GetBmcCheckPoint(void)
-{
-	return gSmbusMailboxData.BmcCheckpoint;
-}
-
-void SetBmcCheckPoint(byte BmcCheckpointData)
-{
-	// TODO Allow for updating from BMC Reset to Boot Complete
-	gSmbusMailboxData.BmcCheckpoint = BmcCheckpointData;
-	// UpdateMailboxRegisterFile(BmcCheckpoint, (uint8_t)gSmbusMailboxData.BmcCheckpoint);
-}
-
-byte GetBiosCheckPoint(void)
-{
-	return gSmbusMailboxData.BiosCheckpoint;
-}
-
-void SetBiosCheckPoint(byte BiosCheckpointData)
-{
-
-	gSmbusMailboxData.BiosCheckpoint = BiosCheckpointData;
-	// UpdateMailboxRegisterFile(BiosCheckpoint, (uint8_t)gSmbusMailboxData.BiosCheckpoint);
-
 }
 
 // PCH UpdateIntent
@@ -522,148 +569,6 @@ bool IsBmcUpdateIntentUpdateAtReset(void)
 	return gSmbusMailboxData.BmcUpdateIntentUpdateAtReset ? true : false;
 }
 
-byte GetBmcUpdateIntent(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentValue;
-}
-
-void SetBmcUpdateIntent(byte BmcUpdateIntent)
-{
-	gSmbusMailboxData.BmcUpdateIntentValue = BmcUpdateIntent;
-	// UpdateMailboxRegisterFile(BmcUpdateIntentValue, (uint8_t)gSmbusMailboxData.BmcUpdateIntentValue);
-}
-
-byte GetPchPfmActiveSvn(void)
-{
-	return gSmbusMailboxData.PchPFMActiveSVN;
-}
-
-void SetPchPfmActiveSvn(byte ActiveSVN)
-{
-	gSmbusMailboxData.PchPFMActiveSVN = ActiveSVN;
-	// UpdateMailboxRegisterFile(PchPFMActiveSVN, (uint8_t)gSmbusMailboxData.PchPFMActiveSVN);
-}
-
-byte GetPchPfmActiveMajorVersion(void)
-{
-	return gSmbusMailboxData.PchPFMActiveMajorVersion;
-}
-
-void SetPchPfmActiveMajorVersion(byte ActiveMajorVersion)
-{
-	gSmbusMailboxData.PchPFMActiveMajorVersion = ActiveMajorVersion;
-	// UpdateMailboxRegisterFile(PchPFMActiveMajorVersion, (uint8_t)gSmbusMailboxData.PchPFMActiveMajorVersion);
-}
-
-byte GetPchPfmActiveMinorVersion(void)
-{
-	return gSmbusMailboxData.PchPFMActiveMinorVersion;
-}
-
-void SetPchPfmActiveMinorVersion(byte ActiveMinorVersion)
-{
-	gSmbusMailboxData.PchPFMActiveMinorVersion = ActiveMinorVersion;
-	// UpdateMailboxRegisterFile(PchPFMActiveMinorVersion, (uint8_t)gSmbusMailboxData.PchPFMActiveMinorVersion);
-}
-
-byte GetBmcPfmActiveSvn(void)
-{
-	return gSmbusMailboxData.BmcPFMActiveSVN;
-}
-
-void SetBmcPfmActiveSvn(byte ActiveSVN)
-{
-	gSmbusMailboxData.BmcPFMActiveSVN = ActiveSVN;
-	// UpdateMailboxRegisterFile(BmcPFMActiveSVN, (uint8_t)gSmbusMailboxData.BmcPFMActiveSVN);
-}
-
-byte GetBmcPfmActiveMajorVersion(void)
-{
-	return gSmbusMailboxData.BmcPFMActiveMajorVersion;
-}
-
-void SetBmcPfmActiveMajorVersion(byte ActiveMajorVersion)
-{
-	gSmbusMailboxData.BmcPFMActiveMajorVersion = ActiveMajorVersion;
-	// UpdateMailboxRegisterFile(BmcPFMActiveMajorVersion, (uint8_t)gSmbusMailboxData.BmcPFMActiveMajorVersion);
-}
-
-byte GetBmcPfmActiveMinorVersion(void)
-{
-	return gSmbusMailboxData.BmcPFMActiveMinorVersion;
-}
-
-void SetBmcPfmActiveMinorVersion(byte ActiveMinorVersion)
-{
-	gSmbusMailboxData.BmcPFMActiveMinorVersion = ActiveMinorVersion;
-	// UpdateMailboxRegisterFile(BmcPFMActiveMinorVersion, (uint8_t)gSmbusMailboxData.BmcPFMActiveMinorVersion);
-}
-
-byte GetPchPfmRecoverSvn(void)
-{
-	return gSmbusMailboxData.PchPFMRecoverSVN;
-}
-
-void SetPchPfmRecoverSvn(byte RecoverSVN)
-{
-	gSmbusMailboxData.PchPFMRecoverSVN = RecoverSVN;
-	// UpdateMailboxRegisterFile(PchPFMRecoverSVN, (uint8_t)gSmbusMailboxData.PchPFMRecoverSVN);
-}
-
-byte GetPchPfmRecoverMajorVersion(void)
-{
-	return gSmbusMailboxData.PchPFMRecoverMajorVersion;
-}
-
-void SetPchPfmRecoverMajorVersion(byte RecoverMajorVersion)
-{
-	gSmbusMailboxData.PchPFMRecoverMajorVersion = RecoverMajorVersion;
-	// UpdateMailboxRegisterFile(PchPFMRecoverMajorVersion, (uint8_t)gSmbusMailboxData.PchPFMRecoverMajorVersion);
-}
-
-byte GetPchPfmRecoverMinorVersion(void)
-{
-	return gSmbusMailboxData.PchPFMRecoverMinorVersion;
-}
-
-void SetPchPfmRecoverMinorVersion(byte RecoverMinorVersion)
-{
-	gSmbusMailboxData.PchPFMRecoverMinorVersion = RecoverMinorVersion;
-	// UpdateMailboxRegisterFile(PchPFMRecoverMinorVersion, (uint8_t)gSmbusMailboxData.PchPFMRecoverMinorVersion);
-}
-
-byte GetBmcPfmRecoverSvn(void)
-{
-	return gSmbusMailboxData.BmcPFMRecoverSVN;
-}
-
-void SetBmcPfmRecoverSvn(byte RecoverSVN)
-{
-	gSmbusMailboxData.BmcPFMRecoverSVN = RecoverSVN;
-	// UpdateMailboxRegisterFile(BmcPFMRecoverSVN, (uint8_t)gSmbusMailboxData.BmcPFMRecoverSVN);
-}
-
-byte GetBmcPfmRecoverMajorVersion(void)
-{
-	return gSmbusMailboxData.BmcPFMRecoverMajorVersion;
-}
-
-void SetBmcPfmRecoverMajorVersion(byte RecoverMajorVersion)
-{
-	gSmbusMailboxData.BmcPFMRecoverMajorVersion = RecoverMajorVersion;
-	// UpdateMailboxRegisterFile(BmcPFMRecoverMajorVersion, (uint8_t)gSmbusMailboxData.BmcPFMRecoverMajorVersion);
-}
-
-byte GetBmcPfmRecoverMinorVersion(void)
-{
-	return gSmbusMailboxData.BmcPFMRecoverMinorVersion;
-}
-
-void SetBmcPfmRecoverMinorVersion(byte RecoverMinorVersion)
-{
-	gSmbusMailboxData.BmcPFMRecoverMinorVersion = RecoverMinorVersion;
-	// UpdateMailboxRegisterFile(BmcPFMRecoverMinorVersion, (uint8_t)gSmbusMailboxData.BmcPFMRecoverMinorVersion);
-}
 
 byte *GetCpldFpgaRotHash(void)
 {
@@ -724,13 +629,13 @@ unsigned char ProvisionPchOffsets(void)
 
 		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
 		if (Status == Success) {
-			DEBUG_PRINTF("Ps\r\n");
+			DEBUG_PRINTF("PCH offsets provisioned\r\n");
 			UfmStatus &= 0xFB;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
 		} else   {
-			DEBUG_PRINTF("PCH Offsets Provision failed...\r\n");
+			DEBUG_PRINTF("PCH offsets provision failed...\r\n");
 			erase_provision_flash();
-			set_provision_status(COMMAND_ERROR);
+			SetUfmStatusValue(COMMAND_ERROR);
 		}
 		return Success;
 	} else   {
@@ -751,12 +656,12 @@ unsigned char ProvisionBmcOffsets(void)
 		if (Status == Success) {
 			UfmStatus &= 0xF7;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-			DEBUG_PRINTF("Bs\r\n");
+			DEBUG_PRINTF("BMC offsets provisioned\r\n");
 
 		} else   {
-			DEBUG_PRINTF("BMC Offsets Provision failed...\r\n");
+			DEBUG_PRINTF("BMC offsets provision failed...\r\n");
 			erase_provision_flash();
-			set_provision_status(COMMAND_ERROR);
+			SetUfmStatusValue(COMMAND_ERROR);
 		}
 		return Success;
 	} else   {
@@ -778,16 +683,25 @@ void lock_provision_flash(void)
 void ReadRootKey(void)
 {
 	memcpy(gReadFifoData, gRootKeyHash, SHA256_DIGEST_LENGTH);
+	for (size_t i = 0; i<SHA256_DIGEST_LENGTH; ++i) {
+		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gRootKeyHash+i);
+	}
 }
 
 void ReadPchOfsets(void)
 {
 	memcpy(gReadFifoData, gPchOffsets, sizeof(gPchOffsets));
+	for (size_t i = 0; i<sizeof(gPchOffsets); ++i) {
+		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gPchOffsets+i);
+	}
 }
 
 void ReadBmcOffets(void)
 {
 	memcpy(gReadFifoData, gBmcOffsets, sizeof(gBmcOffsets));
+	for (size_t i = 0; i<sizeof(gBmcOffsets); ++i) {
+		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gBmcOffsets+i);
+	}
 }
 
 /**
@@ -801,7 +715,7 @@ void process_provision_command(void)
 	byte UfmStatus;
 	byte Status = 0;
 
-	UfmStatus = get_provision_status();
+	UfmStatus = GetUfmStatusValue();
 
 	if (UfmStatus & UFM_LOCKED) {
 		// Ufm locked
@@ -809,24 +723,25 @@ void process_provision_command(void)
 		return;
 	}
 
-	UfmCommandData = get_provision_command();
+	UfmCommandData = GetUfmCommand();
+
 	switch (UfmCommandData) {
 	case ERASE_CURRENT:
-		set_provision_status(COMMAND_BUSY);
+		SetUfmStatusValue(COMMAND_BUSY);
 		Status = erase_provision_flash();
 		if (Status == Success) {
 			gProvisionCount = 0;
-			set_provision_status(COMMAND_DONE);
+			SetUfmStatusValue(COMMAND_DONE);
 		} else   {
-			set_provision_status(COMMAND_ERROR);
+			SetUfmStatusValue(COMMAND_ERROR);
 		}
 		break;
 	case PROVISION_ROOT_KEY:
-		set_provision_status(COMMAND_BUSY);
+		SetUfmStatusValue(COMMAND_BUSY);
 		memcpy(gRootKeyHash, gUfmFifoData, SHA256_DIGEST_LENGTH);
-		gProvisionCount++;
+		gProvisionCount |= 1 << 0;
 		gProvisionData = 1;
-		set_provision_status(COMMAND_DONE);
+		SetUfmStatusValue(COMMAND_DONE);
 
 		break;
 	case PROVISION_PIT_KEY:
@@ -834,38 +749,38 @@ void process_provision_command(void)
 		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
 		break;
 	case PROVISION_PCH_OFFSET:
-		set_provision_status(COMMAND_BUSY);
+		SetUfmStatusValue(COMMAND_BUSY);
 		memcpy(gPchOffsets, gUfmFifoData, sizeof(gPchOffsets));
-		gProvisionCount++;
+		gProvisionCount |= 1 << 1;
 		gProvisionData = 1;
-		set_provision_status(COMMAND_DONE);
+		SetUfmStatusValue(COMMAND_DONE);
 
 		break;
 	case PROVISION_BMC_OFFSET:
-		set_provision_status(COMMAND_BUSY);
+		SetUfmStatusValue(COMMAND_BUSY);
 		memcpy(gBmcOffsets, gUfmFifoData, sizeof(gPchOffsets));
-		gProvisionCount++;
+		gProvisionCount |= 1 << 2;
 		gProvisionData = 1;
-		set_provision_status(COMMAND_DONE);
+		SetUfmStatusValue(COMMAND_DONE);
 
 		break;
 	case LOCK_UFM:
 		// lock ufm
 		lock_provision_flash();
-		set_provision_status(COMMAND_DONE | UFM_LOCKED);
+		SetUfmStatusValue(COMMAND_DONE | UFM_LOCKED);
 		break;
 	case READ_ROOT_KEY:
 		ReadRootKey();
-		set_provision_status(COMMAND_DONE);
+		SetUfmStatusValue(COMMAND_DONE);
 		break;
 	case READ_PCH_OFFSET:
 		ReadPchOfsets();
-		set_provision_status(COMMAND_DONE);
+		SetUfmStatusValue(COMMAND_DONE);
 		break;
 	case READ_BMC_OFFSET:
 		ReadBmcOffets();
-		set_provision_status(COMMAND_DONE | UFM_PROVISIONED);
-		// set_provision_status(COMMAND_DONE);
+		SetUfmStatusValue(COMMAND_DONE | UFM_PROVISIONED);
+		// SetUfmStatusValue(COMMAND_DONE);
 		break;
 
 	case ENABLE_PIT_LEVEL_1_PROTECTION:
@@ -877,30 +792,30 @@ void process_provision_command(void)
 		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
 		break;
 	}
-	if ((gProvisionCount == 3) && (gProvisionData == 1)) {
-		set_provision_status(COMMAND_BUSY);
-		// printk("Calling provisioing process..\n");
+	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {
+		SetUfmStatusValue(COMMAND_BUSY);
+		printk("Calling provisioing process..\n");
 		gProvisionData = 0;
 		Status = ProvisionRootKeyHash();
 		if (Status != Success) {
-			set_provision_status(COMMAND_ERROR);
+			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
 
 		Status = ProvisionPchOffsets();
 		if (Status != Success) {
-			set_provision_status(COMMAND_ERROR);
+			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
 
 		Status = ProvisionBmcOffsets();
 		if (Status != Success) {
 			printk("Status: %x\n", Status);
-			set_provision_status(COMMAND_ERROR);
+			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
 
-		set_provision_status(COMMAND_DONE | UFM_PROVISIONED);
+		SetUfmStatusValue(COMMAND_DONE | UFM_PROVISIONED);
 
 		CPLD_STATUS cpld_status;
 
@@ -923,7 +838,7 @@ void UpdateBmcCheckpoint(byte Data)
 		// Start WDT for BMC boot
 		gBmcBootDone = START;
 		gBMCWatchDogTimer = 0;
-		SetBmcCheckPoint(Data);
+		SetBmcCheckpoint(Data);
 	} else
 		DEBUG_PRINTF("BMC boot completed. Checkpoint update not allowed\r\n");
 
@@ -989,7 +904,7 @@ void UpdateBiosCheckpoint(byte Data)
 	}
 	if (gBmcBootDone == TRUE && gBiosBootDone == TRUE)
 		SetPlatformState(T0_BOOT_COMPLETED);
-	SetBiosCheckPoint(Data);
+	SetBiosCheckpoint(Data);
 }
 
 void PublishUpdateEvent(uint8_t ImageType, uint8_t FlashRegion)
@@ -1058,7 +973,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 				PublishUpdateEvent(PCH_EVENT, PRIMARY_FLASH_REGION);
 				return;
 			}
-			if (Source == BmcUpdateIntentValue) {
+			if (Source == BmcUpdateIntent) {
 				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 				cpld_update_status.BmcToPchStatus = 1;
 				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
@@ -1068,7 +983,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 		}
 
 		if (Data & PchRecoveryUpdate) {
-			if (Source == BmcUpdateIntentValue) {
+			if (Source == BmcUpdateIntent) {
 				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 				cpld_update_status.BmcToPchStatus = 1;
 				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
@@ -1126,72 +1041,25 @@ uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
 	byte DataToSend = 0;
 	uint8_t i = 0;
 
-	switch (CipherText[0]) {
-	case CpldIdentifier:
-		DataToSend = GetCpldIdentifier();
-		break;
-	case CpldReleaseVersion:
-		DataToSend = GetCpldReleaseVersion();
-		break;
-	case CpldRoTSVN:
-		DataToSend = GetCpldRotSvn();
-		break;
-	case PlatformState:
-		DataToSend = GetPlatformState();
-		break;
-	case Recoverycount:
-		DataToSend = GetRecoveryCount();
-		break;
-	case LastRecoveryReason:
-		DataToSend = GetLastRecoveryReason();
-		break;
-	case PanicEventCount:
-		DataToSend = GetPanicEventCount();
-		break;
-	case LastPanicReason:
-		DataToSend = GetLastPanicReason();
-		break;
-	case MajorErrorCode:
-		DataToSend = GetMajorErrorCode();
-		break;
-	case MinorErrorCode:
-		DataToSend = GetMinorErrorCode();
-		break;
-	case UfmStatusValue:
-		DataToSend = get_provision_status();
-		break;
-	case UfmCommand:
-		if (ReadFlag == TRUE)
-			DataToSend = get_provision_command();
-		else
-			set_provision_command(CipherText[1]);
-		break;
-	case UfmCmdTriggerValue:
-		if (ReadFlag == TRUE) {
-			DataToSend = get_provision_commandTrigger();
-		} else  {
-			if (CipherText[1] & EXECUTE_UFM_COMMAND) {       // If bit 0 set
-				// Execute command specified at UFM/Provisioning Command register
-				process_provision_command();
-			} else if (CipherText[1] & FLUSH_WRITE_FIFO) {    // Flush Write FIFO
-				// Need to read UFM Write FIFO offest
-				memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
-				gFifoData = 0;
-			} else if (CipherText[1] & FLUSH_READ_FIFO) {    // flush Read FIFO
-				// Need to read UFM Read FIFO offest
-				memset(&gReadFifoData, 0, sizeof(gReadFifoData));
-				gFifoData = 0;
-				mailBox_index = 0;
-			}
-		}
+	printk("PchBmcCommands CipherText: %02x %02x\n", CipherText[0], CipherText[1]);
 
-		break;
-	case UfmWriteFIFO:
-		gUfmFifoData[gFifoData++] = CipherText[1];
-		break;
-	case UfmReadFIFO:
-		DataToSend = gReadFifoData[mailBox_index];
-		mailBox_index++;
+	switch (CipherText[0]) {
+	case UfmCmdTriggerValue:
+		if (CipherText[1] & EXECUTE_UFM_COMMAND) {       // If bit 0 set
+			// Execute command specified at UFM/Provisioning Command register
+			process_provision_command();
+		} else if (CipherText[1] & FLUSH_WRITE_FIFO) {    // Flush Write FIFO
+			// Need to read UFM Write FIFO offest
+			memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
+			swmbx_flush_fifo(gSwMbxDev, UfmWriteFIFO);
+			gFifoData = 0;
+		} else if (CipherText[1] & FLUSH_READ_FIFO) {    // flush Read FIFO
+			// Need to read UFM Read FIFO offest
+			memset(&gReadFifoData, 0, sizeof(gReadFifoData));
+			swmbx_flush_fifo(gSwMbxDev, UfmReadFIFO);
+			gFifoData = 0;
+			mailBox_index = 0;
+		}
 		break;
 	case BmcCheckpoint:
 		UpdateBmcCheckpoint(CipherText[1]);
@@ -1202,59 +1070,13 @@ uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
 	case BiosCheckpoint:
 		UpdateBiosCheckpoint(CipherText[1]);
 		break;
-	case PchUpdateIntentValue:
-		if (!ReadFlag) {
-			SetPchUpdateIntent(CipherText[1]);
-			UpdateIntentHandle(CipherText[1], PchUpdateIntentValue);
-		}
+	case PchUpdateIntent:
+		SetPchUpdateIntent(CipherText[1]);
+		UpdateIntentHandle(CipherText[1], PchUpdateIntent);
 		break;
-	case BmcUpdateIntentValue:
-		if (!ReadFlag) {
-			SetBmcUpdateIntent(CipherText[1]);
-			UpdateIntentHandle(CipherText[1], BmcUpdateIntentValue);
-		}
-		break;
-	case PchPFMActiveSVN:
-		DataToSend = GetPchPfmActiveSvn();
-		break;
-	case PchPFMActiveMajorVersion:
-		DataToSend = GetPchPfmActiveMajorVersion();
-		break;
-	case PchPFMActiveMinorVersion:
-		DataToSend = GetPchPfmActiveMinorVersion();
-		break;
-	case BmcPFMActiveSVN:
-		DataToSend = GetBmcPfmActiveSvn();
-		break;
-	case BmcPFMActiveMajorVersion:
-		DataToSend = GetBmcPfmActiveMajorVersion();
-		break;
-	case BmcPFMActiveMinorVersion:
-		DataToSend = GetBmcPfmActiveMinorVersion();
-		break;
-	case PchPFMRecoverSVN:
-		DataToSend = GetPchPfmRecoverSvn();
-		break;
-	case PchPFMRecoverMajorVersion:
-		DataToSend = GetPchPfmRecoverMajorVersion();
-		break;
-	case PchPFMRecoverMinorVersion:
-		DataToSend = GetPchPfmRecoverMinorVersion();
-		break;
-	case BmcPFMRecoverSVN:
-		DataToSend = GetBmcPfmRecoverSvn();
-		break;
-	case BmcPFMRecoverMajorVersion:
-		DataToSend = GetBmcPfmRecoverMajorVersion();
-		break;
-	case BmcPFMRecoverMinorVersion:
-		DataToSend = GetBmcPfmRecoverMinorVersion();
-		break;
-	case CpldFPGARoTHash:
-		break;
-	case AcmBiosScratchPad:
-		break;
-	case BmcScratchPad:
+	case BmcUpdateIntent:
+		SetBmcUpdateIntent(CipherText[1]);
+		UpdateIntentHandle(CipherText[1], BmcUpdateIntent);
 		break;
 	default:
 		DEBUG_PRINTF("Mailbox command not found\r\n");

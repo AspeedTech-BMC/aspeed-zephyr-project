@@ -28,27 +28,28 @@
 	status = "okay";
 	pinctrl-0 = <&pinctrl_i2c0_default>;
 
-	bmcmbx_0: bmcmbx_0@38 {
-		compatible = "bmcmbx";
-		reg = <0x38>;
-		status = "okay";
-		label = "BMCMBX_0";
-	};
-#if 0
-	swmbx0: swmbx0@60 {
+	swmbx0: swmbx0@38 {
 		compatible = "aspeed,swmbx-dev";
-		reg = <0x60>;
-		label = "SWMBX_SLAVE_0";
+		reg = <0x38>;
+		label = "SWMBX_SLAVE_BMC";
 		size = <256>;
 		port = <0>;
 		status = "okay";
 	};
-#endif
 };
 
 &i2c1 {
 	pinctrl-0 = <&pinctrl_i2c1_default>;
 	status = "okay";
+
+	swmbx1: swmbx1@38 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x62>;
+		label = "SWMBX_SLAVE_CPU";
+		size = <256>;
+		port = <1>;
+		status = "okay";
+	};
 };
 
 &i2c2 {
@@ -76,15 +77,6 @@
 #ifdef CONFIG_I2C_IPMB_SLAVE
 		status = "okay";
 #endif
-	};
-
-	swmbx2: swmbx2@62 {
-		compatible = "aspeed,swmbx-dev";
-		reg = <0x62>;
-		label = "SWMBX_SLAVE_2";
-		size = <256>;
-		port = <1>;
-		status = "okay";
 	};
 };
 

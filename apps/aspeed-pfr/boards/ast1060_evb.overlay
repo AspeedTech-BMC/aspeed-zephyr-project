@@ -32,17 +32,28 @@
 &i2c0 {
 	status = "okay";
 	pinctrl-0 = <&pinctrl_i2c0_default>;
+
+	swmbx1: swmbx1@38 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x38>;
+		label = "SWMBX_SLAVE_CPU";
+		size = <256>;
+		port = <1>;
+		status = "okay";
+	};
 };
 
 &i2c1 {
 	pinctrl-0 = <&pinctrl_i2c1_default>;
 	status = "okay";
 
-	bmcmbx_0: bmcmbx_0@38 {
-		compatible = "bmcmbx";
+	swmbx0: swmbx0@38 {
+		compatible = "aspeed,swmbx-dev";
 		reg = <0x38>;
+		label = "SWMBX_SLAVE_BMC";
+		size = <256>;
+		port = <0>;
 		status = "okay";
-		label = "BMCMBX_0";
 	};
 };
 
