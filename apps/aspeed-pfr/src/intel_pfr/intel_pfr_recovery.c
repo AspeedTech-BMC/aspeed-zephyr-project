@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "pfr/pfr_common.h"
 #include "state_machine/common_smc.h"
 #include "intel_pfr_recovery.h"
@@ -14,8 +15,10 @@
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -52,7 +55,7 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 		active_svn = GetPchPfmActiveSvn();
 
 	if (active_svn != staging_svn) {
-		DEBUG_PRINTF("SVN error\r\n");
+		DEBUG_PRINTF("SVN error");
 		return Failure;
 	}
 
@@ -75,11 +78,11 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 
 	status = flash_copy_and_verify(&spi_flash->spi, target_address, source_address, area_size);
 	if (status != Success) {
-		DEBUG_PRINTF("Recovery region update failed\r\n");
+		DEBUG_PRINTF("Recovery region update failed");
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Recovery region update completed\r\n");
+	DEBUG_PRINTF("Recovery region update completed");
 
 	return Success;
 }
@@ -92,7 +95,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	uint32_t read_address = 0;
 	uint32_t area_size;
 
-	DEBUG_PRINTF("Active Data Corrupted\r\n");
+	DEBUG_PRINTF("Active Data Corrupted");
 	if (manifest->image_type == BMC_TYPE) {
 		status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
@@ -110,17 +113,17 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 
 	status = capsule_decompression(manifest->image_type, read_address, area_size);
 	if (status != Success) {
-		DEBUG_PRINTF("Repair Failed\r\n");
+		DEBUG_PRINTF("Repair Failed");
 		return Failure;
 	}
 
 	status = active_region_pfm_update(manifest);
 	if (status != Success) {
-		DEBUG_PRINTF("Active Region PFM Update failed!!\r\n");
+		DEBUG_PRINTF("Active Region PFM Update failed!!");
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Repair success\r\n");
+	DEBUG_PRINTF("Repair success");
 
 	return Success;
 }
@@ -173,7 +176,7 @@ int active_region_pfm_update(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	DEBUG_PRINTF("PFM Updated!!\r\n");
+	DEBUG_PRINTF("PFM Updated!!");
 
 	return Success;
 }
@@ -208,11 +211,11 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address = source_address;
 	manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 
-	DEBUG_PRINTF("BMC(PCH) Staging Area verfication\r\n");
+	DEBUG_PRINTF("BMC(PCH) Staging Area verfication");
 	// manifest verifcation
 	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("verify failed\r\n");
+		DEBUG_PRINTF("verify failed");
 		return Failure;
 	}
 
@@ -223,7 +226,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success)
 		return Failure;
-	printk("BMC PCH Staging verification successful\r\n");
+	DEBUG_PRINTF("BMC PCH Staging verification successful");
 	manifest->address = target_address;
 	manifest->image_type = image_type;
 
@@ -245,13 +248,13 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	}
 
 	if (manifest->state == RECOVERY) {
-		DEBUG_PRINTF("PCH staging region verification\r\n");
+		DEBUG_PRINTF("PCH staging region verification");
 		status = manifest->update_fw->base->verify(manifest, NULL, NULL);
 		if (status != Success)
 			return Failure;
 	}
 
-	DEBUG_PRINTF("BMC PCH Recovery region Update completed\r\n");
+	DEBUG_PRINTF("BMC PCH Recovery region Update completed");
 
 	return Success;
 }

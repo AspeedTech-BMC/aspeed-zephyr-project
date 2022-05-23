@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_verification.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr_provision.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #if PF_STATUS_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -22,7 +25,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	int status = 0;
 	uint32_t read_address;
 
-	DEBUG_PRINTF("Verify recovery\r\n");
+	DEBUG_PRINTF("Verify recovery");
 
 	// Recovery region verification
 	if (manifest->image_type == BMC_TYPE) {
@@ -37,7 +40,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	// Block0-Block1 verifcation
 	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("Verify recovery failed\r\n");
+		DEBUG_PRINTF("Verify recovery failed");
 		return Failure;
 	}
 
@@ -52,7 +55,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	// manifest verifcation
 	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("Verify recovery pfm failed\r\n");
+		DEBUG_PRINTF("Verify recovery pfm failed");
 		return Failure;
 	}
 
@@ -60,7 +63,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	DEBUG_PRINTF("Recovery Region verification success\r\n");
+	DEBUG_PRINTF("Recovery Region verification success");
 
 	return Success;
 }
@@ -80,11 +83,11 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	manifest->address = read_address;
 
-	DEBUG_PRINTF("PFM Verification\r\n");
+	DEBUG_PRINTF("PFM Verification");
 
 	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("Verify active pfm failed\r\n");
+		DEBUG_PRINTF("Verify active pfm failed");
 		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 		return Failure;
 	}
@@ -97,7 +100,7 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	status = pfm_spi_region_verification(manifest);
 	if (status != Success) {
 		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
-		DEBUG_PRINTF("Verify active spi failed\r\n");
+		DEBUG_PRINTF("Verify active spi failed");
 		return Failure;
 	}
 

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <zephyr.h>
 #include <smf.h>
 
@@ -12,6 +13,8 @@
 #include "include/SmbusMailBoxCom.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "logging/debug_log.h"// State Machine log saving
+
+LOG_MODULE_REGISTER(state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 
 K_FIFO_DEFINE(evt_q);
 
@@ -53,7 +56,7 @@ int StartHrotStateMachine(void)
 
 static void run_idle(void *context)
 {
-	// printk("Executing run_idle\r\n");
+	LOG_DBG("Executing run_idle\r\n");
 
 	if (!k_fifo_is_empty(&evt_q)) {
 		int new_state = 0;
@@ -94,13 +97,13 @@ static void run_idle(void *context)
 /* I2C State Handlers */
 static void i2c_entry(void *context)
 {
-	// printk("Executing i2c_entry\r\n");
-	// printk("Leaving i2c_entry\r\n");
+	LOG_DBG("Executing i2c_entry\r\n");
+	LOG_DBG("Leaving i2c_entry\r\n");
 }
 
 static void run_i2c(void *context)
 {
-	// printk("Executing run_i2c\r\n");
+	LOG_DBG("Executing run_i2c\r\n");
 	struct hrot_smc_context *sm_context = (struct hrot_smc_context *)context;
 	void *sm_static_data = sm_context->sm_static_data;
 	void *event_ctx = sm_context->event_ctx;
@@ -109,13 +112,13 @@ static void run_i2c(void *context)
 	// Event
 	process_i2c_command(sm_static_data, event_ctx);
 	// PchBmcCommands(event_ctx, 0);
-	// printk("Leaving run_i2c\r\n");
+	LOG_DBG("Leaving run_i2c\r\n");
 }
 
 static void i2c_exit(void *context)
 {
-	// printk("Executing i2c_exit\r\n");
-	// printk("Leaving i2c_exit\r\n");
+	LOG_DBG("Executing i2c_exit\r\n");
+	LOG_DBG("Leaving i2c_exit\r\n");
 }
 
 /* verify State Handlers */
@@ -141,10 +144,10 @@ static void run_verify(void *context)
 	debug_log_create_entry(DEBUG_LOG_SEVERITY_INFO, DEBUG_LOG_COMPONENT_VERIFY, VERIFY_LOG_COMPONENT_RUN_START, 0, 0);
 	debug_log_flush();// State Machine log saving to SPI
 
-	// printk("Executing run_verify\r\n");
+	LOG_DBG("Executing run_verify\r\n");
 	status = handleImageVerification(sm_static_data, event_ctx);
 
-	// printk("Leaving run_verify\r\n");
+	LOG_DBG("Leaving run_verify\r\n");
 }
 
 static void verify_exit(void *context)
@@ -152,9 +155,9 @@ static void verify_exit(void *context)
 	struct hrot_smc_context *sm_context = (struct hrot_smc_context *)context;
 	void *sm_static_data = sm_context->sm_static_data;
 
-	// printk("Executing verify_exit\r\n");
+	LOG_DBG("Executing verify_exit\r\n");
 	handleVerifyExitState(sm_static_data);
-	// printk("Leaving verify_exit\r\n");
+	LOG_DBG("Leaving verify_exit\r\n");
 }
 
 /* recovery State Handlers */
@@ -166,10 +169,10 @@ static void recovery_entry(void *context)
 	debug_log_create_entry(DEBUG_LOG_SEVERITY_INFO, DEBUG_LOG_COMPONENT_RECOVERY, RECOVERY_LOG_COMPONENT_ENTRY_START, 0, 0);
 	debug_log_flush();// State Machine log saving to SPI
 
-	// printk("Executing recovery_entry\r\n");
+	LOG_DBG("Executing recovery_entry\r\n");
 	handleRecoveryEntryState(sm_static_data);
 	handleRecoveryInitState(sm_static_data);
-	// printk("Leaving recovery_entry\r\n");
+	LOG_DBG("Leaving recovery_entry\r\n");
 }
 
 static void run_recovery(void *context)
@@ -183,7 +186,7 @@ static void run_recovery(void *context)
 	debug_log_create_entry(DEBUG_LOG_SEVERITY_INFO, DEBUG_LOG_COMPONENT_RECOVERY, RECOVERY_LOG_COMPONENT_RUN_START, 0, 0);
 	debug_log_flush();// State Machine log saving to SPI
 
-	// printk("Executing run_recovery\r\n");
+	LOG_DBG("Executing run_recovery\r\n");
 	status = handleRecoveryAction(sm_static_data, event_ctx);
 	AO_DATA *ActiveObjectData = (AO_DATA *)sm_static_data;
 
@@ -203,7 +206,7 @@ static void run_recovery(void *context)
 		handlePostRecoveryFailure(sm_static_data, event_ctx);
 	}
 
-	// printk("Leaving run_recovery\r\n");
+	LOG_DBG("Leaving run_recovery\r\n");
 }
 
 static void recovery_exit(void *context)
@@ -211,9 +214,9 @@ static void recovery_exit(void *context)
 	struct hrot_smc_context *sm_context = (struct hrot_smc_context *)context;
 	void *sm_static_data = sm_context->sm_static_data;
 
-	// printk("Executing recovery_exit\r\n");
+	LOG_DBG("Executing recovery_exit\r\n");
 	handleRecoveryExitState(sm_static_data);
-	// printk("Leaving recovery_exit\r\n");
+	LOG_DBG("Leaving recovery_exit\r\n");
 }
 
 /* update State Handlers */
@@ -227,10 +230,10 @@ static void update_entry(void *context)
 	debug_log_create_entry(DEBUG_LOG_SEVERITY_INFO, DEBUG_LOG_COMPONENT_UPDATE, UPDATE_LOG_COMPONENT_ENTRY_START, 0, 0);
 	debug_log_flush();// State Machine log saving to SPI
 
-	// printk("Executing update_entry\r\n");
+	LOG_DBG("Executing update_entry\r\n");
 	handleUpdateEntryState((int)type, sm_static_data);
 	handleUpdateInitState((int)type, sm_static_data);
-	// printk("Leaving update_entry\r\n");
+	LOG_DBG("Leaving update_entry\r\n");
 }
 
 static void run_update(void *context)
@@ -244,7 +247,7 @@ static void run_update(void *context)
 	debug_log_create_entry(DEBUG_LOG_SEVERITY_INFO, DEBUG_LOG_COMPONENT_UPDATE, UPDATE_LOG_COMPONENT_RUN_START, 0, 0);
 	debug_log_flush();// State Machine log saving to SPI
 
-	// printk("Executing run_update\r\n");
+	LOG_DBG("Executing run_update\r\n");
 	status = handleUpdateImageAction(sm_static_data, event_ctx);
 	if (status == Success) {
 		debug_log_create_entry(DEBUG_LOG_SEVERITY_INFO, DEBUG_LOG_COMPONENT_UPDATE, UPDATE_LOG_COMPONENT_UPDATE_SUCCESS, 0, 0);
@@ -257,7 +260,7 @@ static void run_update(void *context)
 
 		handlePostUpdateFailure(sm_static_data);
 	}
-	// printk("Leaving run_update\r\n");
+	LOG_DBG("Leaving run_update\r\n");
 }
 
 static void update_exit(void *context)
@@ -267,9 +270,9 @@ static void update_exit(void *context)
 	void *event_ctx = sm_context->event_ctx;
 	unsigned int type = ((EVENT_CONTEXT *)event_ctx)->image;
 
-	// printk("Executing update_exit\r\n");
+	LOG_DBG("Executing update_exit\r\n");
 	handleUpdateExitState((int)type, sm_static_data);
-	// printk("Leaving update_exit\r\n");
+	LOG_DBG("Leaving update_exit\r\n");
 }
 
 /* Lockdown State Handlers */
@@ -278,9 +281,9 @@ static void run_lockdown(void *context)
 	struct hrot_smc_context *sm_context = (struct hrot_smc_context *)context;
 	void *sm_static_data = sm_context->sm_static_data;
 
-	// printk("Executing run_lockdown\r\n");
+	LOG_DBG("Executing run_lockdown\r\n");
 	handleLockDownState(sm_static_data);
-	// printk("Leaving run_lockdown\r\n");
+	LOG_DBG("Leaving run_lockdown\r\n");
 }
 
 int post_smc_action(int new_state, void *static_data, void *event)

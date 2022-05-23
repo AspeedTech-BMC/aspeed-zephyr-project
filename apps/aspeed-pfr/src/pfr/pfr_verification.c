@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "intel_pfr/intel_pfr_authentication.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "state_machine/common_smc.h"
@@ -13,9 +14,11 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "pfr_util.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -33,12 +36,12 @@ int authentication_image(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI
-		DEBUG_PRINTF("Image Type: BMC \r\n");
+		DEBUG_PRINTF("Image Type: BMC ");
 		pfr_manifest->image_type = BMC_TYPE;
 
 	} else  {
 		// PCH SPI
-		DEBUG_PRINTF("Image Type: PCH \r\n");
+		DEBUG_PRINTF("Image Type: PCH ");
 		pfr_manifest->image_type = PCH_TYPE;
 	}
 

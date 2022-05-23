@@ -10,6 +10,8 @@
 #include MBEDTLS_CONFIG_FILE
 #endif
 
+#include <logging/log.h>
+
 // #include "pfr_util.h"
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
@@ -24,9 +26,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if 1
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -156,12 +160,12 @@ int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t
 void print_buffer(uint8_t *string, uint8_t *buffer, uint32_t length)
 {
 
-	DEBUG_PRINTF("\r\n%s ", string);
+	DEBUG_PRINTF("%s ", string);
 
 	for (int i = 0; i < length; i++)
 		DEBUG_PRINTF(" %x", buffer[i]);
 
-	DEBUG_PRINTF("\r\n");
+	DEBUG_PRINTF("");
 }
 
 // compare buffer
@@ -227,7 +231,7 @@ static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
 	mbedtls_mpi_free(&r);
 	mbedtls_mpi_free(&s);
 
-	// printk("ECDSA:%d\r\n", ret);
+	// LOG_INF("ECDSA:%d", ret);
 
 	return ret;
 

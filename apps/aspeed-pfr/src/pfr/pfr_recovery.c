@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "pfr_recovery.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "state_machine/common_smc.h"
@@ -11,9 +12,11 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "include/SmbusMailBoxCom.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -32,12 +35,12 @@ int recover_image(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI
-		DEBUG_PRINTF("Image Type: BMC \r\n");
+		DEBUG_PRINTF("Image Type: BMC ");
 		pfr_manifest->image_type = BMC_TYPE;
 
 	} else  {
 		// PCH SPI
-		DEBUG_PRINTF("Image Type: PCH \r\n");
+		DEBUG_PRINTF("Image Type: PCH ");
 		pfr_manifest->image_type = PCH_TYPE;
 	}
 
@@ -45,7 +48,7 @@ int recover_image(void *AoData, void *EventContext)
 		// status = pfr_staging_verify(pfr_manifest);
 		status = status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
 		if (status != Success) {
-			DEBUG_PRINTF("PFR Staging Area Corrupted\r\n");
+			DEBUG_PRINTF("PFR Staging Area Corrupted");
 			if (ActiveObjectData->ActiveImageStatus != Success) {
 				SetMajorErrorCode(pfr_manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 				SetMinorErrorCode(ACTIVE_RECOVERY_STAGING_AUTH_FAIL);

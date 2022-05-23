@@ -4,15 +4,18 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_definitions.h"
 #include "state_machine/common_smc.h"
 #include "intel_pfr_provision.h"
 #include "pfr/pfr_common.h"
 
+LOG_MODULE_REGISTER(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if INTEL_MANIFEST_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -38,14 +41,14 @@ int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address)
 
 	status = pfr_spi_read(manifest->image_type, read_address, sizeof(PFM_STRUCTURE_1), buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("Pfm Version Set failed...\r\n");
+		DEBUG_PRINTF("Pfm Version Set failed...");
 		return Failure;
 	}
 
 	if (((PFM_STRUCTURE_1 *)buffer)->PfmTag == PFMTAG) {
-		DEBUG_PRINTF("PfmTag verification success...\r\n");
+		DEBUG_PRINTF("PfmTag verification success...");
 	} else {
-		DEBUG_PRINTF("PfmTag verification failed...\r\n");
+		DEBUG_PRINTF("PfmTag verification failed...");
 		return Failure;
 	}
 
@@ -92,7 +95,7 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 
 	status = pfr_spi_read(manifest->image_type, pfm_data_address, sizeof(PFM_STRUCTURE_1), buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("Get Recover Pfm Version Details failed...\r\n");
+		DEBUG_PRINTF("Get Recover Pfm Version Details failed...");
 		return Failure;
 	}
 
@@ -136,7 +139,7 @@ int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version)
 
 	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE_1), buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("Invalid Staging Area Pfm \r\n");
+		DEBUG_PRINTF("Invalid Staging Area Pfm ");
 		return Failure;
 	}
 
@@ -151,13 +154,13 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 	int status = 0;
 	uint32_t region_length;
 
-	DEBUG_PRINTF("RegionStartAddress: %x,RegionEndAddress: %x\r\n",
+	DEBUG_PRINTF("RegionStartAddress: %x, RegionEndAddress: %x",
 		     PfmSpiDefinition->RegionStartAddress, PfmSpiDefinition->RegionEndAddress);
 	region_length = (PfmSpiDefinition->RegionEndAddress) - (PfmSpiDefinition->RegionStartAddress);
 
 	if ((PfmSpiDefinition->HashAlgorithmInfo.SHA256HashPresent == 1) ||
 	    (PfmSpiDefinition->HashAlgorithmInfo.SHA384HashPresent == 1)) {
-		DEBUG_PRINTF("Digest verification start\r\n");
+		DEBUG_PRINTF("Digest verification start");
 
 		uint8_t sha256_buffer[SHA384_DIGEST_LENGTH] = { 0 };
 		uint32_t hash_length = 0;
@@ -179,10 +182,10 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 
 		status = compare_buffer(pfm_spi_Hash, sha256_buffer, SHA256_DIGEST_LENGTH);
 		if (status != Success) {
-			DEBUG_PRINTF("Digest verification failed\r\n");
+			DEBUG_PRINTF("Digest verification failed");
 			return Failure;
 		}
-		DEBUG_PRINTF("Digest verification succeeded\r\n");
+		DEBUG_PRINTF("Digest verification succeeded");
 	}
 
 
@@ -325,7 +328,7 @@ Manifest_Status get_pfm_manifest_data(struct pfr_manifest *manifest, uint32_t *p
 	if (status != Success)
 		return manifest_failure;
 
-	// DEBUG_PRINTF("PFMDefinitionType %d\r\n", pfm_definition_type);
+	// DEBUG_PRINTF("PFMDefinitionType %d", pfm_definition_type);
 
 	if (pfm_definition_type == ACTIVE_PFM_SMBUS_RULE) {
 		if (pfm_definition_type == pfm_definition) {
@@ -336,7 +339,7 @@ Manifest_Status get_pfm_manifest_data(struct pfr_manifest *manifest, uint32_t *p
 		*position += sizeof(PFM_SMBUS_RULE);
 	} else if (pfm_definition_type == PCH_PFM_SPI_REGION) {
 
-		DEBUG_PRINTF("PFM Spi Region Detected\n");
+		DEBUG_PRINTF("PFM Spi Region Detected");
 
 		status = pfr_spi_read(manifest->image_type, (manifest_start_address + *position), sizeof(PFM_SPI_DEFINITION), (uint8_t *) spi_definition);
 		if (status != Success)
@@ -381,7 +384,7 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 	for (position = 0; position <= g_pfm_manifest_length - 1; region_count++) {
 		verify_status = get_pfm_manifest_data(manifest, &position, (void *)&pfm_spi_definition, (uint8_t *)&pfm_spi_hash, pfm_definition_type);
 		if (verify_status == manifest_failure) {
-			DEBUG_PRINTF("Invalid Manifest Data..System Halted !!\r\n");
+			DEBUG_PRINTF("Invalid Manifest Data..System Halted !!");
 			return Failure;
 		}
 
@@ -394,7 +397,7 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 		if (pfm_definition_type == PCH_PFM_SPI_REGION) {
 			status = spi_region_hash_verification(manifest, &pfm_spi_definition, pfm_spi_hash);
 			if (status != Success) {
-				DEBUG_PRINTF("SPI region hash verification fail...\r\n");
+				DEBUG_PRINTF("SPI region hash verification fail...");
 				return Failure;
 			}
 
@@ -428,9 +431,9 @@ Manifest_Status get_fvm_manifest_data(struct pfr_manifest *manifest, uint32_t *p
 			return manifest_failure;
 
 		if (fvm_data.FvmTag == FVMTAG) {
-			DEBUG_PRINTF("FvmTag verification success...\r\n");
+			DEBUG_PRINTF("FvmTag verification success...");
 		} else {
-			DEBUG_PRINTF("FvmTag verification failed...\r\n");
+			DEBUG_PRINTF("FvmTag verification failed...");
 			return manifest_failure;
 		}
 

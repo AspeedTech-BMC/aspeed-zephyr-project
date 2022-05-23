@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <drivers/flash.h>
 #include <drivers/spi_nor.h>
 #include <gpio/gpio_aspeed.h>
@@ -17,7 +18,6 @@
 
 #define LOG_MODULE_NAME gpio_api
 
-#include <logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 static char *GPIO_Devices_List[6] = {
@@ -34,11 +34,11 @@ static void GPIO_dump_buf(uint8_t *buf, uint32_t len)
 	uint32_t i;
 
 	for (i = 0; i < len; i++) {
-		printk("%02x ", buf[i]);
+		LOG_INF("%02x ", buf[i]);
 		if (i % 16 == 15)
-			printk("\n");
+			LOG_INF("\n");
 	}
-	printk("\n");
+	LOG_INF("\n");
 }
 
 int BMCBootHold(void)
@@ -59,7 +59,7 @@ int BMCBootHold(void)
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
 	if (gpio_dev == NULL) {
-		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
+		LOG_INF("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
 
@@ -92,7 +92,7 @@ int PCHBootHold(void)
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
 	if (gpio_dev == NULL) {
-		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
+		LOG_INF("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
 
@@ -117,7 +117,7 @@ int BMCBootRelease(void)
 	spim_rst_flash(dev_m, 1000);
 	spim_passthrough_config(dev_m, 0, false);
 #if defined(CONFIG_ASPEED_DC_SCM)
-	printk("release BMC\n\n");
+	LOG_INF("release BMC");
 	aspeed_spi_monitor_sw_rst(dev_m);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
 	pfr_bmc_srst_enable_ctrl(false);
@@ -129,7 +129,7 @@ int BMCBootRelease(void)
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
 	if (gpio_dev == NULL) {
-		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
+		LOG_INF("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
 
@@ -161,7 +161,7 @@ int PCHBootRelease(void)
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
 	if (gpio_dev == NULL) {
-		printk("[%d]Fail to get GPIO0_M_P", __LINE__);
+		LOG_INF("[%d]Fail to get GPIO0_M_P", __LINE__);
 		return -1;
 	}
 

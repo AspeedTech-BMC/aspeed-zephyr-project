@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <stdint.h>
 #include "intel_pfr_provision.h"
 #include "intel_pfr_definitions.h"
@@ -17,9 +18,11 @@
 #include <gpio/gpio_aspeed.h>
 #include <drivers/misc/aspeed/pfr_aspeed.h>
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -63,7 +66,7 @@ int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 		manifest->kc_flag = FALSE;
 	}
 
-	DEBUG_PRINTF("KeyCancellationFlag : %x \r\n", manifest->kc_flag);
+	DEBUG_PRINTF("KeyCancellationFlag : %x ", manifest->kc_flag);
 
 	return Success;
 }
@@ -89,12 +92,12 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 
 	new_key_id = new_key_id << (key_id % 8);
 	if ((key_id / 8) > (CSK_KEY_SIZE - 1)) {
-		DEBUG_PRINTF("Invalid Key Id\r\n");
+		DEBUG_PRINTF("Invalid Key Id");
 		return Failure;
 	}
 
 	if (!(new_key_id & old_key_id[key_id / 8])) {
-		DEBUG_PRINTF("This PFR CSK Key Was cancelled..!Can't Proceed with verify with this key Id: %d\r\n", key_id);
+		DEBUG_PRINTF("This PFR CSK Key Was cancelled..!Can't Proceed with verify with this key Id: %d", key_id);
 		return Failure;
 	}
 
@@ -115,7 +118,7 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 	uint8_t policy_data = 0;
 
 	if (!ufm_offset) {
-		DEBUG_PRINTF("Invalid provisioned UFM offset for key cancellation\r\n");
+		DEBUG_PRINTF("Invalid provisioned UFM offset for key cancellation");
 		return Failure;
 	}
 
@@ -126,7 +129,7 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 	// store policy data from flash part
 	status = ufm_read(PROVISION_UFM, ufm_offset, &policy_data, 1);
 	if (status != Success) {
-		DEBUG_PRINTF("ReadCancellationPolicyStatus load cancellation policy fail\r\n");
+		DEBUG_PRINTF("ReadCancellationPolicyStatus load cancellation policy fail");
 		return Failure;
 	}
 

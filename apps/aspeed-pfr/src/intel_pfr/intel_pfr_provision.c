@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <stdint.h>
 #include "state_machine/common_smc.h"
 #include "pfr/pfr_common.h"
@@ -12,9 +13,11 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_verification.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif

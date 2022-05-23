@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <zephyr.h>
 
 #include "state_machine.h"
@@ -18,6 +19,8 @@
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include <logging/logging_wrapper.h>
 
+LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
+
 #define DEBUG_HALT() {				  \
 		volatile int halt = 1;		  \
 		while (halt) {			  \
@@ -29,7 +32,7 @@ void main(void)
 {
 	int status = 0;
 
-	printk("\r\n *** ASPEED_PFR version 0.0.1 ***\r\n");
+	LOG_INF("*** ASPEED_PFR version 0.0.1 ***");
 
 	status = initializeEngines();
 	status = initializeManifestProcessor();

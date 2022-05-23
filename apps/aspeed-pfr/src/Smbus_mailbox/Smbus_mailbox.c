@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "Smbus_mailbox.h"
 #include "common/common.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
@@ -12,8 +13,10 @@
 #include <drivers/i2c.h>
 #include <drivers/i2c/pfr/swmbx.h>
 
+LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
+
 #if SMBUS_MAILBOX_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -172,7 +175,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	while(1) {
 		ret = k_poll(events, 8, K_FOREVER);
 		if (ret < 0) {
-			printk("%s: k_poll error ret=%d\n", ret);
+			DEBUG_PRINTF("%s: k_poll error ret=%d", ret);
 			continue;
 		}
 
@@ -252,7 +255,7 @@ void InitializeSoftwareMailbox(void)
 	const struct device *swmbx_dev = NULL;
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
-		printk("%s: fail to bind %s\n", "SWMBX");
+		DEBUG_PRINTF("%s: fail to bind %s", "SWMBX");
 		return;
 	}
 	gSwMbxDev = swmbx_dev;
@@ -320,10 +323,10 @@ void InitializeSmbusMailbox(void)
 	uint8_t root_key_provision_flag = 1 << ROOT_KEY_HASH_PROVISION_FLAG;
 	uint8_t provision_flag = root_key_provision_flag | bmc_provision_flag | pch_provision_flag;
 
-	if (memcmp(UfmStatus & provision_flag, 0) == 0)
+	if (!(UfmStatus & provision_flag))
 		SetUfmStatusValue(UFM_PROVISIONED);
 
-	if (memcmp(UfmStatus & pch_provision_flag, 0) == 0) {
+	if (!(UfmStatus & pch_provision_flag)) {
 		uint8_t PCHActiveMajorVersion, PCHActiveMinorVersion;
 		uint8_t PCHActiveSVN;
 		uint32_t pch_pfm_address;
@@ -347,7 +350,7 @@ void InitializeSmbusMailbox(void)
 		SetPchPfmRecoverMinorVersion(PCHRecoveryMinorVersion);
 	}
 	// f1
-	if (memcmp(UfmStatus & bmc_provision_flag, 0) == 0) {
+	if (!(UfmStatus & bmc_provision_flag)) {
 		uint8_t BMCActiveMajorVersion, BMCActiveMinorVersion;
 		uint8_t BMCActiveSVN;
 		uint32_t bmc_pfm_address;
@@ -613,7 +616,7 @@ unsigned char ProvisionRootKeyHash(void)
 			return Failure;
 		}
 	} else   {
-		printk("Unsupported error\n");
+		DEBUG_PRINTF("Unsupported error");
 		return UnSupported;
 	}
 }
@@ -629,11 +632,11 @@ unsigned char ProvisionPchOffsets(void)
 
 		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
 		if (Status == Success) {
-			DEBUG_PRINTF("PCH offsets provisioned\r\n");
+			DEBUG_PRINTF("PCH offsets provisioned");
 			UfmStatus &= 0xFB;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
 		} else   {
-			DEBUG_PRINTF("PCH offsets provision failed...\r\n");
+			DEBUG_PRINTF("PCH offsets provision failed...");
 			erase_provision_flash();
 			SetUfmStatusValue(COMMAND_ERROR);
 		}
@@ -656,10 +659,10 @@ unsigned char ProvisionBmcOffsets(void)
 		if (Status == Success) {
 			UfmStatus &= 0xF7;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-			DEBUG_PRINTF("BMC offsets provisioned\r\n");
+			DEBUG_PRINTF("BMC offsets provisioned");
 
 		} else   {
-			DEBUG_PRINTF("BMC offsets provision failed...\r\n");
+			DEBUG_PRINTF("BMC offsets provision failed...");
 			erase_provision_flash();
 			SetUfmStatusValue(COMMAND_ERROR);
 		}
@@ -719,7 +722,7 @@ void process_provision_command(void)
 
 	if (UfmStatus & UFM_LOCKED) {
 		// Ufm locked
-		DEBUG_PRINTF("UFM LOCKED\n\r");
+		DEBUG_PRINTF("UFM LOCKED");
 		return;
 	}
 
@@ -746,7 +749,7 @@ void process_provision_command(void)
 		break;
 	case PROVISION_PIT_KEY:
 		// Update password to provsioned UFM
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
+		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
 		break;
 	case PROVISION_PCH_OFFSET:
 		SetUfmStatusValue(COMMAND_BUSY);
@@ -785,16 +788,16 @@ void process_provision_command(void)
 
 	case ENABLE_PIT_LEVEL_1_PROTECTION:
 		// EnablePitLevel1();
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
+		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
 		break;
 	case ENABLE_PIT_LEVEL_2_PROTECTION:
 		// EnablePitLevel2();
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED\n\r");
+		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
 		break;
 	}
 	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {
 		SetUfmStatusValue(COMMAND_BUSY);
-		printk("Calling provisioing process..\n");
+		DEBUG_PRINTF("Calling provisioing process..");
 		gProvisionData = 0;
 		Status = ProvisionRootKeyHash();
 		if (Status != Success) {
@@ -810,7 +813,7 @@ void process_provision_command(void)
 
 		Status = ProvisionBmcOffsets();
 		if (Status != Success) {
-			printk("Status: %x\n", Status);
+			DEBUG_PRINTF("Status: %x", Status);
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
@@ -840,10 +843,10 @@ void UpdateBmcCheckpoint(byte Data)
 		gBMCWatchDogTimer = 0;
 		SetBmcCheckpoint(Data);
 	} else
-		DEBUG_PRINTF("BMC boot completed. Checkpoint update not allowed\r\n");
+		DEBUG_PRINTF("BMC boot completed. Checkpoint update not allowed");
 
 	if (Data == PausingExecutionBlock) {
-		printk("Enter PausingExecutionBlock Disable Timer\n");
+		DEBUG_PRINTF("Enter PausingExecution: Block Disable Timer");
 		AspeedPFR_DisableTimer(BMC_EVENT);
 	}
 	if (Data == ResumedExecutionBlock)
@@ -852,7 +855,7 @@ void UpdateBmcCheckpoint(byte Data)
 	// BMC boot completed
 	if (Data == CompletingexecutionBlock || Data == ReadToBootOS) {
 		// If execution completed disable timer
-		printk("Enter CompletingexecutionBlock Disable Timer\n");
+		DEBUG_PRINTF("Enter Completingexecution: Block Disable Timer");
 		AspeedPFR_DisableTimer(BMC_EVENT);
 		gBmcBootDone = TRUE;
 		gBMCWatchDogTimer = -1;
@@ -894,7 +897,7 @@ void UpdateBiosCheckpoint(byte Data)
 		gBootCheckpointReceived = true;
 		gPCHWatchDogTimer = -1;
 		SetPlatformState(T0_BIOS_BOOTED);
-		DEBUG_PRINTF("BIOS boot completed. Checkpoint update not allowed\r\n");
+		DEBUG_PRINTF("BIOS boot completed. Checkpoint update not allowed");
 	}
 	if (Data == AUTHENTICATION_FAILED) {
 		gBiosBootDone = FALSE;
@@ -918,7 +921,7 @@ void PublishUpdateEvent(uint8_t ImageType, uint8_t FlashRegion)
 	UpdateEventData.image = ImageType;
 
 	if (post_smc_action(UPDATE, &UpdateActiveObject, &UpdateEventData)) {
-		DEBUG_PRINTF("%s : event queue not available !\n", __func__);
+		DEBUG_PRINTF("%s : event queue not available !", __func__);
 		return;
 	}
 }
@@ -929,7 +932,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 	uint8_t PchActiveStatus;
 	uint8_t BmcActiveStatus;
 
-	DEBUG_PRINTF("\r\n Update Intent = 0x%x\r\n", Data);
+	DEBUG_PRINTF(" Update Intent = 0x%x", Data);
 
 	if (Data & UpdateAtReset) {
 		// Getting cpld status from UFM
@@ -957,9 +960,9 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 			cpld_update_status.Region[1].Recoveryregion = 1;
 		}
 		if (Data & HROTRecoveryUpdate)
-			DEBUG_PRINTF("HROTRecoveryUpdate not supported\r\n");
+			DEBUG_PRINTF("HROTRecoveryUpdate not supported");
 		if (Data & DymanicUpdate)
-			DEBUG_PRINTF("DymanicUpdate not supported\r\n");
+			DEBUG_PRINTF("DymanicUpdate not supported");
 		// Setting updated cpld status to ufm
 		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 	} else   {
@@ -1005,9 +1008,9 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 		if (Data & BmcRecoveryUpdate)
 			PublishUpdateEvent(BMC_EVENT, SECONDARY_FLASH_REGION);
 		if (Data & HROTRecoveryUpdate)
-			DEBUG_PRINTF("HROTRecoveryUpdate not supported\r\n");
+			DEBUG_PRINTF("HROTRecoveryUpdate not supported");
 		if (Data & DymanicUpdate)
-			DEBUG_PRINTF("DymanicUpdate not supported\r\n");
+			DEBUG_PRINTF("DymanicUpdate not supported");
 	}
 
 }
@@ -1018,7 +1021,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
  */
 bool WatchDogTimer(int ImageType)
 {
-	DEBUG_PRINTF("WDT Update Tiggers\r\n");
+	DEBUG_PRINTF("WDT Update Tiggers");
 	if (ImageType == PCH_EVENT) {
 		gPCHWatchDogTimer = 0;
 		gBiosBootDone = FALSE;
@@ -1041,7 +1044,7 @@ uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
 	byte DataToSend = 0;
 	uint8_t i = 0;
 
-	printk("PchBmcCommands CipherText: %02x %02x\n", CipherText[0], CipherText[1]);
+	DEBUG_PRINTF("PchBmcCommands CipherText: %02x %02x", CipherText[0], CipherText[1]);
 
 	switch (CipherText[0]) {
 	case UfmCmdTriggerValue:
@@ -1079,7 +1082,7 @@ uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
 		UpdateIntentHandle(CipherText[1], BmcUpdateIntent);
 		break;
 	default:
-		DEBUG_PRINTF("Mailbox command not found\r\n");
+		DEBUG_PRINTF("Mailbox command not found");
 		break;
 	}
 

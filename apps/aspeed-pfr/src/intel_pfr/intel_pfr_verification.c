@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <stdint.h>
 #include "state_machine/common_smc.h"
 #include "pfr/pfr_common.h"
@@ -13,9 +14,11 @@
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_verification.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -90,7 +93,7 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 	block1_buffer = (BLOCK0ENTRY *)&buffer;
 
 	if (block1_buffer->TagBlock0Entry != BLOCK1_BLOCK0ENTRYTAG) {
-		DEBUG_PRINTF("Block 0 entry Magic/Tag not matched \r\n");
+		DEBUG_PRINTF("Block 0 entry Magic/Tag not matched ");
 		return Failure;
 	}
 
@@ -101,7 +104,7 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 
 	// Key curve and Block 0 signature curve type should match
 	if (block0_signature_curve_magic != manifest->hash_curve) {
-		DEBUG_PRINTF("Key curve magic and Block0 signature curve magic not matched \r\n");
+		DEBUG_PRINTF("Key curve magic and Block0 signature curve magic not matched ");
 		return Failure;
 	}
 
@@ -132,7 +135,7 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	DEBUG_PRINTF("Block 0 entry Verification status: %d\r\n", status);
+	DEBUG_PRINTF("Block 0 entry Verification status: %d", status);
 
 	return Success;
 }
@@ -157,7 +160,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 
 	// validate CSK entry magic tag
 	if (block1_buffer->CskEntryInitial.Tag != BLOCK1CSKTAG) {
-		DEBUG_PRINTF("CSK Magic/Tag not matched \r\n");
+		DEBUG_PRINTF("CSK Magic/Tag not matched ");
 		return Failure;
 	}
 
@@ -168,7 +171,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 
 	// Root key curve and CSK signature curve type should match
 	if (csk_sign_curve_magic != manifest->hash_curve) {
-		DEBUG_PRINTF("Root Key curve magic and CSK key signature curve magic not matched \r\n");
+		DEBUG_PRINTF("Root Key curve magic and CSK key signature curve magic not matched ");
 		return Failure;
 	}
 
@@ -194,7 +197,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	}
 
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
-		DEBUG_PRINTF("CSK key permission denied..\r\n");
+		DEBUG_PRINTF("CSK key permission denied..");
 		return Failure;
 	}
 
@@ -232,7 +235,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	DEBUG_PRINTF("Block0 Entry validation success\r\n");
+	DEBUG_PRINTF("Block0 Entry validation success");
 
 	return Success;
 }
@@ -246,24 +249,24 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0), sizeof(block1_buffer->TagBlock1) + sizeof(block1_buffer->ReservedBlock1) + sizeof(block1_buffer->RootEntry), buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("Block1 Verification failed\r\n");
+		DEBUG_PRINTF("Block1 Verification failed");
 		return Failure;
 	}
 
 	block1_buffer = (PFR_AUTHENTICATION_BLOCK1 *)buffer;
 
 	if (block1_buffer->TagBlock1 != BLOCK1TAG) {
-		DEBUG_PRINTF("Block1 Tag Not Found\r\n");
+		DEBUG_PRINTF("Block1 Tag Not Found");
 		return Failure;
 	}
 
 	status = verify_root_key_entry(manifest, block1_buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("Root Entry validation failed\r\n");
+		DEBUG_PRINTF("Root Entry validation failed");
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Root Entry validation success\r\n");
+	DEBUG_PRINTF("Root Entry validation success");
 	memcpy(manifest->verification->pubkey->x, block1_buffer->RootEntry.PubKeyX, sizeof(block1_buffer->RootEntry.PubKeyX));
 	memcpy(manifest->verification->pubkey->y, block1_buffer->RootEntry.PubKeyY, sizeof(block1_buffer->RootEntry.PubKeyY));
 
@@ -276,13 +279,13 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 		// CSK and Block 0 entry verification
 		status = manifest->pfr_authentication->block1_csk_block0_entry_verify(manifest);
 		if (status != Success) {
-			DEBUG_PRINTF("CSK and Block0 Entry validation failed\r\n");
+			DEBUG_PRINTF("CSK and Block0 Entry validation failed");
 			return Failure;
 		}
 	} else  {
 		status = manifest->pfr_authentication->block1_block0_entry_verify(manifest);
 		if (status != Success) {
-			DEBUG_PRINTF("Block0 Entry validation failed\r\n");
+			DEBUG_PRINTF("Block0 Entry validation failed");
 			return Failure;
 		}
 	}
@@ -303,13 +306,13 @@ uint8_t intel_block0_verify(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(PFR_AUTHENTICATION_BLOCK0), buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("Block0 Verification failed\r\n");
+		DEBUG_PRINTF("Block0 Verification failed");
 		return Failure;
 	}
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type_status)), sizeof(pc_type_status), (uint8_t *)&pc_type_status);
 	if (status != Success) {
-		DEBUG_PRINTF("Block0 Verification failed\r\n");
+		DEBUG_PRINTF("Block0 Verification failed");
 		return Failure;
 	}
 
@@ -328,12 +331,12 @@ uint8_t intel_block0_verify(struct pfr_manifest *manifest)
 		return Failure;
 
 	if (status != Success) {
-		DEBUG_PRINTF("Block0 Hash Not Matched..\r\n");
+		DEBUG_PRINTF("Block0 Hash Not Matched..");
 		return Failure;
 	}
 
 	if (block0_buffer->Block0Tag != BLOCK0TAG) {
-		DEBUG_PRINTF("Block0 tag not found\r\n");
+		DEBUG_PRINTF("Block0 tag not found");
 		return Failure;
 	}
 
@@ -370,14 +373,14 @@ uint8_t intel_block0_verify(struct pfr_manifest *manifest)
 
 	status = compare_buffer(ptr_sha, sha_buffer, hash_length);
 	if (status != Success) {
-		DEBUG_PRINTF(" Block0 Verification failed..\r\n");
+		DEBUG_PRINTF(" Block0 Verification failed..");
 		return Failure;
 	}
 
 	if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE)
 		SetCpldFpgaRotHash(&sha_buffer[0]);
 
-	DEBUG_PRINTF("Block0 Hash Matched..\r\n");
+	DEBUG_PRINTF("Block0 Hash Matched..");
 	return Success;
 }
 
