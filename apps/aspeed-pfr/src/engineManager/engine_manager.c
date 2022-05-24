@@ -44,9 +44,7 @@ static int initialize_crypto(/*struct engine_instances *engineInstances*/)
 
 static int initialize_flash(void)
 {
-	int status = 0;
-
-	status = flash_master_wrapper_init(getFlashMasterInstance());
+	int status = flash_master_wrapper_init(getFlashEngineWrapper());
 	if (status)
 		return status;
 

@@ -37,6 +37,7 @@ struct pfr_manifest {
 	uint32_t address;                                       // START ADDRESS
 	uint32_t recovery_address;                              // Recovery address
 	uint32_t staging_address;                               // Staging Address
+	uint32_t active_pfm_addr;                               // Active PFM address
 	uint32_t pc_length;                                     // Protected Content Size
 	uint32_t pc_type;                                       // manifest protected content type
 	uint32_t kc_flag;                                       // Key Cancellation flag

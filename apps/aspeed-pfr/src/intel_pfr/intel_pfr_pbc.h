@@ -6,7 +6,7 @@
 
 #ifndef INTEL_PFR_PBC_H_
 #define INTEL_PFR_PBC_H_
+#include "intel_pfr_definitions.h"
 
-int capsule_decompression(int image_type, uint32_t read_address, uint32_t area_size);
-
+int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_ENUM decomp_type);
 #endif /*INTEL_PFR_PBC_H_*/

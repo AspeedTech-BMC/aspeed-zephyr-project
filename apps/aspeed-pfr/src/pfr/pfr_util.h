@@ -15,9 +15,13 @@ int pfr_spi_read(unsigned int device_id, unsigned int address,
 int pfr_spi_write(unsigned int device_id, unsigned int address,
 		  unsigned int data_length, unsigned char *data);
 
-int pfr_spi_page_read_write(unsigned int device_id, uint32_t *source_address, uint32_t *target_address);
+int pfr_spi_page_read_write(unsigned int device_id, uint32_t source_address, uint32_t target_address);
 
 int pfr_spi_erase_4k(unsigned int device_id, unsigned int address);
+
+int pfr_spi_erase_block(unsigned int device_id, unsigned int address);
+
+int pfr_spi_get_block_size(unsigned int device_id);
 
 int esb_ecdsa_verify(struct pfr_manifest *manifest, unsigned int digest[], unsigned char pub_key[],
 		     unsigned char signature[], unsigned char *auth_pass);

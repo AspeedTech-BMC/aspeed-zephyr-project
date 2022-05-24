@@ -11,6 +11,9 @@
 #include <stddef.h>
 #include <device.h>
 
+#define SECTOR_SIZE 0x1000
+#define BLOCK_SIZE  0x10000
+
 enum {
 	SPI_APP_CMD_NOOP  = 0x00,				/**< No-op */
 	SPI_APP_CMD_READ  = 0x01,
@@ -74,7 +77,7 @@ enum {
 	//MIDLEY_FLASH_CMD_DIO_READ = 0xbb,			/**< Dual I/O read */
 	//MIDLEY_FLASH_CMD_4BYTE_DIO_READ = 0xbc,	/**< Dual I/O read with 4 byte address */
 	MIDLEY_FLASH_CMD_CE = 0xc7,				    /**< Chip erase */
-	MIDLEY_FLASH_CMD_64K_ERASE = 0xd8,			/**< Block erase 64kB */
+	MIDLEY_FLASH_CMD_BLOCK_ERASE = 0xd8,			/**< Block erase 64kB */
 	//MIDLEY_FLASH_CMD_4BYTE_64K_ERASE = 0xdc,	/**< Block erase 64kB with 4 byte address */
 	//MIDLEY_FLASH_CMD_EX4B = 0xe9,				/**< Exit 4-byte mode */
 	//MIDLEY_FLASH_CMD_QIO_READ = 0xeb,			/**< Quad I/O read */

@@ -50,25 +50,33 @@
 #define CPLD_RoT_SVN                    1
 
 // BIOS/BMC SPI Region information
+#define PCH_ACTIVE_FW_UPDATE_ADDRESS    0x00000000
 #define PCH_CAPSULE_STAGING_ADDRESS     0x007F0000
-#define PCH_PFM_ADDRESS                         0x02FF0000
-#define PCH_FVM_ADDRESS                         0x02FF1000
+#define PCH_PFM_ADDRESS                 0x02FF0000
+#define PCH_FVM_ADDRESS                 0x02FF1000
 #define PCH_RECOVERY_AREA_ADDRESS       0x01BF0000
-#define PCH_STAGING_SIZE                        0x01400000
-#define BMC_STAGING_SIZE                        0x02000000
+#define PCH_STAGING_SIZE                0x01400000
+#define BMC_STAGING_SIZE                0x02000000
+#define BMC_ACTIVE_FW_UPDATE_ADDRESS    0x00000000
 #define BMC_CAPSULE_STAGING_ADDRESS     0x04A00000
 #define BMC_CPLD_STAGING_ADDRESS        0x07A00000
 #define BMC_CPLD_RECOVERY_ADDRESS       0x07F00000
-#define BMC_PFM_ADDRESS                         0x029C0000
+#define BMC_PFM_ADDRESS                 0x029C0000
 #define BMC_RECOVERY_AREA_ADDRESS       0x02A00000
-#define BMC_FLASH_SIZE                          0x08000000
-#define PCH_FLASH_SIZE                          0x04000000
-#define BMC_CPLD_RECOVERY_SIZE      0x100000
+#define BMC_FLASH_SIZE                  0x08000000
+#define PCH_FLASH_SIZE                  0x04000000
+#define BMC_CPLD_RECOVERY_SIZE          0x100000
 
 #define BMC_CAPSULE_PCH_STAGING_ADDRESS 0x06A00000
 #define BMC_PCH_STAGING_SIZE                    0x01000000
 
-#define COMPRESSION_TAG             0x5F504243
+#define PBC_COMPRESSION_TAG             0x5F504243
+#define PBC_VERSION                     2
+#define PBC_PAGE_SIZE                   0x1000
+#define PBC_PATTERN_SIZE                0x0001
+#define PBC_PATTERN                     0xFF
+
+
 #define BLOCK0TAG                   0xB6EAFD19
 #define BLOCK0_RSA_TAG                  0x35C6B783
 #define BLOCK1TAG                   0xF27F28D7
@@ -117,7 +125,8 @@
 #define SVN_MAX                                 63
 #define MAX_READ_SIZE                   0x1000
 #define MAX_WRITE_SIZE                  0x1000
-#define PAGE_SIZE               0x1000
+#define PAGE_SIZE                       0x1000
+#define BLOCK_SIZE                      0x10000
 #define UFM_PAGE_SIZE                   16
 #define CSK_KEY_SIZE                    16
 #define ROOT_KEY_SIZE                   64
@@ -159,6 +168,13 @@ enum Ecc_Curve {
 	secp384r1 = 1,
 	secp256r1,
 };
+
+typedef enum
+{
+        DECOMPRESSION_STATIC_REGIONS_MASK             = 0b1,
+        DECOMPRESSION_DYNAMIC_REGIONS_MASK            = 0b10,
+        DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK = 0b11,
+} DECOMPRESSION_TYPE_MASK_ENUM;
 
 typedef struct {
 	uint8_t ActiveRegion;

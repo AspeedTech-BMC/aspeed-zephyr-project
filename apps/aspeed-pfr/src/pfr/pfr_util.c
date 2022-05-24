@@ -65,25 +65,36 @@ int pfr_spi_erase_4k(unsigned int device_id, unsigned int address)
 	return Success;
 }
 
-int pfr_spi_page_read_write(unsigned int device_id, uint32_t *source_address, uint32_t *target_address)
+int pfr_spi_erase_block(unsigned int device_id, unsigned int address)
 {
 	int status = 0;
-	int index1, index2;
-	uint8_t buffer[MAX_READ_SIZE] = { 0 };
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+
+	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.base.block_erase(&spi_flash->spi, address);
+	return Success;
+}
+
+int pfr_spi_get_block_size(unsigned int device_id)
+{
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	int block_sz;
+
+	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.base.get_block_size(&spi_flash->spi, &block_sz);
+	return block_sz;
+}
+
+int pfr_spi_page_read_write(unsigned int device_id, uint32_t source_address, uint32_t target_address)
+{
+	int status = 0;
+	uint8_t buffer[PAGE_SIZE] = {0};
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-
-	for (index1 = 0; index1 < (PAGE_SIZE / MAX_READ_SIZE); index1++) {
-		spi_flash->spi.base.read(&spi_flash->spi, *source_address, buffer, MAX_READ_SIZE);
-		for (index2 = 0; index2 < (MAX_READ_SIZE / MAX_WRITE_SIZE); index2++) {
-			spi_flash->spi.base.write(&spi_flash->spi, *target_address, &buffer[index2 * MAX_WRITE_SIZE], MAX_WRITE_SIZE);
-			*target_address += MAX_WRITE_SIZE;
-		}
-
-		*source_address += MAX_READ_SIZE;
-	}
+	spi_flash->spi.base.read(&spi_flash->spi, source_address, buffer, PAGE_SIZE);
+	spi_flash->spi.base.write(&spi_flash->spi, target_address, buffer, PAGE_SIZE);
 
 	return Success;
 }

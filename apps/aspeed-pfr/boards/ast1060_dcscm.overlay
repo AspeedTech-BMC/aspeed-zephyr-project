@@ -287,46 +287,51 @@
 			label = "bmc-sofs";
 		};
 
-		/* 8064KB */
+		/* 18432KB */
 		bmc_rwfs_partition: partition@320000{
 			label = "bmc-rwfs";
-			reg = <0x00320000 0x007e0000>;
+			reg = <0x00320000 0x01200000>;
 		};
 
-		/* 31744KB */
-		bmc_fitimg_partition: partition@b00000{
+		/* 46080KB */
+		bmc_fitimg_partition: partition@1520000{
 			label = "bmc-fitimg";
-			reg = <0x00b00000 0x01f00000>;
+			reg = <0x01520000 0x02d00000>;
 		};
 
-		/* 32768KB  */
-		bmc_rc_image_partition: partition@2a00000{
-			label = "bmc-rc-image";
-			reg = <0x02a00000 0x02000000>;
-		};
-
-		/* 32768KB */
-		bmc_stg_partition: partition@4a00000{
+		/* 63360KB */
+		bmc_stg_partition: partition@4220000{
 			label = "bmc-stg";
-			reg = <0x04a00000 0x02000000>;
+			reg = <0x04220000 0x03de0000>;
+		};
+
+		/* 63360KB  */
+		bmc_rc_image_partition: partition@8000000{
+			label = "bmc-rc-image";
+			reg = <0x08000000 0x03de0000>;
 		};
 
 		/* 16384KB */
-		bmc_pch_stg_partition: partition@6a00000{
+		bmc_pch_stg_partition: partition@bde0000{
 			label = "bmc-pch-stg";
-			reg = <0x06a00000 0x01000000>;
+			reg = <0x0bde0000 0x01000000>;
 		};
 
 		/* 5120KB */
-		bmc_pfr_stg_partition: partition@7a00000{
+		bmc_pfr_stg_partition: partition@cde0000{
 			label = "bmc-pfr-stg";
-			reg = <0x07a00000 0x00500000>;
+			reg = <0x0cde0000 0x00500000>;
 		};
 
 		/* 1024KB */
-		bmc_pfr_rc_partition: partition@7f00000{
+		bmc_pfr_rc_partition: partition@d2e0000{
 			label = "bmc-pfr-rc";
-			reg = <0x07f00000 0x00100000>;
+			reg = <0x0d2e0000 0x00100000>;
+		};
+
+		reserve_partition: partitions@d3e0000{
+			label = "dcscm-reserved";
+			reg = <0x0d3e0000 0x02c20000>;
 		};
 	};
 };

@@ -5,6 +5,7 @@
  */
 
 #include <logging/log.h>
+#include <storage/flash_map.h>
 #include "pfr/pfr_common.h"
 #include "state_machine/common_smc.h"
 #include "intel_pfr_recovery.h"
@@ -65,54 +66,53 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
 {
 	int status = 0;
-	uint32_t area_size = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	const struct flash_area *fa;
 
 	if (image_type == BMC_TYPE)
-		area_size = BMC_STAGING_SIZE;
+		status = flash_area_open(FLASH_AREA_ID(bmc_stg), &fa);
 	else if (image_type == PCH_TYPE)
-		area_size = PCH_STAGING_SIZE;
+		status = flash_area_open(FLASH_AREA_ID(pch_stg), &fa);
+
+	if (status != Success) {
+		DEBUG_PRINTF("Staging region is undefined, image_type: %d\r\n", image_type);
+		return Failure;
+	}
 
 	spi_flash->spi.device_id[0] = image_type; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	DEBUG_PRINTF("Recovering...");
 
-	status = flash_copy_and_verify(&spi_flash->spi, target_address, source_address, area_size);
-	if (status != Success) {
-		DEBUG_PRINTF("Recovery region update failed");
+	if (flash_copy_and_verify(&spi_flash->spi, target_address, source_address, fa->fa_size)){
+		DEBUG_PRINTF("Recovery region update failed\r\n");
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Recovery region update completed");
+	DEBUG_PRINTF("Recovery region update completed\r\n");
 
-	return Success;
+	return status;
 }
 
 int pfr_recover_active_region(struct pfr_manifest *manifest)
 {
-
-	int status = 0;
+	int status;
 	uint32_t pfm_length;
-	uint32_t read_address = 0;
-	uint32_t area_size;
+	uint32_t read_address;
 
 	DEBUG_PRINTF("Active Data Corrupted");
 	if (manifest->image_type == BMC_TYPE) {
 		status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
 			return status;
-
-		area_size = BMC_STAGING_SIZE;
 	} else if (manifest->image_type == PCH_TYPE) {
 		status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
 			return Failure;
-		area_size = PCH_STAGING_SIZE;
 	} else  {
 		return Failure;
 	}
 
-	status = capsule_decompression(manifest->image_type, read_address, area_size);
-	if (status != Success) {
+	manifest->recovery_address = read_address;
+	if (decompress_capsule(manifest, DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK)) {
 		DEBUG_PRINTF("Repair Failed");
 		return Failure;
 	}
@@ -132,14 +132,10 @@ int active_region_pfm_update(struct pfr_manifest *manifest)
 {
 
 	int status = 0;
-	uint32_t active_offset = 0, capsule_offset = 0;
+	uint32_t active_offset, capsule_offset;
 
 	// Getting offsets based on ImageType
 	if (manifest->image_type == PCH_TYPE) {
-		status = ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &active_offset, sizeof(active_offset));
-		if (status != Success)
-			return Failure;
-
 		if (manifest->state == RECOVERY)
 			status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *) &capsule_offset, sizeof(capsule_offset));
 		else
@@ -149,10 +145,6 @@ int active_region_pfm_update(struct pfr_manifest *manifest)
 			return Failure;
 
 	} else if (manifest->image_type == BMC_TYPE) {
-		status = ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &active_offset, sizeof(active_offset));
-		if (status != Success)
-			return status;
-
 		if (manifest->state == RECOVERY)
 			status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *) &capsule_offset, sizeof(capsule_offset));
 		else
@@ -166,6 +158,7 @@ int active_region_pfm_update(struct pfr_manifest *manifest)
 
 	// Adjusting capsule offset size to PFM Signing chain
 	capsule_offset += PFM_SIG_BLOCK_SIZE;
+	active_offset = manifest->active_pfm_addr;
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
@@ -184,14 +177,15 @@ int active_region_pfm_update(struct pfr_manifest *manifest)
 int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 {
 
-	int status = 0;
+	int status;
 
-	uint32_t source_address = 0;                                    // BMC_CAPSULE_PCH_STAGING_ADDRESS;
-	uint32_t target_address = 0;                                    // PCH_CAPSULE_STAGING_ADDRESS;
-	uint32_t area_size = BMC_PCH_STAGING_SIZE;
+	uint32_t source_address;
+	uint32_t target_address;
 	uint32_t PfmLength, PcLength;
-
+	uint32_t image_type = manifest->image_type;
 	uint8_t active_svn = 0;
+	const struct flash_area *bmc_staging;
+	const struct flash_area *bmc_pch_staging;
 
 	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 	if (status != Success)
@@ -201,13 +195,17 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
+	status = flash_area_open(FLASH_AREA_ID(bmc_stg), &bmc_staging);
+	if (status)
+		return Failure;
 
-	source_address += BMC_STAGING_SIZE;          // PFR Staging - PCH Staging offset is 32MB after BMC staging offset
+	status = flash_area_open(FLASH_AREA_ID(bmc_pch_stg), &bmc_pch_staging);
+	if (status)
+		return Failure;
 
-	uint32_t image_type = manifest->image_type;
+	source_address += bmc_staging->fa_size;
 
 	manifest->image_type = BMC_TYPE;
-
 	manifest->address = source_address;
 	manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 
@@ -232,7 +230,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	uint32_t erase_address = target_address;
 
-	for (int i = 0; i < (area_size / PAGE_SIZE); i++) {
+	for (int i = 0; i < (bmc_staging->fa_size / PAGE_SIZE); i++) {
 
 		status = pfr_spi_erase_4k(manifest->image_type, erase_address);
 		if (status != Success)
@@ -241,7 +239,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		erase_address += PAGE_SIZE;
 	}
 
-	for (int i = 0; i < (area_size / PAGE_SIZE); i++) {
+	for (int i = 0; i < (bmc_staging->fa_size / PAGE_SIZE); i++) {
 		status = pfr_spi_page_read_write_between_spi(BMC_TYPE, &source_address, PCH_TYPE, &target_address);
 		if (status != Success)
 			return Failure;

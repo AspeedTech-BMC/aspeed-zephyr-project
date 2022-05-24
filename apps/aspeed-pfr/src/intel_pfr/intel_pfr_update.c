@@ -5,6 +5,7 @@
  */
 
 #include <logging/log.h>
+#include <storage/flash_map.h>
 #include "pfr/pfr_update.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "state_machine/common_smc.h"
@@ -93,6 +94,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 
 	manifest->update_fw->pfm_length = manifest->pc_length;
 	manifest->address = read_address;
+	manifest->staging_address = read_address;
 
 	DEBUG_PRINTF("Stagig area verification successful");
 
@@ -369,14 +371,18 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 {
 	int status = 0;
 	uint32_t source_address, target_address, pfm_length, area_size, pc_length;
+	uint32_t act_pfm_offset;
 	uint32_t address = 0;
 	uint32_t pc_type_status = 0;
 	uint8_t active_update_needed = 0;
 	uint8_t active_svn_number = 0;
 	CPLD_STATUS cpld_update_status;
+	const struct flash_area *pfr_staging;
+	const struct flash_area *bmc_staging;
 
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
+	DECOMPRESSION_TYPE_MASK_ENUM decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
 
 	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
 
@@ -387,23 +393,30 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	pfr_manifest->flash_id = flash_select;
 
 	if (pfr_manifest->image_type == ROT_TYPE) {
+		status = flash_area_open(FLASH_AREA_ID(bmc_pfr_stg), &pfr_staging);
+		if (status)
+			return Failure;
 		pfr_manifest->image_type = BMC_TYPE;
-		pfr_manifest->address = BMC_CPLD_STAGING_ADDRESS;
+		pfr_manifest->address = pfr_staging->fa_off;
 		return ast1060_update(pfr_manifest);
 	}
 
 	if (pfr_manifest->image_type == BMC_TYPE) {
 		DEBUG_PRINTF("BMC Update in Progress");
-		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
-		if (status != Success)
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address)))
 			return Failure;
-
+		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset, sizeof(act_pfm_offset)))
+			return Failure;
 	} else if (pfr_manifest->image_type == PCH_TYPE) {
 		DEBUG_PRINTF("PCH Update in Progress");
-		status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
-		if (status != Success)
-			return status;
+		if(ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address)))
+			return Failure;
+		if(ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset, sizeof(act_pfm_offset)))
+			return Failure;
 	}
+
+	pfr_manifest->staging_address = source_address;
+	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
 	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	if (status != Success)
@@ -420,7 +433,11 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		if (status != Success)
 			return Failure;
 
-		address += BMC_STAGING_SIZE;          // PFR Staging - PCH Staging offset is 32MB after BMC staging offset
+		status = flash_area_open(FLASH_AREA_ID(bmc_stg), &bmc_staging);
+		if (status)
+			return Failure;
+
+		address += bmc_staging->fa_size;          // PFR Staging - PCH Staging offset after BMC staging offset
 		pfr_manifest->address = address;
 
 		// Checking for key cancellation
@@ -439,7 +456,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	// Staging area verification
 	DEBUG_PRINTF("Staging Area verfication ");
-	// status = pfr_staging_verify(pfr_manifest);
 	status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
 	if (status != Success) {
 		DEBUG_PRINTF("Staging Area verfication failed");
@@ -475,10 +491,15 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			return Failure;
 		}
 
-		status = capsule_decompression(pfr_manifest->image_type, source_address /* + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE + PfmLength*/, area_size);
-		if (status != Success)
+		uint32_t time_start, time_end;
+		time_start = k_uptime_get_32();
+
+		if (decompress_capsule(pfr_manifest, decomp_event))
 			return Failure;
 
+		time_end = k_uptime_get_32();
+		DEBUG_PRINTF("Firmware update completed, elapsed time = %u milliseconds",
+				(time_end - time_start));
 		status = active_region_pfm_update(pfr_manifest);
 		if (status != Success) {
 			DEBUG_PRINTF("Active Region PFM Update failed!!");

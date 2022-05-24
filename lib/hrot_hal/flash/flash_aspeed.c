@@ -51,8 +51,8 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	uint32_t FlashSize = 0;
 	int ret = 0;
 	char buf[4096];
-	uint32_t page_sz = 0;
-	uint32_t sector_sz = 0;
+	int page_sz = 0;
+	int sector_sz = 0;
 
 	flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
 	AdrOffset = xfer->address;
@@ -75,7 +75,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 #endif
 	case SPI_APP_CMD_GET_FLASH_BLOCK_SIZE:
-		page_sz = (flash_get_write_block_size(flash_device) << 4);
+		page_sz = spi_nor_get_erase_sz(flash_device, MIDLEY_FLASH_CMD_BLOCK_ERASE);
 		return page_sz;
 	break;
 	case MIDLEY_FLASH_CMD_READ:
@@ -90,12 +90,12 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = flash_write(flash_device, AdrOffset, buf, Datalen);
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
-		sector_sz = flash_get_write_block_size(flash_device);
-		ret = flash_erase(flash_device, AdrOffset, sector_sz);
+		spi_nor_erase_by_cmd(flash_device, AdrOffset, SECTOR_SIZE,
+				MIDLEY_FLASH_CMD_4K_ERASE);
 	break;
-	case MIDLEY_FLASH_CMD_64K_ERASE:
-		sector_sz =  (flash_get_write_block_size(flash_device) << 4);
-		ret = flash_erase(flash_device, AdrOffset, sector_sz);
+	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
+		spi_nor_erase_by_cmd(flash_device, AdrOffset, BLOCK_SIZE,
+				MIDLEY_FLASH_CMD_BLOCK_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_CE:
 		FlashSize = flash_get_flash_size(flash_device);
@@ -167,7 +167,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		sector_sz = flash_get_write_block_size(flash_device);
 		ret = flash_area_erase(partition_device, AdrOffset, sector_sz);
 	break;
-	case MIDLEY_FLASH_CMD_64K_ERASE:
+	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
 		printk("%d Command is not supported", xfer->cmd);
 		ret = 0;
 	break;
