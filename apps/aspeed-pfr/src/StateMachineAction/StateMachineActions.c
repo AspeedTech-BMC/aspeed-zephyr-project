@@ -182,7 +182,7 @@ void PublishInitialEvents(void)
 {
 	byte provision_state = GetUfmStatusValue();
 
-	if (provision_state == UFM_PROVISIONED) {
+	if (provision_state & UFM_PROVISIONED) {
 		check_staging_area();
 #if BMC_SUPPORT
 		PublishBmcEvents();
@@ -646,7 +646,7 @@ void T0Transition(int releaseBmc, int releasePCH)
 
 	SetPlatformState(ENTER_T0);
 	provision_status = GetUfmStatusValue();
-	if (provision_status == UFM_PROVISIONED) {
+	if (provision_status & UFM_PROVISIONED) {
 		// enable spi filtering
 		if (releaseBmc) {
 			init_SPI_RW_Region(0);

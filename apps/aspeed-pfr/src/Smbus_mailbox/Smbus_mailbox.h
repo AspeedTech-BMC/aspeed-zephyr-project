@@ -252,7 +252,8 @@ bool IsUfmStatusUfmProvisioned(void);
 bool IsUfmStatusPitLevel1Enforced(void);
 bool IsUfmStatusPITL2CompleteSuccess(void);
 byte GetUfmStatusValue(void);
-void SetUfmStatusValue(byte UfmStatus);
+void SetUfmStatusValue(uint8_t UfmStatusBitMask);
+void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
 byte get_provision_command(void);
 void set_provision_command(byte UfmCommandValue);
 void set_provision_commandTrigger(byte UfmCommandTrigger);
@@ -320,9 +321,15 @@ bool WatchDogTimer(int ImageType);
 uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag);
 void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion);
 
-#define ROOT_KEY_HASH_PROVISION_FLAG 1
-#define PCH_OFFSET_PROVISION_FLAG 2
-#define BMC_OFFSET_PROVISION_FLAG 3
+#define UFM_STATUS_LOCK_BIT_MASK                      0b1
+#define UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK 0b10
+#define UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK   0b100
+#define UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK   0b1000
+#define UFM_STATUS_PROVISIONED_PIT_ID_BIT_MASK        0b10000
+#define UFM_STATUS_PIT_L1_ENABLE_BIT_MASK             0b100000
+#define UFM_STATUS_PIT_L2_ENABLE_BIT_MASK             0b1000000
+#define UFM_STATUS_PIT_HASH_STORED_BIT_MASK           0b10000000
+#define UFM_STATUS_PIT_L2_PASSED_BIT_MASK             0b100000000
 
 extern uint8_t gBiosBootDone;
 extern uint8_t gBmcBootDone;

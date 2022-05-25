@@ -161,7 +161,8 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	struct k_poll_event events[8];
 	AO_DATA aodata[8];
 	EVENT_CONTEXT evt_ctx[8];
-	uint8_t buffer[8][2] = {{0}};
+	uint8_t buffer[8][2] = { { 0 } };
+
 	k_poll_event_init(&events[0], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_write_fifo_data_sem);
 	k_poll_event_init(&events[1], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_read_fifo_state_sem);
 	k_poll_event_init(&events[2], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_provision_trigger_sem);
@@ -172,7 +173,8 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	k_poll_event_init(&events[7], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bios_checkpoint_sem);
 
 	int ret;
-	while(1) {
+
+	while (1) {
 		ret = k_poll(events, 8, K_FOREVER);
 		if (ret < 0) {
 			DEBUG_PRINTF("%s: k_poll error ret=%d", ret);
@@ -182,20 +184,18 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Write FIFO from BMC/PCH */
 			k_sem_take(events[0].sem, K_NO_WAIT);
-			//TODO: race condition
+			// TODO: race condition
 			do {
 				uint8_t c;
+
 				ret = swmbx_read(gSwMbxDev, true, UfmWriteFIFO, &c);
-				if (!ret) {
+				if (!ret)
 					gUfmFifoData[gFifoData++] = c;
-				}
-			} while(!ret);
-		}
-		else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+			} while (!ret);
+		} else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Read FIFO empty prepare next data */
 			k_sem_take(events[1].sem, K_NO_WAIT);
-		}
-		else if (events[2].state == K_POLL_STATE_SEM_AVAILABLE) {
+		} else if (events[2].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Provision Trigger */
 			k_sem_take(events[2].sem, K_NO_WAIT);
 			aodata[2].ProcessNewCommand = 1;
@@ -206,8 +206,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			swmbx_get_msg(0, UfmCmdTriggerValue, &buffer[2][1]);
 
 			post_smc_action(I2C, &aodata[2], &evt_ctx[2]);
-		}
-		else if (events[3].state == K_POLL_STATE_SEM_AVAILABLE) {
+		} else if (events[3].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Update Intent */
 			k_sem_take(events[3].sem, K_NO_WAIT);
 			aodata[3].ProcessNewCommand = 1;
@@ -218,12 +217,10 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			swmbx_get_msg(0, BmcUpdateIntent, &buffer[3][1]);
 
 			post_smc_action(I2C, &aodata[3], &evt_ctx[3]);
-		}
-		else if (events[4].state == K_POLL_STATE_SEM_AVAILABLE) {
+		} else if (events[4].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* PCH Update Intent */
 			k_sem_take(events[4].sem, K_NO_WAIT);
-		}
-		else if (events[5].state == K_POLL_STATE_SEM_AVAILABLE) {
+		} else if (events[5].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Checkpoint */
 			k_sem_take(events[5].sem, K_NO_WAIT);
 			aodata[5].ProcessNewCommand = 1;
@@ -234,17 +231,15 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			swmbx_get_msg(0, BmcCheckpoint, &buffer[5][1]);
 
 			post_smc_action(I2C, &aodata[5], &evt_ctx[5]);
-		}
-		else if (events[6].state == K_POLL_STATE_SEM_AVAILABLE) {
+		} else if (events[6].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* ACM Checkpoint */
 			k_sem_take(events[6].sem, K_NO_WAIT);
-		}
-		else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
+		} else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BIOS Checkpoint */
 			k_sem_take(events[7].sem, K_NO_WAIT);
 		}
 
-		for (size_t i = 0; i<8; ++i)
+		for (size_t i = 0; i < 8; ++i)
 			events[i].state = K_POLL_STATE_NOT_READY;
 	}
 }
@@ -253,6 +248,7 @@ void InitializeSoftwareMailbox(void)
 {
 	/* Top level mailbox device driver */
 	const struct device *swmbx_dev = NULL;
+
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
 		DEBUG_PRINTF("%s: fail to bind %s", "SWMBX");
@@ -278,30 +274,31 @@ void InitializeSoftwareMailbox(void)
 
 	/* Register slave device to bus device */
 	const struct device *dev = NULL;
+
 	dev = device_get_binding("SWMBX_SLAVE_BMC");
-	if (dev) {
+	if (dev)
 		i2c_slave_driver_register(dev);
-	}
 
 	/* TODO: CPU0 */
 	dev = device_get_binding("SWMBX_SLAVE_CPU");
-	if (dev) {
+	if (dev)
 		i2c_slave_driver_register(dev);
-	}
 
 	k_tid_t swmbx_tid = k_thread_create(
-			&swmbx_notifyee_thread,
-			swmbx_notifyee_stack,
-			SWMBX_NOTIFYEE_STACK_SIZE,
-			swmbx_notifyee_main,
-			NULL, NULL, NULL,
-			5, 0, K_NO_WAIT);
+		&swmbx_notifyee_thread,
+		swmbx_notifyee_stack,
+		SWMBX_NOTIFYEE_STACK_SIZE,
+		swmbx_notifyee_main,
+		NULL, NULL, NULL,
+		5, 0, K_NO_WAIT);
 	k_thread_name_set(swmbx_tid, "Software Mailbox Handler");
 
 }
 
 void InitializeSmbusMailbox(void)
 {
+	uint32_t UfmStatus;
+
 	InitializeSoftwareMailbox();
 	ResetMailBox();
 
@@ -313,20 +310,18 @@ void InitializeSmbusMailbox(void)
 	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA256_DIGEST_LENGTH);
 	get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
 	get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 
-	uint32_t UfmStatus;
-
-	get_provision_data_in_flash(UFM_STATUS, &UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
-
-	uint8_t bmc_provision_flag = 1 << BMC_OFFSET_PROVISION_FLAG;
-	uint8_t pch_provision_flag = 1 << PCH_OFFSET_PROVISION_FLAG;
-	uint8_t root_key_provision_flag = 1 << ROOT_KEY_HASH_PROVISION_FLAG;
-	uint8_t provision_flag = root_key_provision_flag | bmc_provision_flag | pch_provision_flag;
-
-	if (!(UfmStatus & provision_flag))
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK |
+			   UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK |
+			   UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
 		SetUfmStatusValue(UFM_PROVISIONED);
+	}
 
-	if (!(UfmStatus & pch_provision_flag)) {
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK))
+		SetUfmStatusValue(UFM_LOCKED);
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
 		uint8_t PCHActiveMajorVersion, PCHActiveMinorVersion;
 		uint8_t PCHActiveSVN;
 		uint32_t pch_pfm_address;
@@ -350,7 +345,7 @@ void InitializeSmbusMailbox(void)
 		SetPchPfmRecoverMinorVersion(PCHRecoveryMinorVersion);
 	}
 	// f1
-	if (!(UfmStatus & bmc_provision_flag)) {
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
 		uint8_t BMCActiveMajorVersion, BMCActiveMinorVersion;
 		uint8_t BMCActiveSVN;
 		uint32_t bmc_pfm_address;
@@ -422,7 +417,7 @@ MBX_REG_INC_GETTER(PanicEventCount);
 MBX_REG_SETTER_GETTER(LastPanicReason);
 MBX_REG_SETTER_GETTER(MajorErrorCode);
 MBX_REG_SETTER_GETTER(MinorErrorCode);
-MBX_REG_SETTER_GETTER(UfmStatusValue);
+MBX_REG_GETTER(UfmStatusValue);
 MBX_REG_GETTER(UfmCommand);
 MBX_REG_SETTER_GETTER(UfmCmdTriggerValue);
 MBX_REG_SETTER_GETTER(BmcCheckpoint);
@@ -443,6 +438,33 @@ MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
 
 // UFM Status
+void SetUfmStatusValue(uint8_t UfmStatusBitMask)
+{
+	uint8_t status = GetUfmStatusValue();
+
+	status |= UfmStatusBitMask;
+	swmbx_write(gSwMbxDev, false, UfmStatusValue, &status);
+}
+
+void ClearUfmStatusValue(uint8_t UfmStatusBitMask)
+{
+	uint8_t status = GetUfmStatusValue();
+
+	status &= ~UfmStatusBitMask;
+	swmbx_write(gSwMbxDev, false, UfmStatusValue, &status);
+}
+
+void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
+{
+	UfmStatus &= ~UfmStatusBitMask;
+	set_provision_data_in_flash(UFM_STATUS, &UfmStatus, 4);
+}
+
+int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
+{
+	return ((~UfmStatus & UfmStatusBitMask) == UfmStatusBitMask);
+}
+
 bool IsUfmStatusCommandBusy(void)
 {
 	return gSmbusMailboxData.CommandBusy ? true : false;
@@ -603,22 +625,22 @@ unsigned char ProvisionRootKeyHash(void)
 	uint8_t Status;
 	uint32_t UfmStatus;
 
-	get_provision_data_in_flash(UFM_STATUS, &UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
-	if (gRootKeyHash == NULL)
-		return Failure;
-	if (((UfmStatus & 1)) && ((UfmStatus & 2))) {
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
 		Status = set_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA256_DIGEST_LENGTH);
 		if (Status == Success) {
-			UfmStatus &= 0xFD;
-			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
+			DEBUG_PRINTF("Root key provisioned");
+			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
 			return Success;
-		} else   {
-			return Failure;
 		}
-	} else   {
-		DEBUG_PRINTF("Unsupported error");
-		return UnSupported;
+
+		DEBUG_PRINTF("Root key provision failed...");
+		erase_provision_flash();
+		return Failure;
 	}
+
+	DEBUG_PRINTF("%s, Provisioned or UFM Locked", __func__);
+	return UnSupported;
 }
 
 unsigned char ProvisionPchOffsets(void)
@@ -627,23 +649,21 @@ unsigned char ProvisionPchOffsets(void)
 	uint32_t UfmStatus;
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-
-	if (((UfmStatus & 1)) && ((UfmStatus & 4))) {
-
+	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
 		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
 		if (Status == Success) {
 			DEBUG_PRINTF("PCH offsets provisioned");
-			UfmStatus &= 0xFB;
-			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
-		} else   {
-			DEBUG_PRINTF("PCH offsets provision failed...");
-			erase_provision_flash();
-			SetUfmStatusValue(COMMAND_ERROR);
+			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK);
+			return Success;
 		}
-		return Success;
-	} else   {
-		return UnSupported;
+
+		DEBUG_PRINTF("PCH offsets provision failed...");
+		erase_provision_flash();
+		return Failure;
 	}
+
+	DEBUG_PRINTF("%s, Provisioned or UFM Locked", __func__);
+	return UnSupported;
 }
 
 unsigned char ProvisionBmcOffsets(void)
@@ -653,58 +673,53 @@ unsigned char ProvisionBmcOffsets(void)
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 
-	if (((UfmStatus & 1)) && ((UfmStatus & 8))) {
-
+	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
 		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
 		if (Status == Success) {
-			UfmStatus &= 0xF7;
-			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK);
 			DEBUG_PRINTF("BMC offsets provisioned");
-
-		} else   {
-			DEBUG_PRINTF("BMC offsets provision failed...");
-			erase_provision_flash();
-			SetUfmStatusValue(COMMAND_ERROR);
+			return Success;
 		}
-		return Success;
-	} else   {
-		return UnSupported;
+
+		DEBUG_PRINTF("BMC offsets provision failed...");
+		erase_provision_flash();
+		return Failure;
 	}
+
+	DEBUG_PRINTF("%s, Provisioned or UFM Locked", __func__);
+	return UnSupported;
 }
 
 void lock_provision_flash(void)
 {
-	uint8_t Status;
 	uint32_t UfmStatus;
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-	UfmStatus |= 1;
-
-	set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	SetUfmFlashStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK);
 }
 
 void ReadRootKey(void)
 {
+	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA256_DIGEST_LENGTH);
 	memcpy(gReadFifoData, gRootKeyHash, SHA256_DIGEST_LENGTH);
-	for (size_t i = 0; i<SHA256_DIGEST_LENGTH; ++i) {
-		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gRootKeyHash+i);
-	}
+	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gRootKeyHash + i);
 }
 
 void ReadPchOfsets(void)
 {
+	get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
 	memcpy(gReadFifoData, gPchOffsets, sizeof(gPchOffsets));
-	for (size_t i = 0; i<sizeof(gPchOffsets); ++i) {
-		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gPchOffsets+i);
-	}
+	for (size_t i = 0; i < sizeof(gPchOffsets); ++i)
+		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gPchOffsets + i);
 }
 
 void ReadBmcOffets(void)
 {
+	get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
 	memcpy(gReadFifoData, gBmcOffsets, sizeof(gBmcOffsets));
-	for (size_t i = 0; i<sizeof(gBmcOffsets); ++i) {
-		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gBmcOffsets+i);
-	}
+	for (size_t i = 0; i < sizeof(gBmcOffsets); ++i)
+		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gBmcOffsets + i);
 }
 
 /**
@@ -714,78 +729,64 @@ void ReadBmcOffets(void)
  **/
 void process_provision_command(void)
 {
+	uint32_t UfmFlashStatus;
 	byte UfmCommandData;
-	byte UfmStatus;
 	byte Status = 0;
 
-	UfmStatus = GetUfmStatusValue();
-
-	if (UfmStatus & UFM_LOCKED) {
-		// Ufm locked
-		DEBUG_PRINTF("UFM LOCKED");
-		return;
-	}
-
 	UfmCommandData = GetUfmCommand();
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmFlashStatus, sizeof(UfmFlashStatus));
+
+	if (CheckUfmStatus(UfmFlashStatus, UFM_STATUS_LOCK_BIT_MASK)) {
+		if ((UfmCommandData < READ_ROOT_KEY) || (UfmCommandData > READ_BMC_OFFSET)) {
+			// Ufm locked
+			DEBUG_PRINTF("UFM Locked and Dropedd Write Command: 0x%x", UfmCommandData);
+			return;
+		}
+	}
 
 	switch (UfmCommandData) {
 	case ERASE_CURRENT:
-		SetUfmStatusValue(COMMAND_BUSY);
 		Status = erase_provision_flash();
 		if (Status == Success) {
 			gProvisionCount = 0;
-			SetUfmStatusValue(COMMAND_DONE);
-		} else   {
+			ClearUfmStatusValue(UFM_CLEAR_ON_ERASE_COMMAND);
+		} else {
 			SetUfmStatusValue(COMMAND_ERROR);
 		}
 		break;
 	case PROVISION_ROOT_KEY:
-		SetUfmStatusValue(COMMAND_BUSY);
 		memcpy(gRootKeyHash, gUfmFifoData, SHA256_DIGEST_LENGTH);
 		gProvisionCount |= 1 << 0;
 		gProvisionData = 1;
-		SetUfmStatusValue(COMMAND_DONE);
-
 		break;
 	case PROVISION_PIT_KEY:
 		// Update password to provsioned UFM
 		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
 		break;
 	case PROVISION_PCH_OFFSET:
-		SetUfmStatusValue(COMMAND_BUSY);
 		memcpy(gPchOffsets, gUfmFifoData, sizeof(gPchOffsets));
 		gProvisionCount |= 1 << 1;
 		gProvisionData = 1;
-		SetUfmStatusValue(COMMAND_DONE);
-
 		break;
 	case PROVISION_BMC_OFFSET:
-		SetUfmStatusValue(COMMAND_BUSY);
-		memcpy(gBmcOffsets, gUfmFifoData, sizeof(gPchOffsets));
+		memcpy(gBmcOffsets, gUfmFifoData, sizeof(gBmcOffsets));
 		gProvisionCount |= 1 << 2;
 		gProvisionData = 1;
-		SetUfmStatusValue(COMMAND_DONE);
-
 		break;
 	case LOCK_UFM:
 		// lock ufm
 		lock_provision_flash();
-		SetUfmStatusValue(COMMAND_DONE | UFM_LOCKED);
+		SetUfmStatusValue(UFM_LOCKED);
 		break;
 	case READ_ROOT_KEY:
 		ReadRootKey();
-		SetUfmStatusValue(COMMAND_DONE);
 		break;
 	case READ_PCH_OFFSET:
 		ReadPchOfsets();
-		SetUfmStatusValue(COMMAND_DONE);
 		break;
 	case READ_BMC_OFFSET:
 		ReadBmcOffets();
-		SetUfmStatusValue(COMMAND_DONE | UFM_PROVISIONED);
-		// SetUfmStatusValue(COMMAND_DONE);
 		break;
-
 	case ENABLE_PIT_LEVEL_1_PROTECTION:
 		// EnablePitLevel1();
 		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
@@ -795,10 +796,11 @@ void process_provision_command(void)
 		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
 		break;
 	}
+
 	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {
-		SetUfmStatusValue(COMMAND_BUSY);
 		DEBUG_PRINTF("Calling provisioing process..");
 		gProvisionData = 0;
+		gProvisionCount = 0;
 		Status = ProvisionRootKeyHash();
 		if (Status != Success) {
 			SetUfmStatusValue(COMMAND_ERROR);
@@ -818,7 +820,7 @@ void process_provision_command(void)
 			return;
 		}
 
-		SetUfmStatusValue(COMMAND_DONE | UFM_PROVISIONED);
+		SetUfmStatusValue(UFM_PROVISIONED);
 
 		CPLD_STATUS cpld_status;
 
@@ -965,7 +967,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 			DEBUG_PRINTF("DymanicUpdate not supported");
 		// Setting updated cpld status to ufm
 		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-	} else   {
+	} else {
 		if (Data & PchActiveUpdate) {
 			if ((Data & PchActiveUpdate) && (Data & PchRecoveryUpdate)) {
 				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
@@ -997,12 +999,10 @@ void UpdateIntentHandle(byte Data, uint32_t Source)
 			PublishUpdateEvent(ROT_TYPE, PRIMARY_FLASH_REGION);
 
 		if (Data & BmcActiveUpdate) {
-
 			if ((Data & BmcActiveUpdate) && (Data & BmcRecoveryUpdate)) {
 				PublishUpdateEvent(BMC_EVENT, PRIMARY_FLASH_REGION);
 				return;
 			}
-
 			PublishUpdateEvent(BMC_EVENT, PRIMARY_FLASH_REGION);
 		}
 		if (Data & BmcRecoveryUpdate)
@@ -1044,13 +1044,17 @@ uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
 	byte DataToSend = 0;
 	uint8_t i = 0;
 
-	DEBUG_PRINTF("PchBmcCommands CipherText: %02x %02x", CipherText[0], CipherText[1]);
+	DEBUG_PRINTF("%s CipherText: %02x %02x", __func__, CipherText[0], CipherText[1]);
 
 	switch (CipherText[0]) {
 	case UfmCmdTriggerValue:
 		if (CipherText[1] & EXECUTE_UFM_COMMAND) {       // If bit 0 set
 			// Execute command specified at UFM/Provisioning Command register
+			ClearUfmStatusValue(UFM_CLEAR_ON_NEW_COMMAND);
+			SetUfmStatusValue(COMMAND_BUSY);
 			process_provision_command();
+			ClearUfmStatusValue(COMMAND_BUSY);
+			SetUfmStatusValue(COMMAND_DONE);
 		} else if (CipherText[1] & FLUSH_WRITE_FIFO) {    // Flush Write FIFO
 			// Need to read UFM Write FIFO offest
 			memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
