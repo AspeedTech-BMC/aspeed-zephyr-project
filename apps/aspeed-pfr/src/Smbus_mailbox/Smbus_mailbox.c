@@ -739,7 +739,7 @@ void process_provision_command(void)
 	if (CheckUfmStatus(UfmFlashStatus, UFM_STATUS_LOCK_BIT_MASK)) {
 		if ((UfmCommandData < READ_ROOT_KEY) || (UfmCommandData > READ_BMC_OFFSET)) {
 			// Ufm locked
-			DEBUG_PRINTF("UFM Locked and Dropedd Write Command: 0x%x", UfmCommandData);
+			DEBUG_PRINTF("UFM Locked and Dropped Write Command: 0x%x", UfmCommandData);
 			return;
 		}
 	}
