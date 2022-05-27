@@ -184,26 +184,24 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	uint32_t PfmLength, PcLength;
 	uint32_t image_type = manifest->image_type;
 	uint8_t active_svn = 0;
-	const struct flash_area *bmc_staging;
 	const struct flash_area *bmc_pch_staging;
 
+	// TODO: need to find a way to get bmc pch staging offset rather than hardcode.
+#if 0
 	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 	if (status != Success)
 		return Failure;
+#endif
 
 	status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 	if (status != Success)
-		return Failure;
-
-	status = flash_area_open(FLASH_AREA_ID(bmc_stg), &bmc_staging);
-	if (status)
 		return Failure;
 
 	status = flash_area_open(FLASH_AREA_ID(bmc_pch_stg), &bmc_pch_staging);
 	if (status)
 		return Failure;
 
-	source_address += bmc_staging->fa_size;
+	source_address = bmc_pch_staging->fa_off;
 
 	manifest->image_type = BMC_TYPE;
 	manifest->address = source_address;
@@ -228,22 +226,16 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address = target_address;
 	manifest->image_type = image_type;
 
-	uint32_t erase_address = target_address;
+	int sector_sz = pfr_spi_get_block_size(image_type);
+	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
-	for (int i = 0; i < (bmc_staging->fa_size / PAGE_SIZE); i++) {
+	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
+			bmc_pch_staging->fa_size))
+		return Failure;
 
-		status = pfr_spi_erase_4k(manifest->image_type, erase_address);
-		if (status != Success)
-			return Failure;
-
-		erase_address += PAGE_SIZE;
-	}
-
-	for (int i = 0; i < (bmc_staging->fa_size / PAGE_SIZE); i++) {
-		status = pfr_spi_page_read_write_between_spi(BMC_TYPE, &source_address, PCH_TYPE, &target_address);
-		if (status != Success)
-			return Failure;
-	}
+	if (pfr_spi_region_read_write_between_spi(BMC_TYPE, source_address, PCH_TYPE,
+				target_address, bmc_pch_staging->fa_size))
+		return Failure;
 
 	if (manifest->state == RECOVERY) {
 		DEBUG_PRINTF("PCH staging region verification");

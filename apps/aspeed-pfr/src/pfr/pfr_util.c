@@ -35,7 +35,7 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 #define DEBUG_PRINTF(...)
 #endif
 
-int pfr_spi_read(unsigned int device_id, unsigned int address, unsigned int data_length, unsigned char *data)
+int pfr_spi_read(uint8_t device_id, uint32_t address, uint32_t data_length, uint8_t *data)
 {
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -45,7 +45,7 @@ int pfr_spi_read(unsigned int device_id, unsigned int address, unsigned int data
 	return Success;
 }
 
-int pfr_spi_write(unsigned int device_id, unsigned int address, unsigned int data_length, unsigned char *data)
+int pfr_spi_write(uint8_t device_id, uint32_t address, uint32_t data_length, uint8_t *data)
 {
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -55,7 +55,7 @@ int pfr_spi_write(unsigned int device_id, unsigned int address, unsigned int dat
 	return Success;
 }
 
-int pfr_spi_erase_4k(unsigned int device_id, unsigned int address)
+int pfr_spi_erase_4k(uint8_t device_id, uint32_t address)
 {
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -65,7 +65,7 @@ int pfr_spi_erase_4k(unsigned int device_id, unsigned int address)
 	return Success;
 }
 
-int pfr_spi_erase_block(unsigned int device_id, unsigned int address)
+int pfr_spi_erase_block(uint8_t device_id, uint32_t address)
 {
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -75,7 +75,29 @@ int pfr_spi_erase_block(unsigned int device_id, unsigned int address)
 	return Success;
 }
 
-int pfr_spi_get_block_size(unsigned int device_id)
+int pfr_spi_erase_region(uint8_t device_id,
+		bool support_block_erase, uint32_t start_addr, uint32_t nbytes)
+{
+	uint32_t erase_addr = start_addr;
+	uint32_t end_addr = start_addr + nbytes;
+
+	while(erase_addr < end_addr) {
+		if (support_block_erase && ((end_addr - erase_addr) >= BLOCK_SIZE) &&
+				!(erase_addr & 0xffff)) {
+			if (pfr_spi_erase_block(device_id, erase_addr))
+				return Failure;
+			erase_addr += BLOCK_SIZE;
+		} else {
+			if (pfr_spi_erase_4k(device_id, erase_addr))
+				return Failure;
+			erase_addr += PAGE_SIZE;
+		}
+	}
+
+	return Success;
+}
+
+int pfr_spi_get_block_size(uint8_t device_id)
 {
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int block_sz;
@@ -85,7 +107,7 @@ int pfr_spi_get_block_size(unsigned int device_id)
 	return block_sz;
 }
 
-int pfr_spi_page_read_write(unsigned int device_id, uint32_t source_address, uint32_t target_address)
+int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t target_address)
 {
 	int status = 0;
 	uint8_t buffer[PAGE_SIZE] = {0};
@@ -99,7 +121,7 @@ int pfr_spi_page_read_write(unsigned int device_id, uint32_t source_address, uin
 	return Success;
 }
 
-int pfr_spi_page_read_write_between_spi(int source_flash, uint32_t *source_address, int target_flash, uint32_t *target_address)
+int pfr_spi_page_read_write_between_spi(uint8_t source_flash, uint32_t *source_address, uint8_t target_flash, uint32_t *target_address)
 {
 	int status = 0;
 	uint32_t index1, index2;
@@ -125,8 +147,28 @@ int pfr_spi_page_read_write_between_spi(int source_flash, uint32_t *source_addre
 	return Success;
 }
 
+int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
+		uint8_t dest_dev, uint32_t dest_addr, size_t length)
+{
+	int i, status = 0;
+	uint32_t index1, index2;
+	uint8_t buffer[PAGE_SIZE];
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+
+	for (i = 0; i < length / PAGE_SIZE; i++) {
+		spi_flash->spi.device_id[0] = src_dev;
+		spi_flash->spi.base.read(&spi_flash->spi, src_addr, buffer, PAGE_SIZE);
+		spi_flash->spi.device_id[0] = dest_dev;
+		spi_flash->spi.base.write(&spi_flash->spi, dest_addr, buffer, PAGE_SIZE);
+		src_addr += PAGE_SIZE;
+		dest_addr += PAGE_SIZE;
+	}
+
+	return Success;
+}
+
 // calculates sha for dataBuffer
-int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, unsigned char *hash_out)
+int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out)
 {
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -142,8 +184,8 @@ int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t
 	return Success;
 }
 
-int esb_ecdsa_verify(struct pfr_manifest *manifest, unsigned int digest[], unsigned char pub_key[],
-		     unsigned char signature[], unsigned char *auth_pass)
+int esb_ecdsa_verify(struct pfr_manifest *manifest, uint32_t digest[], uint8_t pub_key[],
+		     uint8_t signature[], uint8_t *auth_pass)
 {
 	*auth_pass = true;
 
@@ -209,7 +251,7 @@ static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
 {
 	mbedtls_ecdsa_context ctx_verify;
 	mbedtls_mpi r, s;
-	unsigned char hash[SHA256_HASH_LENGTH];
+	uint8_t hash[SHA256_HASH_LENGTH];
 	int ret = 0;
 	char z = 1;
 

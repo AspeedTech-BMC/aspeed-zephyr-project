@@ -85,6 +85,7 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	DEBUG_PRINTF("PFM Verification");
 
+	LOG_INF("manifest->address=%p manifest->recovery_address=%p", manifest->address, manifest->recovery_address);
 	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("Verify active pfm failed");

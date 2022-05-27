@@ -33,28 +33,6 @@ typedef struct
 	uint32_t _reserved[25];
 } PBC_HEADER;
 
-int decompression_erase_region(uint32_t image_type,
-		bool support_block_erase, uint32_t start_addr, uint32_t nbytes)
-{
-	uint32_t erase_addr = start_addr;
-	uint32_t end_addr = start_addr + nbytes;
-
-	while(erase_addr < end_addr) {
-		if (support_block_erase && ((end_addr - erase_addr) >= BLOCK_SIZE) &&
-				!(erase_addr & 0xffff)) {
-			if (pfr_spi_erase_block(image_type, erase_addr))
-				return Failure;
-			erase_addr += BLOCK_SIZE;
-		} else {
-			if (pfr_spi_erase_4k(image_type, erase_addr))
-				return Failure;
-			erase_addr += PBC_PAGE_SIZE;
-		}
-	}
-
-	return Success;
-}
-
 int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_addr,
 		uint32_t active_bitmap)
 {
@@ -84,7 +62,7 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 			if (erase_start_bit != 0xffffffff)
 				erase_bits = bit_in_bitmap - erase_start_bit;
 			if (erase_bits) {
-				decompression_erase_region(image_type,
+				pfr_spi_erase_region(image_type,
 						support_block_erase,
 						erase_start_bit * PAGE_SIZE,
 						erase_bits * PAGE_SIZE);
@@ -94,7 +72,7 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 	}
 	if (erase_start_bit != 0xffffffff) {
 		start_addr = erase_start_bit * PAGE_SIZE;
-		decompression_erase_region(image_type, support_block_erase,
+		pfr_spi_erase_region(image_type, support_block_erase,
 				start_addr, end_addr - start_addr);
 	}
 }

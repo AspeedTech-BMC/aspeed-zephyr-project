@@ -9,24 +9,30 @@
 
 #include <stdint.h>
 
-int pfr_spi_read(unsigned int device_id, unsigned int address,
-		 unsigned int data_length, unsigned char *data);
+int pfr_spi_read(uint8_t device_id, uint32_t address,
+		 uint32_t data_length, uint8_t *data);
 
-int pfr_spi_write(unsigned int device_id, unsigned int address,
-		  unsigned int data_length, unsigned char *data);
+int pfr_spi_write(uint8_t device_id, uint32_t address,
+		  uint32_t data_length, uint8_t *data);
 
-int pfr_spi_page_read_write(unsigned int device_id, uint32_t source_address, uint32_t target_address);
+int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t target_address);
 
-int pfr_spi_erase_4k(unsigned int device_id, unsigned int address);
+int pfr_spi_erase_4k(uint8_t device_id, uint32_t address);
 
-int pfr_spi_erase_block(unsigned int device_id, unsigned int address);
+int pfr_spi_erase_block(uint8_t device_id, uint32_t address);
 
-int pfr_spi_get_block_size(unsigned int device_id);
+int pfr_spi_erase_region(uint8_t device_id,
+		bool support_block_erase, uint32_t start_addr, uint32_t nbytes);
 
-int esb_ecdsa_verify(struct pfr_manifest *manifest, unsigned int digest[], unsigned char pub_key[],
-		     unsigned char signature[], unsigned char *auth_pass);
+int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
+		uint8_t dest_dev, uint32_t dest_addr, size_t length);
 
-int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, unsigned char *hash_out);
+int pfr_spi_get_block_size(uint8_t device_id);
+
+int esb_ecdsa_verify(struct pfr_manifest *manifest, uint32_t digest[], uint8_t pub_key[],
+		     uint8_t signature[], uint8_t *auth_pass);
+
+int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out);
 
 int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t *hash_out,
 	     size_t hash_length);

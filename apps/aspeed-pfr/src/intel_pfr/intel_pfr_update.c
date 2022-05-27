@@ -219,25 +219,25 @@ int update_rot_fw(uint32_t address, uint32_t length)
 {
 	int status = 0;
 	uint32_t source_address = address;
-	uint32_t target_address = 0;
-
-	uint32_t rot_recovery_address = 0;
 	uint32_t rot_active_address = 0;
+	uint32_t rot_recovery_address = 0;
 	uint32_t active_length = 0x60000;
 
-	for (int i = 0; i < (active_length / PAGE_SIZE); i++) {
-		pfr_spi_erase_4k(ROT_INTERNAL_RECOVERY, rot_recovery_address);
-		status = pfr_spi_page_read_write_between_spi(ROT_INTERNAL_ACTIVE, &rot_active_address, ROT_INTERNAL_RECOVERY, &rot_recovery_address);
-		if (status != Success)
-			return Failure;
-	}
+	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, false, rot_recovery_address,
+			active_length))
+		return Failure;
 
-	for (int i = 0; i <= (length / PAGE_SIZE); i++) {
-		pfr_spi_erase_4k(ROT_INTERNAL_ACTIVE, target_address);
-		status = pfr_spi_page_read_write_between_spi(BMC_SPI, &source_address, ROT_INTERNAL_ACTIVE, &target_address);
-		if (status != Success)
-			return Failure;
-	}
+	if (pfr_spi_region_read_write_between_spi(ROT_INTERNAL_ACTIVE, rot_active_address,
+				ROT_INTERNAL_RECOVERY, rot_recovery_address, active_length))
+		return Failure;
+
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, false, rot_active_address,
+				length))
+		return Failure;
+
+	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
+			ROT_INTERNAL_ACTIVE, rot_active_address, length))
+		return Failure;
 
 	return Success;
 }
