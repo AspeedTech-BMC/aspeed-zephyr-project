@@ -29,7 +29,7 @@ void SPI_Monitor_Enable(char *dev_name, bool enabled)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
 #else
 	/* config spim as SPI monitor */
-	spim_ext_mux_config(dev_m, 0);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
 #endif
 	spim_monitor_enable(dev_m, enabled);
 }
