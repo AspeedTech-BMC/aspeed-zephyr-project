@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_ASPEED_PFR_SRC_INCLUDE_ENGINES_H_
-#define ZEPHYR_ASPEED_PFR_SRC_INCLUDE_ENGINES_H_
+#pragma once
 
 #include <zephyr.h>
 
@@ -31,4 +30,3 @@ struct engine_instances {
 
 int initializeEngines(void);
 
-#endif /* ZEPHYR_ASPEED_PFR_SRC_INCLUDE_ENGINES_H_ */

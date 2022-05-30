@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef PFR_VERIFICATION_H
-#define PFR_VERIFICATION_H
+#pragma once
 
 
 int authentication_image(void *AoData, void *EventContext);
@@ -17,4 +16,3 @@ int PfmSpiRegionVerification(unsigned int ImageId, unsigned int FlashSelect);
 // -- Recovery Region
 int RecoveryRegionVerification(int ImageType);
 
-#endif /* PFR_VERIFICATION_H */

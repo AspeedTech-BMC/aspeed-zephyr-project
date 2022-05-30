@@ -3,8 +3,9 @@
  *
  * SPDX-License-Identifier: MIT
  */
-#ifndef PFR_SMBUS_MAILBOX_H_
-#define PFR_SMBUS_MAILBOX_H_
+
+#pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 // #include <HrotStateMachine.h>
@@ -334,4 +335,3 @@ void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *Ma
 extern uint8_t gBiosBootDone;
 extern uint8_t gBmcBootDone;
 
-#endif /* PFR_SMBUS_MAILBOX_H_ */

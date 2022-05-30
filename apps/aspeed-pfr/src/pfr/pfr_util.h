@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef PFR_UTIL_H
-#define PFR_UTIL_H
+#pragma once
 
 #include <stdint.h>
 
@@ -48,4 +47,3 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 
 int pfr_cpld_update_reboot(void);
 
-#endif /*PFR_UTIL_H*/

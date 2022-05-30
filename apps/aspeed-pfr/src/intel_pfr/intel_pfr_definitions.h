@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_DEFINITIONS_H_
-#define INTEL_PFR_DEFINITIONS_H_
+#pragma once
 
 #define BMC_FLASH_ID                            0
 #define PCH_FLASH_ID                            1
@@ -192,4 +191,3 @@ typedef struct {
 	uint8_t Reserved[4];
 } CPLD_STATUS;
 
-#endif

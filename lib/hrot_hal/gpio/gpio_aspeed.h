@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_INCLUDE_GPIO_API_MIDLEYER_H_
-#define ZEPHYR_INCLUDE_GPIO_API_MIDLEYER_H_
+#pragma once
 
 #define BMC_SPI_MONITOR "spi_m1"
 #if !defined(CONFIG_ASPEED_DC_SCM)
@@ -24,4 +23,3 @@ enum {
 	GPIO_APP_CMD_NOOP  = 0x00,				/**< No-op */
 };
 
-#endif

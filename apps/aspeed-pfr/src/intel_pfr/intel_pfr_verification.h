@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_VERIFICATION_H_
-#define INTEL_PFR_VERIFICATION_H_
+#pragma once
 
 #include <stdint.h>
 
@@ -222,4 +221,3 @@ struct pfr_authentication {
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
-#endif /*INTEL_PFR_VERIFICATION_H*/

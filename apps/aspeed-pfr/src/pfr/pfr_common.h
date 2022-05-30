@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef PFR_COMMON_H_
-#define PFR_COMMON_H_
+#pragma once
 
 #include "manifest/manifest_flash.h"
 #include "manifest/manifest.h"
@@ -91,4 +90,3 @@ struct pfr_keystore {
 void init_pfr_manifest(void);
 struct pfr_manifest *get_pfr_manifest(void);
 
-#endif /* PFR_COMMON_H_ */

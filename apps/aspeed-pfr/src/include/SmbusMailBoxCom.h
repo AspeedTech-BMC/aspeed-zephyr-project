@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef PFR_SMBUS_MAILBOX_COMM_H_
-#define PFR_SMBUS_MAILBOX_COMM_H_
+#pragma once
 
 typedef char byte;
 
@@ -177,4 +176,3 @@ typedef enum _BMC_PCH_UPDATE_INTENT_VALUE {
 	UPDATE_AT_RESET = 0X80
 } BMC_PCH_UPDATE_INTENT_VALUE;
 
-#endif /* PFR_SMBUS_MAILBOX_COMM_H_ */

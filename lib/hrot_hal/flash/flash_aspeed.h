@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_INCLUDE_SPI_API_MIDLEYER_H_
-#define ZEPHYR_INCLUDE_SPI_API_MIDLEYER_H_
+#pragma once
 
 #include <zephyr/types.h>
 #include <stddef.h>
@@ -304,4 +303,3 @@ struct pspi_flash {
 
 int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer);
 
-#endif

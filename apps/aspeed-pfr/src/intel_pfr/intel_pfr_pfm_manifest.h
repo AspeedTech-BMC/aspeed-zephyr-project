@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_PFM_VERIFICATION_H_
-#define INTEL_PFR_PFM_VERIFICATION_H_
+#pragma once
 
 #include <stdint.h>
 
@@ -145,4 +144,3 @@ extern ProtectLevelMask bmc_protect_level_mask_count;
 #pragma pack()
 
 
-#endif /*INTEL_PFR_PFM_VERIFICATION_H_*/

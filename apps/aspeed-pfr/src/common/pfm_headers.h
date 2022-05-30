@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_ASPEED_PFR_SRC_COMMON_PFM_HEADER_H_
-#define ZEPHYR_ASPEED_PFR_SRC_COMMON_PFM_HEADER_H_
+#pragma once
 
 #include <zephyr.h>
 
@@ -77,4 +76,3 @@ struct recovery_image {
 	uint8_t image_length[4];
 };
 
-#endif /* ZEPHYR_ASPEED_PFR_SRC_COMMON_PFM_HEADER_H_ */

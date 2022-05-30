@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_INCLUDE_HASH_API_MIDLEYER_H_
-#define ZEPHYR_INCLUDE_HASH_API_MIDLEYER_H_
+#pragma once
 
 #include <crypto/hash_structs.h>
 
@@ -55,4 +54,3 @@ int hash_engine_update(const uint8_t *data, size_t length);
 int hash_engine_finish(uint8_t *hash, size_t hash_length);
 void hash_engine_cancel(void);
 
-#endif	/* ZEPHYR_INCLUDE_HASH_API_MIDLEYER_H_ */

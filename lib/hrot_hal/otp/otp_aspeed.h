@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#pragma once
+
 #include <sys/util.h>
 
 #define OTP_REG_RESERVED	-1

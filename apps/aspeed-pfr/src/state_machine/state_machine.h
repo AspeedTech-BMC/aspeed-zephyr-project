@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_STATE_MACHINE_H
-#define ZEPHYR_STATE_MACHINE_H
+#pragma once
 
 #include <smf.h>
 #include "common_smc.h"
@@ -29,4 +28,3 @@ int post_smc_action(int new_state, void *static_data, void *event);
 int execute_next_smc_action(int new_state, void *static_data, void *event_ctx);
 void PublishInitialEvents(void);
 
-#endif // #ifndef ZEPHYR_STATE_MACHINE_H

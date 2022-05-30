@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef CONTEXT_MANAGER_H_
-#define CONTEXT_MANAGER_H_
+#pragma once
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -31,4 +30,4 @@ struct Context_Manager {
 int app_context_init(struct app_context *context);
 struct app_context *getappcontextInstance(void);
 static int save_cpld_context(struct app_context *context);
-#endif  //  #ifndef CONTEXT_MANAGER_H_
+

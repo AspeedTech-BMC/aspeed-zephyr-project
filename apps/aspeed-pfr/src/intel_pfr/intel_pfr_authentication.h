@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_AUTHENTICATION_H_
-#define INTEL_PFR_AUTHENTICATION_H_
+#pragma once
 
 int pfr_active_verify(struct pfr_manifest *manifest);
-
-#endif /*INTEL_PFR_AUTHENTICATION_H_*/
 
