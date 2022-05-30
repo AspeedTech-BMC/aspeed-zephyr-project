@@ -20,7 +20,7 @@
 #define LOG_MODULE_NAME spi_api
 
 #include <logging/log.h>
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 static char *Flash_Devices_List[6] = {
 	"spi1_cs0",
@@ -117,7 +117,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;
 	break;
 	default:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 	break;
 	}
 
@@ -184,11 +184,11 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = flash_area_erase(partition_device, AdrOffset, sector_sz);
 	break;
 	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 		ret = 0;
 	break;
 	case MIDLEY_FLASH_CMD_CE:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 		ret = 0;
 	break;
 	case MIDLEY_FLASH_CMD_RDSR:
@@ -197,7 +197,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;
 	break;
 	default:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 	break;
 	}
 

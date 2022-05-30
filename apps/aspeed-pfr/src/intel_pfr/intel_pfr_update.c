@@ -256,8 +256,9 @@ int rot_svn_policy_verify(struct pfr_manifest *manifest, uint32_t hrot_svn)
 	if (hrot_svn > SVN_MAX) {
 		DEBUG_PRINTF("Invalid Staging area SVN Number");
 		return Failure;
-	} else if (hrot_svn <= current_svn) {
-		DEBUG_PRINTF("Can't update with older version of SVN");
+	} else if (hrot_svn < current_svn) {
+		DEBUG_PRINTF("Can't update with older version of SVN current=%02x staging=%02x",
+				current_svn, hrot_svn);
 		return Failure;
 	}
 	set_ufm_svn(manifest, SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
@@ -354,7 +355,8 @@ int check_svn_number(struct pfr_manifest *manifest, uint32_t read_address, uint8
 		DEBUG_PRINTF("Invalid Staging area SVN Number");
 		return Failure;
 	} else if (staging_svn_number < current_svn_number) {
-		DEBUG_PRINTF("Can't update with older version of SVN");
+		DEBUG_PRINTF("Can't update with older version of SVN current=%02x staging=%02x",
+				current_svn_number, staging_svn_number);
 		return Failure;
 	}
 

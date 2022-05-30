@@ -13,6 +13,8 @@
 #include <drivers/i2c.h>
 #include <drivers/i2c/pfr/swmbx.h>
 
+#include "AspeedStateMachine/AspeedStateMachine.h"
+
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
 #if SMBUS_MAILBOX_DEBUG
@@ -176,6 +178,8 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 	while (1) {
 		ret = k_poll(events, 8, K_FOREVER);
+
+		union aspeed_event_data data = {0};
 		if (ret < 0) {
 			DEBUG_PRINTF("%s: k_poll error ret=%d", ret);
 			continue;
@@ -189,23 +193,25 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 				uint8_t c;
 
 				ret = swmbx_read(gSwMbxDev, true, UfmWriteFIFO, &c);
-				if (!ret)
+				if (!ret) {
 					gUfmFifoData[gFifoData++] = c;
+				}
 			} while (!ret);
 		} else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Read FIFO empty prepare next data */
 			k_sem_take(events[1].sem, K_NO_WAIT);
 		} else if (events[2].state == K_POLL_STATE_SEM_AVAILABLE) {
+
 			/* UFM Provision Trigger */
 			k_sem_take(events[2].sem, K_NO_WAIT);
 			aodata[2].ProcessNewCommand = 1;
 			aodata[2].type = I2C_EVENT;
 			evt_ctx[2].operation = I2C_HANDLE;
 			evt_ctx[2].i2c_data = buffer[2];
-			buffer[2][0] = UfmCmdTriggerValue;
-			swmbx_get_msg(0, UfmCmdTriggerValue, &buffer[2][1]);
+			data.bit8[0] = UfmCmdTriggerValue;
+			swmbx_get_msg(0, UfmCmdTriggerValue, &data.bit8[1]);
 
-			post_smc_action(I2C, &aodata[2], &evt_ctx[2]);
+			GenerateStateMachineEvent(PROVISION_CMD, data.ptr);
 		} else if (events[3].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Update Intent */
 			k_sem_take(events[3].sem, K_NO_WAIT);
@@ -213,10 +219,10 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			aodata[3].type = I2C_EVENT;
 			evt_ctx[3].operation = I2C_HANDLE;
 			evt_ctx[3].i2c_data = buffer[3];
-			buffer[3][0] = BmcUpdateIntent;
-			swmbx_get_msg(0, BmcUpdateIntent, &buffer[3][1]);
+			data.bit8[0] = BmcUpdateIntent;
+			swmbx_get_msg(0, BmcUpdateIntent, &data.bit8[1]);
 
-			post_smc_action(I2C, &aodata[3], &evt_ctx[3]);
+			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 		} else if (events[4].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* PCH Update Intent */
 			k_sem_take(events[4].sem, K_NO_WAIT);
@@ -227,16 +233,18 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			aodata[5].type = I2C_EVENT;
 			evt_ctx[5].operation = I2C_HANDLE;
 			evt_ctx[5].i2c_data = buffer[5];
-			buffer[5][0] = BmcCheckpoint;
-			swmbx_get_msg(0, BmcCheckpoint, &buffer[5][1]);
+			data.bit8[0] = BmcCheckpoint;
+			swmbx_get_msg(0, BmcCheckpoint, &data.bit8[1]);
 
-			post_smc_action(I2C, &aodata[5], &evt_ctx[5]);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
 		} else if (events[6].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* ACM Checkpoint */
 			k_sem_take(events[6].sem, K_NO_WAIT);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		} else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BIOS Checkpoint */
 			k_sem_take(events[7].sem, K_NO_WAIT);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		}
 
 		for (size_t i = 0; i < 8; ++i)
@@ -597,9 +605,9 @@ bool IsBmcUpdateIntentUpdateAtReset(void)
 
 byte *GetCpldFpgaRotHash(void)
 {
-	uint8_t HashData[SHA256_DIGEST_LENGTH] = { 0 };
+	uint8_t HashData[SHA384_DIGEST_LENGTH] = { 0 };
 
-	memcpy(HashData, gSmbusMailboxData.CpldFPGARoTHash, SHA256_DIGEST_LENGTH);
+	memcpy(HashData, gSmbusMailboxData.CpldFPGARoTHash, SHA384_DIGEST_LENGTH);
 	// add obb read code for bmc
 	return gSmbusMailboxData.CpldFPGARoTHash;
 }

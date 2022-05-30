@@ -23,3 +23,7 @@ enum {
 	GPIO_APP_CMD_NOOP  = 0x00,				/**< No-op */
 };
 
+int BMCBootHold(void);
+int PCHBootHold(void);
+int BMCBootRelease(void);
+int PCHBootRelease(void);

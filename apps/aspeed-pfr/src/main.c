@@ -17,7 +17,9 @@
 #include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
+#include "platform_monitor/platform_monitor.h"
 #include <logging/logging_wrapper.h>
+#include "AspeedStateMachine/AspeedStateMachine.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -32,25 +34,9 @@ void main(void)
 {
 	int status = 0;
 
-	LOG_INF("*** ASPEED_PFR version 0.0.1 ***");
+	LOG_INF("*** ASPEED_PFR version 01.01 Board:%s ***", CONFIG_BOARD);
 
-	status = initializeEngines();
-	status = initializeManifestProcessor();
-	debug_log_init();// State Machine log saving
+	aspeed_print_sysrst_info();
 
-	// DEBUG_HALT();
-	BMCBootHold();
-	PCHBootHold();
-
-	// I2c_slave_dev_debug+>
-	struct i2c_slave_interface *I2CSlaveEngine = getI2CSlaveEngineInstance();
-	struct I2CSlave_engine_wrapper *I2cSlaveEngineWrapper;
-
-	status = I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
-
-#if SMBUS_MAILBOX_SUPPORT
-	InitializeSmbusMailbox();
-	SetPlatformState(ENTER_T_MINUS_1);
-#endif
-	StartHrotStateMachine();
+	AspeedStateMachine();
 }

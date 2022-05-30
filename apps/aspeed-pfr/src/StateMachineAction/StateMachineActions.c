@@ -19,6 +19,7 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "spi_filter/spi_filter_wrapper.h"
 #include "logging/debug_log.h"// State Machine log saving
+#include "AspeedStateMachine/AspeedStateMachine.h"
 
 LOG_MODULE_DECLARE(state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -42,12 +43,14 @@ static void wdt_callback_bmc_timeout(void)
 {
 	DEBUG_PRINTF("enter %s", __func__);
 	SetLastPanicReason(BMC_WDT_EXPIRE);
+	GenerateStateMachineEvent(WDT_TIMEOUT, NULL);
 }
 
 static void wdt_callback_pch_timeout(void)
 {
 	DEBUG_PRINTF("enter %s", __func__);
 	SetLastPanicReason(ACM_WDT_EXPIRE);
+	GenerateStateMachineEvent(WDT_TIMEOUT, NULL);
 }
 
 void AspeedPFR_EnableTimer(int type)
