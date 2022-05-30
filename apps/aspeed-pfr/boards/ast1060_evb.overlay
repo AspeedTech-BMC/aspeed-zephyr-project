@@ -1,5 +1,5 @@
 / {
-#if 0
+#if 1
 	/* For v01.00.06 */
 	resources {
 		compatible = "demo,gpio_basic_api";
@@ -29,16 +29,20 @@
 	status = "okay";
 };
 
+&mbxctrl {
+	status = "okay";
+};
+
 &i2c0 {
 	status = "okay";
 	pinctrl-0 = <&pinctrl_i2c0_default>;
 
-	swmbx1: swmbx1@38 {
+	swmbx0: swmbx0@38 {
 		compatible = "aspeed,swmbx-dev";
 		reg = <0x38>;
-		label = "SWMBX_SLAVE_CPU";
+		label = "SWMBX_SLAVE_BMC";
 		size = <256>;
-		port = <1>;
+		port = <0>;
 		status = "okay";
 	};
 };
@@ -47,12 +51,12 @@
 	pinctrl-0 = <&pinctrl_i2c1_default>;
 	status = "okay";
 
-	swmbx0: swmbx0@38 {
+	swmbx1: swmbx1@38 {
 		compatible = "aspeed,swmbx-dev";
-		reg = <0x38>;
-		label = "SWMBX_SLAVE_BMC";
+		reg = <0x62>;
+		label = "SWMBX_SLAVE_CPU";
 		size = <256>;
-		port = <0>;
+		port = <1>;
 		status = "okay";
 	};
 };

@@ -28,8 +28,8 @@ void SPI_Monitor_Enable(char *dev_name, bool enabled)
 	aspeed_spi_monitor_sw_rst(dev_m);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
 #else
-
-	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
+	/* config spim as SPI monitor */
+	spim_ext_mux_config(dev_m, 0);
 #endif
 	spim_monitor_enable(dev_m, enabled);
 }

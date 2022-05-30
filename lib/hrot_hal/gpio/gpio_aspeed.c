@@ -54,7 +54,8 @@ int BMCBootHold(void)
 	pfr_bmc_srst_enable_ctrl(true);
 	pfr_bmc_extrst_enable_ctrl(true);
 #else
-	spim_ext_mux_config(dev_m, SPIM_MASTER_MODE);
+	/* config all spi monitor as master mode */
+	spim_ext_mux_config(dev_m, 1);
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -87,7 +88,8 @@ int PCHBootHold(void)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
 	pfr_pch_rst_enable_ctrl(true);
 #else
-	spim_ext_mux_config(dev_m, SPIM_MASTER_MODE);
+	/* config all spi monitor as master mode */
+	spim_ext_mux_config(dev_m, 1);
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
@@ -123,7 +125,8 @@ int BMCBootRelease(void)
 	pfr_bmc_srst_enable_ctrl(false);
 	pfr_bmc_extrst_enable_ctrl(false);
 #else
-	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
+	/* config spim as SPI monitor */
+	spim_ext_mux_config(dev_m, 0);
 
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
@@ -156,7 +159,8 @@ int PCHBootRelease(void)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
 	pfr_pch_rst_enable_ctrl(false);
 #else
-	spim_ext_mux_config(dev_m, SPIM_MONITOR_MODE);
+	/* config spim as SPI monitor */
+	spim_ext_mux_config(dev_m, 0);
 	/* GPIOM5 */
 	gpio_dev = device_get_binding("GPIO0_M_P");
 
