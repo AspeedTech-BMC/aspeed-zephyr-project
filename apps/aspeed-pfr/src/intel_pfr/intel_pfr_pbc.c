@@ -59,14 +59,15 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 			if (erase_start_bit == 0xffffffff)
 				erase_start_bit = bit_in_bitmap;
 		} else {
-			if (erase_start_bit != 0xffffffff)
+			if (erase_start_bit != 0xffffffff) {
 				erase_bits = bit_in_bitmap - erase_start_bit;
-			if (erase_bits) {
-				pfr_spi_erase_region(image_type,
-						support_block_erase,
-						erase_start_bit * PAGE_SIZE,
-						erase_bits * PAGE_SIZE);
-				erase_start_bit = 0xffffffff;
+				if (erase_bits) {
+					pfr_spi_erase_region(image_type,
+							support_block_erase,
+							erase_start_bit * PAGE_SIZE,
+							erase_bits * PAGE_SIZE);
+					erase_start_bit = 0xffffffff;
+				}
 			}
 		}
 	}
@@ -146,8 +147,6 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 	active_bitmap = pbc_offset + sizeof(PBC_HEADER);
 	comp_bitmap = active_bitmap + bitmap_size;
 	decomp_src_addr = comp_bitmap + bitmap_size;
-
-
 	if (decompression_erase(image_type, start_addr, end_addr, active_bitmap))
 		return Failure;
 

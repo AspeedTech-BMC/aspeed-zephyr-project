@@ -97,21 +97,41 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	int status;
 	uint32_t pfm_length;
 	uint32_t read_address;
+	uint32_t staging_address;
+	uint32_t act_pfm_offset;
 
 	DEBUG_PRINTF("Active Data Corrupted");
 	if (manifest->image_type == BMC_TYPE) {
-		status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
-		if (status != Success)
-			return status;
-	} else if (manifest->image_type == PCH_TYPE) {
-		status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
-		if (status != Success)
+		if (ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
+					sizeof(read_address)))
 			return Failure;
-	} else  {
+
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&staging_address, sizeof(staging_address)))
+			return Failure;
+
+		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
+			return Failure;
+	} else if (manifest->image_type == PCH_TYPE) {
+		if (ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
+					sizeof(read_address)))
+			return Failure;
+
+		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&staging_address,
+					sizeof(staging_address)))
+			return Failure;
+
+		if(ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
+			return Failure;
+	} else {
 		return Failure;
 	}
 
 	manifest->recovery_address = read_address;
+	manifest->staging_address = staging_address;
+	manifest->active_pfm_addr = act_pfm_offset;
 	if (decompress_capsule(manifest, DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK)) {
 		DEBUG_PRINTF("Repair Failed");
 		return Failure;
