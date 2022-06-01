@@ -224,13 +224,7 @@ void print_buffer(uint8_t *string, uint8_t *buffer, uint32_t length)
 // compare buffer
 int compare_buffer(uint8_t *buffer1, uint8_t *buffer2, uint32_t length)
 {
-	int status = Success;
-
-	for (int i = 0; i < length; i++) {
-		if ((buffer1[i] != buffer2[i]) && (status != Failure))
-			status = Failure;
-	}
-	return status;
+	return (memcmp(buffer1, buffer2, length));
 }
 
 // reverse byte array

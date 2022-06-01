@@ -132,11 +132,17 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	manifest->recovery_address = read_address;
 	manifest->staging_address = staging_address;
 	manifest->active_pfm_addr = act_pfm_offset;
+	uint32_t time_start, time_end;
+	time_start = k_uptime_get_32();
+
 	if (decompress_capsule(manifest, DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK)) {
 		DEBUG_PRINTF("Repair Failed");
 		return Failure;
 	}
 
+	time_end = k_uptime_get_32();
+	DEBUG_PRINTF("Firmware recovery completed, elapsed time = %u milliseconds",
+			(time_end - time_start));
 	status = active_region_pfm_update(manifest);
 	if (status != Success) {
 		DEBUG_PRINTF("Active Region PFM Update failed!!");
