@@ -10,6 +10,7 @@
 #include "state_machine/common_smc.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
+#include "flash/flash_wrapper.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_pfm_manifest.h"
 
@@ -32,6 +33,33 @@ typedef struct
 	uint32_t payload_len;
 	uint32_t _reserved[25];
 } PBC_HEADER;
+
+int update_active_pfm(struct pfr_manifest *manifest)
+{
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	int status = 0;
+	uint32_t capsule_offset;
+
+	if (manifest->state == RECOVERY)
+		capsule_offset = manifest->recovery_address;
+	else
+		capsule_offset = manifest->staging_address;
+
+	// Adjusting capsule offset size to PFM Signing chain
+	capsule_offset += PFM_SIG_BLOCK_SIZE;
+
+	spi_flash->spi.device_id[0] = manifest->image_type;
+
+	// Updating PFM from capsule to active region
+	status = flash_copy_and_verify(&spi_flash->spi, manifest->active_pfm_addr,
+			capsule_offset, PAGE_SIZE);
+	if (status != Success)
+		return Failure;
+
+	DEBUG_PRINTF("Active PFM Updated!!");
+
+	return Success;
+}
 
 int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_addr,
 		uint32_t active_bitmap)
@@ -147,11 +175,13 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 	active_bitmap = pbc_offset + sizeof(PBC_HEADER);
 	comp_bitmap = active_bitmap + bitmap_size;
 	decomp_src_addr = comp_bitmap + bitmap_size;
+#if 1
 	if (decompression_erase(image_type, start_addr, end_addr, active_bitmap))
 		return Failure;
 
 	status = decompression_write(image_type, decomp_src_addr, start_addr, end_addr,
 			comp_bitmap);
+#endif
 
 	return status;
 }
@@ -241,6 +271,9 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 			break;
 		}
 	}
+
+	if (decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK)
+		update_active_pfm(manifest);
 
 	return Success;
 }

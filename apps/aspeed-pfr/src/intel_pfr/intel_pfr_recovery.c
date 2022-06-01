@@ -143,59 +143,8 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	time_end = k_uptime_get_32();
 	DEBUG_PRINTF("Firmware recovery completed, elapsed time = %u milliseconds",
 			(time_end - time_start));
-	status = active_region_pfm_update(manifest);
-	if (status != Success) {
-		DEBUG_PRINTF("Active Region PFM Update failed!!");
-		return Failure;
-	}
 
 	DEBUG_PRINTF("Repair success");
-
-	return Success;
-}
-
-int active_region_pfm_update(struct pfr_manifest *manifest)
-{
-
-	int status = 0;
-	uint32_t active_offset, capsule_offset;
-
-	// Getting offsets based on ImageType
-	if (manifest->image_type == PCH_TYPE) {
-		if (manifest->state == RECOVERY)
-			status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *) &capsule_offset, sizeof(capsule_offset));
-		else
-			status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *) &capsule_offset, sizeof(capsule_offset));
-
-		if (status != Success)
-			return Failure;
-
-	} else if (manifest->image_type == BMC_TYPE) {
-		if (manifest->state == RECOVERY)
-			status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *) &capsule_offset, sizeof(capsule_offset));
-		else
-			status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *) &capsule_offset, sizeof(capsule_offset));
-
-		if (status != Success)
-			return status;
-	} else  {
-		return Failure;
-	}
-
-	// Adjusting capsule offset size to PFM Signing chain
-	capsule_offset += PFM_SIG_BLOCK_SIZE;
-	active_offset = manifest->active_pfm_addr;
-
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-
-	spi_flash->spi.device_id[0] = manifest->image_type; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-
-	// Updating PFM from capsule to active region
-	status = flash_copy_and_verify(&spi_flash->spi, active_offset, capsule_offset, PAGE_SIZE);
-	if (status != Success)
-		return Failure;
-
-	DEBUG_PRINTF("PFM Updated!!");
 
 	return Success;
 }

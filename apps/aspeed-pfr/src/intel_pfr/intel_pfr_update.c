@@ -500,11 +500,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		time_end = k_uptime_get_32();
 		DEBUG_PRINTF("Firmware update completed, elapsed time = %u milliseconds",
 				(time_end - time_start));
-		status = active_region_pfm_update(pfr_manifest);
-		if (status != Success) {
-			DEBUG_PRINTF("Active Region PFM Update failed!!");
-			return Failure;
-		}
 	} else   {
 		if (pfr_manifest->image_type == BMC_TYPE) {
 			DEBUG_PRINTF("BMC Recovery Region Update");
