@@ -175,13 +175,11 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 	active_bitmap = pbc_offset + sizeof(PBC_HEADER);
 	comp_bitmap = active_bitmap + bitmap_size;
 	decomp_src_addr = comp_bitmap + bitmap_size;
-#if 1
 	if (decompression_erase(image_type, start_addr, end_addr, active_bitmap))
 		return Failure;
 
 	status = decompression_write(image_type, decomp_src_addr, start_addr, end_addr,
 			comp_bitmap);
-#endif
 
 	return status;
 }

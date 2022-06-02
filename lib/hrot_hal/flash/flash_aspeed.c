@@ -13,6 +13,7 @@
 #include <string.h>
 #include <zephyr.h>
 #include <flash_map.h>
+#include <soc.h>
 //#include <flash_master.h>
 //#include "flash/spi_flash.h"
 
@@ -29,6 +30,10 @@ static char *Flash_Devices_List[6] = {
 	"fmc_cs0",
 	"fmc_cs1"
 };
+
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+static uint8_t flash_rw_buf[8192] NON_CACHED_BSS_ALIGN16;
+#endif
 
 static void Data_dump_buf(uint8_t *buf, uint32_t len)
 {
@@ -78,11 +83,21 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		return page_sz;
 	break;
 	case MIDLEY_FLASH_CMD_READ:
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		ret = flash_read(flash_device, AdrOffset, flash_rw_buf, Datalen);
+		memcpy(xfer->data, flash_rw_buf, Datalen);
+#else
 		ret = flash_read(flash_device, AdrOffset, xfer->data, Datalen);
+#endif
 		//Data_dump_buf(buf,Datalen);
 	break;
 	case MIDLEY_FLASH_CMD_PP://Flash Write
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		memcpy(flash_rw_buf, xfer->data, Datalen);
+		ret = flash_write(flash_device, AdrOffset, flash_rw_buf, Datalen);
+#else
 		ret = flash_write(flash_device, AdrOffset, xfer->data, Datalen);
+#endif
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
 		spi_nor_erase_by_cmd(flash_device, AdrOffset, SECTOR_SIZE,
@@ -148,10 +163,21 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;	// bypass as write enabled
 	break;
 	case MIDLEY_FLASH_CMD_READ:
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		ret = flash_area_read(partition_device, AdrOffset, flash_rw_buf, Datalen);
+		memcpy(xfer->data, flash_rw_buf, Datalen);
+
+#else
 		ret = flash_area_read(partition_device, AdrOffset, xfer->data, Datalen);
+#endif
 	break;
 	case MIDLEY_FLASH_CMD_PP://Flash Write
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		memcpy(flash_rw_buf, xfer->data, Datalen);
+		ret = flash_area_write(partition_device, AdrOffset, flash_rw_buf, Datalen);
+#else
 		ret = flash_area_write(partition_device, AdrOffset, xfer->data, Datalen);
+#endif
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
 		sector_sz = flash_get_write_block_size(flash_device);
