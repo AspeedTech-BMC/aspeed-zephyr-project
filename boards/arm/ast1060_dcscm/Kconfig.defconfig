@@ -6,6 +6,6 @@
 
 if BOARD_AST1060_DCSCM
 config BOARD
-	default "ast1060_DCSCM"
+	default "ast1060_dcscm"
 endif # BOARD_AST1060_DCSCM
 
