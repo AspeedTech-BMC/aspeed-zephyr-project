@@ -6,5 +6,8 @@
 
 #pragma once
 
+#include "pfr/pfr_common.h"
+
 int pfr_active_verify(struct pfr_manifest *manifest);
+int pfr_recovery_verify(struct pfr_manifest *manifest);
 

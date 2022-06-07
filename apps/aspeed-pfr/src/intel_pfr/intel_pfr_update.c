@@ -7,6 +7,8 @@
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include "pfr/pfr_update.h"
+#include "pfr/pfr_ufm.h"
+#include "pfr/pfr_util.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "state_machine/common_smc.h"
 #include "pfr/pfr_common.h"
@@ -15,9 +17,12 @@
 #include "intel_pfr_verification.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_definitions.h"
+#include "intel_pfr_pbc.h"
+#include "intel_pfr_recovery.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -66,9 +71,9 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 	manifest->recovery_address = target_address;
 
-	LOG_INF("manifest->address=%p manifest->recovery_address=%p", manifest->address, manifest->recovery_address);
+	DEBUG_PRINTF("manifest->address=0x%08x manifest->recovery_address=0x%08x", manifest->address, manifest->recovery_address);
 	// manifest verification
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("Staging manifest verification failed");
 		return Failure;
@@ -84,9 +89,9 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	// Recovery region PFM verification
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 
-	LOG_INF("manifest->address=%p manifest->recovery_address=%p", manifest->address, manifest->recovery_address);
+	DEBUG_PRINTF("manifest->address=0x%08x manifest->recovery_address=0x%08x", manifest->address, manifest->recovery_address);
 	// manifest verification
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("Recovery manifest verification failed");
 		return Failure;
@@ -107,7 +112,6 @@ int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash,
 	ARG_UNUSED(hash);
 	ARG_UNUSED(rsa);
 
-	int status = 0;
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) fw;
 
 	return pfr_staging_verify(pfr_manifest);
@@ -115,6 +119,7 @@ int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash,
 
 int set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
 {
+	ARG_UNUSED(manifest);
 
 	int status = 0;
 	uint8_t svn_buffer[8];
@@ -137,6 +142,7 @@ int set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn
 
 int get_ufm_svn(struct pfr_manifest *manifest, uint8_t offset)
 {
+	ARG_UNUSED(manifest);
 
 	uint8_t svn_size = 8; // we have (0- 63) SVN Number in 64 bits
 	uint8_t svn_buffer[8];
@@ -217,7 +223,6 @@ int pfr_decommission(struct pfr_manifest *manifest)
 
 int update_rot_fw(uint32_t address, uint32_t length)
 {
-	int status = 0;
 	uint32_t source_address = address;
 	uint32_t rot_active_address = 0;
 	uint32_t rot_recovery_address = 0;
@@ -264,7 +269,6 @@ int rot_svn_policy_verify(struct pfr_manifest *manifest, uint32_t hrot_svn)
 int ast1060_update(struct pfr_manifest *manifest)
 {
 	int status = 0;
-	uint8_t buffer;
 	uint32_t pc_length = 0, pc_type, pc_type_status;
 	uint32_t payload_address;
 
@@ -276,7 +280,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 	}
 
 	manifest->pc_type = pc_type;
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("HROT update capsule verification failed");
 		SetMinorErrorCode(CPLD_UPD_CAPSULE_AUTH_FAIL);
@@ -309,7 +313,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 
 		uint32_t hrot_svn = 0;
 
-		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t), &hrot_svn);
+		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t), (uint8_t *)&hrot_svn);
 		if (status != Success)
 			return Failure;
 
@@ -370,18 +374,16 @@ int update_recovery_region(int image_type, uint32_t source_address, uint32_t tar
 int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 {
 	int status = 0;
-	uint32_t source_address, target_address, pfm_length, area_size, pc_length;
+	uint32_t source_address, target_address, area_size;
 	uint32_t act_pfm_offset;
 	uint32_t address = 0;
 	uint32_t pc_type_status = 0;
-	uint8_t active_update_needed = 0;
 	uint8_t active_svn_number = 0;
 	CPLD_STATUS cpld_update_status;
 	const struct flash_area *pfr_staging;
 	const struct flash_area *bmc_staging;
 
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
-	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 	DECOMPRESSION_TYPE_MASK_ENUM decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
 
 	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
@@ -456,7 +458,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	// Staging area verification
 	DEBUG_PRINTF("Staging Area verfication ");
-	status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
+	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest, NULL, NULL);
 	if (status != Success) {
 		DEBUG_PRINTF("Staging Area verfication failed");
 		SetMinorErrorCode(FW_UPD_CAPSULE_AUTH_FAIL);
@@ -554,6 +556,7 @@ void get_region_type(CPLD_STATUS region, void *AoData)
 
 void watchdog_timer(uint32_t image_type)
 {
+	ARG_UNUSED(image_type);
 #if 0
 	if (image_type == BMC_TYPE) {
 		DEBUG_PRINTF("Watchdog timer BMC TYPE");
@@ -565,10 +568,7 @@ void watchdog_timer(uint32_t image_type)
 
 int check_staging_area(void)
 {
-
 	int status = 0;
-	uint32_t pc_length, read_address, pc_type;
-	uint8_t active_svn_number = 0;
 	int flash_id;
 	void *AoData = NULL;
 

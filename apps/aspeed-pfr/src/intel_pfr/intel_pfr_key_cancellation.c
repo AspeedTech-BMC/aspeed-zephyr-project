@@ -6,6 +6,9 @@
 
 #include <logging/log.h>
 #include <stdint.h>
+#include <StateMachineAction/StateMachineActions.h>
+#include <gpio/gpio_aspeed.h>
+#include <drivers/misc/aspeed/pfr_aspeed.h>
 #include "intel_pfr_provision.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_verification.h"
@@ -14,9 +17,7 @@
 #include "flash/flash_aspeed.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
-#include <StateMachineAction/StateMachineActions.h>
-#include <gpio/gpio_aspeed.h>
-#include <drivers/misc/aspeed/pfr_aspeed.h>
+#include "pfr/pfr_ufm.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -55,7 +56,7 @@ int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 		manifest->kc_flag = TRUE;
 	} else   {
 		// Read Csk key ID
-		status = pfr_spi_read(manifest->image_type, block1_address + CSK_KEY_ID_ADDRESS, sizeof(key_id), &key_id);
+		status = pfr_spi_read(manifest->image_type, block1_address + CSK_KEY_ID_ADDRESS, sizeof(key_id), (uint8_t *)&key_id);
 		if (status != Success)
 			return Failure;
 
@@ -108,8 +109,6 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 {
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
-	uint8_t cancellation_byte_old[16] = { 0 };
-	uint8_t cancellation_byte_new = 1;
 	uint8_t byte_no = 0;
 	uint8_t bit_no = 0;
 

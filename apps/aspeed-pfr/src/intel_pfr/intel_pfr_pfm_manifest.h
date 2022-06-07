@@ -7,7 +7,7 @@
 #pragma once
 
 #include <stdint.h>
-
+#include "pfr/pfr_common.h"
 #pragma pack(1)
 
 #define NUM_WHITESPACE 8
@@ -138,9 +138,10 @@ extern uint32_t g_fvm_manifest_length;
 extern ProtectLevelMask pch_protect_level_mask_count;
 extern ProtectLevelMask bmc_protect_level_mask_count;
 
-// int pfm_spi_region_verification(struct pfr_manifest *manifest);
-// Manifest_Status get_pfm_manifest_data(struct pfr_manifest *manifest, uint32_t *position,void *spi_definition, uint8_t *pfm_spi_hash, uint8_t pfm_definition);
-
 #pragma pack()
 
+int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version);
+int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
+int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address);
+int pfm_spi_region_verification(struct pfr_manifest *manifest);
 

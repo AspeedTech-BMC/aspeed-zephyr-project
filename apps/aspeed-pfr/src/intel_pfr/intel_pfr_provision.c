@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include "state_machine/common_smc.h"
 #include "pfr/pfr_common.h"
+#include "pfr/pfr_ufm.h"
 #include "intel_pfr_definitions.h"
 #include "pfr/pfr_util.h"
 #include "intel_pfr_provision.h"
@@ -99,8 +100,6 @@ int verify_root_key_entry(struct pfr_manifest *manifest, PFR_AUTHENTICATION_BLOC
 {
 	int status;
 	int root_key_permission = 0xFFFFFFFF;    // -1;
-	uint8_t i = 0;
-	uint8_t temp = 0;
 
 	if (block1_buffer->RootEntry.Tag != BLOCK1_ROOTENTRY_TAG) {
 		DEBUG_PRINTF("Root Magic/Tag not matched \r\n");

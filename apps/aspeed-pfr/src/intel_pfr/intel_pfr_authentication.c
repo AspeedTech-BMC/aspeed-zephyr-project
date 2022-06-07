@@ -10,6 +10,8 @@
 #include "intel_pfr_verification.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr_provision.h"
+#include "intel_pfr_pfm_manifest.h"
+#include "pfr/pfr_ufm.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -29,16 +31,16 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 
 	// Recovery region verification
 	if (manifest->image_type == BMC_TYPE) {
-		ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, &read_address, sizeof(read_address));
+		ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 	} else if (manifest->image_type == PCH_TYPE) {
-		ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, &read_address, sizeof(read_address));
+		ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
 	manifest->address = read_address;
 
 	// Block0-Block1 verifcation
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("Verify recovery failed");
 		return Failure;
@@ -53,7 +55,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 
 	// manifest verifcation
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("Verify recovery pfm failed");
 		return Failure;
@@ -74,10 +76,10 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	uint32_t read_address;
 
 	if (manifest->image_type == BMC_TYPE) {
-		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, &read_address, sizeof(read_address));
+		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		manifest->pc_type = PFR_BMC_PFM;
 	} else if (manifest->image_type == PCH_TYPE) {
-		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, &read_address, sizeof(read_address));
+		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		manifest->pc_type = PFR_PCH_PFM;
 	}
 
@@ -85,8 +87,8 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	DEBUG_PRINTF("PFM Verification");
 
-	LOG_INF("manifest->address=%p manifest->recovery_address=%p", manifest->address, manifest->recovery_address);
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	DEBUG_PRINTF("manifest->address=0x%08x manifest->recovery_address=0x%08x", manifest->address, manifest->recovery_address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("Verify active pfm failed");
 		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);

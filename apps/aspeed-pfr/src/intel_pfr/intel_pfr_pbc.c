@@ -13,6 +13,7 @@
 #include "flash/flash_wrapper.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_pfm_manifest.h"
+#include "common/common.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -104,6 +105,8 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 		pfr_spi_erase_region(image_type, support_block_erase,
 				start_addr, end_addr - start_addr);
 	}
+
+	return Success;
 }
 
 int decompression_write(uint32_t image_type,
@@ -232,14 +235,14 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	PFM_SPI_DEFINITION spi_def;
 	PBC_HEADER pbc;
 
-	if(pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), &pbc))
+	if(pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
 		return Failure;
 
 	if (!is_pbc_valid(&pbc))
 		return Failure;
 
 	while (1) {
-		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION), &spi_def);
+		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_def);
 		if (spi_def.PFMDefinitionType == SMBUS_RULE) {
 			cap_pfm_body_offset += sizeof(PFM_SMBUS_RULE);
 		} else if (spi_def.PFMDefinitionType == SPI_REGION) {

@@ -6,15 +6,22 @@
 
 #include <logging/log.h>
 #include <storage/flash_map.h>
+#include "common/common.h"
+#include "pfr/pfr_ufm.h"
 #include "pfr/pfr_common.h"
+#include "pfr/pfr_util.h"
 #include "state_machine/common_smc.h"
-#include "intel_pfr_recovery.h"
 #include "manifest/pfm/pfm_manager.h"
+#include "intel_pfr_recovery.h"
+#include "intel_pfr_pfm_manifest.h"
+#include "intel_pfr_pbc.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_verification.h"
+#include "intel_pfr_authentication.h"
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -34,7 +41,6 @@ int intel_pfr_recovery_verify(struct recovery_image *image, struct hash_engine *
 	ARG_UNUSED(hash_length);
 	ARG_UNUSED(pfm);
 
-	int status = 0;
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
 
 	return pfr_recovery_verify(pfr_manifest);
@@ -94,8 +100,6 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 
 int pfr_recover_active_region(struct pfr_manifest *manifest)
 {
-	int status;
-	uint32_t pfm_length;
 	uint32_t read_address;
 	uint32_t staging_address;
 	uint32_t act_pfm_offset;
@@ -156,9 +160,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	uint32_t source_address;
 	uint32_t target_address;
-	uint32_t PfmLength, PcLength;
 	uint32_t image_type = manifest->image_type;
-	uint8_t active_svn = 0;
 	const struct flash_area *bmc_pch_staging;
 
 	// TODO: need to find a way to get bmc pch staging offset rather than hardcode.
@@ -184,7 +186,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	DEBUG_PRINTF("BMC(PCH) Staging Area verfication");
 	// manifest verifcation
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("verify failed");
 		return Failure;
@@ -194,7 +196,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 	manifest->pc_type = PFR_PCH_PFM;
 	// manifest verifcation
-	status = manifest->base->verify(manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success)
 		return Failure;
 	DEBUG_PRINTF("BMC PCH Staging verification successful");
@@ -214,7 +216,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	if (manifest->state == RECOVERY) {
 		DEBUG_PRINTF("PCH staging region verification");
-		status = manifest->update_fw->base->verify(manifest, NULL, NULL);
+		status = manifest->update_fw->base->verify((struct firmware_image *)manifest, NULL, NULL);
 		if (status != Success)
 			return Failure;
 	}
@@ -226,5 +228,6 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 int intel_pfr_recover_update_action(struct pfr_manifest *manifest)
 {
+	ARG_UNUSED(manifest);
 	return Success;
 }

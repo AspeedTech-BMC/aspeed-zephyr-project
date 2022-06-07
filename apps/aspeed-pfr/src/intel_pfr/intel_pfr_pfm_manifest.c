@@ -9,7 +9,11 @@
 #include "intel_pfr_definitions.h"
 #include "state_machine/common_smc.h"
 #include "intel_pfr_provision.h"
+#include "intel_pfr_update.h"
 #include "pfr/pfr_common.h"
+#include "pfr/pfr_util.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
+
 
 LOG_MODULE_REGISTER(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -178,7 +182,7 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 			return Failure;
 		}
 
-		pfr_manifest->base->get_hash(pfr_manifest, pfr_manifest->hash, sha256_buffer, SHA256_DIGEST_LENGTH);
+		pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash, sha256_buffer, SHA256_DIGEST_LENGTH);
 
 		status = compare_buffer(pfm_spi_Hash, sha256_buffer, SHA256_DIGEST_LENGTH);
 		if (status != Success) {
@@ -192,6 +196,7 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 	return Success;
 }
 
+#if 0
 int get_fvm_start_address(struct pfr_manifest *manifest, uint32_t *fvm_address)
 {
 
@@ -243,7 +248,7 @@ int get_fvm_address(struct pfr_manifest *manifest, uint16_t fv_type)
 
 	return 0;
 }
-
+#endif
 int get_spi_region_hash(struct pfr_manifest *manifest, uint32_t address, PFM_SPI_DEFINITION *p_spi_definition, uint8_t *pfm_spi_hash, uint8_t pfm_definition)
 {
 	int status = 0;
@@ -264,7 +269,6 @@ int get_spi_region_hash(struct pfr_manifest *manifest, uint32_t address, PFM_SPI
 
 void set_protect_level_mask_count(struct pfr_manifest *manifest, PFM_SPI_DEFINITION *spi_definition)
 {
-	int status = 0;
 	uint8_t local_count = 0;
 
 	if (manifest->image_type == PCH_TYPE) {
@@ -348,7 +352,7 @@ Manifest_Status get_pfm_manifest_data(struct pfr_manifest *manifest, uint32_t *p
 		*position += sizeof(PFM_SPI_DEFINITION);
 
 		*position += get_spi_region_hash(manifest, (uint32_t)(manifest_start_address + *position), (PFM_SPI_DEFINITION *)spi_definition, pfm_spi_hash, pfm_definition);
-		set_protect_level_mask_count(manifest->image_type, spi_definition);
+		set_protect_level_mask_count(manifest, spi_definition);
 	} else if (pfm_definition_type == PCH_PFM_FVM_ADDRESS_DEFINITION) {
 
 		if (pfm_definition_type == pfm_definition) {
@@ -377,7 +381,6 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 	PFM_SPI_DEFINITION pfm_spi_definition = { 0 };
 	uint8_t pfm_definition_type = PCH_PFM_SPI_REGION;
 	uint8_t pfm_spi_hash[SHA384_SIZE] = { 0 };
-	uint8_t fvm_region_count = 0;
 
 	region_count = 0;
 
