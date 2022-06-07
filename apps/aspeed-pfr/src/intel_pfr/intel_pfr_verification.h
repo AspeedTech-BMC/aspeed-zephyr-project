@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "pfr/pfr_common.h"
 
 #define INTEL_PFR_BLOCK_0_TAG 0xB6EAFD19
 
@@ -26,8 +27,6 @@
 #define HROT_UPDATE_RESERVED    32
 #define MAX_BIOS_BOOT_TIME                      300
 #define MAX_ERASE_SIZE                          0x1000
-#define MAX_READ_SIZE                           0x100
-#define MAX_WRITE_SIZE                          0x100
 
 #define RANDOM_KEY_MAGIC_TAG                                    0x52414E44
 #define RANDOM_KEY_ADDRESS_IN_UFM                               ((PROVISION_UFM_SIZE * 16) - (2 * SHA384_SIZE))
@@ -221,3 +220,4 @@ struct pfr_authentication {
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
+void init_pfr_authentication(struct pfr_authentication *pfr_authentication);

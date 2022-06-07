@@ -13,6 +13,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_verification.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -27,6 +28,12 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
 {
 
+	ARG_UNUSED(hash);
+	ARG_UNUSED(verification);
+	ARG_UNUSED(hash_out);
+	ARG_UNUSED(hash_length);
+	ARG_UNUSED(verification);
+
 	int status = 0;
 	uint32_t pc_type = 0;
 
@@ -34,7 +41,7 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 
 	init_pfr_authentication(pfr_manifest->pfr_authentication);
 
-	status = pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type), &pc_type);
+	status = pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type), (uint8_t *)&pc_type);
 	if (status != Success)
 		return Failure;
 
@@ -77,7 +84,6 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 	uint32_t block0_entry_address = 0;
 	BLOCK0ENTRY *block1_buffer;
 	uint8_t block0_signature_curve_magic = 0;
-	uint8_t verify_status = 0;
 	uint8_t buffer[sizeof(BLOCK0ENTRY)] = { 0 };
 
 	// Adjusting BlockAddress in case of KeyCancellation
@@ -124,14 +130,14 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	status = manifest->base->get_hash(manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
+	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
 	if (status != Success)
 		return Failure;
 
 	memcpy(manifest->verification->pubkey->signature_r, block1_buffer->Block0SignatureR, hash_length);
 	memcpy(manifest->verification->pubkey->signature_s, block1_buffer->Block0SignatureS, hash_length);
 
-	status = manifest->verification->base->verify_signature(manifest, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
+	status = manifest->verification->base->verify_signature(manifest->verification->base, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
 	if (status != Success)
 		return Failure;
 
@@ -150,7 +156,6 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	uint8_t csk_sign_curve_magic = 0;
 	uint8_t buffer[sizeof(CSKENTRY)] = { 0 };
 	uint8_t csk_key_curve_type = 0;
-	uint8_t verify_status = 0;
 
 	status = pfr_spi_read(manifest->image_type, block1_address + CSK_START_ADDRESS, sizeof(CSKENTRY), buffer);
 	if (status != Success)
@@ -217,7 +222,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	status = manifest->base->get_hash(manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
+	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
 	if (status != Success)
 		return Failure;
 
@@ -227,7 +232,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	// memcpy(&signature[0],&block1_buffer->CskSignatureR[0],hash_length);
 	// memcpy(&signature[hash_length],&block1_buffer->CskSignatureS[0],hash_length);
 
-	status = manifest->verification->base->verify_signature(manifest, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
+	status = manifest->verification->base->verify_signature(manifest->verification->base, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
 	if (status != Success)
 		return Failure;
 
@@ -294,13 +299,11 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 }
 
 // BLOCK 0
-uint8_t intel_block0_verify(struct pfr_manifest *manifest)
+int intel_block0_verify(struct pfr_manifest *manifest)
 {
 	int status = 0;
 	uint32_t pc_type_status = 0;
 	PFR_AUTHENTICATION_BLOCK0 *block0_buffer;
-
-	uint8_t block0_hash_match = 0;
 	uint8_t buffer[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
 	uint8_t sha_buffer[SHA384_DIGEST_LENGTH] = { 0 };
 
@@ -367,7 +370,7 @@ uint8_t intel_block0_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	status = manifest->base->get_hash(manifest, manifest->hash, sha_buffer, hash_length);
+	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, sha_buffer, hash_length);
 	if (status != Success)
 		return Failure;
 
