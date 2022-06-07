@@ -137,7 +137,7 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 	memcpy(manifest->verification->pubkey->signature_r, block1_buffer->Block0SignatureR, hash_length);
 	memcpy(manifest->verification->pubkey->signature_s, block1_buffer->Block0SignatureS, hash_length);
 
-	status = manifest->verification->base->verify_signature(manifest->verification->base, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
+	status = manifest->verification->base->verify_signature((struct signature_verification *)manifest, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
 	if (status != Success)
 		return Failure;
 
@@ -232,7 +232,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	// memcpy(&signature[0],&block1_buffer->CskSignatureR[0],hash_length);
 	// memcpy(&signature[hash_length],&block1_buffer->CskSignatureS[0],hash_length);
 
-	status = manifest->verification->base->verify_signature(manifest->verification->base, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
+	status = manifest->verification->base->verify_signature((struct signature_verification *)manifest, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
 	if (status != Success)
 		return Failure;
 
