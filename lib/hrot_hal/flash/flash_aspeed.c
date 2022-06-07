@@ -32,7 +32,7 @@ static char *Flash_Devices_List[6] = {
 };
 
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
-static uint8_t flash_rw_buf[8192] NON_CACHED_BSS_ALIGN16;
+static uint8_t flash_rw_buf[12288] NON_CACHED_BSS_ALIGN16;
 #endif
 
 static void Data_dump_buf(uint8_t *buf, uint32_t len)
