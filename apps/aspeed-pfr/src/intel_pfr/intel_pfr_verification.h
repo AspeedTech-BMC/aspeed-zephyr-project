@@ -216,6 +216,7 @@ struct pfr_authentication {
 	int (*validate_root_key);
 };
 
+#pragma pack()
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);

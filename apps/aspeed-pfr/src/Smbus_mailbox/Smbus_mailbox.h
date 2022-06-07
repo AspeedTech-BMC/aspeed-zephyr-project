@@ -208,6 +208,8 @@ typedef struct _PFM_STRUCTURE {
 	uint32_t Length;
 } PFM_STRUCTURE;
 
+#pragma pack()
+
 static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);

@@ -52,35 +52,35 @@ static void wdt_callback_pch_timeout(void)
 
 void AspeedPFR_EnableTimer(int type)
 {
-	struct watchdog_config *wdt_config;
+	struct watchdog_config wdt_config;
 	const struct device *wdt_dev;
 	int ret = 0;
 	uint32_t count = 0;
 
-	wdt_config->wdt_cfg.window.min = 0;
-	wdt_config->reset_option = WDT_FLAG_RESET_NONE;
+	wdt_config.wdt_cfg.window.min = 0;
+	wdt_config.reset_option = WDT_FLAG_RESET_NONE;
 
 	if (type == BMC_EVENT) {
 		DEBUG_PRINTF("---------------------------------------");
 		DEBUG_PRINTF("     Start BMC Timer");
 		DEBUG_PRINTF("---------------------------------------");
-		wdt_config->wdt_cfg.window.max = BMC_MAXTIMEOUT;
-		wdt_config->wdt_cfg.callback = wdt_callback_bmc_timeout;
+		wdt_config.wdt_cfg.window.max = BMC_MAXTIMEOUT;
+		wdt_config.wdt_cfg.callback = wdt_callback_bmc_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[0]);
 
 	} else if (type == PCH_EVENT) {
 		DEBUG_PRINTF("---------------------------------------");
 		DEBUG_PRINTF("     Start PCH Timer");
 		DEBUG_PRINTF("---------------------------------------");
-		wdt_config->wdt_cfg.window.max = BIOS_MAXTIMEOUT;
-		wdt_config->wdt_cfg.callback = wdt_callback_pch_timeout;
+		wdt_config.wdt_cfg.window.max = BIOS_MAXTIMEOUT;
+		wdt_config.wdt_cfg.callback = wdt_callback_pch_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
 	}
 	if (!wdt_dev) {
 		DEBUG_PRINTF("wdt_timer_err: cannot find wdt device.");
 		return;
 	}
-	ret = watchdog_init(wdt_dev, wdt_config);
+	ret = watchdog_init(wdt_dev, &wdt_config);
 
 	watchdog_feed(wdt_dev, 0);
 }
