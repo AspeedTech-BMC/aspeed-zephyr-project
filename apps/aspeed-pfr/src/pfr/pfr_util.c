@@ -81,7 +81,7 @@ int pfr_spi_erase_region(uint8_t device_id,
 	uint32_t erase_addr = start_addr;
 	uint32_t end_addr = start_addr + nbytes;
 
-	while(erase_addr < end_addr) {
+	while (erase_addr < end_addr) {
 		if (support_block_erase && ((end_addr - erase_addr) >= BLOCK_SIZE) &&
 				!(erase_addr & 0xffff)) {
 			if (pfr_spi_erase_block(device_id, erase_addr))
@@ -170,9 +170,6 @@ int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 // calculates sha for dataBuffer
 int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out)
 {
-
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-
 	if (manifest->hash_curve == secp256r1) {
 		manifest->hash->start_sha256(manifest->hash);
 		manifest->hash->calculate_sha256(manifest->hash, data_buffer, length, hash_out, SHA256_HASH_LENGTH);
@@ -278,7 +275,7 @@ static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
 	mbedtls_mpi_free(&r);
 	mbedtls_mpi_free(&s);
 
-	// LOG_INF("ECDSA:%d", ret);
+	// DEBUG_PRINTF("ECDSA:%d", ret);
 
 	return ret;
 
@@ -306,7 +303,7 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 	// memcpy(&signature_r[0],&signature[0],length);
 	// memcpy(&signature_s[0],&signature[length],length);
 
-	int ecdsa_result =  mbedtls_ecdsa_verify_middlelayer(manifest->verification->pubkey,
+	status = mbedtls_ecdsa_verify_middlelayer(manifest->verification->pubkey,
 							     digest,
 							     manifest->verification->pubkey->signature_r,
 							     manifest->verification->pubkey->signature_s);

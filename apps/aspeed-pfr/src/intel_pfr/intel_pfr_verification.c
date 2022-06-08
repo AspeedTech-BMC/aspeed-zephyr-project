@@ -233,14 +233,23 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	// memcpy(&signature[hash_length],&block1_buffer->CskSignatureS[0],hash_length);
 
 	status = manifest->verification->base->verify_signature((struct signature_verification *)manifest, manifest->pfr_hash->hash_out, hash_length, signature, (2 * hash_length));
-	if (status != Success)
+	if (status != Success) {
+		DEBUG_PRINTF("Block1 CSK Entry validation failed");
 		return Failure;
+	}
+
+	DEBUG_PRINTF("Block1 CSK Entry validation success");
+
+	memcpy(manifest->verification->pubkey->x, block1_buffer->CskEntryInitial.PubKeyX, hash_length);
+	memcpy(manifest->verification->pubkey->y, block1_buffer->CskEntryInitial.PubKeyY, hash_length);
 
 	status = manifest->pfr_authentication->block1_block0_entry_verify(manifest);
-	if (status != Success)
+	if (status != Success) {
+		DEBUG_PRINTF("Blocke1 Block0 Entry validation failed");
 		return Failure;
+	}
 
-	DEBUG_PRINTF("Block0 Entry validation success");
+	DEBUG_PRINTF("Block1 Block0 Entry validation success");
 
 	return Success;
 }
@@ -287,12 +296,14 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 			DEBUG_PRINTF("CSK and Block0 Entry validation failed");
 			return Failure;
 		}
+		DEBUG_PRINTF("CSK and Block0 Entry validation success");
 	} else  {
 		status = manifest->pfr_authentication->block1_block0_entry_verify(manifest);
 		if (status != Success) {
 			DEBUG_PRINTF("Block0 Entry validation failed");
 			return Failure;
 		}
+		DEBUG_PRINTF("Block0 Entry validation success");
 	}
 
 	return Success;
