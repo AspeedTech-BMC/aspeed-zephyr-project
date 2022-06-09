@@ -300,14 +300,14 @@
 		};
 
 		/* 63360KB */
-		bmc_stg_partition: partition@4220000{
-			label = "bmc-stg";
+		bmc_rc_image_partition: partition@4220000{
+			label = "bmc-rc-image";
 			reg = <0x04220000 0x03de0000>;
 		};
 
 		/* 63360KB  */
-		bmc_rc_image_partition: partition@8000000{
-			label = "bmc-rc-image";
+		bmc_stg_partition: partition@8000000{
+			label = "bmc-stg";
 			reg = <0x08000000 0x03de0000>;
 		};
 
@@ -323,15 +323,22 @@
 			reg = <0x0cde0000 0x00500000>;
 		};
 
-		/* 1024KB */
-		bmc_pfr_rc_partition: partition@d2e0000{
-			label = "bmc-pfr-rc";
-			reg = <0x0d2e0000 0x00100000>;
+		/* 128KB */
+		afm_act_partition: partition@d2e0000 {
+			label = "afm-act";
+			reg = <0x0d2e0000 0x00020000>;
 		};
 
-		reserve_partition: partitions@d3e0000{
-			label = "dcscm-reserved";
-			reg = <0x0d3e0000 0x02c20000>;
+		/* 128KB */
+		afm_rc_partition: partition@d300000 {
+			label = "afm-rc";
+			reg = <0x0d300000 0x00020000>;
+		};
+
+		/* 45952KB */
+		reserved_partition: partition@d320000 {
+			reg = <0x0d320000 0x02ce0000>;
+			label = "reserved";
 		};
 	};
 };

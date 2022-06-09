@@ -47,7 +47,7 @@ int BMCBootHold(void)
 	const struct device *dev_m = NULL;
 
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
-	spim_rst_flash(dev_m, 1000);
+	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 #if defined(CONFIG_ASPEED_DC_SCM)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
@@ -82,7 +82,7 @@ int PCHBootHold(void)
 	const struct device *dev_m = NULL;
 
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_rst_flash(dev_m, 1000);
+	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 #if defined(CONFIG_ASPEED_DC_SCM)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
@@ -116,7 +116,7 @@ int BMCBootRelease(void)
 	const struct device *dev_m = NULL;
 
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
-	spim_rst_flash(dev_m, 1000);
+	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 #if defined(CONFIG_ASPEED_DC_SCM)
 	LOG_INF("release BMC");
@@ -153,7 +153,7 @@ int PCHBootRelease(void)
 	const struct device *dev_m = NULL;
 
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_rst_flash(dev_m, 1000);
+	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 #if defined(CONFIG_ASPEED_DC_SCM)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);

@@ -6,6 +6,7 @@
 
 #include <assert.h>
 
+#include <logging/log.h>
 #include "engine_manager.h"
 #include "include/definitions.h"
 #include "common/common.h"

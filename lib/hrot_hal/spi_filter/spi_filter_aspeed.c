@@ -22,7 +22,7 @@ void SPI_Monitor_Enable(char *dev_name, bool enabled)
 		printk("%s: unable to bind %s\n", __FUNCTION__, dev_name);
 		return ;
 	}
-	spim_rst_flash(dev_m, 1000);
+	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 #if defined(CONFIG_ASPEED_DC_SCM)
 	aspeed_spi_monitor_sw_rst(dev_m);

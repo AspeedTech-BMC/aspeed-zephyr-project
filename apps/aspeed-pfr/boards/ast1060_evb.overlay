@@ -233,10 +233,22 @@
 			reg = <0x07a00000 0x00500000>;
 		};
 
-		/* 1024KB */
-		bmc_pfr_rc_partition: partition@7f00000{
-			label = "bmc-pfr-rc";
-			reg = <0x07f00000 0x00100000>;
+		/* 128KB */
+		afm_act_partition: partition@7f00000 {
+			label = "afm-act";
+			reg = <0x07f00000 0x00020000>;
+		};
+
+		/* 128KB */
+		afm_rc_partition: partition@7f20000 {
+			label = "afm-rc";
+			reg = <0x07f20000 0x00020000>;
+		};
+
+		/* 768KB */
+		reserved_partition: partition@7f40000 {
+			reg = <0x07f40000 0x000c0000>;
+			label = "reserved";
 		};
 	};
 };

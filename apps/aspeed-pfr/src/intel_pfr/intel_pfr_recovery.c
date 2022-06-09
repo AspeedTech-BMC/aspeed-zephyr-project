@@ -73,22 +73,17 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 {
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	const struct flash_area *fa;
+	size_t area_size;
 
 	if (image_type == BMC_TYPE)
-		status = flash_area_open(FLASH_AREA_ID(bmc_stg), &fa);
+		area_size = BMC_STAGING_SIZE;
 	else if (image_type == PCH_TYPE)
-		status = flash_area_open(FLASH_AREA_ID(pch_stg), &fa);
-
-	if (status != Success) {
-		DEBUG_PRINTF("Staging region is undefined, image_type: %d\r\n", image_type);
-		return Failure;
-	}
+		area_size = PCH_STAGING_SIZE;
 
 	spi_flash->spi.device_id[0] = image_type; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	DEBUG_PRINTF("Recovering...");
 
-	if (flash_copy_and_verify(&spi_flash->spi, target_address, source_address, fa->fa_size)){
+	if (flash_copy_and_verify(&spi_flash->spi, target_address, source_address, area_size)) {
 		DEBUG_PRINTF("Recovery region update failed\r\n");
 		return Failure;
 	}
@@ -161,24 +156,16 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	uint32_t source_address;
 	uint32_t target_address;
 	uint32_t image_type = manifest->image_type;
-	const struct flash_area *bmc_pch_staging;
 
-	// TODO: need to find a way to get bmc pch staging offset rather than hardcode.
-#if 0
 	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 	if (status != Success)
 		return Failure;
-#endif
 
 	status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 	if (status != Success)
 		return Failure;
 
-	status = flash_area_open(FLASH_AREA_ID(bmc_pch_stg), &bmc_pch_staging);
-	if (status)
-		return Failure;
-
-	source_address = bmc_pch_staging->fa_off;
+	source_address += BMC_STAGING_SIZE;
 
 	manifest->image_type = BMC_TYPE;
 	manifest->address = source_address;
@@ -207,11 +194,11 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
-			bmc_pch_staging->fa_size))
+			BMC_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (pfr_spi_region_read_write_between_spi(BMC_TYPE, source_address, PCH_TYPE,
-				target_address, bmc_pch_staging->fa_size))
+				target_address, BMC_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (manifest->state == RECOVERY) {
