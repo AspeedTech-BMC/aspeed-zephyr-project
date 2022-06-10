@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <stdint.h>
+#include "pfr_common.h"
 
 int pfr_spi_read(uint8_t device_id, uint32_t address,
 		 uint32_t data_length, uint8_t *data);
@@ -27,9 +27,6 @@ int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 		uint8_t dest_dev, uint32_t dest_addr, size_t length);
 
 int pfr_spi_get_block_size(uint8_t device_id);
-
-int esb_ecdsa_verify(struct pfr_manifest *manifest, uint32_t digest[], uint8_t pub_key[],
-		     uint8_t signature[], uint8_t *auth_pass);
 
 int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out);
 
