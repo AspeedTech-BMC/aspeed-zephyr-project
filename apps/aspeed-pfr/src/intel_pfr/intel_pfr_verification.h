@@ -213,7 +213,6 @@ struct pfr_authentication {
 	int (*block1_csk_block0_entry_verify)(struct pfr_manifest *manifest);
 	int (*block1_verify)(struct pfr_manifest *manifest);
 	int (*block0_verify)(struct pfr_manifest *manifest);
-	int (*validate_root_key);
 };
 
 #pragma pack()
