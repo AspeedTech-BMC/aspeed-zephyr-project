@@ -8,9 +8,6 @@
 
 #include <stdint.h>
 #include "intel_pfr_verification.h"
-// #include "pfr/pfr_common.h"
-
-extern int g_provision_data;
 
 enum {
 	UFM_STATUS,
@@ -34,7 +31,5 @@ enum {
 	KEY_CANCELLATION_POLICY_FOR_SIGNING_CPLD_UPDATE_CAPSULE = 0x0dc
 };
 
-// int verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *root_public_key);
-// int verify_root_key_data(struct pfr_manifest *manifest, uint8_t *pubkey_x, uint8_t *pubkey_y);
 int verify_root_key_entry(struct pfr_manifest *manifest, PFR_AUTHENTICATION_BLOCK1 *block1_buffer);
 
