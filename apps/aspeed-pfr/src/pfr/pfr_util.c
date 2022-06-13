@@ -199,18 +199,6 @@ int compare_buffer(uint8_t *buffer1, uint8_t *buffer2, uint32_t length)
 	return memcmp(buffer1, buffer2, length);
 }
 
-// reverse byte array
-void reverse_byte_array(uint8_t *data_buffer, uint32_t length)
-{
-	uint8_t temp = 0;
-
-	for (int i = 0, j = length; i < length / 2; i++, j--) {
-		temp = data_buffer[i];
-		data_buffer[i] = data_buffer[j];
-		data_buffer[j] = temp;
-	}
-}
-
 static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
 					    const uint8_t *digest, size_t length, uint8_t *signature_r,
 					    uint8_t *signature_s)

@@ -36,7 +36,7 @@ EVENT_CONTEXT DataContext;
 
 uint8_t gUfmFifoData[64];
 uint8_t gReadFifoData[64];
-uint8_t gRootKeyHash[32];
+uint8_t gRootKeyHash[SHA384_DIGEST_LENGTH];
 uint8_t gPchOffsets[12];
 uint8_t gBmcOffsets[12];
 uint8_t gUfmFifoLength;
@@ -307,7 +307,7 @@ void InitializeSmbusMailbox(void)
 	uint8_t CurrentSvn = 0;
 
 	// get root key hash
-	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA256_DIGEST_LENGTH);
+	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
 	get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
 	get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
@@ -627,7 +627,7 @@ unsigned char ProvisionRootKeyHash(void)
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
-		Status = set_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA256_DIGEST_LENGTH);
+		Status = set_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
 		if (Status == Success) {
 			DEBUG_PRINTF("Root key provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
@@ -700,9 +700,9 @@ void lock_provision_flash(void)
 
 void ReadRootKey(void)
 {
-	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA256_DIGEST_LENGTH);
-	memcpy(gReadFifoData, gRootKeyHash, SHA256_DIGEST_LENGTH);
-	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
+	memcpy(gReadFifoData, gRootKeyHash, SHA384_DIGEST_LENGTH);
+	for (size_t i = 0; i < SHA384_DIGEST_LENGTH; ++i)
 		swmbx_write(gSwMbxDev, true, UfmReadFIFO, gRootKeyHash + i);
 }
 
@@ -755,7 +755,7 @@ void process_provision_command(void)
 		}
 		break;
 	case PROVISION_ROOT_KEY:
-		memcpy(gRootKeyHash, gUfmFifoData, SHA256_DIGEST_LENGTH);
+		memcpy(gRootKeyHash, gUfmFifoData, SHA384_DIGEST_LENGTH);
 		gProvisionCount |= 1 << 0;
 		gProvisionData = 1;
 		break;

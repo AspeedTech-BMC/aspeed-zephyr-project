@@ -166,7 +166,7 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 	    (PfmSpiDefinition->HashAlgorithmInfo.SHA384HashPresent == 1)) {
 		DEBUG_PRINTF("Digest verification start");
 
-		uint8_t sha256_buffer[SHA384_DIGEST_LENGTH] = { 0 };
+		uint8_t sha_buffer[SHA384_DIGEST_LENGTH] = { 0 };
 		uint32_t hash_length = 0;
 
 		pfr_manifest->pfr_hash->start_address = PfmSpiDefinition->RegionStartAddress;
@@ -182,9 +182,9 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest, PFM_SPI_DEFI
 			return Failure;
 		}
 
-		pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash, sha256_buffer, SHA256_DIGEST_LENGTH);
+		pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash, sha_buffer, hash_length);
 
-		status = compare_buffer(pfm_spi_Hash, sha256_buffer, SHA256_DIGEST_LENGTH);
+		status = compare_buffer(pfm_spi_Hash, sha_buffer, hash_length);
 		if (status != Success) {
 			DEBUG_PRINTF("Digest verification failed");
 			return Failure;
