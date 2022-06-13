@@ -30,8 +30,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <soc.h>
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
 
 int pfr_spi_read(uint8_t device_id, uint32_t address, uint32_t data_length, uint8_t *data)
 {
@@ -107,7 +109,6 @@ int pfr_spi_get_block_size(uint8_t device_id)
 
 int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t target_address)
 {
-	uint8_t buffer[PAGE_SIZE] = {0};
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
@@ -122,7 +123,6 @@ int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t
 int pfr_spi_page_read_write_between_spi(uint8_t source_flash, uint32_t *source_address, uint8_t target_flash, uint32_t *target_address)
 {
 	uint32_t index1, index2;
-	uint8_t buffer[MAX_READ_SIZE];
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
@@ -148,7 +148,6 @@ int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 		uint8_t dest_dev, uint32_t dest_addr, size_t length)
 {
 	int i;
-	uint8_t buffer[PAGE_SIZE];
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	for (i = 0; i < length / PAGE_SIZE; i++) {
