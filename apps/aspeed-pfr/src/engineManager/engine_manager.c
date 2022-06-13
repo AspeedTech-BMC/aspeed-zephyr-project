@@ -71,11 +71,15 @@ int initializeEngines(void)
 	assert(status == 0);
 	status = initialize_crypto();
 	assert(status == 0);
+#ifdef CONFIG_CERBERUS_PFR
 	status = signature_verification_init(getSignatureVerificationInstance());
 	assert(status == 0);
+#endif
 	status = initialize_I2cSlave();
 	assert(status == 0);
+#ifdef CONFIG_CERBERUS_PFR
 	status = initialize_pfm_flash();
+#endif
 
 	return status;
 }

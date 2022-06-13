@@ -18,9 +18,11 @@ int initializeManifestProcessor(void)
 {
 	int status = 0;
 
+#ifdef CONFIG_CERBERUS_PFR
 	status = manifest_flash_init(getManifestFlashInstance(), getFlashDeviceInstance(), PFM_FLASH_MANIFEST_ADDRESS, PFM_V2_MAGIC_NUM);
 	if (status)
 		return status;
+#endif
 
 	init_pfr_manifest();
 	// status = pfm_manager_flash_init(getPfmManagerFlashInstance(), getPfmFlashInstance(), getPfmFlashInstance(),
