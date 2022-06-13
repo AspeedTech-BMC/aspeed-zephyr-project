@@ -129,7 +129,6 @@ int decompression_write(uint32_t image_type,
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Writing...");
 	while (cur_bit < region_end_bit) {
 		for (bit_mask = 0x80; bit_mask > 0; bit_mask >>= 1) {
 			copy_this_page = comp_bitmap_byte[bitmap_byte_idx] & bit_mask;
@@ -240,6 +239,9 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 
 	if (!is_pbc_valid(&pbc))
 		return Failure;
+
+	DEBUG_PRINTF("Decompressing %s capsule...", (manifest->state == UPDATE) ?
+			"staging" : "recovery");
 
 	while (1) {
 		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_def);
