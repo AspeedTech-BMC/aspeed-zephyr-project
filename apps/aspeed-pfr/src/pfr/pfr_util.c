@@ -33,7 +33,7 @@
 #include <soc.h>
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+uint8_t buffer[PAGE_SIZE] __aligned(16);
 
 int pfr_spi_read(uint8_t device_id, uint32_t address, uint32_t data_length, uint8_t *data)
 {
