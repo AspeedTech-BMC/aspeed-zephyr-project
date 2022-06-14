@@ -51,7 +51,7 @@ int pfr_spi_write(uint8_t device_id, uint32_t address, uint32_t data_length, uin
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, address, data, data_length);
+	spi_flash->spi.base.write((struct flash *)&spi_flash->spi, address, data, data_length);
 	return status;
 }
 
@@ -61,7 +61,7 @@ int pfr_spi_erase_4k(uint8_t device_id, uint32_t address)
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, address);
+	spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, address);
 	return status;
 }
 
@@ -71,7 +71,7 @@ int pfr_spi_erase_block(uint8_t device_id, uint32_t address)
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	status = spi_flash->spi.base.block_erase((struct flash *)&spi_flash->spi, address);
+	spi_flash->spi.base.block_erase((struct flash *)&spi_flash->spi, address);
 	return status;
 }
 
@@ -114,8 +114,7 @@ int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	if (spi_flash->spi.base.read((struct flash *)&spi_flash->spi, source_address, buffer, PAGE_SIZE))
 		return Failure;
-	if (spi_flash->spi.base.write((struct flash *)&spi_flash->spi, target_address, buffer, PAGE_SIZE))
-		return Failure;
+	spi_flash->spi.base.write((struct flash *)&spi_flash->spi, target_address, buffer, PAGE_SIZE);
 
 	return Success;
 }
