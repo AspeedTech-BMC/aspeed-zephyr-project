@@ -73,6 +73,8 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 {
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	int sector_sz = pfr_spi_get_block_size(image_type);
+	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 	size_t area_size;
 
 	if (image_type == BMC_TYPE)
@@ -82,8 +84,15 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 
 	spi_flash->spi.device_id[0] = image_type; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	DEBUG_PRINTF("Recovering...");
+	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
 
-	if (flash_copy_and_verify(&spi_flash->spi, target_address, source_address, area_size)) {
+		DEBUG_PRINTF("Recovery region erase failed\r\n");
+		return Failure;
+	}
+
+	// use read_write_between spi for supporting dual flash
+	if (pfr_spi_region_read_write_between_spi(image_type, source_address, image_type,
+				target_address, area_size)) {
 		DEBUG_PRINTF("Recovery region update failed\r\n");
 		return Failure;
 	}
