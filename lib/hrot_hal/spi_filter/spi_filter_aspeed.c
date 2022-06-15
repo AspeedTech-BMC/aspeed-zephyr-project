@@ -7,6 +7,7 @@
 #include <drivers/flash.h>
 #include <drivers/spi_nor.h>
 #include <spi_filter/spi_filter_aspeed.h>
+#include <gpio/gpio_aspeed.h>
 #include <kernel.h>
 #include <sys/util.h>
 #include <stdlib.h>
@@ -24,13 +25,8 @@ void SPI_Monitor_Enable(char *dev_name, bool enabled)
 	}
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
-#if defined(CONFIG_ASPEED_DC_SCM)
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
 	aspeed_spi_monitor_sw_rst(dev_m);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
-#else
-	/* config spim as SPI monitor */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-#endif
 	spim_monitor_enable(dev_m, enabled);
 }
 

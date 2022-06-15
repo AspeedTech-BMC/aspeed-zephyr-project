@@ -1,0 +1,13 @@
+identifier: ast1060_dual_flash
+name: AST1060-DUAL-FLASH
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+supported:
+  - i2c
+  - spi
+testing:
+  default: true
+ram: 768
+flash: 512

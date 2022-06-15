@@ -28,6 +28,7 @@ enum {
 
 enum {
 	BMC_SPI = 0,
+	BMC_SPI_2,
 	PCH_SPI,
 	ROT_INTERNAL_ACTIVE = 4,
 	ROT_INTERNAL_RECOVERY,

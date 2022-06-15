@@ -21,11 +21,7 @@ LOG_MODULE_REGISTER(engine, CONFIG_LOG_DEFAULT_LEVEL);
 uint8_t signature[RSA_MAX_KEY_LENGTH];          /**< Buffer for the manifest signature. */
 uint8_t platform_id[256];                       /**< Cache for the platform ID. */
 
-#if defined(CONFIG_ASPEED_DC_SCM)
-#define SPIM_NUM  3
-#else
 #define SPIM_NUM  4
-#endif
 
 static int initialize_I2cSlave(/*struct engine_instances *engineInstances*/)
 {
@@ -99,9 +95,7 @@ void apply_pfm_protection(int spi_device_id)
 	int status = 0;
 	static char *spim_devs[SPIM_NUM] = {
 		"spi_m1",
-#if !defined(CONFIG_ASPEED_DC_SCM)
 		"spi_m2",
-#endif
 		"spi_m3",
 		"spi_m4"
 	};
@@ -120,9 +114,9 @@ void apply_pfm_protection(int spi_device_id)
 	uint8_t pfm_length[4];
 	uint32_t pfm_read_address;
 
-	if (spi_device_id == 0)
+	if (spi_device_id == BMC_SPI)
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, &pfm_read_address, sizeof(pfm_read_address));
-	else if (spi_device_id == 1)
+	else if (spi_device_id == PCH_SPI)
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, &pfm_read_address, sizeof(pfm_read_address));
 
 	// Block 0 + Block 1 = 1024 (0x400); PFM data(PFM Body = 0x20)
@@ -136,6 +130,7 @@ void apply_pfm_protection(int spi_device_id)
 	// cerberus define region_id start from 1
 	int region_id = 1;
 	uint8_t region_record[40];
+	int flash_size;
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.device_id[0] = spi_device_id;
@@ -158,13 +153,22 @@ void apply_pfm_protection(int spi_device_id)
 			 * 0b00000100: Recover: recover on first recovery
 			 * 0b00001000: Recover: recover on second recovery
 			 * 0b00010000: Recover: Recover on third recovery
-			 * 0b11100000: Reserved 
+			 * 0b11100000: Reserved
 			 */
 
 			region_start_address = (region_record[8] & 0xff) | (region_record[9] << 8 & 0xff00) |
 				(region_record[10] << 16 & 0xff0000) | (region_record[11] << 24 & 0xff000000);
 			region_end_address = (region_record[12] & 0xff) | (region_record[13] << 8 & 0xff00) |
 				(region_record[14] << 16 & 0xff0000) | (region_record[15] << 24 & 0xff000000);
+
+#if defined(CONFIG_BMC_DUAL_FLASH)
+			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+			if (region_start_address >= flash_size && region_end_address >= flash_size) {
+				region_start_address -= flash_size;
+				region_end_address -= flash_size;
+				spi_device_id = BMC_SPI_2;
+			}
+#endif
 			region_length = region_end_address - region_start_address;
 			if (region_record[1] & 0x02) {
 				/* Write allowed region */

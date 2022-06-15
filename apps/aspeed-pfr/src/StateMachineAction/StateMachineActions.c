@@ -652,12 +652,12 @@ void T0Transition(int releaseBmc, int releasePCH)
 	if (provision_status & UFM_PROVISIONED) {
 		// enable spi filtering
 		if (releaseBmc) {
-			init_SPI_RW_Region(0);
+			init_SPI_RW_Region(BMC_SPI);
 			AspeedPFR_EnableTimer(BMC_EVENT);
 		}
 		if (releasePCH) {
-#if defined(CONFIG_ASPEED_DC_SCM)
-			init_SPI_RW_Region(2);
+#if defined(CONFIG_ASPEED_DC_SCM) || defined(CONFIG_BMC_DUAL_FLASH)
+			init_SPI_RW_Region(PCH_SPI);
 #else
 			init_SPI_RW_Region(1);
 #endif

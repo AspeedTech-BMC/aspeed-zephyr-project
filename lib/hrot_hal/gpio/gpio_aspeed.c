@@ -33,18 +33,15 @@ int BMCBootHold(void)
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
-#if defined(CONFIG_ASPEED_DC_SCM)
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
-#else
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-#endif
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+
 	return 0;
 }
 
 int PCHBootHold(void)
 {
 	const struct device *dev_m = NULL;
-	
+
 	/* Hold PCH Reset */
 	pfr_pch_rst_enable_ctrl(true);
 
@@ -52,11 +49,8 @@ int PCHBootHold(void)
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
-#if defined(CONFIG_ASPEED_DC_SCM)
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
-#else
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-#endif
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+
 	return 0;
 }
 
@@ -69,12 +63,12 @@ int BMCBootRelease(void)
 	spim_passthrough_config(dev_m, 0, false);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
-#if defined(CONFIG_ASPEED_DC_SCM)
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-#else
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+
+#if !defined(CONFIG_ASPEED_DC_SCM)
 	pfr_bmc_srst_enable_ctrl(false);
 #endif
+
 	pfr_bmc_extrst_enable_ctrl(false);
 	LOG_INF("release BMC");
 	return 0;
@@ -89,11 +83,7 @@ int PCHBootRelease(void)
 	spim_passthrough_config(dev_m, 0, false);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
-#if defined(CONFIG_ASPEED_DC_SCM)
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
-#else
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
-#endif
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 
 	pfr_pch_rst_enable_ctrl(false);
 	LOG_INF("release PCH");

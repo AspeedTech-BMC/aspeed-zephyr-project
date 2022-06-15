@@ -19,6 +19,7 @@
 #include "platform_monitor/platform_monitor.h"
 #include "engineManager/engine_manager.h"
 #include "spi_filter/spi_filter_wrapper.h"
+#include "flash/flash_aspeed.h"
 
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
 K_FIFO_DEFINE(aspeed_sm_fifo);
@@ -316,7 +317,7 @@ void enter_tzero(void *o)
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		/* Provisioned */
 		/* Arm SPI/I2C Filter */
-		apply_pfm_protection(0);
+		apply_pfm_protection(BMC_SPI);
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
 			BMCBootRelease();

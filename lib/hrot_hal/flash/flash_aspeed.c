@@ -14,8 +14,6 @@
 #include <zephyr.h>
 #include <flash_map.h>
 #include <soc.h>
-//#include <flash_master.h>
-//#include "flash/spi_flash.h"
 
 #define LOG_MODULE_NAME spi_api
 
@@ -24,9 +22,9 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 static char *Flash_Devices_List[6] = {
 	"spi1_cs0",
+	"spi1_cs1",
 	"spi2_cs0",
 	"spi2_cs1",
-	"spi2_cs2",
 	"fmc_cs0",
 	"fmc_cs1"
 };
@@ -51,21 +49,33 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
 	struct device *flash_device;
 	uint8_t DeviceId = flash->device_id[0];
-	int AdrOffset = 0;
-	int Datalen = 0;
+	int AdrOffset = xfer->address;
+	int Datalen = xfer->length;
 	uint32_t FlashSize = 0;
 	int ret = 0;
 	int page_sz = 0;
 	int sector_sz = 0;
 
 	flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
-	AdrOffset = xfer->address;
-	Datalen = xfer->length;
+	if (!flash_device) {
+
+		LOG_DBG("%s doesn't exist.\n", Flash_Devices_List[DeviceId]);
+		return -1;
+	}
+
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	FlashSize = flash_get_flash_size(flash_device);
+	if (AdrOffset >= FlashSize) {
+		DeviceId += 1;
+		AdrOffset -= FlashSize;
+		flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
+	}
+#endif
 
 	switch (xfer->cmd) {
 	case SPI_APP_CMD_GET_FLASH_SIZE:
-		FlashSize = flash_get_flash_size(flash_device);
-		//printk("FlashSize:%x\n",FlashSize);
+		if (!FlashSize)
+			FlashSize = flash_get_flash_size(flash_device);
 		return FlashSize;
 	break;
 #if 0
@@ -218,7 +228,7 @@ int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	int Datalen = 0;
 	struct device *dev;
 
-	if (DeviceId == BMC_SPI || DeviceId == PCH_SPI)
+	if (DeviceId <= PCH_SPI)
 		ret = BMC_PCH_SPI_Command(flash, xfer);
 	else
 		ret = FMC_SPI_Command(flash, xfer);

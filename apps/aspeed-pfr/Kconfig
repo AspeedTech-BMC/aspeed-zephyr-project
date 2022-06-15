@@ -7,4 +7,16 @@ config ASPEED_DC_SCM
         help
           Enable ASPEED DC-SCM board basic settings.
 
+config BMC_DUAL_FLASH
+        default n
+        bool "Enable dual flash support"
+        help
+          Enable if BMC has dual flash
+
+config SPI_MUX_INVERSE
+        default n
+        bool "Invert SPI MUX"
+        help
+          Enable if SPI MUX connected to BMC/ROT is inverted
+
 source "Kconfig.zephyr"

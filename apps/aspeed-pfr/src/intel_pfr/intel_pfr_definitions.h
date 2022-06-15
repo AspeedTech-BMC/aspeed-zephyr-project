@@ -10,7 +10,7 @@
 #define PCH_FLASH_ID                            1
 
 #define BMC_TYPE 0
-#define PCH_TYPE 1
+#define PCH_TYPE 2
 
 #define UFM0            4
 #define UFM0_SIZE       256
@@ -52,7 +52,7 @@
 #define PCH_RECOVERY_AREA_ADDRESS       0x01BF0000
 #define PCH_STAGING_SIZE                0x01400000
 
-#if !defined(CONFIG_ASPEED_DC_SCM)
+#if !defined(CONFIG_ASPEED_DC_SCM) && !defined(CONFIG_BMC_DUAL_FLASH)
 // ast2600-pfr
 #define BMC_STAGING_SIZE                0x02000000
 #else
@@ -60,6 +60,7 @@
 #define BMC_STAGING_SIZE                0x03DE0000
 #endif
 #define BMC_PCH_STAGING_SIZE            0x01000000
+#define BMC_PFR_STAGING_SIZE            0x00500000
 
 #define PBC_COMPRESSION_TAG             0x5F504243
 #define PBC_VERSION                     2

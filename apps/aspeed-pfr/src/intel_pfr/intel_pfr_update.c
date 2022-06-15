@@ -382,8 +382,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	uint32_t pc_type_status = 0;
 	uint8_t active_svn_number = 0;
 	CPLD_STATUS cpld_update_status;
-	const struct flash_area *pfr_staging;
-	const struct flash_area *bmc_staging;
 
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	DECOMPRESSION_TYPE_MASK_ENUM decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
@@ -397,11 +395,10 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	pfr_manifest->flash_id = flash_select;
 
 	if (pfr_manifest->image_type == ROT_TYPE) {
-		status = flash_area_open(FLASH_AREA_ID(bmc_pfr_stg), &pfr_staging);
-		if (status)
-			return Failure;
 		pfr_manifest->image_type = BMC_TYPE;
-		pfr_manifest->address = pfr_staging->fa_off;
+		address += BMC_STAGING_SIZE;
+		address += BMC_PCH_STAGING_SIZE;
+		pfr_manifest->address = address;
 		return ast1060_update(pfr_manifest);
 	}
 
@@ -437,11 +434,8 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		if (status != Success)
 			return Failure;
 
-		status = flash_area_open(FLASH_AREA_ID(bmc_stg), &bmc_staging);
-		if (status)
-			return Failure;
-
-		address += bmc_staging->fa_size;          // PFR Staging - PCH Staging offset after BMC staging offset
+		// PFR Staging - PCH Staging offset after BMC staging offset
+		address += BMC_STAGING_SIZE;
 		pfr_manifest->address = address;
 
 		// Checking for key cancellation
