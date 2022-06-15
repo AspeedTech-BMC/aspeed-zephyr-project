@@ -244,7 +244,7 @@ void handle_recovery(void *o)
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 			LOG_INF("Recovery Active Region return=%d", ret);
-			if (!ret) {
+			if (ret == Success || ret == VerifyActive) {
 				recovery_done = 1;
 			}
 			break;
@@ -254,7 +254,7 @@ void handle_recovery(void *o)
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 			LOG_INF("Recovery Recovery Region return=%d", ret);
-			if (!ret) {
+			if (ret == Success || ret == VerifyRecovery) {
 				recovery_done = 1;
 			}
 			break;
