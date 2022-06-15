@@ -224,7 +224,7 @@ void handle_recovery(void *o)
 	struct event_context *evt_ctx = state->event_ctx;
 
 	/* Check Staging Image */
-	bool recovery_done = -1;
+	bool recovery_done = 0;
 	int ret;
 	int verify_staging = -1;
 	EVENT_CONTEXT evt_wrap;
