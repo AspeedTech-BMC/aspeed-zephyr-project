@@ -82,6 +82,12 @@ void do_init(void *o)
 		// TODO: Wait for Power Sequence signal to leave INIT state
 		//       Populate INIT_DONE event will enter FIRMWARE_VERIFY state
 		GenerateStateMachineEvent(INIT_DONE, NULL);
+
+		/* ABR primary booted */
+#if SMBUS_MAILBOX_SUPPORT
+		InitializeSmbusMailbox();
+		SetPlatformState(CPLD_NIOS_II_PROCESSOR_STARTED);
+#endif
 	}
 	LOG_DBG("End");
 }
@@ -105,11 +111,6 @@ void handle_image_verification(void *o)
 	int verify_recovery = -1, verify_active = -1;
 	int ret;
 
-	/* ABR primary booted */
-#if SMBUS_MAILBOX_SUPPORT
-	InitializeSmbusMailbox();
-	SetPlatformState(CPLD_NIOS_II_PROCESSOR_STARTED);
-#endif
 
 	byte provision_state = GetUfmStatusValue();
 
@@ -237,6 +238,7 @@ void handle_recovery(void *o)
 		switch (evt_ctx->event) {
 		case WDT_TIMEOUT:
 			SetPlatformState(WDT_TIMEOUT_RECOVERY);
+			state->bmc_active_object.ActiveImageStatus = Failure;
 			__attribute__ ((fallthrough));
 		case VERIFY_ACT_FAILED:
 			// WDT Checkpoint Timeout

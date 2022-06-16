@@ -181,7 +181,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 		union aspeed_event_data data = {0};
 		if (ret < 0) {
-			DEBUG_PRINTF("%s: k_poll error ret=%d", ret);
+			DEBUG_PRINTF("k_poll error ret=%d", ret);
 			continue;
 		}
 
