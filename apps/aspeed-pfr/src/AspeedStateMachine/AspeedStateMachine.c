@@ -734,6 +734,9 @@ void AspeedStateMachine()
 				// Just run provision handling
 				run_state = true;
 				break;
+			case RESET_DETECTED:
+				next_state = &state_table[FIRMWARE_VERIFY];
+				break;
 			default:
 				break;
 			}
