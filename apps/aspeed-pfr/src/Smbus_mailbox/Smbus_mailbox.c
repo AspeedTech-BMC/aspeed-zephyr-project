@@ -256,6 +256,7 @@ void InitializeSoftwareMailbox(void)
 {
 	/* Top level mailbox device driver */
 	const struct device *swmbx_dev = NULL;
+	int result;
 
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
@@ -265,7 +266,7 @@ void InitializeSoftwareMailbox(void)
 	gSwMbxDev = swmbx_dev;
 
 	/* Enable mailbox read/write notifiaction and FIFO */
-	swmbx_enable_behavior(swmbx_dev, SWMBX_NOTIFY | SWMBX_FIFO, 1);
+	swmbx_enable_behavior(swmbx_dev, SWMBX_PROTECT | SWMBX_NOTIFY | SWMBX_FIFO, 1);
 
 	/* Register mailbox notification semphore */
 	swmbx_update_fifo(swmbx_dev, &ufm_write_fifo_state_sem, 0, UfmWriteFIFO, 0x40, SWMBX_FIFO_NOTIFY_STOP, true);
@@ -279,6 +280,43 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &acm_checkpoint_sem, AcmCheckpoint, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bios_checkpoint_sem, BiosCheckpoint, true);
+
+	/* Protect bit:
+	 * 0 means readable/writable
+	 * 1 means read-only
+	 *
+	 * Port and access_control[]:
+	 * 0 for BMC
+	 * 1 for PCH
+	 */
+	uint32_t access_control[2][8] = {
+		/* BMC */
+		{
+			0xfff704ff, // 1fh ~ 00h
+			0xffffffff, // 3fh ~ 20h CPLD RoT Hash
+			0xffffffff, // 5fh ~ 40h CPLD RoT Hash
+			0xfffffffa, // 7fh ~ 60h
+			0xffffffff, // 9fh ~ 80h ACM/BIOS Scrachpad
+			0xffffffff, // bfh ~ a0h ACM/BIOS Scrachpad
+			0x00000000, // dfh ~ c0h BMC scrachpad
+			0x00000000, // ffh ~ e0h BMC scrachpad
+		},
+		/* PCH */
+		{
+			0xfff884ff, // 1fh ~ 00h
+			0xffffffff, // 3fh ~ 20h CPLD RoT Hash
+			0xffffffff, // 5fh ~ 40h CPLD RoT Hash
+			0xfffffff5, // 7fh ~ 60h
+			0x00000000, // 9fh ~ 80h ACM/BIOS Scrachpad
+			0x00000000, // bfh ~ a0h ACM/BIOS Scrachpad
+			0xffffffff, // dfh ~ c0h BMC scrachpad
+			0xffffffff, // ffh ~ e0h BMC scrachpad
+		},
+	};
+	result = swmbx_apply_protect(swmbx_dev, 0, access_control[0], 0, 8);
+	LOG_INF("Mailbox protection apply result=%d", result);
+	result = swmbx_apply_protect(swmbx_dev, 1, access_control[1], 0, 8);
+	LOG_INF("Mailbox protection apply result=%d", result);
 
 	/* Register slave device to bus device */
 	const struct device *dev = NULL;

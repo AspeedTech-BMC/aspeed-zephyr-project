@@ -79,15 +79,15 @@ void do_init(void *o)
 		LOG_ERR("ROT boot from secondary image, need to recovery ROT active region");
 		GenerateStateMachineEvent(INIT_ROT_SECONDARY_BOOTED, NULL);
 	} else {
-		// TODO: Wait for Power Sequence signal to leave INIT state
-		//       Populate INIT_DONE event will enter FIRMWARE_VERIFY state
-		GenerateStateMachineEvent(INIT_DONE, NULL);
-
 		/* ABR primary booted */
 #if SMBUS_MAILBOX_SUPPORT
 		InitializeSmbusMailbox();
 		SetPlatformState(CPLD_NIOS_II_PROCESSOR_STARTED);
 #endif
+
+		// TODO: Wait for Power Sequence signal to leave INIT state
+		//       Populate INIT_DONE event will enter FIRMWARE_VERIFY state
+		GenerateStateMachineEvent(INIT_DONE, NULL);
 	}
 	LOG_DBG("End");
 }
@@ -769,11 +769,11 @@ static int cmd_smf_show(const struct shell *shell, size_t argc,
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
-	shell_print(shell, "State List: \n");
+	shell_print(shell, "State List:");
 	for (int i=0; i < ARRAY_SIZE(state_table); ++i) {
-		shell_print(shell, "[%d] %p\n", i, &state_table[i]);
+		shell_print(shell, "[%d] %p", i, &state_table[i]);
 	}
-	shell_print(shell, "Current state: %p\n", SMF_CTX(&s_obj)->current);
+	shell_print(shell, "Current state: %p", SMF_CTX(&s_obj)->current);
 	return 0;
 }
 
