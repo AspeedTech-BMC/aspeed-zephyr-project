@@ -26,7 +26,9 @@ int BMCBootHold(void)
 
 	/* Hold BMC Reset */
 	pfr_bmc_extrst_enable_ctrl(true);
-
+#if !defined(CONFIG_ASPEED_DC_SCM)
+	pfr_bmc_srst_enable_ctrl(true);
+#endif
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
@@ -71,8 +73,8 @@ int BMCBootRelease(void)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_0);
 #else
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_SEL_1);
+	pfr_bmc_srst_enable_ctrl(false);
 #endif
-	
 	pfr_bmc_extrst_enable_ctrl(false);
 	LOG_INF("release BMC");
 	return 0;

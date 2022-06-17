@@ -24,6 +24,10 @@
 #endif
 };
 
+&sram0 {
+	reg = <0 DT_SIZE_K(640)>, <0xa0000 DT_SIZE_K(128)>;
+};
+
 &i2cfilter {
 	pinctrl-0 = <&pinctrl_smbflt_default>;
 	status = "okay";

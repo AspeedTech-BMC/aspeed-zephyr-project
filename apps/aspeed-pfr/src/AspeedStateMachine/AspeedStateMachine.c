@@ -310,8 +310,9 @@ void enter_tzero(void *o)
 	struct smf_context *state = (struct smf_context*)o;
 	/* Arm reset monitor */
 	platform_monitor_init();
+#if defined(CONFIG_ASPEED_DC_SCM)
 	pfr_bmc_srst_enable_ctrl(false);
-
+#endif
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		/* Provisioned */
 		/* Arm SPI/I2C Filter */
