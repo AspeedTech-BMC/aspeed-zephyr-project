@@ -20,6 +20,9 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
 {
+	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
+	uint32_t pc_type = 0;
+	int status = 0;
 
 	ARG_UNUSED(hash);
 	ARG_UNUSED(verification);
@@ -27,16 +30,13 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 	ARG_UNUSED(hash_length);
 	ARG_UNUSED(verification);
 
-	int status = 0;
-	uint32_t pc_type = 0;
-
-	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
-
 	init_pfr_authentication(pfr_manifest->pfr_authentication);
 
 	status = pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type), (uint8_t *)&pc_type);
-	if (status != Success)
+	if (status != Success) {
+		LOG_ERR("Flash read PC type failed");
 		return Failure;
+	}
 
 	// Validate PC type
 	status = pfr_manifest->pfr_authentication->validate_pctye(pfr_manifest, pc_type);
@@ -63,63 +63,65 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 
 int validate_pc_type(struct pfr_manifest *manifest, uint32_t pc_type)
 {
-	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_CPU_Seamless_Update_Capsule)
+	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_CPU_Seamless_Update_Capsule) {
+		LOG_ERR("Validation PC Type failed, %x", pc_type);
 		return Failure;
+	}
 
 	return Success;
 }
 
-// Block 1 _ Block 0 Entry
+// Block 1 Block 0 Entry
 int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 {
-	int status = 0;
+	uint8_t buffer[sizeof(BLOCK0ENTRY)] = { 0 };
+	uint8_t block0_signature_curve_magic = 0;
 	uint32_t block0_entry_address = 0;
 	BLOCK0ENTRY *block1_buffer;
-	uint8_t block0_signature_curve_magic = 0;
-	uint8_t buffer[sizeof(BLOCK0ENTRY)] = { 0 };
 	uint32_t hash_length = 0;
+	int status = 0;
 
-	// Adjusting BlockAddress in case of KeyCancellation
+	// Adjusting Block Address in case of KeyCancellation
 	if (manifest->kc_flag == 0)
 		block0_entry_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0) + CSK_START_ADDRESS + sizeof(CSKENTRY);
 	else
 		block0_entry_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0) + CSK_START_ADDRESS;
 
 	status = pfr_spi_read(manifest->image_type, block0_entry_address, sizeof(BLOCK0ENTRY), buffer);
-	if (status != Success)
+	if (status != Success) {
+		LOG_ERR("Block1 Block0 Entry: Flash read data failed");
 		return Failure;
+	}
 
 	block1_buffer = (BLOCK0ENTRY *)&buffer;
 
 	if (block1_buffer->TagBlock0Entry != BLOCK1_BLOCK0ENTRYTAG) {
-		LOG_ERR("Block1 Block0 Entry: Magic/Tag not matched");
+		LOG_ERR("Block1 Block0 Entry: Magic/Tag not matched, %x", block1_buffer->TagBlock0Entry);
 		return Failure;
 	}
 
-	if (block1_buffer->Block0SignatureMagic == SIGNATURE_SECP256_TAG)
+	if (block1_buffer->Block0SignatureMagic == SIGNATURE_SECP256_TAG) {
 		block0_signature_curve_magic = secp256r1;
-	else if (block1_buffer->Block0SignatureMagic == SIGNATURE_SECP384_TAG)
+		manifest->pfr_hash->type = HASH_TYPE_SHA256;
+		hash_length = SHA256_HASH_LENGTH;
+	} else if (block1_buffer->Block0SignatureMagic == SIGNATURE_SECP384_TAG) {
 		block0_signature_curve_magic = secp384r1;
+		manifest->pfr_hash->type = HASH_TYPE_SHA384;
+		hash_length = SHA384_HASH_LENGTH;
+	} else {
+		LOG_ERR("Block1 Block0 Entry: Unsupported signature magic, %x", block1_buffer->Block0SignatureMagic);
+		return Failure;
+	}
 
 	// Key curve and Block 0 signature curve type should match
 	if (block0_signature_curve_magic != manifest->hash_curve) {
-		LOG_ERR("Block1 Block0 Entry: Key curve magic and Block0 signature curve magic not matched");
+		LOG_ERR("Block1 Block0 Entry: key curve magic and Block0 signature curve magic not matched, key_curve = %x, sig_curve = %x",
+			manifest->hash_curve, block0_signature_curve_magic);
 		return Failure;
 	}
 
 	manifest->pfr_hash->start_address = manifest->address;
 	manifest->pfr_hash->length = sizeof(PFR_AUTHENTICATION_BLOCK0);
-
-	if (manifest->hash_curve == secp256r1) {
-		manifest->pfr_hash->type = HASH_TYPE_SHA256;
-		hash_length = SHA256_HASH_LENGTH;
-	} else if (manifest->hash_curve == secp384r1) {
-		manifest->pfr_hash->type = HASH_TYPE_SHA384;
-		hash_length = SHA384_HASH_LENGTH;
-	} else  {
-		LOG_ERR("Block1 Block0 Entry: Unsupported hash curve, %x", manifest->hash_curve);
-		return Failure;
-	}
 
 	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
 	if (status != Success) {
@@ -133,27 +135,33 @@ int intel_block1_block0_entry_verify(struct pfr_manifest *manifest)
 	status = manifest->verification->base->verify_signature((struct signature_verification *)manifest, manifest->pfr_hash->hash_out, hash_length, NULL, (2 * hash_length));
 	if (status != Success) {
 		LOG_ERR("Block1 Block0 Entry: Verify signature failed");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->x, hash_length, "ECDSA X:");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->y, hash_length, "ECDSA Y:");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->signature_r, hash_length, "ECDSA R:");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->signature_s, hash_length, "ECDSA S:");
+		LOG_INF("Hash Info: address = %x, length = %x", manifest->pfr_hash->start_address, manifest->pfr_hash->length);
+		LOG_HEXDUMP_INF(manifest->pfr_hash->hash_out, hash_length, "Calculated D:");
 		return Failure;
 	}
 
 	return Success;
 }
 
-// Block 1 CSK
+// Block 1 CSK Entry
 int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 {
-	int status = 0;
-	uint32_t sign_bit_verify = 0;
 	uint32_t block1_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0);
-	CSKENTRY *block1_buffer;
-	uint8_t csk_sign_curve_magic = 0;
 	uint8_t buffer[sizeof(CSKENTRY)] = { 0 };
+	uint8_t csk_sign_curve_magic = 0;
 	uint8_t csk_key_curve_type = 0;
+	uint32_t sign_bit_verify = 0;
+	CSKENTRY *block1_buffer;
 	uint32_t hash_length = 0;
+	int status = 0;
 
 	status = pfr_spi_read(manifest->image_type, block1_address + CSK_START_ADDRESS, sizeof(CSKENTRY), buffer);
 	if (status != Success) {
-		LOG_ERR("Block1 CSK Entry: Flash read failed");
+		LOG_ERR("Block1 CSK Entry: Flash read data failed");
 		return Failure;
 	}
 
@@ -161,32 +169,42 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 
 	// validate CSK entry magic tag
 	if (block1_buffer->CskEntryInitial.Tag != BLOCK1CSKTAG) {
-		LOG_ERR("Block1 CSK Entry: Magic/Tag not matched");
+		LOG_ERR("Block1 CSK Entry: Magic/Tag not matched, %x", block1_buffer->CskEntryInitial.Tag);
 		return Failure;
 	}
 
-	if (block1_buffer->CskSignatureMagic == SIGNATURE_SECP256_TAG)
-		csk_sign_curve_magic = secp256r1;
-	else if (block1_buffer->CskSignatureMagic == SIGNATURE_SECP384_TAG)
-		csk_sign_curve_magic = secp384r1;
-	else {
-		LOG_ERR("Block1 CSK Entry: CSK signature magic, %x", block1_buffer->CskSignatureMagic);
-		return Failure;
-	}
-
-	// Root key curve and CSK signature curve type should match
-	if (csk_sign_curve_magic != manifest->hash_curve) {
-		LOG_ERR("Block1 CSK Entry: Root Key curve magic and CSK key signature curve magic not matched");
-		return Failure;
-	}
-
-	// Update CSK curve type to validate Block 0 entry
-	if (block1_buffer->CskEntryInitial.PubCurveMagic == PUBLIC_SECP256_TAG)
+	if (block1_buffer->CskEntryInitial.PubCurveMagic == PUBLIC_SECP256_TAG) {
 		csk_key_curve_type = secp256r1;
-	else if (block1_buffer->CskEntryInitial.PubCurveMagic == PUBLIC_SECP384_TAG)
+	} else if (block1_buffer->CskEntryInitial.PubCurveMagic == PUBLIC_SECP384_TAG) {
 		csk_key_curve_type = secp384r1;
-	else {
-		LOG_ERR("Block1 CSK Entry: CSK cure magic, %x", block1_buffer->CskEntryInitial.PubCurveMagic);
+	} else {
+		LOG_ERR("Block1 CSK Entry: Unsupported curve magic, %x", block1_buffer->CskEntryInitial.PubCurveMagic);
+		return Failure;
+	}
+
+	// Root key curve and CSK curve should match
+	if (csk_key_curve_type != manifest->hash_curve) {
+		LOG_ERR("Block1 CSK Entry: Root key curve magic and CSK curve magic not matched, root_curve = %x, csk_curve = %x",
+			manifest->hash_curve, csk_key_curve_type);
+		return Failure;
+	}
+
+	if (block1_buffer->CskSignatureMagic == SIGNATURE_SECP256_TAG) {
+		csk_sign_curve_magic = secp256r1;
+		manifest->pfr_hash->type = HASH_TYPE_SHA256;
+		hash_length = SHA256_DIGEST_LENGTH;
+	} else if (block1_buffer->CskSignatureMagic == SIGNATURE_SECP384_TAG) {
+		csk_sign_curve_magic = secp384r1;
+		manifest->pfr_hash->type = HASH_TYPE_SHA384;
+		hash_length = SHA384_DIGEST_LENGTH;
+	} else {
+		LOG_ERR("Block1 CSK Entry: Unsupported signature magic, %x", block1_buffer->CskSignatureMagic);
+		return Failure;
+	}
+
+	if (csk_key_curve_type != csk_sign_curve_magic) {
+		LOG_ERR("Block1 CSK Entry: curve magic type and signature magic type not matched, key_curve = %x, sig_curve = %x",
+			csk_key_curve_type, csk_sign_curve_magic);
 		return Failure;
 	}
 
@@ -206,21 +224,12 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	}
 
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
-		LOG_ERR("Block1 CSK Entry: CSK key permission denied...");
+		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x", block1_buffer->CskEntryInitial.KeyPermission);
 		return Failure;
 	}
 
 	manifest->pfr_hash->start_address = block1_address + CSK_START_ADDRESS + sizeof(block1_buffer->CskEntryInitial.Tag);
 	manifest->pfr_hash->length = CSK_ENTRY_PC_SIZE;
-
-	if (csk_key_curve_type == secp256r1) {
-		manifest->pfr_hash->type = HASH_TYPE_SHA256;
-		hash_length = SHA256_DIGEST_LENGTH;
-	} else if (csk_key_curve_type == secp384r1) {
-		manifest->pfr_hash->type = HASH_TYPE_SHA384;
-		hash_length = SHA384_DIGEST_LENGTH;
-	} else
-		return Failure;
 
 	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
 	if (status != Success) {
@@ -234,9 +243,16 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	status = manifest->verification->base->verify_signature((struct signature_verification *)manifest, manifest->pfr_hash->hash_out, hash_length, NULL, (2 * hash_length));
 	if (status != Success) {
 		LOG_ERR("Block1 CSK Entry: Verify signature failed");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->x, hash_length, "ECDSA X:");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->y, hash_length, "ECDSA Y:");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->signature_r, hash_length, "ECDSA R:");
+		LOG_HEXDUMP_INF(manifest->verification->pubkey->signature_s, hash_length, "ECDSA S:");
+		LOG_INF("Hash Info: address = %x, length = %x", manifest->pfr_hash->start_address, manifest->pfr_hash->length);
+		LOG_HEXDUMP_INF(manifest->pfr_hash->hash_out, hash_length, "Calculated D:");
 		return Failure;
 	}
 
+	// Update csk key to validate b0 entry
 	memcpy(manifest->verification->pubkey->x, block1_buffer->CskEntryInitial.PubKeyX, hash_length);
 	memcpy(manifest->verification->pubkey->y, block1_buffer->CskEntryInitial.PubKeyY, hash_length);
 
@@ -256,14 +272,14 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0), sizeof(block1_buffer->TagBlock1) + sizeof(block1_buffer->ReservedBlock1) + sizeof(block1_buffer->RootEntry), buffer);
 	if (status != Success) {
-		LOG_ERR("Block1: Flash read failed");
+		LOG_ERR("Block1: Flash read data failed");
 		return Failure;
 	}
 
 	block1_buffer = (PFR_AUTHENTICATION_BLOCK1 *)buffer;
 
 	if (block1_buffer->TagBlock1 != BLOCK1TAG) {
-		LOG_ERR("Block1: Tag Not Found");
+		LOG_ERR("Block1: Tag Not Found, %x", block1_buffer->TagBlock1);
 		return Failure;
 	}
 
@@ -274,13 +290,10 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 	}
 
 	LOG_INF("Block1 Root Entry: Validation success");
+
+	// Update root key to validate csk entry if csk entry exist or b0 entry if csk entry does not exist
 	memcpy(manifest->verification->pubkey->x, block1_buffer->RootEntry.PubKeyX, sizeof(block1_buffer->RootEntry.PubKeyX));
 	memcpy(manifest->verification->pubkey->y, block1_buffer->RootEntry.PubKeyY, sizeof(block1_buffer->RootEntry.PubKeyY));
-
-	if (block1_buffer->RootEntry.PubCurveMagic == PUBLIC_SECP256_TAG)
-		manifest->verification->pubkey->length = SHA256_DIGEST_LENGTH;
-	else if (block1_buffer->RootEntry.PubCurveMagic == PUBLIC_SECP384_TAG)
-		manifest->verification->pubkey->length = SHA384_DIGEST_LENGTH;
 
 	if (manifest->kc_flag == 0) {
 		// CSK and Block 0 entry verification
@@ -314,14 +327,14 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(PFR_AUTHENTICATION_BLOCK0), buffer);
 	if (status != Success) {
-		LOG_ERR("Block0: Flash read failed");
+		LOG_ERR("Block0: Flash read data failed");
 		return Failure;
 	}
 
 	block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)buffer;
 
 	if (block0_buffer->Block0Tag != BLOCK0TAG) {
-		LOG_ERR("Block0: Tag Not Found");
+		LOG_ERR("Block0: Tag Not Found, %x", block0_buffer->Block0Tag);
 		return Failure;
 	}
 
@@ -354,12 +367,17 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	}
 
 	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, sha_buffer, hash_length);
-	if (status != Success)
+	if (status != Success) {
+		LOG_ERR("Block0: Get hash failed");
 		return Failure;
+	}
 
+	LOG_INF("Block0: Verification PC, address = %x, length = %x", manifest->pfr_hash->start_address, manifest->pfr_hash->length);
 	status = compare_buffer(ptr_sha, sha_buffer, hash_length);
 	if (status != Success) {
-		LOG_ERR("Block0: Verification failed");
+		LOG_ERR("Block0: Verification PC failed");
+		LOG_HEXDUMP_INF(sha_buffer, hash_length, "Calculated hash:");
+		LOG_HEXDUMP_INF(ptr_sha, hash_length, "Expected hash:");
 		return Failure;
 	}
 

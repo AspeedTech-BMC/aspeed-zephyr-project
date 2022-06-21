@@ -207,20 +207,14 @@ static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
 	uint8_t z = 1;
 	int ret = 0;
 
-	LOG_HEXDUMP_DBG(pubkey->x, pubkey->length, "ECDSA X:");
-	LOG_HEXDUMP_DBG(pubkey->y, pubkey->length, "ECDSA Y:");
-	LOG_HEXDUMP_DBG(signature_r, pubkey->length, "ECDSA R:");
-	LOG_HEXDUMP_DBG(signature_s, pubkey->length, "ECDSA S:");
-	LOG_HEXDUMP_DBG(digest, length, "ECDSA D:");
-
 	mbedtls_ecdsa_init(&ctx_verify);
 	mbedtls_mpi_init(&r);
 	mbedtls_mpi_init(&s);
-	mbedtls_mpi_read_binary(&ctx_verify.Q.X, pubkey->x, pubkey->length);
-	mbedtls_mpi_read_binary(&ctx_verify.Q.Y, pubkey->y, pubkey->length);
+	mbedtls_mpi_read_binary(&ctx_verify.Q.X, pubkey->x, length);
+	mbedtls_mpi_read_binary(&ctx_verify.Q.Y, pubkey->y, length);
 	mbedtls_mpi_read_binary(&ctx_verify.Q.Z, &z, 1);
-	mbedtls_mpi_read_binary(&r, signature_r, pubkey->length);
-	mbedtls_mpi_read_binary(&s, signature_s, pubkey->length);
+	mbedtls_mpi_read_binary(&r, signature_r, length);
+	mbedtls_mpi_read_binary(&s, signature_s, length);
 
 	if (length == SHA256_HASH_LENGTH)
 		mbedtls_ecp_group_load(&ctx_verify.grp, MBEDTLS_ECP_DP_SECP256R1);
@@ -266,7 +260,7 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 							  manifest->verification->pubkey->signature_r,
 							  manifest->verification->pubkey->signature_s);
 		LOG_DBG("MBEDTLS ECDSA End, status = %d", status);
-	} else {
+	} else if (length == SHA384_HASH_LENGTH) {
 		LOG_DBG("ASPEED ECDSA Start");
 		status = aspeed_ecdsa_verify_middlelayer(manifest->verification->pubkey->x,
 							 manifest->verification->pubkey->y,
@@ -275,7 +269,8 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 							 manifest->verification->pubkey->signature_r,
 							 manifest->verification->pubkey->signature_s);
 		LOG_DBG("ASPEED ECDSA End, status = %d", status);
-	}
+	} else
+		LOG_ERR("Unsupported digest length, %d", length);
 
 	return status;
 }

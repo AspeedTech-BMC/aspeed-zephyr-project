@@ -49,12 +49,6 @@ int aspeed_ecdsa_verify_middlelayer(uint8_t *public_key_x, uint8_t *public_key_y
 		return status;
 	}
 
-	LOG_HEXDUMP_DBG(public_key_x, length, "ECDSA X:");
-	LOG_HEXDUMP_DBG(public_key_y, length, "ECDSA Y:");
-	LOG_HEXDUMP_DBG(signature_r, length, "ECDSA R:");
-	LOG_HEXDUMP_DBG(signature_s, length, "ECDSA S:");
-	LOG_HEXDUMP_DBG(digest, length, "ECDSA D:");
-
 	ek.curve_id = ECC_CURVE_NIST_P384;
 	ek.qx = public_key_x;
 	ek.qy = public_key_y;
