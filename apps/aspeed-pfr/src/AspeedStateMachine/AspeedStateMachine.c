@@ -20,6 +20,7 @@
 #include "engineManager/engine_manager.h"
 #include "spi_filter/spi_filter_wrapper.h"
 #include "flash/flash_aspeed.h"
+#include "flash/flash_wrapper.h"
 
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
 K_FIFO_DEFINE(aspeed_sm_fifo);
@@ -292,14 +293,51 @@ void do_recovery(void *o)
 	LOG_DBG("End");
 }
 
+static uint8_t recovery_buffer[1024] __aligned(16);
+
 void do_rot_recovery(void *o)
 {
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
+	uint8_t status;
+	size_t offset = 0;
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	/* TODO: Overwrite active region with recovery region firmware */
 	clear_abr_indicator();
-	GenerateStateMachineEvent(RECOVERY_DONE, NULL);
+
+	LOG_INF("Erase PFR Active region");
+	pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, 384 * 1024);
+
+	LOG_INF("Copy PFR Recovery region to Active region");
+	for (size_t i=0; i < (384 * 1024)/sizeof(recovery_buffer); ++i) {
+		offset = sizeof(recovery_buffer) * i;
+		spi_flash->spi.device_id[0] = ROT_INTERNAL_RECOVERY;
+		status = spi_flash->spi.base.read(&spi_flash->spi,
+				offset,
+				recovery_buffer,
+				sizeof(recovery_buffer));
+		if (status) {
+			LOG_ERR("Read PFR Recovery region %p failed", offset);
+			break;
+		}
+		spi_flash->spi.device_id[0] = ROT_INTERNAL_ACTIVE;
+		status = spi_flash->spi.base.write(&spi_flash->spi,
+				offset,
+				recovery_buffer,
+				sizeof(recovery_buffer));
+		if (status) {
+			LOG_ERR("Write PFR Active region %p failed", offset);
+			break;
+		}
+	}
+
+	if (!status) {
+		LOG_INF("Copy PFR Recovery region to Active region done");
+		GenerateStateMachineEvent(RECOVERY_DONE, NULL);
+	} else {
+		LOG_ERR("Recover PFR active region failed, SYSTEM LOCKDOWN");
+		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+	}
 	LOG_DBG("End");
 }
 
@@ -757,7 +795,7 @@ void AspeedStateMachine()
 }
 
 #ifdef CONFIG_SHELL
-static int cmd_smf_event(const struct shell *shell,
+static int cmd_asm_event(const struct shell *shell,
 		         size_t argc, char **argv, void *data)
 {
 	ARG_UNUSED(argc);
@@ -769,7 +807,7 @@ static int cmd_smf_event(const struct shell *shell,
 	return 0;
 }
 
-static int cmd_smf_show(const struct shell *shell, size_t argc,
+static int cmd_asm_show(const struct shell *shell, size_t argc,
                         char **argv)
 {
 	ARG_UNUSED(argc);
@@ -782,7 +820,7 @@ static int cmd_smf_show(const struct shell *shell, size_t argc,
 	return 0;
 }
 
-static int cmd_smf_log(const struct shell *shell, size_t argc,
+static int cmd_asm_log(const struct shell *shell, size_t argc,
                         char **argv)
 {
 	ARG_UNUSED(argc);
@@ -791,16 +829,34 @@ static int cmd_smf_log(const struct shell *shell, size_t argc,
 	shell_hexdump(shell, event_log, sizeof(event_log));
 	return 0;
 }
+static int cmd_asm_abr(const struct shell *shell, size_t argc,
+                        char **argv)
+{
+	bool control = false;
 
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_smf,
-        SHELL_CMD(show, NULL, "Show current state machine state", cmd_smf_show),
-	SHELL_CMD(log, NULL, "Show state machine event log", cmd_smf_log),
+	if (argc > 1 && !strncmp(argv[1], "enable", 6)) {
+		shell_print(shell, "Enable ABR FMCWDT2");
+#define ABR_CTRL_REG    0x7e620064
+		uint32_t reg_val;
+		reg_val = sys_read32(ABR_CTRL_REG);
+		reg_val |= BIT(0);
+		sys_write32(reg_val, ABR_CTRL_REG);
+	} else {
+		shell_print(shell, "Disable ABR FMCWDT2");
+		disable_abr_wdt();
+	}
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
+        SHELL_CMD(show, NULL, "Show current state machine state", cmd_asm_show),
+	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
+	SHELL_CMD(abr, NULL, "Control FMCWDT2 timer manually: enable or disable", cmd_asm_abr),
         SHELL_SUBCMD_SET_END
 );
 
-SHELL_CMD_REGISTER(smf, &sub_smf, "State Machine Commands", NULL);
+SHELL_CMD_REGISTER(asm, &sub_asm, "Aspeed PFR State Machine Commands", NULL);
 
-SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_smf_event,
+SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(INIT_DONE, INIT_DONE),
 	(VERIFY_UNPROVISIONED, VERIFY_UNPROVISIONED),
 	(VERIFY_PFM_FAILED, VERIFY_PFM_FAILED),
