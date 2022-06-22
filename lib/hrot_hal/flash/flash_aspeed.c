@@ -190,12 +190,12 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 #endif
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
-		sector_sz = flash_get_write_block_size(flash_device);
-		ret = flash_area_erase(partition_device, AdrOffset, sector_sz);
+		ret = spi_nor_erase_by_cmd(flash_device, partition_device->fa_off + AdrOffset,
+				SECTOR_SIZE, MIDLEY_FLASH_CMD_4K_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
-		LOG_DBG("%d Command is not supported\n", xfer->cmd);
-		ret = 0;
+		ret = spi_nor_erase_by_cmd(flash_device, partition_device->fa_off + AdrOffset,
+				BLOCK_SIZE, MIDLEY_FLASH_CMD_BLOCK_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_CE:
 		LOG_DBG("%d Command is not supported\n", xfer->cmd);
