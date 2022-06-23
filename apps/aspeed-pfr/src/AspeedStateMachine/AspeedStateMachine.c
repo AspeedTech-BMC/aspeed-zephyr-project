@@ -238,10 +238,12 @@ void handle_recovery(void *o)
 	if (verify_staging) {
 		SetPlatformState(T_MINUS_1_FW_RECOVERY);
 		switch (evt_ctx->event) {
+#if defined(CONFIG_CHECKPOINT_RECOVERY)
 		case WDT_TIMEOUT:
 			SetPlatformState(WDT_TIMEOUT_RECOVERY);
 			state->bmc_active_object.ActiveImageStatus = Failure;
 			__attribute__ ((fallthrough));
+#endif
 		case VERIFY_ACT_FAILED:
 			// WDT Checkpoint Timeout
 			// Bad, Good, Good: Recovery -> Active 
@@ -761,9 +763,11 @@ void AspeedStateMachine()
 				// Just run provision handling
 				run_state = true;
 				break;
+#if defined(CONFIG_CHECKPOINT_RECOVERY)
 			case WDT_TIMEOUT:
 				next_state = &state_table[FIRMWARE_RECOVERY];
 				break;
+#endif
 			default:
 				break;
 			}

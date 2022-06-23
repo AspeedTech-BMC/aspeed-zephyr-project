@@ -19,4 +19,10 @@ config SPI_MUX_INVERSE
         help
           Enable if SPI MUX connected to BMC/ROT is inverted
 
+config CHECKPOINT_RECOVERY
+	default n
+	bool "Checkpoint timeout recovery function"
+	help
+	  Enable if BMC/PCH supports mailbox checkpoint
+
 source "Kconfig.zephyr"
