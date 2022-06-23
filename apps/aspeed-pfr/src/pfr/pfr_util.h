@@ -26,6 +26,8 @@ int pfr_spi_erase_region(uint8_t device_id,
 int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 		uint8_t dest_dev, uint32_t dest_addr, size_t length);
 
+uint32_t pfr_spi_get_device_size(uint8_t device_id);
+
 int pfr_spi_get_block_size(uint8_t device_id);
 
 int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out);

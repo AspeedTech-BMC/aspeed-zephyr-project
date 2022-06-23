@@ -97,6 +97,16 @@ int pfr_spi_erase_region(uint8_t device_id,
 	return Success;
 }
 
+uint32_t pfr_spi_get_device_size(uint8_t device_id)
+{
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	uint32_t size;
+
+	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &size);
+	return size;
+}
+
 int pfr_spi_get_block_size(uint8_t device_id)
 {
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
