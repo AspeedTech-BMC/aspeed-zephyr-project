@@ -17,7 +17,6 @@
 #include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
-#include "platform_monitor/platform_monitor.h"
 #include <logging/logging_wrapper.h>
 #include "AspeedStateMachine/AspeedStateMachine.h"
 

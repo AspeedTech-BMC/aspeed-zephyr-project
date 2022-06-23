@@ -17,6 +17,7 @@
 #include "pfr/pfr_util.h"
 #include "gpio/gpio_aspeed.h"
 #include "platform_monitor/platform_monitor.h"
+#include "platform_monitor/spim_monitor.h"
 #include "engineManager/engine_manager.h"
 #include "spi_filter/spi_filter_wrapper.h"
 #include "flash/flash_aspeed.h"
@@ -51,6 +52,7 @@ void do_init(void *o)
 	initializeEngines();
 	initializeManifestProcessor();
 	debug_log_init();// State Machine log saving
+	spim_irq_init();
 
 	// DEBUG_HALT();
 	pfr_bmc_srst_enable_ctrl(true);

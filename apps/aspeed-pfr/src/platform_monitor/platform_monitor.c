@@ -24,8 +24,7 @@ void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint
 	GenerateStateMachineEvent(RESET_DETECTED, NULL);
 }
 
-
-
+/* Monitor BMC Reset Status */
 void platform_monitor_init()
 {
 	int ret;
