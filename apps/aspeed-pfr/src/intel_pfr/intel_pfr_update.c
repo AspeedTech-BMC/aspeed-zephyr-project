@@ -223,11 +223,13 @@ int pfr_decommission(struct pfr_manifest *manifest)
 
 int update_rot_fw(uint32_t address, uint32_t length)
 {
-	uint32_t length_page_align = length + (PAGE_SIZE - (length % PAGE_SIZE));
 	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
 	uint32_t source_address = address;
 	uint32_t rot_recovery_address = 0;
 	uint32_t rot_active_address = 0;
+	uint32_t length_page_align;
+
+	length_page_align = (length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
 
 	if (length_page_align > region_size) {
 		LOG_ERR("length(%x) exceed region size(%x)", length_page_align, region_size);
