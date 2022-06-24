@@ -236,7 +236,7 @@ int update_rot_fw(uint32_t address, uint32_t length)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
+	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, false, rot_recovery_address,
 			region_size)) {
 		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x", rot_recovery_address, region_size);
 		return Failure;
@@ -249,7 +249,7 @@ int update_rot_fw(uint32_t address, uint32_t length)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, false, rot_active_address,
 				region_size)) {
 		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x", rot_active_address, region_size);
 		return Failure;
@@ -347,9 +347,8 @@ int ast1060_update(struct pfr_manifest *manifest)
 			SetMinorErrorCode(CPLD_INVALID_SVN);
 			return Failure;
 		}
-		pc_length = manifest->pc_length;
-		pc_length = pc_length - (sizeof(uint32_t) + HROT_UPDATE_RESERVED);
-		payload_address = payload_address + sizeof(uint32_t) + HROT_UPDATE_RESERVED;
+		pc_length = manifest->pc_length - sizeof(uint32_t);
+		payload_address = payload_address + sizeof(uint32_t);
 
 		status = update_rot_fw(payload_address, pc_length);
 		if (status != Success) {
