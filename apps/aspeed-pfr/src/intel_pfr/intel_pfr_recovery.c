@@ -107,6 +107,8 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	uint32_t read_address;
 	uint32_t staging_address;
 	uint32_t act_pfm_offset;
+	PFR_AUTHENTICATION_BLOCK0 *block0_buffer;
+	uint8_t buffer[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
 
 	DEBUG_PRINTF("Active Data Corrupted");
 	if (manifest->image_type == BMC_TYPE) {
@@ -140,6 +142,18 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	manifest->recovery_address = read_address;
 	manifest->staging_address = staging_address;
 	manifest->active_pfm_addr = act_pfm_offset;
+	manifest->address = read_address;
+	manifest->address += PFM_SIG_BLOCK_SIZE;
+
+	if (pfr_spi_read(manifest->image_type, manifest->address,
+			sizeof(PFR_AUTHENTICATION_BLOCK0), buffer)) {
+		LOG_ERR("Block0: Flash read data failed");
+		return Failure;
+	}
+
+	block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)buffer;
+	manifest->pc_length = block0_buffer->PcLength;
+
 	uint32_t time_start, time_end;
 	time_start = k_uptime_get_32();
 
