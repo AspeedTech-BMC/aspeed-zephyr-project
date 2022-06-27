@@ -64,7 +64,7 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 int validate_pc_type(struct pfr_manifest *manifest, uint32_t pc_type)
 {
 	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_CPU_Seamless_Update_Capsule) {
-		LOG_ERR("Validation PC Type failed, %x", pc_type);
+		LOG_ERR("Validation PC Type failed, block0_read_pc_type = %x, manifest_pc_type = %x", pc_type, manifest->pc_type);
 		return Failure;
 	}
 
@@ -219,7 +219,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		sign_bit_verify = SIGN_PCH_PFM_BIT0;
 	} else if (manifest->pc_type == PFR_CPLD_UPDATE_CAPSULE
 		   || manifest->pc_type == PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON) {
-		// HROT update
+		// ROT update
 		sign_bit_verify = SIGN_CPLD_UPDATE_BIT4;
 	}
 

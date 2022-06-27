@@ -168,7 +168,7 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)), sizeof(pc_type), (uint8_t *)&pc_type);
 	if (pc_type == DECOMMISSION_CAPSULE) {
-		DEBUG_PRINTF("Decommission Certificate found");
+		LOG_INF("Decommission Certificate found");
 		return DECOMMISSION_CAPSULE;
 	} else if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PCH_PFM_CANCELLATION) || (pc_type == PCH_CAPSULE_CANCELLATION)
 		   || (pc_type == BMC_PFM_CANCELLATION) || (pc_type == BMC_CAPSULE_CANCELLATION)) {
@@ -184,39 +184,39 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 
 int pfr_decommission(struct pfr_manifest *manifest)
 {
-	int status = 0;
 	uint8_t decom_buffer[DECOMMISSION_PC_SIZE] = { 0 };
 	uint8_t read_buffer[DECOMMISSION_PC_SIZE] = { 0 };
-
 	CPLD_STATUS cpld_update_status;
+	int status = 0;
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, manifest->pc_length, read_buffer);
 	if (status != Success) {
-		DEBUG_PRINTF("PfrDecommission failed");
+		LOG_ERR("Flash read failed");
 		return Failure;
 	}
 
 	status = compare_buffer(read_buffer, decom_buffer, sizeof(read_buffer));
 	if (status != Success) {
-		DEBUG_PRINTF("Invalid decommission capsule data");
+		LOG_ERR("Invalid decommission capsule data");
 		return Failure;
 	}
 
 	// Erasing provisioned data
-	DEBUG_PRINTF("Decommission Success.Erasing the provisioned UFM data");
-
 	status = ufm_erase(PROVISION_UFM);
-	if (status != Success)
+	if (status != Success) {
+		LOG_ERR("Erase the provisioned UFM data failed");
 		return Failure;
+	}
+
+	LOG_INF("Decommission Success");
 
 	memset(&cpld_update_status, 0, sizeof(cpld_update_status));
-
 	cpld_update_status.DecommissionFlag = 1;
 	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-	if (status != Success)
+	if (status != Success) {
+		LOG_ERR("Update ROT status in UPDATE_STATUS_UFM failed");
 		return Failure;
-
-	// DEBUG_PRINTF("Flash the CPLD Update Capsule to do UFM Provision");
+	}
 
 	return Success;
 }

@@ -22,13 +22,12 @@
     <cskey>
       <magic>0x14711C2F</magic>
       <curvemagic>0xC7B88C74</curvemagic>
-      <permissions>22</permissions>
-      <keyid>1</keyid>
+      <permissions>16</permissions>
+      <keyid>0</keyid>
       <pubkey>csk_pub.pem</pubkey>
       <sigmagic>0xDE64437D</sigmagic>
       <hashalg>sha256</hashalg>
       <signkey>rk_prv.pem</signkey>
-      <!--<script>./sign_external.sh</script>-->
     </cskey>
     <!-- Signature over Block 0 -->
     <b0_sig>
@@ -40,7 +39,7 @@
   </block1>
   <!-- CPLD Bitstream Specific -->
   <cpld>
-    <svn>2</svn>
+    <svn>1</svn>
   </cpld>
   <padding>
     <!-- Pad block1 such that combined block length is 1024b -->
