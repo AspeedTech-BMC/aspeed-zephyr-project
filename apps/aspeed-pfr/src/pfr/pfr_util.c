@@ -57,21 +57,21 @@ int pfr_spi_write(uint8_t device_id, uint32_t address, uint32_t data_length, uin
 
 int pfr_spi_erase_4k(uint8_t device_id, uint32_t address)
 {
-	int status = 0;
+	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, address);
+	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, address);
 	return status;
 }
 
 int pfr_spi_erase_block(uint8_t device_id, uint32_t address)
 {
-	int status = 0;
+	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	spi_flash->spi.base.block_erase((struct flash *)&spi_flash->spi, address);
+	status = spi_flash->spi.base.block_erase((struct flash *)&spi_flash->spi, address);
 	return status;
 }
 

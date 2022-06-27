@@ -110,11 +110,11 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 #endif
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
-		spi_nor_erase_by_cmd(flash_device, AdrOffset, SECTOR_SIZE,
+		ret = spi_nor_erase_by_cmd(flash_device, AdrOffset, SECTOR_SIZE,
 				MIDLEY_FLASH_CMD_4K_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
-		spi_nor_erase_by_cmd(flash_device, AdrOffset, BLOCK_SIZE,
+		ret = spi_nor_erase_by_cmd(flash_device, AdrOffset, BLOCK_SIZE,
 				MIDLEY_FLASH_CMD_BLOCK_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_CE:

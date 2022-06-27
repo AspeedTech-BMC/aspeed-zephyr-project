@@ -312,7 +312,10 @@ void do_rot_recovery(void *o)
 	clear_abr_indicator();
 
 	LOG_INF("Erase PFR Active region size=%08x", region_size);
-	pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, false, 0, region_size);
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, region_size)){
+		LOG_ERR("Erase PFR active region failed, SYSTEM LOCKDOWN");
+		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+	}
 
 	LOG_INF("Copy PFR Recovery region to Active region");
 	status = pfr_spi_region_read_write_between_spi(ROT_INTERNAL_RECOVERY, 0,
@@ -880,11 +883,39 @@ static int cmd_asm_flash_cmp(const struct shell *shell, size_t argc,
 	return 0;
 }
 
+static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
+			char **argv)
+{
+	uint8_t status;
+	size_t offset = 0;
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_RECOVERY);
+
+	LOG_INF("Erase PFR Active region size=%08x", region_size);
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, region_size)){
+		LOG_ERR("Erase PFR active region failed");
+		return 0;
+	}
+
+	LOG_INF("Copy PFR Recovery region to Active region");
+	status = pfr_spi_region_read_write_between_spi(ROT_INTERNAL_RECOVERY, 0,
+			ROT_INTERNAL_ACTIVE, 0, region_size);
+
+	if (!status) {
+		LOG_INF("Copy PFR Recovery region to Active region done");
+	} else {
+		LOG_ERR("Recover PFR active region failed");
+	}
+
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(show, NULL, "Show current state machine state", cmd_asm_show),
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
 	SHELL_CMD(abr, NULL, "Control FMCWDT2 timer manually: enable or disable", cmd_asm_abr),
 	SHELL_CMD(cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
+	SHELL_CMD(rot_rc, NULL, "ROT firmware recoery", cmd_asm_rot_recovery),
 	SHELL_SUBCMD_SET_END
 );
 

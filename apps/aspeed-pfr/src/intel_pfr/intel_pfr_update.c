@@ -236,7 +236,7 @@ int update_rot_fw(uint32_t address, uint32_t length)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, false, rot_recovery_address,
+	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
 			region_size)) {
 		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x", rot_recovery_address, region_size);
 		return Failure;
@@ -249,7 +249,7 @@ int update_rot_fw(uint32_t address, uint32_t length)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, false, rot_active_address,
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
 				region_size)) {
 		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x", rot_active_address, region_size);
 		return Failure;
