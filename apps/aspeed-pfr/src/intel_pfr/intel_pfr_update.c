@@ -42,7 +42,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	uint32_t target_address = 0;
 
 	if (manifest->image_type == BMC_TYPE) {
-		DEBUG_PRINTF("BMC Recovery");
+		DEBUG_PRINTF("BMC Staging Region Verification");
 		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
 			return status;
@@ -54,7 +54,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 
 	} else if (manifest->image_type == PCH_TYPE) {
-		DEBUG_PRINTF("PCH Recovery...");
+		DEBUG_PRINTF("PCH Staging Region Verification");
 		status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
 			return Failure;
@@ -101,7 +101,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 	manifest->staging_address = read_address;
 
-	DEBUG_PRINTF("Stagig area verification successful");
+	DEBUG_PRINTF("Staging area verification successful");
 
 	return Success;
 }
@@ -448,6 +448,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
 	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	LOG_HEXDUMP_INF(&cpld_update_status, sizeof(cpld_update_status), "CPLD Status");
 	if (status != Success)
 		return status;
 
@@ -467,7 +468,9 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		pfr_manifest->address = address;
 
 		// Checking for key cancellation
+		pfr_manifest->image_type = BMC_TYPE;
 		pc_type_status = check_rot_capsule_type(pfr_manifest);
+		pfr_manifest->image_type = image_type;
 
 		status = pfr_staging_pch_staging(pfr_manifest);
 		if (status != Success)
@@ -481,7 +484,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return ast1060_update(pfr_manifest);
 
 	// Staging area verification
-	DEBUG_PRINTF("Staging Area verfication ");
+	DEBUG_PRINTF("Staging Area verfication");
 	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest, NULL, NULL);
 	if (status != Success) {
 		DEBUG_PRINTF("Staging Area verfication failed");
@@ -489,7 +492,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Staging Area verfication success ");
+	DEBUG_PRINTF("Staging Area verfication success");
 
 	// After staging manifest, Compression header will start
 	area_size = pfr_manifest->update_fw->pc_length - (PFM_SIG_BLOCK_SIZE + pfr_manifest->update_fw->pfm_length);

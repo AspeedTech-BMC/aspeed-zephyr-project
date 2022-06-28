@@ -63,12 +63,12 @@ void do_init(void *o)
 	state->bmc_active_object.type = BMC_EVENT;
 	state->bmc_active_object.ActiveImageStatus = Failure;
 	state->bmc_active_object.RecoveryImageStatus = Failure;
-	state->bmc_active_object.RestrictActiveUpdate = Failure;
+	state->bmc_active_object.RestrictActiveUpdate = 0;
 
 	state->pch_active_object.type = PCH_EVENT;
 	state->pch_active_object.ActiveImageStatus = Failure;
 	state->pch_active_object.RecoveryImageStatus = Failure;
-	state->pch_active_object.RestrictActiveUpdate = Failure;
+	state->pch_active_object.RestrictActiveUpdate = 0;
 
 	// I2c_slave_dev_debug+>
 	// struct i2c_slave_interface *I2CSlaveEngine = getI2CSlaveEngineInstance();
@@ -427,6 +427,7 @@ void handle_update_requested(void *o)
 	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
 	bool update_dynamic = evt_ctx->data.bit8[1] & DymanicUpdate;
 	bool update_reset = evt_ctx->data.bit8[1] & UpdateAtReset;
+	CPLD_STATUS cpld_update_status;
 
 	LOG_DBG("FIRMWARE_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
@@ -437,6 +438,11 @@ void handle_update_requested(void *o)
 		break;
 	case BmcUpdateIntent:
 		/* BMC has full access */
+		if ((update_region & PchActiveUpdate) || (update_region & PchRecoveryUpdate)) {
+			ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+			cpld_update_status.BmcToPchStatus = 1;
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+		}
 		break;
 	default:
 		break;
