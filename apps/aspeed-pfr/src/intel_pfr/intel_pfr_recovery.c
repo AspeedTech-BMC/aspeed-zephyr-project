@@ -86,18 +86,18 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 	DEBUG_PRINTF("Recovering...");
 	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
 
-		DEBUG_PRINTF("Recovery region erase failed\r\n");
+		DEBUG_PRINTF("Recovery region erase failed");
 		return Failure;
 	}
 
 	// use read_write_between spi for supporting dual flash
 	if (pfr_spi_region_read_write_between_spi(image_type, source_address, image_type,
 				target_address, area_size)) {
-		DEBUG_PRINTF("Recovery region update failed\r\n");
+		DEBUG_PRINTF("Recovery region update failed");
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Recovery region update completed\r\n");
+	DEBUG_PRINTF("Recovery region update completed");
 
 	return status;
 }
