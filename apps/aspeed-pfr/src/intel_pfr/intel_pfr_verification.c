@@ -158,6 +158,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	CSKENTRY *block1_buffer;
 	uint32_t hash_length = 0;
 	int status = 0;
+	int i;
 
 	status = pfr_spi_read(manifest->image_type, block1_address + CSK_START_ADDRESS, sizeof(CSKENTRY), buffer);
 	if (status != Success) {
@@ -226,6 +227,14 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
 		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x", block1_buffer->CskEntryInitial.KeyPermission);
 		return Failure;
+	}
+
+	// Check for the 0s in the reserved field
+	for (i = 0; i < BLOCK1_CSK_ENTRY_RESERVED_SIZE; i++) {
+		if (block1_buffer->CskEntryInitial.Reserved[i] != 0) {
+			LOG_ERR("Block1 CSK Entry: reserved data failed");
+			return Failure;
+		}
 	}
 
 	manifest->pfr_hash->start_address = block1_address + CSK_START_ADDRESS + sizeof(block1_buffer->CskEntryInitial.Tag);
@@ -344,8 +353,10 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	}
 
 	if (block0_buffer->PcType == DECOMMISSION_CAPSULE) {
-		manifest->pc_length = block0_buffer->PcLength;
-		return Success;
+		if (block0_buffer->PcLength != DECOMMISSION_PC_SIZE) {
+			LOG_ERR("Block0: decommission capsule pc length failed, %x", block0_buffer->PcLength);
+			return Failure;
+		}
 	}
 
 	// Protected content length

@@ -184,10 +184,10 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 
 int pfr_decommission(struct pfr_manifest *manifest)
 {
-	uint8_t decom_buffer[DECOMMISSION_PC_SIZE] = { 0 };
 	uint8_t read_buffer[DECOMMISSION_PC_SIZE] = { 0 };
 	CPLD_STATUS cpld_update_status;
 	int status = 0;
+	int i;
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, manifest->pc_length, read_buffer);
 	if (status != Success) {
@@ -195,10 +195,11 @@ int pfr_decommission(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	status = compare_buffer(read_buffer, decom_buffer, sizeof(read_buffer));
-	if (status != Success) {
-		LOG_ERR("Invalid decommission capsule data");
-		return Failure;
+	for (i = 0; i < DECOMMISSION_PC_SIZE; i++) {
+		if (read_buffer[i] != 0) {
+			LOG_ERR("Invalid decommission capsule data");
+			return Failure;
+		}
 	}
 
 	// Erasing provisioned data
