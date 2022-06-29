@@ -93,5 +93,5 @@ The following example places above files in this directory.
 python3 ./rot_dcc_capsule.py -t ./intel-pfr-signing-utility
 ```
 
-The ROT update capsule will be created in `dss-output/rot_dcc_capsule_signed.bin`
+The ROT decommission capsule will be created in `dss-output/rot_dcc_capsule_signed.bin`
 
