@@ -41,6 +41,11 @@
 &i2c1 {
 	pinctrl-0 = <&pinctrl_i2c1_default>;
 	status = "okay";
+};
+
+&i2c2 {
+	pinctrl-0 = <&pinctrl_i2c2_default>;
+	status = "okay";
 
 	swmbx1: swmbx1@62 {
 		compatible = "aspeed,swmbx-dev";
@@ -52,119 +57,29 @@
 	};
 };
 
-&i2c2 {
-	pinctrl-0 = <&pinctrl_i2c2_default>;
-	status = "okay";
-
-	eeprom2: eeprom2@42 {
-		compatible = "atmel,at24";
-		reg = <0x42>;
-		label = "EEPROM_SLAVE_2";
-		size = <256>;
-		pagesize = <16>;
-		address-width = <8>;
-		timeout = <5>;
-#ifdef CONFIG_I2C_EEPROM_SLAVE
-		status = "okay";
-#endif
-	};
-
-	ipmb2: ipmb2@52 {
-		compatible = "aspeed,ipmb";
-		reg = <0x52>;
-		label = "IPMB_SLAVE_2";
-		size = <5>;
-#ifdef CONFIG_I2C_IPMB_SLAVE
-		status = "okay";
-#endif
-	};
-};
-
 &i2c3 {
 	pinctrl-0 = <&pinctrl_i2c3_default>;
 	status = "okay";
-
-	eeprom3: eeprom3@43 {
-		compatible = "atmel,at24";
-		reg = <0x43>;
-		label = "EEPROM_SLAVE_3";
-		size = <256>;
-		pagesize = <16>;
-		address-width = <8>;
-		timeout = <5>;
-#ifdef CONFIG_I2C_EEPROM_SLAVE
-		status = "okay";
-#endif
-	};
-
-	ipmb3: ipmb3@53 {
-		compatible = "aspeed,ipmb";
-		reg = <0x53>;
-		label = "IPMB_SLAVE_3";
-		size = <5>;
-#ifdef CONFIG_I2C_IPMB_SLAVE
-		status = "okay";
-#endif
-	};
-
 };
 
 &i2c4 {
 	pinctrl-0 = <&pinctrl_i2c4_default>;
 	status = "okay";
-
-	eeprom4: eeprom4@44 {
-		compatible = "atmel,at24";
-		reg = <0x44>;
-		label = "EEPROM_SLAVE_4";
-		size = <256>;
-		pagesize = <16>;
-		address-width = <8>;
-		timeout = <5>;
-#ifdef CONFIG_I2C_EEPROM_SLAVE
-		status = "okay";
-#endif
-	};
-
-	ipmb4: ipmb4@54 {
-		compatible = "aspeed,ipmb";
-		reg = <0x54>;
-		label = "IPMB_SLAVE_4";
-		size = <5>;
-#ifdef CONFIG_I2C_IPMB_SLAVE
-		status = "okay";
-#endif
-	};
-
 };
 
 &i2c5 {
 	pinctrl-0 = <&pinctrl_i2c5_default>;
 	status = "okay";
+};
 
-	eeprom5: eeprom5@45 {
-		compatible = "atmel,at24";
-		reg = <0x45>;
-		label = "EEPROM_SLAVE_5";
-		size = <256>;
-		pagesize = <16>;
-		address-width = <8>;
-		timeout = <5>;
-#ifdef CONFIG_I2C_EEPROM_SLAVE
-		status = "okay";
-#endif
-	};
+&i2c6 {
+	pinctrl-0 = <&pinctrl_i2c6_default>;
+	status = "okay";
+};
 
-	ipmb5: ipmb5@55 {
-		compatible = "aspeed,ipmb";
-		reg = <0x55>;
-		label = "IPMB_SLAVE_5";
-		size = <5>;
-#ifdef CONFIG_I2C_IPMB_SLAVE
-		status = "okay";
-#endif
-	};
-
+&i2c7 {
+	pinctrl-0 = <&pinctrl_i2c7_default>;
+	status = "okay";
 };
 
 // for i2c filter testing
@@ -295,7 +210,7 @@
 };
 
 &spim1 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pinctrl_spim1_cs &pinctrl_spim1_in_default &pinctrl_spim1_qspi_in_default
 				&pinctrl_spim1_rst_out &pinctrl_spim1_muxsel>;
@@ -310,7 +225,7 @@
 };
 
 &spim2 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pinctrl_spim2_cs &pinctrl_spim2_in_default &pinctrl_spim2_qspi_in_default
 				&pinctrl_spim2_rst_out &pinctrl_spim2_muxsel>;
@@ -325,7 +240,7 @@
 };
 
 &spim3 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pinctrl_spim3_cs &pinctrl_spim3_in_default &pinctrl_spim3_out_default
 		&pinctrl_spim3_qspi_in_default &pinctrl_spim3_qspi_out_default
@@ -340,7 +255,7 @@
 };
 
 &spim4 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pinctrl_spim4_cs &pinctrl_spim4_in_default &pinctrl_spim4_out_default
 		&pinctrl_spim4_qspi_in_default &pinctrl_spim4_qspi_out_default
