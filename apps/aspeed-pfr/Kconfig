@@ -2,27 +2,33 @@
 # # SPDX-License-Identifier: MIT
 
 config ASPEED_DC_SCM
-        default n
-        bool "ASPEED DC-SCM board"
-        help
-          Enable ASPEED DC-SCM board basic settings.
+	default n
+	bool "ASPEED DC-SCM board"
+	help
+	  Enable ASPEED DC-SCM board basic settings.
 
 config BMC_DUAL_FLASH
-        default n
-        bool "Enable dual flash support"
-        help
-          Enable if BMC has dual flash
+	default n
+	bool "Enable dual flash support"
+	help
+	  Enable if BMC has dual flash
 
 config SPI_MUX_INVERSE
-        default n
-        bool "Invert SPI MUX"
-        help
-          Enable if SPI MUX connected to BMC/ROT is inverted
+	default n
+	bool "Invert SPI MUX"
+	help
+	  Enable if SPI MUX connected to BMC/ROT is inverted
 
 config CHECKPOINT_RECOVERY
 	default n
 	bool "Checkpoint timeout recovery function"
 	help
 	  Enable if BMC/PCH supports mailbox checkpoint
+
+config PLATFORM_STATE_LED
+	default n
+	bool "Display platfrom state in 8 bits LED"
+	help
+	  Enable if the system has PlatformState LEDs
 
 source "Kconfig.zephyr"

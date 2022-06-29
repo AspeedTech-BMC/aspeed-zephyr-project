@@ -77,3 +77,7 @@ properties:
       required: false
       description: PCH CPU1 SPI flash power control.
 
+    platform-state-out-gpios:
+      type: phandle-array
+      required: false
+      description: 8 bit leds for displaying platform state

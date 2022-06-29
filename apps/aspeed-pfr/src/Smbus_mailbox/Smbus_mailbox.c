@@ -5,6 +5,7 @@
  */
 
 #include <logging/log.h>
+#include <drivers/gpio.h>
 #include "Smbus_mailbox.h"
 #include "common/common.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
@@ -456,7 +457,7 @@ void InitializeSmbusMailbox(void)
 MBX_REG_SETTER_GETTER(CpldIdentifier);
 MBX_REG_SETTER_GETTER(CpldReleaseVersion);
 MBX_REG_SETTER_GETTER(CpldRotSvn);
-MBX_REG_SETTER_GETTER(PlatformState);
+MBX_REG_GETTER(PlatformState);
 MBX_REG_INC_GETTER(RecoveryCount);
 MBX_REG_SETTER_GETTER(LastRecoveryReason);
 MBX_REG_INC_GETTER(PanicEventCount);
@@ -482,6 +483,28 @@ MBX_REG_SETTER_GETTER(PchPfmRecoverMinorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverSvn);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
+
+void SetPlatformState(byte PlatformStateData)
+{
+#if defined(CONFIG_PLATFORM_STATE_LED)
+	uint8_t bit;
+	static const struct gpio_dt_spec leds[] = {
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 1),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 2),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 3),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 4),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 5),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 6),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 7)};
+
+	for(uint8_t bit = 0; bit < 8; ++bit) {
+		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
+		gpio_pin_set(leds[bit].port, leds[bit].pin, !(PlatformStateData & BIT(bit)));
+	}
+#endif
+	swmbx_write(gSwMbxDev, false, PlatformState, &PlatformStateData);
+}
 
 // UFM Status
 void SetUfmStatusValue(uint8_t UfmStatusBitMask)

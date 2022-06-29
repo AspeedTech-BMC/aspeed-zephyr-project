@@ -12,6 +12,12 @@
 		cpu1-rst-ind-in-gpios = <&gpio0_q_t 28 0>; /* GPIO_T4 */
 		cpu0-flash-pwr-out-gpios = <&gpio0_i_l 26 0>; /* GPIO_L2 */
 		cpu1-flash-pwr-out-gpios = <&gpio0_i_l 27 0>; /* GPIO_L3 */
+
+		platform-state-out-gpios =
+			<&sgpiom_a_d 0 0>, <&sgpiom_a_d 1 0>,
+			<&sgpiom_a_d 2 0>, <&sgpiom_a_d 3 0>,
+			<&sgpiom_a_d 4 0>, <&sgpiom_a_d 5 0>,
+			<&sgpiom_a_d 6 0>, <&sgpiom_a_d 7 0>;
 	};
 };
 
@@ -263,5 +269,9 @@
 
 	flash-device = <&spi2_cs1>;
 	ext-mux-sel = <1>;
+	status = "okay";
+};
+
+&sgpiom {
 	status = "okay";
 };
