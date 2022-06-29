@@ -354,7 +354,7 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 
 	if (block0_buffer->PcType == DECOMMISSION_CAPSULE) {
 		if (block0_buffer->PcLength != DECOMMISSION_PC_SIZE) {
-			LOG_ERR("Block0: decommission capsule pc length failed, %x", block0_buffer->PcLength);
+			LOG_ERR("Block0: Decommission capsule PC length failed, %x", block0_buffer->PcLength);
 			return Failure;
 		}
 	}

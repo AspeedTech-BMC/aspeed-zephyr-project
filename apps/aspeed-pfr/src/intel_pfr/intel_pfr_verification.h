@@ -12,7 +12,7 @@
 #define INTEL_PFR_BLOCK_0_TAG 0xB6EAFD19
 
 #define DECOMMISSION_CAPSULE             0x200
-#define KEY_CANCELLATION_CAPSULE         0x300
+#define KEY_CANCELLATION_CAPSULE         0x100
 
 #define FALSE                            0
 #define TRUE                             1
