@@ -7,6 +7,7 @@
 #include <smf.h>
 #include <shell/shell.h>
 #include <logging/log.h>
+#include <logging/log_ctrl.h>
 #include <drivers/i2c/pfr/swmbx.h>
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include <drivers/flash.h>
@@ -610,10 +611,8 @@ void do_reboot(void *o)
 {
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
-	LOG_INF("ROT going to reboot in 1 second");
-	k_msleep(1000);
+	LOG_PANIC();
 	pfr_cpld_update_reboot();
-
 	/* Should never reach here? */
 	LOG_DBG("End");
 }
