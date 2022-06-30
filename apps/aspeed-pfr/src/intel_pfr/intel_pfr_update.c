@@ -191,7 +191,7 @@ int pfr_decommission(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, manifest->pc_length, read_buffer);
 	if (status != Success) {
-		LOG_ERR("Flash read failed");
+		LOG_ERR("Flash read decommission capsule data failed");
 		return Failure;
 	}
 
@@ -299,7 +299,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 	// Checking the PC type
 	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)), sizeof(pc_type), (uint8_t *)&pc_type);
 	if (status != Success) {
-		LOG_ERR("ROT update failed");
+		LOG_ERR("Flash read PC type failed");
 		return Failure;
 	}
 
@@ -325,13 +325,13 @@ int ast1060_update(struct pfr_manifest *manifest)
 	} else if (pc_type_status ==  KEY_CANCELLATION_CAPSULE) {
 		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t), (uint8_t *)&cancelled_id);
 		if (status != Success) {
-			LOG_ERR("ROT update failed");
+			LOG_ERR("Flash read key cancellation Id failed");
 			return Failure;
 		}
 
 		status = manifest->keystore->kc_flag->cancel_kc_flag(manifest, cancelled_id);
 		if (status == Success)
-			LOG_ERR("Key cancellation success. Key Id :%d was cancelled", cancelled_id);
+			LOG_INF("Key cancellation success. Key Id :%d was cancelled", cancelled_id);
 
 		return status;
 	} else if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE) {

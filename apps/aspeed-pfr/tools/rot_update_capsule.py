@@ -24,6 +24,7 @@ def main(args):
     parser = argparse.ArgumentParser(description='sign ROT update capsule')
     parser.add_argument('-t',
                         '--input_sign_tool',
+                        required=True,
                         metavar="[input sign tool]",
                         dest='input_sign_tool',
                         default=None,
@@ -37,6 +38,7 @@ def main(args):
                         default is rot_update_capsule.xml')
     parser.add_argument('-i',
                         '--input_img',
+                        required=True,
                         metavar="[input image]",
                         dest='input_img',
                         default=None,
@@ -50,13 +52,6 @@ def main(args):
                         default is rot_update_capsule_signed.bin')
     args = parser.parse_args(args)
     logger.info(args)
-
-    if args.input_sign_tool is None:
-        logger.error("please set sign tool")
-        exit(1)
-    if args.input_img is None:
-        logger.error("please set input image")
-        exit(1)
 
     logger.info("sign ROT update capsule")
     cmd = "{} -c {} -o {} {}".format(args.input_sign_tool,
