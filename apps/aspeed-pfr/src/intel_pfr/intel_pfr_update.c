@@ -425,8 +425,8 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			return Failure;
 		}
 
-		source_address += BMC_STAGING_SIZE;
-		source_address += BMC_PCH_STAGING_SIZE;
+		source_address += CONFIG_BMC_STAGING_SIZE;
+		source_address += CONFIG_BMC_PCH_STAGING_SIZE;
 		pfr_manifest->address = source_address;
 		return ast1060_update(pfr_manifest);
 	}
@@ -465,7 +465,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			return Failure;
 
 		// PFR Staging - PCH Staging offset after BMC staging offset
-		address += BMC_STAGING_SIZE;
+		address += CONFIG_BMC_STAGING_SIZE;
 		pfr_manifest->address = address;
 
 		// Checking for key cancellation

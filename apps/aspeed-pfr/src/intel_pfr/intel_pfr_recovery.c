@@ -78,9 +78,9 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 	size_t area_size;
 
 	if (image_type == BMC_TYPE)
-		area_size = BMC_STAGING_SIZE;
+		area_size = CONFIG_BMC_STAGING_SIZE;
 	else if (image_type == PCH_TYPE)
-		area_size = PCH_STAGING_SIZE;
+		area_size = CONFIG_PCH_STAGING_SIZE;
 
 	spi_flash->spi.device_id[0] = image_type; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	DEBUG_PRINTF("Recovering...");
@@ -188,7 +188,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	source_address += BMC_STAGING_SIZE;
+	source_address += CONFIG_BMC_STAGING_SIZE;
 
 	manifest->image_type = BMC_TYPE;
 	manifest->address = source_address;
@@ -217,11 +217,11 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
-			BMC_PCH_STAGING_SIZE))
+			CONFIG_BMC_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (pfr_spi_region_read_write_between_spi(BMC_TYPE, source_address, PCH_TYPE,
-				target_address, BMC_PCH_STAGING_SIZE))
+				target_address, CONFIG_BMC_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (manifest->state == RECOVERY) {
@@ -231,7 +231,8 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 			return Failure;
 	}
 
-	DEBUG_PRINTF("BMC PCH Recovery region Update completed");
+	DEBUG_PRINTF("BMC PCH %s region Update completed",
+			(manifest->state == RECOVERY) ? "Recovery" : "Staging");
 
 	return Success;
 }
