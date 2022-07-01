@@ -25,24 +25,27 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	// Recovery region verification
 	if (manifest->image_type == BMC_TYPE) {
 		LOG_INF("Image Type: BMC");
-		ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
+		ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
+				sizeof(read_address));
 		manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 	} else if (manifest->image_type == PCH_TYPE) {
 		LOG_INF("Image Type: PCH");
-		ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
+		ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
+				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
 
 	manifest->address = read_address;
 
+	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
 	// Block0-Block1 verifcation
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
-		LOG_ERR("Verify update capsule failed");
+		LOG_ERR("Verify recovery capsule failed");
 		return Failure;
 	}
-
-	LOG_INF("Verify recovery capsule success");
 
 	if (manifest->image_type == BMC_TYPE)
 		manifest->pc_type = PFR_BMC_PFM;
@@ -52,20 +55,21 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	// Recovery region PFM verification
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 
+	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
 	// manifest verifcation
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("Verify recovery PFM failed");
 		return Failure;
 	}
 
-	LOG_INF("Verify recovery PFM success");
-
 	status = get_recover_pfm_version_details(manifest, read_address);
 	if (status != Success)
 		return Failure;
 
-	LOG_INF("Recovery region verification success");
+	LOG_INF("Recovery area verification successful");
 
 	return Success;
 }
@@ -77,26 +81,28 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	if (manifest->image_type == BMC_TYPE) {
 		LOG_INF("Image Type: BMC");
-		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
+		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
+				sizeof(read_address));
 		manifest->pc_type = PFR_BMC_PFM;
 	} else if (manifest->image_type == PCH_TYPE) {
 		LOG_INF("Image Type: PCH");
-		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
+		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
+				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_PFM;
 	}
 
 	manifest->address = read_address;
 
-	LOG_INF("PFM Verification");
-	LOG_INF("manifest->address=%x manifest->recovery_address=%x", manifest->address, manifest->recovery_address);
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	LOG_INF("Active Firmware Verification");
+	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("Verify active PFM failed");
 		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 		return Failure;
 	}
-
-	LOG_INF("Verify active PFM success");
 
 	read_address = read_address + PFM_SIG_BLOCK_SIZE;
 	status = pfm_version_set(manifest, read_address);
