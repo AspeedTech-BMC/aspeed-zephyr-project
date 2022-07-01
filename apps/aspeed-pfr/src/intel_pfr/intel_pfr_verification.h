@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_VERIFICATION_H_
-#define INTEL_PFR_VERIFICATION_H_
+#pragma once
 
 #include <stdint.h>
+#include "pfr/pfr_common.h"
 
 #define INTEL_PFR_BLOCK_0_TAG 0xB6EAFD19
 
 #define DECOMMISSION_CAPSULE             0x200
-#define KEY_CANCELLATION_CAPSULE         0x300
+#define KEY_CANCELLATION_CAPSULE         0x100
 
 #define FALSE                            0
 #define TRUE                             1
@@ -27,13 +27,12 @@
 #define HROT_UPDATE_RESERVED    32
 #define MAX_BIOS_BOOT_TIME                      300
 #define MAX_ERASE_SIZE                          0x1000
-#define MAX_READ_SIZE                           0x100
-#define MAX_WRITE_SIZE                          0x100
 
 #define RANDOM_KEY_MAGIC_TAG                                    0x52414E44
 #define RANDOM_KEY_ADDRESS_IN_UFM                               ((PROVISION_UFM_SIZE * 16) - (2 * SHA384_SIZE))
 #define ROOT_PUB_KEY_LOC_IN_UFM                                 (RANDOM_KEY_ADDRESS_IN_UFM - (2 * SHA384_SIZE))
 #define MAGIC_TAG_SIZE                                                  4
+#define BLOCK1_CSK_ENTRY_RESERVED_SIZE 20
 
 
 #pragma pack(1)
@@ -215,11 +214,11 @@ struct pfr_authentication {
 	int (*block1_csk_block0_entry_verify)(struct pfr_manifest *manifest);
 	int (*block1_verify)(struct pfr_manifest *manifest);
 	int (*block0_verify)(struct pfr_manifest *manifest);
-	int (*validate_root_key);
 };
 
+#pragma pack()
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
-#endif /*INTEL_PFR_VERIFICATION_H*/
+void init_pfr_authentication(struct pfr_authentication *pfr_authentication);

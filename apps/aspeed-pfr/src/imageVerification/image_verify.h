@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_ASPEED_PFR_SRC_IMAGEVERIFICATION_IMAGE_VERIFY_H_
-#define ZEPHYR_ASPEED_PFR_SRC_IMAGEVERIFICATION_IMAGE_VERIFY_H_
+#pragma once
 
 #include <zephyr.h>
 #include <crypto/signature_verification_rsa_wrapper.h>
@@ -17,4 +16,4 @@ void handleVerifyExitState(/* TBD */);
 int perform_image_verification(void);
 int signature_verification_init(struct signature_verification *verification);
 int read_rsa_public_key(struct rsa_public_key *public_key);
-#endif /* ZEPHYR_ASPEED_PFR_SRC_IMAGEVERIFICATION_IMAGE_VERIFY_H_ */
+

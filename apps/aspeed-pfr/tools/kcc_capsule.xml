@@ -1,0 +1,37 @@
+<?xml version="1.0" ?>
+<!-- XML file for Block Sign Tool -->
+<blocksign>
+  <version>1</version>
+  <block0>
+  <magic>0xB6EAFD19</magic>
+  <!-- intel-pfr-signing-utility adds CANCELLATION_BIT(0x100) if CSKEY does not exist-->
+  <!-- 0 ROT Update Capsule (0x100 + 0 = 0x100) -->
+  <!-- 1 PCH PFM (0x100 + 1 = 0x101) -->
+  <!-- 2 PCH Update Capsule (0x100 + 2 = 0x102) -->
+  <!-- 3 BMC PFM (0x100 + 3 = 0x103) -->
+  <!-- 4 BMC Update Capsule (0x100 + 4 = 0x104) -->
+  <pctype>0</pctype>
+  </block0>
+  <block1>
+    <magic>0xF27F28D7</magic>
+    <rkey>
+      <magic>0xA757A046</magic>
+      <curvemagic>0xC7B88C74</curvemagic>
+      <permissions>-1</permissions>
+      <keyid>-1</keyid>
+      <pubkey>rk_pub.pem</pubkey>
+    </rkey>
+    <b0_sig>
+      <magic>0x15364367</magic>
+      <sigmagic>0xDE64437D</sigmagic>
+      <hashalg>sha256</hashalg>
+      <signkey>rk_prv.pem</signkey>
+    </b0_sig>
+  </block1>
+  <padding>
+    <!-- Pad block1 such that combined block length is 1024b -->
+    <blockpad>1024</blockpad>
+    <!-- Align total package to 128 bytes -->
+    <align>128</align>
+  </padding>
+</blocksign>

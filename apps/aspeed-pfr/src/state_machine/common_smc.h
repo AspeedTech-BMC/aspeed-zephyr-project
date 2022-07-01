@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef COMMON_SMC_H
-#define COMMON_SMC_H
+#pragma once
+
 
 /* List of HRoT states */
 enum HRoT_state { IDLE, INITIALIZE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
@@ -27,4 +27,3 @@ enum _hrot_event {
 	I2C_EVENT
 };
 
-#endif  // #ifndef COMMON_SMC_H

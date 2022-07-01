@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_INCLUDE_WATCHDOG_API_MIDLETER_H_
-#define ZEPHYR_INCLUDE_WATCHDOG_API_MIDLETER_H_
+#pragma once
 
 #include <drivers/watchdog.h>
 #include <device.h>
@@ -56,4 +55,3 @@ int watchdog_feed(const struct device *dev, int channel_id);
  */
 int watchdog_disable(const struct device *dev);
 
-#endif

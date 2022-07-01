@@ -3,8 +3,9 @@
  *
  * SPDX-License-Identifier: MIT
  */
-#ifndef PFR_SMBUS_MAILBOX_H_
-#define PFR_SMBUS_MAILBOX_H_
+
+#pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 // #include <HrotStateMachine.h>
@@ -120,39 +121,39 @@ typedef struct _SMBUS_MAIL_BOX_ {
 } SMBUS_MAIL_BOX;
 
 typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
-	CpldIdentifier,
-	CpldReleaseVersion,
-	CpldRoTSVN,
-	PlatformState,
-	Recoverycount,
-	LastRecoveryReason,
-	PanicEventCount,
-	LastPanicReason,
-	MajorErrorCode,
-	MinorErrorCode,
-	UfmStatusValue,
-	UfmCommand,
-	UfmCmdTriggerValue,
-	UfmWriteFIFO,
-	UfmReadFIFO,
-	BmcCheckpoint,
-	AcmCheckpoint,
-	BiosCheckpoint,
-	PchUpdateIntentValue,
-	BmcUpdateIntentValue,
-	PchPFMActiveSVN,
-	PchPFMActiveMajorVersion,
-	PchPFMActiveMinorVersion,
-	BmcPFMActiveSVN,
-	BmcPFMActiveMajorVersion,
-	BmcPFMActiveMinorVersion,
-	PchPFMRecoverSVN,
-	PchPFMRecoverMajorVersion,
-	PchPFMRecoverMinorVersion,
-	BmcPFMRecoverSVN,
-	BmcPFMRecoverMajorVersion,
-	BmcPFMRecoverMinorVersion,
-	CpldFPGARoTHash,
+	CpldIdentifier = 0x00,
+	CpldReleaseVersion = 0x01,
+	CpldRotSvn = 0x02,
+	PlatformState = 0x03,
+	RecoveryCount = 0x04,
+	LastRecoveryReason = 0x05,
+	PanicEventCount = 0x06,
+	LastPanicReason = 0x07,
+	MajorErrorCode = 0x08,
+	MinorErrorCode = 0x09,
+	UfmStatusValue = 0x0a,
+	UfmCommand = 0x0b,
+	UfmCmdTriggerValue = 0x0c,
+	UfmWriteFIFO = 0x0d,
+	UfmReadFIFO = 0x0e,
+	BmcCheckpoint = 0x0f,
+	AcmCheckpoint = 0x10,
+	BiosCheckpoint = 0x11,
+	PchUpdateIntent = 0x12,
+	BmcUpdateIntent = 0x13,
+	PchPfmActiveSvn = 0x14,
+	PchPfmActiveMajorVersion = 0x15,
+	PchPfmActiveMinorVersion = 0x16,
+	BmcPfmActiveSvn = 0x17,
+	BmcPfmActiveMajorVersion = 0x18,
+	BmcPfmActiveMinorVersion = 0x19,
+	PchPfmRecoverSvn = 0x1a,
+	PchPfmRecoverMajorVersion = 0x1b,
+	PchPfmRecoverMinorVersion = 0x1c,
+	BmcPfmRecoverSvn = 0x1d,
+	BmcPfmRecoverMajorVersion = 0x1e,
+	BmcPfmRecoverMinorVersion = 0x1f,
+	CpldFPGARoTHash = 0x20, /* 0x20 - 0x5f */
 	Reserved                = 0x63,
 	AcmBiosScratchPad       = 0x80,
 	BmcScratchPad           = 0xc0,
@@ -207,6 +208,8 @@ typedef struct _PFM_STRUCTURE {
 	uint32_t Length;
 } PFM_STRUCTURE;
 
+#pragma pack()
+
 static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);
@@ -229,15 +232,21 @@ void SetPlatformState(byte PlatformStateData);
 byte GetRecoveryCount(void);
 void IncRecoveryCount(void);
 byte GetLastRecoveryReason(void);
-void SetLastRecoveryReason(LAST_RECOVERY_REASON_VALUE LastRecoveryReasonValue);
+
+// void SetLastRecoveryReason(LAST_RECOVERY_REASON_VALUE LastRecoveryReasonValue);
+void SetLastRecoveryReason(byte LastRecoveryReasonValue);
+
 byte GetPanicEventCount(void);
 void IncPanicEventCount(void);
 byte GetLastPanicReason(void);
-void SetLastPanicReason(LAST_PANIC_REASON_VALUE LastPanicReasonValue);
+// void SetLastPanicReason(LAST_PANIC_REASON_VALUE LastPanicReasonValue);
+void SetLastPanicReason(byte LastPanicReasonValue);
 byte GetMajorErrorCode(void);
-void SetMajorErrorCode(MAJOR_ERROR_CODE_VALUE MajorErrorCodeValue);
+// void SetMajorErrorCode(MAJOR_ERROR_CODE_VALUE MajorErrorCodeValue);
+void SetMajorErrorCode(byte MajorErrorCodeValue);
 byte GetMinorErrorCode(void);
-void SetMinorErrorCode(MINOR_ERROR_CODE_VALUE MinorErrorCodeValue);
+// void SetMinorErrorCode(MINOR_ERROR_CODE_VALUE MinorErrorCodeValue);
+void SetMinorErrorCode(byte MinorErrorCodeValue);
 bool IsUfmStatusCommandBusy(void);
 bool IsUfmStatusCommandDone(void);
 bool IsUfmStatusCommandError(void);
@@ -245,8 +254,9 @@ bool IsUfmStatusLocked(void);
 bool IsUfmStatusUfmProvisioned(void);
 bool IsUfmStatusPitLevel1Enforced(void);
 bool IsUfmStatusPITL2CompleteSuccess(void);
-byte get_provision_status(void);
-void set_provision_status(byte UfmStatus);
+byte GetUfmStatusValue(void);
+void SetUfmStatusValue(uint8_t UfmStatusBitMask);
+void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
 byte get_provision_command(void);
 void set_provision_command(byte UfmCommandValue);
 void set_provision_commandTrigger(byte UfmCommandTrigger);
@@ -314,11 +324,16 @@ bool WatchDogTimer(int ImageType);
 uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag);
 void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion);
 
-#define ROOT_KEY_HASH_PROVISION_FLAG 1
-#define PCH_OFFSET_PROVISION_FLAG 2
-#define BMC_OFFSET_PROVISION_FLAG 3
+#define UFM_STATUS_LOCK_BIT_MASK                      0b1
+#define UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK 0b10
+#define UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK   0b100
+#define UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK   0b1000
+#define UFM_STATUS_PROVISIONED_PIT_ID_BIT_MASK        0b10000
+#define UFM_STATUS_PIT_L1_ENABLE_BIT_MASK             0b100000
+#define UFM_STATUS_PIT_L2_ENABLE_BIT_MASK             0b1000000
+#define UFM_STATUS_PIT_HASH_STORED_BIT_MASK           0b10000000
+#define UFM_STATUS_PIT_L2_PASSED_BIT_MASK             0b100000000
 
 extern uint8_t gBiosBootDone;
 extern uint8_t gBmcBootDone;
 
-#endif /* PFR_SMBUS_MAILBOX_H_ */

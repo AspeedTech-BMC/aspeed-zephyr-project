@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "intel_pfr/intel_pfr_authentication.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "state_machine/common_smc.h"
@@ -13,16 +14,17 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "pfr_util.h"
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
 #undef DEBUG_PRINTF
 #if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
 
 int authentication_image(void *AoData, void *EventContext)
 {
-
 	int status = 0;
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
@@ -34,12 +36,12 @@ int authentication_image(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI
-		DEBUG_PRINTF("Image Type: BMC \r\n");
+		DEBUG_PRINTF("Image Type: BMC ");
 		pfr_manifest->image_type = BMC_TYPE;
 
 	} else  {
 		// PCH SPI
-		DEBUG_PRINTF("Image Type: PCH \r\n");
+		DEBUG_PRINTF("Image Type: PCH ");
 		pfr_manifest->image_type = PCH_TYPE;
 	}
 
@@ -70,7 +72,6 @@ int authentication_image(void *AoData, void *EventContext)
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		    struct signature_verification *verification, uint8_t *hash_out, size_t hash_length)
 {
-
 	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
 
@@ -84,7 +85,6 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
  */
 int manifest_get_id(struct manifest *manifest, uint32_t *id)
 {
-
 	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
 
@@ -107,7 +107,6 @@ int manifest_get_id(struct manifest *manifest, uint32_t *id)
  */
 int manifest_get_platform_id(struct manifest *manifest, char **id, size_t length)
 {
-
 	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
 	ARG_UNUSED(length);
@@ -124,7 +123,6 @@ int manifest_get_platform_id(struct manifest *manifest, char **id, size_t length
  */
 void manifest_free_platform_id(struct manifest *manifest, char *id)
 {
-
 	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
 
@@ -146,7 +144,6 @@ void manifest_free_platform_id(struct manifest *manifest, char *id)
 int manifest_get_hash(struct manifest *manifest, struct hash_engine *hash, uint8_t *hash_out,
 		      size_t hash_length)
 {
-
 	return get_hash(manifest, hash, hash_out, hash_length);
 }
 
@@ -162,7 +159,6 @@ int manifest_get_hash(struct manifest *manifest, struct hash_engine *hash, uint8
  */
 int manifest_get_signature(struct manifest *manifest, uint8_t *signature, size_t length)
 {
-
 	ARG_UNUSED(manifest);
 	ARG_UNUSED(signature);
 	ARG_UNUSED(length);

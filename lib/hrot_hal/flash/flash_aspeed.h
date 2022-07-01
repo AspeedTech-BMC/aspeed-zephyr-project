@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_INCLUDE_SPI_API_MIDLEYER_H_
-#define ZEPHYR_INCLUDE_SPI_API_MIDLEYER_H_
+#pragma once
 
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <device.h>
+
+#define SECTOR_SIZE 0x1000
+#define BLOCK_SIZE  0x10000
 
 enum {
 	SPI_APP_CMD_NOOP  = 0x00,				/**< No-op */
@@ -26,6 +28,7 @@ enum {
 
 enum {
 	BMC_SPI = 0,
+	BMC_SPI_2,
 	PCH_SPI,
 	ROT_INTERNAL_ACTIVE = 4,
 	ROT_INTERNAL_RECOVERY,
@@ -74,7 +77,7 @@ enum {
 	//MIDLEY_FLASH_CMD_DIO_READ = 0xbb,			/**< Dual I/O read */
 	//MIDLEY_FLASH_CMD_4BYTE_DIO_READ = 0xbc,	/**< Dual I/O read with 4 byte address */
 	MIDLEY_FLASH_CMD_CE = 0xc7,				    /**< Chip erase */
-	MIDLEY_FLASH_CMD_64K_ERASE = 0xd8,			/**< Block erase 64kB */
+	MIDLEY_FLASH_CMD_BLOCK_ERASE = 0xd8,			/**< Block erase 64kB */
 	//MIDLEY_FLASH_CMD_4BYTE_64K_ERASE = 0xdc,	/**< Block erase 64kB with 4 byte address */
 	//MIDLEY_FLASH_CMD_EX4B = 0xe9,				/**< Exit 4-byte mode */
 	//MIDLEY_FLASH_CMD_QIO_READ = 0xeb,			/**< Quad I/O read */
@@ -301,4 +304,3 @@ struct pspi_flash {
 
 int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer);
 
-#endif

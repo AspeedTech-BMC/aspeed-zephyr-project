@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <common/signature_verification.h>
 
 #include <flash/flash_master.h>
 #include "image_verify.h"
 #include "common/common.h"
 #include "common/pfm_headers.h"
+
+LOG_MODULE_REGISTER(verification, CONFIG_LOG_DEFAULT_LEVEL);
 
 void verify_initialize(void)
 {
@@ -161,11 +164,11 @@ int perform_image_verification(void)
 					       );
 
 		if (status) {
-			printk("Active Verification Fail\n");
-			printk("start_address:%x\n", *((uint32_t *) firmware_info.start_address));
-			printk("end_address:%x\n", *((uint32_t *) firmware_info.end_address));
+			LOG_INF("Active Verification Fail");
+			LOG_INF("start_address:%x", *((uint32_t *) firmware_info.start_address));
+			LOG_INF("end_address:%x", *((uint32_t *) firmware_info.end_address));
 		} else  {
-			printk("Active Region offset %x verify successful\n", *((uint32_t *) firmware_info.start_address));
+			LOG_INF("Active Region offset %x verify successful", *((uint32_t *) firmware_info.start_address));
 		}
 		firmware_offset += sizeof(firmware_info);
 	}

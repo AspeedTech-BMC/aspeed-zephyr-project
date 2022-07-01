@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef PFR_COMMON_H_
-#define PFR_COMMON_H_
+#pragma once
 
 #include "manifest/manifest_flash.h"
 #include "manifest/manifest.h"
@@ -37,6 +36,7 @@ struct pfr_manifest {
 	uint32_t address;                                       // START ADDRESS
 	uint32_t recovery_address;                              // Recovery address
 	uint32_t staging_address;                               // Staging Address
+	uint32_t active_pfm_addr;                               // Active PFM address
 	uint32_t pc_length;                                     // Protected Content Size
 	uint32_t pc_type;                                       // manifest protected content type
 	uint32_t kc_flag;                                       // Key Cancellation flag
@@ -90,4 +90,3 @@ struct pfr_keystore {
 void init_pfr_manifest(void);
 struct pfr_manifest *get_pfr_manifest(void);
 
-#endif /* PFR_COMMON_H_ */

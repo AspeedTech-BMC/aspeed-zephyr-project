@@ -3,7 +3,7 @@
 
 manifest:
   self:
-    path: aspeed-zephyr-sdk
+    path: aspeed-zephyr-project
 
   remotes:
     - name: github
@@ -12,7 +12,7 @@ manifest:
   projects:
     - name: zephyr
       remote: github
-      revision: db3dbcc9c52e67a47180890ac938ed380b33f91c
+      revision: d014527731033db477f806f5bff2e1ca5d4b2ba7
       import:
         name-whitelist:
           - mcumgr

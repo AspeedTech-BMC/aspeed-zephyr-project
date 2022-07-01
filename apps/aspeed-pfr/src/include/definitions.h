@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_ASPEED_PFR_SRC_INCLUDE_DEFINITIONS_H_
-#define ZEPHYR_ASPEED_PFR_SRC_INCLUDE_DEFINITIONS_H_
+#pragma once
 
 #include <zephyr.h>
 
@@ -47,4 +46,3 @@ struct pfmInfo {
 	uint8_t platform_id[256];                               /**< Cache for the platform ID. */
 };
 
-#endif /* ZEPHYR_ASPEED_PFR_SRC_INCLUDE_DEFINITIONS_H_ */

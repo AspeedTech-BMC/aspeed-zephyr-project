@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_PBC_H_
-#define INTEL_PFR_PBC_H_
+#pragma once
 
-int capsule_decompression(int image_type, uint32_t read_address, uint32_t area_size);
+#include "intel_pfr_definitions.h"
 
-#endif /*INTEL_PFR_PBC_H_*/
+int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_ENUM decomp_type);

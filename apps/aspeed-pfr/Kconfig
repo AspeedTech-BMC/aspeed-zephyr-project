@@ -1,0 +1,58 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# # SPDX-License-Identifier: MIT
+
+config ASPEED_DC_SCM
+	default n
+	bool "ASPEED DC-SCM board"
+	help
+	  Enable ASPEED DC-SCM board basic settings.
+
+config BMC_DUAL_FLASH
+	default n
+	bool "Enable dual flash support"
+	help
+	  Enable if BMC has dual flash
+
+config SPI_MUX_INVERSE
+	default n
+	bool "Invert SPI MUX"
+	help
+	  Enable if SPI MUX connected to BMC/ROT is inverted
+
+config CHECKPOINT_RECOVERY
+	default n
+	bool "Checkpoint timeout recovery function"
+	help
+	  Enable if BMC/PCH supports mailbox checkpoint
+
+config PLATFORM_STATE_LED
+	default n
+	bool "Display platfrom state in 8 bits LED"
+	help
+	  Enable if the system has PlatformState LEDs
+
+config BMC_STAGING_SIZE
+	default 0x03DE0000
+	hex "BMC staging region size in BMC flash"
+	help
+	  The max size of BMC staging area for putting signed BMC capsule.
+
+config BMC_PCH_STAGING_SIZE
+	default 0x1000000
+	hex "PCH staging region size in BMC flash"
+	help
+	  The max size of PCH staging area for putting signed PCH capsule.
+
+config BMC_PFR_STAGING_SIZE
+	default 0x500000
+	hex "PFR staging region size in BMC flash"
+	help
+	  The max size of PFR staging area for putting signed ROT capsule.
+
+config PCH_STAGING_SIZE
+	default 0x1000000
+	hex "PCH staging region size in PCH flash"
+	help
+	  The max size of PCH staging area for putting signed PCH capsule.
+
+source "Kconfig.zephyr"

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_ASPEED_PFR_SRC_COMMON_COMMON_H_
-#define ZEPHYR_ASPEED_PFR_SRC_COMMON_COMMON_H_
+#pragma once
+
 
 /* Cerberus Includes*/
 #include <common/signature_verification.h>
@@ -38,6 +38,7 @@
 #include <i2c/I2C_wrapper.h>
 
 #define hashStorageLength 256
+#define MAX_BIOS_BOOT_TIME 300
 
 struct flash *getFlashDeviceInstance(void);
 struct flash_master *getFlashMasterInstance(void);
@@ -49,7 +50,5 @@ struct spi_flash *getSpiFlashInstance(void);
 struct rsa_engine_wrapper *getRsaEngineInstance(void);
 struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void);
 struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper(void);
+struct spi_engine_wrapper *getSpiEngineWrapper(void);
 
-#endif /* ZEPHYR_ASPEED_PFR_SRC_COMMON_COMMON_H_ */
-
-#define MAX_BIOS_BOOT_TIME 300

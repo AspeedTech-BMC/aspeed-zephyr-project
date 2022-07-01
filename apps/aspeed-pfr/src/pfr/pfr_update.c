@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <stdint.h>
 #include "pfr_ufm.h"
 #include "state_machine/common_smc.h"
@@ -15,10 +16,11 @@
 #include "pfr_common.h"
 #include <flash/flash_wrapper.h>
 
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 #undef DEBUG_PRINTF
 #if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif

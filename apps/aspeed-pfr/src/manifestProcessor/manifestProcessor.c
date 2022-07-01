@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <assert.h>
 
 #include "include/definitions.h"
@@ -11,13 +12,17 @@
 #include "common/common.h"
 #include "firmware/app_image.h"
 
+LOG_MODULE_REGISTER(manifest, CONFIG_LOG_DEFAULT_LEVEL);
+
 int initializeManifestProcessor(void)
 {
 	int status = 0;
 
+#ifdef CONFIG_CERBERUS_PFR
 	status = manifest_flash_init(getManifestFlashInstance(), getFlashDeviceInstance(), PFM_FLASH_MANIFEST_ADDRESS, PFM_V2_MAGIC_NUM);
 	if (status)
 		return status;
+#endif
 
 	init_pfr_manifest();
 	// status = pfm_manager_flash_init(getPfmManagerFlashInstance(), getPfmFlashInstance(), getPfmFlashInstance(),
@@ -37,12 +42,12 @@ int processPfmFlashManifest(void)
 	uint8_t *hashStorage = getNewHashStorage();
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 
-	// printk("Manifest Verification\n");
+	LOG_INF("Manifest Verification\n");
 	status = manifest_flash_verify(manifest_flash, get_hash_engine_instance(),
 				       getSignatureVerificationInstance(), hashStorage, hashStorageLength);
 
 	if (true == manifest_flash->manifest_valid) {
-		printk("Manifest Verificaation Successful\n");
+		LOG_INF("Manifest Verificaation Successful\n");
 
 		status = perform_image_verification();
 	}

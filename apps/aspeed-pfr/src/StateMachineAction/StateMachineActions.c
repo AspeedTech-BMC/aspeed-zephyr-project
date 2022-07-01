@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include "StateMachineActions.h"
 #include "state_machine/common_smc.h"
 #include "include/SmbusMailBoxCom.h"
@@ -18,6 +19,9 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "spi_filter/spi_filter_wrapper.h"
 #include "logging/debug_log.h"// State Machine log saving
+#include "AspeedStateMachine/AspeedStateMachine.h"
+
+LOG_MODULE_DECLARE(state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 
 #define RELEASE_PLATFORM 1
 
@@ -26,7 +30,7 @@
 #define SMBUS_WRITE 0x45
 
 #if PF_STATUS_DEBUG
-#define DEBUG_PRINTF printk
+#define DEBUG_PRINTF LOG_INF
 #else
 #define DEBUG_PRINTF(...)
 #endif
@@ -37,47 +41,49 @@ AO_DATA BmcActiveObjectData, PchActiveObjectData;
 
 static void wdt_callback_bmc_timeout(void)
 {
-	printk("enter %s\n", __func__);
+	DEBUG_PRINTF("enter %s", __func__);
 	SetLastPanicReason(BMC_WDT_EXPIRE);
+	GenerateStateMachineEvent(WDT_TIMEOUT, NULL);
 }
 
 static void wdt_callback_pch_timeout(void)
 {
-	printk("enter %s\n", __func__);
+	DEBUG_PRINTF("enter %s", __func__);
 	SetLastPanicReason(ACM_WDT_EXPIRE);
+	GenerateStateMachineEvent(WDT_TIMEOUT, NULL);
 }
 
 void AspeedPFR_EnableTimer(int type)
 {
-	struct watchdog_config *wdt_config;
+	struct watchdog_config wdt_config;
 	const struct device *wdt_dev;
 	int ret = 0;
 	uint32_t count = 0;
 
-	wdt_config->wdt_cfg.window.min = 0;
-	wdt_config->reset_option = WDT_FLAG_RESET_NONE;
+	wdt_config.wdt_cfg.window.min = 0;
+	wdt_config.reset_option = WDT_FLAG_RESET_NONE;
 
 	if (type == BMC_EVENT) {
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     Start BMC Timer\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		wdt_config->wdt_cfg.window.max = BMC_MAXTIMEOUT;
-		wdt_config->wdt_cfg.callback = wdt_callback_bmc_timeout;
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     Start BMC Timer");
+		DEBUG_PRINTF("---------------------------------------");
+		wdt_config.wdt_cfg.window.max = BMC_MAXTIMEOUT;
+		wdt_config.wdt_cfg.callback = wdt_callback_bmc_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[0]);
 
 	} else if (type == PCH_EVENT) {
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     Start PCH Timer\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		wdt_config->wdt_cfg.window.max = BIOS_MAXTIMEOUT;
-		wdt_config->wdt_cfg.callback = wdt_callback_pch_timeout;
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     Start PCH Timer");
+		DEBUG_PRINTF("---------------------------------------");
+		wdt_config.wdt_cfg.window.max = BIOS_MAXTIMEOUT;
+		wdt_config.wdt_cfg.callback = wdt_callback_pch_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
 	}
 	if (!wdt_dev) {
-		printk("wdt_timer_err: cannot find wdt device.\n");
+		DEBUG_PRINTF("wdt_timer_err: cannot find wdt device.");
 		return;
 	}
-	ret = watchdog_init(wdt_dev, wdt_config);
+	ret = watchdog_init(wdt_dev, &wdt_config);
 
 	watchdog_feed(wdt_dev, 0);
 }
@@ -87,15 +93,15 @@ void AspeedPFR_DisableTimer(int type)
 	const struct device *wdt_dev;
 
 	if (type == BMC_EVENT) {
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     Disable BMC Timer\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     Disable BMC Timer");
+		DEBUG_PRINTF("---------------------------------------");
 		wdt_dev = device_get_binding(WDT_Devices_List[0]);
 
 	} else if (type == PCH_EVENT) {
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     Disable PCH Timer\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     Disable PCH Timer");
+		DEBUG_PRINTF("---------------------------------------");
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
 
 	}
@@ -177,9 +183,9 @@ void PublishPchEvents(void)
 
 void PublishInitialEvents(void)
 {
-	byte provision_state = get_provision_status();
+	byte provision_state = GetUfmStatusValue();
 
-	if (provision_state == UFM_PROVISIONED) {
+	if (provision_state & UFM_PROVISIONED) {
 		check_staging_area();
 #if BMC_SUPPORT
 		PublishBmcEvents();
@@ -232,17 +238,17 @@ void CheckAndReleasePlatform(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		release_bmc = 1;
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     BMC authentication success\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     BMC authentication success");
+		DEBUG_PRINTF("---------------------------------------");
 		PublishPchEvents();
 	}
 	if (EventData->image == PCH_EVENT) {
 		release_pch = 1;
 		release_bmc = 1;
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     PCH authentication success\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     PCH authentication success");
+		DEBUG_PRINTF("---------------------------------------");
 		T0Transition(release_bmc, release_pch);
 	}
 
@@ -627,7 +633,6 @@ void handlePostUpdateSuccess(void *AoData)
 
 	if (ActiveObjectData->type == ROT_TYPE)
 		pfr_cpld_update_reboot();
-
 }
 
 void handlePostUpdateFailure(void *AoData)
@@ -643,15 +648,19 @@ void T0Transition(int releaseBmc, int releasePCH)
 	int provision_status;
 
 	SetPlatformState(ENTER_T0);
-	provision_status = get_provision_status();
-	if (provision_status == UFM_PROVISIONED) {
+	provision_status = GetUfmStatusValue();
+	if (provision_status & UFM_PROVISIONED) {
 		// enable spi filtering
 		if (releaseBmc) {
-			init_SPI_RW_Region(0);
+			init_SPI_RW_Region(BMC_SPI);
 			AspeedPFR_EnableTimer(BMC_EVENT);
 		}
 		if (releasePCH) {
+#if defined(CONFIG_ASPEED_DC_SCM) || defined(CONFIG_BMC_DUAL_FLASH)
+			init_SPI_RW_Region(PCH_SPI);
+#else
 			init_SPI_RW_Region(1);
+#endif
 			AspeedPFR_EnableTimer(PCH_EVENT);
 		}
 	}
@@ -675,15 +684,15 @@ void LockDownPlatform(void *AoData)
 	int image_type = ao_data->type;
 
 	if (image_type == BMC_EVENT) {
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     BMC authentication failed\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     BMC authentication failed");
+		DEBUG_PRINTF("---------------------------------------");
 		execute_next_smc_action(LOCKDOWN, AoData, NULL);
 	} else if (image_type == PCH_EVENT) {
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("     PCH authentication failed\r\n");
-		DEBUG_PRINTF("---------------------------------------\r\n");
-		DEBUG_PRINTF("ao_data->InLockdown: %d\r\n", ao_data->InLockdown);
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("     PCH authentication failed");
+		DEBUG_PRINTF("---------------------------------------");
+		DEBUG_PRINTF("ao_data->InLockdown: %d", ao_data->InLockdown);
 		if (ao_data->InLockdown == 1) {
 			uint8_t ReleasePch = 0, ReleaseBmc = RELEASE_PLATFORM;
 
@@ -699,7 +708,7 @@ int process_i2c_command(void *static_data, void *event_context)
 	EVENT_CONTEXT *I2CData = (EVENT_CONTEXT *) event_context;
 
 	if (I2CActiveObjectData->ProcessNewCommand) {
-		// printk("I2CData->i2c_data[0]: %x, I2CData->i2c_data[1]: %x\n", I2CData->i2c_data[0], I2CData->i2c_data[1]);
+		// LOG_INF("I2CData->i2c_data[0]: %x, I2CData->i2c_data[1]: %x", I2CData->i2c_data[0], I2CData->i2c_data[1]);
 		PchBmcCommands(I2CData->i2c_data, 0);
 		I2CActiveObjectData->ProcessNewCommand = 0;
 	}

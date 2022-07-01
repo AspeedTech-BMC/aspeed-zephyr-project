@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef ZEPHYR_INCLUDE_I2C_SLAVE_DEVICE_API_MIDLEYER_H_
-#define ZEPHYR_INCLUDE_I2C_SLAVE_DEVICE_API_MIDLEYER_H_
+#pragma once
+
 #include <zephyr/types.h>
 #include <stddef.h>
 #include <device.h>
@@ -169,4 +169,4 @@ int ast_i2c_slave_dev_init(const struct device *dev, uint8_t slave_addr);
 #define SLAVE_BUF_BUFF_MODE 1
 #define SLAVE_BUF_BYTE_MODE 2
 #define SLAVE_BUF_B_size 0x80
-#endif
+

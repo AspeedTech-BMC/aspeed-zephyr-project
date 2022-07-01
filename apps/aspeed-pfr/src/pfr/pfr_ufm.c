@@ -11,7 +11,6 @@
 
 int get_cpld_status(uint8_t *data, uint32_t data_length)
 {
-
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 

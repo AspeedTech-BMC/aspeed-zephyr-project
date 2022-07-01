@@ -13,22 +13,25 @@
 #include <string.h>
 #include <zephyr.h>
 #include <flash_map.h>
-//#include <flash_master.h>
-//#include "flash/spi_flash.h"
+#include <soc.h>
 
 #define LOG_MODULE_NAME spi_api
 
 #include <logging/log.h>
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
 static char *Flash_Devices_List[6] = {
 	"spi1_cs0",
+	"spi1_cs1",
 	"spi2_cs0",
 	"spi2_cs1",
-	"spi2_cs2",
 	"fmc_cs0",
 	"fmc_cs1"
 };
+
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+static uint8_t flash_rw_buf[16384] NON_CACHED_BSS_ALIGN16;
+#endif
 
 static void Data_dump_buf(uint8_t *buf, uint32_t len)
 {
@@ -46,22 +49,33 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
 	struct device *flash_device;
 	uint8_t DeviceId = flash->device_id[0];
-	int AdrOffset = 0;
-	int Datalen = 0;
+	int AdrOffset = xfer->address;
+	int Datalen = xfer->length;
 	uint32_t FlashSize = 0;
 	int ret = 0;
-	char buf[4096];
-	uint32_t page_sz = 0;
-	uint32_t sector_sz = 0;
+	int page_sz = 0;
+	int sector_sz = 0;
 
 	flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
-	AdrOffset = xfer->address;
-	Datalen = xfer->length;
+	if (!flash_device) {
+
+		LOG_DBG("%s doesn't exist.\n", Flash_Devices_List[DeviceId]);
+		return -1;
+	}
+
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	FlashSize = flash_get_flash_size(flash_device);
+	if (AdrOffset >= FlashSize) {
+		DeviceId += 1;
+		AdrOffset -= FlashSize;
+		flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
+	}
+#endif
 
 	switch (xfer->cmd) {
 	case SPI_APP_CMD_GET_FLASH_SIZE:
-		FlashSize = flash_get_flash_size(flash_device);
-		//printk("FlashSize:%x\n",FlashSize);
+		if (!FlashSize)
+			FlashSize = flash_get_flash_size(flash_device);
 		return FlashSize;
 	break;
 #if 0
@@ -75,27 +89,33 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 #endif
 	case SPI_APP_CMD_GET_FLASH_BLOCK_SIZE:
-		page_sz = (flash_get_write_block_size(flash_device) << 4);
+		page_sz = spi_nor_get_erase_sz(flash_device, MIDLEY_FLASH_CMD_BLOCK_ERASE);
 		return page_sz;
 	break;
 	case MIDLEY_FLASH_CMD_READ:
-		ret = flash_read(flash_device, AdrOffset, buf, Datalen);
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		ret = flash_read(flash_device, AdrOffset, flash_rw_buf, Datalen);
+		memcpy(xfer->data, flash_rw_buf, Datalen);
+#else
+		ret = flash_read(flash_device, AdrOffset, xfer->data, Datalen);
+#endif
 		//Data_dump_buf(buf,Datalen);
-		if (xfer->data != NULL)
-			memcpy(xfer->data, buf, Datalen);
 	break;
 	case MIDLEY_FLASH_CMD_PP://Flash Write
-		memset(buf, 0xff, Datalen);
-		memcpy(buf, xfer->data, Datalen);
-		ret = flash_write(flash_device, AdrOffset, buf, Datalen);
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		memcpy(flash_rw_buf, xfer->data, Datalen);
+		ret = flash_write(flash_device, AdrOffset, flash_rw_buf, Datalen);
+#else
+		ret = flash_write(flash_device, AdrOffset, xfer->data, Datalen);
+#endif
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
-		sector_sz = flash_get_write_block_size(flash_device);
-		ret = flash_erase(flash_device, AdrOffset, sector_sz);
+		ret = spi_nor_erase_by_cmd(flash_device, AdrOffset, SECTOR_SIZE,
+				MIDLEY_FLASH_CMD_4K_ERASE);
 	break;
-	case MIDLEY_FLASH_CMD_64K_ERASE:
-		sector_sz =  (flash_get_write_block_size(flash_device) << 4);
-		ret = flash_erase(flash_device, AdrOffset, sector_sz);
+	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
+		ret = spi_nor_erase_by_cmd(flash_device, AdrOffset, BLOCK_SIZE,
+				MIDLEY_FLASH_CMD_BLOCK_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_CE:
 		FlashSize = flash_get_flash_size(flash_device);
@@ -107,7 +127,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;
 	break;
 	default:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 	break;
 	}
 
@@ -123,7 +143,6 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	uint32_t sector_sz = 0;
 	int AdrOffset = 0;
 	int Datalen = 0;
-	char buf[4096];
 	int err, ret = 0;
 
 	flash_device = device_get_binding(Flash_Devices_List[ROT_SPI]);
@@ -154,25 +173,32 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;	// bypass as write enabled
 	break;
 	case MIDLEY_FLASH_CMD_READ:
-		ret = flash_area_read(partition_device, AdrOffset, buf, Datalen);
-		if (xfer->data != NULL)
-			memcpy(xfer->data, buf, Datalen);
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		ret = flash_area_read(partition_device, AdrOffset, flash_rw_buf, Datalen);
+		memcpy(xfer->data, flash_rw_buf, Datalen);
+
+#else
+		ret = flash_area_read(partition_device, AdrOffset, xfer->data, Datalen);
+#endif
 	break;
 	case MIDLEY_FLASH_CMD_PP://Flash Write
-		memset(buf, 0xff, Datalen);
-		memcpy(buf, xfer->data, Datalen);
-		ret = flash_area_write(partition_device, AdrOffset, buf, Datalen);
+#if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
+		memcpy(flash_rw_buf, xfer->data, Datalen);
+		ret = flash_area_write(partition_device, AdrOffset, flash_rw_buf, Datalen);
+#else
+		ret = flash_area_write(partition_device, AdrOffset, xfer->data, Datalen);
+#endif
 	break;
 	case MIDLEY_FLASH_CMD_4K_ERASE:
-		sector_sz = flash_get_write_block_size(flash_device);
-		ret = flash_area_erase(partition_device, AdrOffset, sector_sz);
+		ret = spi_nor_erase_by_cmd(flash_device, partition_device->fa_off + AdrOffset,
+				SECTOR_SIZE, MIDLEY_FLASH_CMD_4K_ERASE);
 	break;
-	case MIDLEY_FLASH_CMD_64K_ERASE:
-		printk("%d Command is not supported", xfer->cmd);
-		ret = 0;
+	case MIDLEY_FLASH_CMD_BLOCK_ERASE:
+		ret = spi_nor_erase_by_cmd(flash_device, partition_device->fa_off + AdrOffset,
+				BLOCK_SIZE, MIDLEY_FLASH_CMD_BLOCK_ERASE);
 	break;
 	case MIDLEY_FLASH_CMD_CE:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 		ret = 0;
 	break;
 	case MIDLEY_FLASH_CMD_RDSR:
@@ -181,7 +207,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;
 	break;
 	default:
-		printk("%d Command is not supported", xfer->cmd);
+		LOG_DBG("%d Command is not supported\n", xfer->cmd);
 	break;
 	}
 
@@ -198,12 +224,11 @@ int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	uint32_t page_sz = 0;
 	int ret  = 0;
 	int i = 0;
-	char buf[4096];
 	int AdrOffset = 0;
 	int Datalen = 0;
 	struct device *dev;
 
-	if (DeviceId == BMC_SPI || DeviceId == PCH_SPI)
+	if (DeviceId <= PCH_SPI)
 		ret = BMC_PCH_SPI_Command(flash, xfer);
 	else
 		ret = FMC_SPI_Command(flash, xfer);

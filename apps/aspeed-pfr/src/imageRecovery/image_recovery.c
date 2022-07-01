@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <logging/log.h>
 #include <assert.h>
 
 #include "include/definitions.h"
 #include "common/pfm_headers.h"
 #include "firmware/app_image.h"
 #include "common/common.h"
+
+LOG_MODULE_REGISTER(recovery, CONFIG_LOG_DEFAULT_LEVEL);
 
 uint8_t recovery_image_magic_num[4] = { 0x8A, 0x14, 0x7C, 0x29 };
 
@@ -30,7 +33,7 @@ int recovery_header_magic_num_check(uint8_t *magic_num)
 	if (memcmp(magic_num, recovery_image_magic_num, sizeof(recovery_image_magic_num)))
 		return 0;
 
-	printk("Recovery Header Magic Number not Match.\r\n");
+	LOG_INF("Recovery Header Magic Number not Match.");
 	return 1;
 }
 
@@ -93,14 +96,14 @@ int recovery_action(struct flash *flash, uint8_t *recovery_address)
 		image_offset += sizeof(recovery_info); // image data start
 
 		if (!memcmp(recovery_address, recovery_info.address, sizeof(recovery_info.address))) {
-			printk("Start Recovery\n");
+			LOG_INF("Start Recovery");
 
 			match_flag = 1;
 			// do recovery here;
 			recovery_read_offset = image_offset;
 			active_write_offset = *((uint32_t *)recovery_address);
 
-			printk("recovery offset:%x\n", active_write_offset);
+			LOG_INF("recovery offset:%x", active_write_offset);
 
 			page_count = *((uint32_t *)recovery_info.image_length) / sizeof(buf);
 			block_count = *((uint32_t *)recovery_info.image_length) / 1024 / 64;
@@ -115,7 +118,7 @@ int recovery_action(struct flash *flash, uint8_t *recovery_address)
 				flash->read(flash, recovery_read_offset + page * sizeof(buf), buf, sizeof(buf));
 				flash->write(flash, active_write_offset + page * sizeof(buf), buf, sizeof(buf));
 			}
-			printk("recovery offset:%x recovery successful\n", active_write_offset);
+			LOG_INF("recovery offset:%x recovery successful", active_write_offset);
 			break;
 		}
 		image_offset += *((uint32_t *)recovery_info.image_length);// image data end
@@ -140,7 +143,7 @@ int performImageRecovery(void)
 		if (status)
 			return status;
 
-		printk("Recovery Verification\n");
+		LOG_INF("Recovery Verification");
 		recovery_verify_result = recovery_verification(manifest_flash->flash,
 							       get_hash_engine_instance(),
 							       getRsaEngineInstance(),
@@ -150,11 +153,11 @@ int performImageRecovery(void)
 		recovery_verify_flag++;
 
 		if (recovery_verify_result) {
-			printk("Recovery Verification Fail\n");
+			LOG_INF("Recovery Verification Fail");
 			return recovery_verify_result;
 		}
 
-		printk("Recovery Verification Successful\n");
+		LOG_INF("Recovery Verification Successful");
 	}
 
 	return recovery_action(manifest_flash->flash, firmware_info.start_address);

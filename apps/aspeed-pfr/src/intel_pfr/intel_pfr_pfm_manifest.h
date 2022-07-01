@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef INTEL_PFR_PFM_VERIFICATION_H_
-#define INTEL_PFR_PFM_VERIFICATION_H_
+#pragma once
 
 #include <stdint.h>
-
+#include "pfr/pfr_common.h"
 #pragma pack(1)
 
 #define NUM_WHITESPACE 8
@@ -120,6 +119,7 @@ typedef struct _FVM_CAPABILITIES {
 #define PCH_PFM_SPI_REGION 0x01
 #define ACTIVE_PFM_SMBUS_RULE 0x02
 #define PCH_PFM_FVM_ADDRESS_DEFINITION 0x03
+#define SPI_REGION_DEF_MIN_SIZE 16
 
 #define PCH_FVM_SPI_REGION 0x01
 #define PCH_FVM_Capabilities 0x04
@@ -138,10 +138,10 @@ extern uint32_t g_fvm_manifest_length;
 extern ProtectLevelMask pch_protect_level_mask_count;
 extern ProtectLevelMask bmc_protect_level_mask_count;
 
-// int pfm_spi_region_verification(struct pfr_manifest *manifest);
-// Manifest_Status get_pfm_manifest_data(struct pfr_manifest *manifest, uint32_t *position,void *spi_definition, uint8_t *pfm_spi_hash, uint8_t pfm_definition);
-
 #pragma pack()
 
+int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version);
+int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
+int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address);
+int pfm_spi_region_verification(struct pfr_manifest *manifest);
 
-#endif /*INTEL_PFR_PFM_VERIFICATION_H_*/

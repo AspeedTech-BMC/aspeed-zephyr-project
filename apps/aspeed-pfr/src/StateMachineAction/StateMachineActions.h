@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#ifndef SMC_ACTIONS_H_
-#define SMC_ACTIONS_H_
+#pragma once
 
 #include "state_machine.h"
 #include "common_smc.h"
@@ -106,4 +105,4 @@ int StartBmcAOWithEvent(void);
 int StartPchAOWithEvent(void);
 int process_i2c_command(void *static_data, void *event_context);
 void T0Transition(int releaseBmc, int releasePCH);
-#endif /* FALZARGOSMC_ACTIONS_H_ */
+

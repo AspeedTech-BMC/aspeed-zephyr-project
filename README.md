@@ -4,9 +4,28 @@ applications are developing on top of [Zephyr BSP](https://github.com/AspeedTech
 
 
 # Building ASPEED-PFR firmware
+
 ```
-west init -m https://github.com/AspeedTech-BMC/aspeed-zephyr-sdk --mr aspeed-master workspace
+west init -m https://github.com/AspeedTech-BMC/aspeed-zephyr-project --mr aspeed-master workspace
 cd workspace
 west update
-west build -b ast1060_evb -p auto aspeed-zephyr-sdk/apps/aspeed-pfr
 ```
+
+## AST2600 L board
+
+```
+west build -b ast1060_evb -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
+## AST2600 DCSCM board
+
+```
+west build -b ast1060_dcscm -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
+## AST2600 Dual Flash
+
+```
+west build -b ast1060_dual_flash -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
