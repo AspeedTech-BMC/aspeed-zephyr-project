@@ -27,7 +27,6 @@ def main(args):
                         required=True,
                         metavar="[input sign tool]",
                         dest='input_sign_tool',
-                        default=None,
                         help='sign tool')
     parser.add_argument('-c',
                         '--input_xml',
@@ -41,7 +40,6 @@ def main(args):
                         required=True,
                         metavar="[input image]",
                         dest='input_img',
-                        default=None,
                         help='raw image to be signed')
     parser.add_argument('-o',
                         '--out_img',
@@ -53,21 +51,21 @@ def main(args):
     args = parser.parse_args(args)
     logger.info(args)
 
-    logger.info("sign ROT update capsule")
-    cmd = "{} -c {} -o {} {}".format(args.input_sign_tool,
-                                     args.input_xml,
-                                     args.out_img,
-                                     args.input_img)
+    logger.info("sign %s", args.input_img)
+    cmd = "{} -c {} -o {} {} -v".format(args.input_sign_tool,
+                                        args.input_xml,
+                                        args.out_img,
+                                        args.input_img)
     logger.info("issue: %s", cmd)
     p = subprocess.Popen(cmd,
                          shell=True,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     out, err = p.communicate()
+    logger.info(out.decode("utf-8"))
 
     if (p.returncode):
-        logger.error(err)
-        logger.error("create ROT update capsule failed")
+        logger.error(err.decode("utf-8"))
         exit(1)
 
     work_path = pathlib.Path(__file__).parent.absolute()

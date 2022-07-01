@@ -146,4 +146,4 @@ The following example places above files in this directory.
 python3 ./kcc_capsule.py  -t ./intel-pfr-signing-utility -k 0
 ```
 
-The key cancellation capsule will be created in `kcc-output/kcc_csk1_cap_signed.bin` for CSK ID `1`.
+The key cancellation capsule will be created in `kcc-output/kcc_csk0_cap_signed.bin` for CSK ID `0`.
