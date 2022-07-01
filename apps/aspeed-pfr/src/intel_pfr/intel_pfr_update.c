@@ -19,6 +19,7 @@
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_pbc.h"
 #include "intel_pfr_recovery.h"
+#include "intel_pfr_key_cancellation.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
@@ -187,7 +188,7 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 
 int pfr_decommission(struct pfr_manifest *manifest)
 {
-	uint8_t read_buffer[DECOMMISSION_PC_SIZE] = { 0 };
+	uint8_t read_buffer[DECOMM_CAP_RESERVED_SIZE] = { 0 };
 	CPLD_STATUS cpld_update_status;
 	int status = 0;
 	int i;
@@ -198,7 +199,7 @@ int pfr_decommission(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	for (i = 0; i < DECOMMISSION_PC_SIZE; i++) {
+	for (i = 0; i < sizeof(read_buffer); i++) {
 		if (read_buffer[i] != 0) {
 			LOG_ERR("Invalid decommission capsule data");
 			return Failure;
@@ -245,7 +246,7 @@ int update_rot_fw(uint32_t address, uint32_t length)
 	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
 			region_size)) {
 		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x",
-				rot_recovery_address, region_size);
+			rot_recovery_address, region_size);
 		return Failure;
 	}
 
@@ -259,7 +260,7 @@ int update_rot_fw(uint32_t address, uint32_t length)
 	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
 				region_size)) {
 		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x",
-				rot_active_address, region_size);
+			rot_active_address, region_size);
 		return Failure;
 	}
 

@@ -32,6 +32,8 @@
 #define RANDOM_KEY_ADDRESS_IN_UFM                               ((PROVISION_UFM_SIZE * 16) - (2 * SHA384_SIZE))
 #define ROOT_PUB_KEY_LOC_IN_UFM                                 (RANDOM_KEY_ADDRESS_IN_UFM - (2 * SHA384_SIZE))
 #define MAGIC_TAG_SIZE                                                  4
+#define BLOCK0_FRIST_RESERVED_SIZE 4
+#define BLOCK0_SECOND_RESERVED_SIZE 32
 #define BLOCK1_CSK_ENTRY_RESERVED_SIZE 20
 
 

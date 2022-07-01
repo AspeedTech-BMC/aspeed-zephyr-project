@@ -87,7 +87,6 @@
 #define ACTIVE_PFM                      2
 #define ROT_TYPE                        3
 #define LENGTH                          256
-#define DECOMMISSION_PC_SIZE            128
 
 #define  SIGN_PCH_PFM_BIT0              0x00000001
 #define  SIGN_PCH_UPDATE_BIT1           0x00000002
@@ -139,11 +138,10 @@ enum Ecc_Curve {
 	secp256r1,
 };
 
-typedef enum
-{
-        DECOMPRESSION_STATIC_REGIONS_MASK             = 0b1,
-        DECOMPRESSION_DYNAMIC_REGIONS_MASK            = 0b10,
-        DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK = 0b11,
+typedef enum {
+	DECOMPRESSION_STATIC_REGIONS_MASK             = 0b1,
+	DECOMPRESSION_DYNAMIC_REGIONS_MASK            = 0b10,
+	DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK = 0b11,
 } DECOMPRESSION_TYPE_MASK_ENUM;
 
 typedef struct {
