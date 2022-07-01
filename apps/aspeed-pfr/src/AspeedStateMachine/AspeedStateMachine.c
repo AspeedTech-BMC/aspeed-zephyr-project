@@ -784,8 +784,11 @@ static int cmd_asm_event(const struct shell *shell,
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	shell_print(shell, "Sending event[%d]\n", data);
-	GenerateStateMachineEvent((enum aspeed_pfr_event)data, NULL);
+	enum aspeed_pfr_event evt = (enum aspeed_pfr_event)((uint32_t)data & 0x000000FF);
+	uint32_t evt_data = ((uint32_t)data & 0xFFFFFF00) >> 8;
+
+	shell_print(shell, "Sending event[%d] evt_data[%08x]\n", evt, evt_data);
+	GenerateStateMachineEvent(evt, (void *)evt_data);
 
 	return 0;
 }
@@ -901,16 +904,6 @@ static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
 	return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
-	SHELL_CMD(show, NULL, "Show current state machine state", cmd_asm_show),
-	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
-	SHELL_CMD(abr, NULL, "Control FMCWDT2 timer manually: enable or disable", cmd_asm_abr),
-	SHELL_CMD(cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
-	SHELL_CMD(rot_rc, NULL, "ROT firmware recoery", cmd_asm_rot_recovery),
-	SHELL_SUBCMD_SET_END
-);
-
-SHELL_CMD_REGISTER(asm, &sub_asm, "Aspeed PFR State Machine Commands", NULL);
 
 SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(INIT_DONE, INIT_DONE),
@@ -922,12 +915,34 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(RECOVERY_DONE, RECOVERY_DONE),
 	(RECOVERY_FAILED, RECOVERY_FAILED),
 	(RESET_DETECTED, RESET_DETECTED),
-	(UPDATE_REQUESTED, UPDATE_REQUESTED),
 	(UPDATE_DONE, UPDATE_DONE),
 	(UPDATE_FAILED, UPDATE_FAILED),
 	(PROVISION_CMD, PROVISION_CMD),
-	(WDT_TIMEOUT, WDT_TIMEOUT)
+	(WDT_TIMEOUT, WDT_TIMEOUT),
+
+	/* BMC Update Intent */
+	(UPDATE_REQUESTED_BMC_BMC_ACT, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | BmcActiveUpdate << 16)))),
+	(UPDATE_REQUESTED_BMC_BMC_RCV, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | BmcRecoveryUpdate << 16)))),
+	(UPDATE_REQUESTED_BMC_PCH_ACT, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | PchActiveUpdate << 16)))),
+	(UPDATE_REQUESTED_BMC_PCH_RCV, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | PchRecoveryUpdate << 16)))),
+	(UPDATE_REQUESTED_BMC_PFR_ACT, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | HROTActiveUpdate << 16)))),
+	(UPDATE_REQUESTED_BMC_PFR_RCV, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | HROTRecoveryUpdate << 16)))),
+
+	/* PCH Update Intent */
+	(UPDATE_REQUESTED_PCH_PCH_ACT, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchActiveUpdate << 16)))),
+	(UPDATE_REQUESTED_PCH_PCH_RCV, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchRecoveryUpdate << 16))))
+
 );
 
-SHELL_CMD_REGISTER(event, &sub_event, "State Machine Events", NULL);
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
+	SHELL_CMD(show, NULL, "Show current state machine state", cmd_asm_show),
+	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
+	SHELL_CMD(event, &sub_event, "State Machine Event", NULL),
+	SHELL_CMD(abr, NULL, "Control FMCWDT2 timer manually: enable or disable", cmd_asm_abr),
+	SHELL_CMD(cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
+	SHELL_CMD(rot_rc, NULL, "ROT firmware recoery", cmd_asm_rot_recovery),
+	SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(asm, &sub_asm, "Aspeed PFR State Machine Commands", NULL);
 #endif
