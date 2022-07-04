@@ -122,8 +122,59 @@ void handle_image_verification(void *o)
 		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
 		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
 	} else {
-		/* BMC Verification */
-		{
+		/* Check pending firmware update (update at reset) */
+		CPLD_STATUS cpld_update_status;
+		bool update_reset = false;
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+		if (cpld_update_status.CpldStatus == 1
+				|| cpld_update_status.BmcStatus == 1
+				|| cpld_update_status.PchStatus == 1) {
+			uint8_t intent = 0x00;
+			if (cpld_update_status.CpldStatus == 1) {
+				if (cpld_update_status.Region[0].ActiveRegion == 1)
+					intent |= HROTActiveUpdate;
+				if (cpld_update_status.Region[0].Recoveryregion == 1)
+					intent |= HROTRecoveryUpdate;
+				cpld_update_status.CpldStatus = 0;
+				cpld_update_status.Region[0].ActiveRegion = 0;
+				cpld_update_status.Region[0].Recoveryregion = 0;
+			}
+
+			if (cpld_update_status.BmcStatus == 1) {
+				if (cpld_update_status.Region[1].ActiveRegion == 1)
+					intent |= BmcActiveUpdate;
+				if (cpld_update_status.Region[1].Recoveryregion == 1)
+					intent |= BmcRecoveryUpdate;
+				cpld_update_status.BmcStatus = 0;
+				cpld_update_status.Region[1].ActiveRegion = 0;
+				cpld_update_status.Region[1].Recoveryregion = 0;
+			}
+
+			if (cpld_update_status.PchStatus == 1) {
+				if (cpld_update_status.Region[2].ActiveRegion == 1)
+					intent |= PchActiveUpdate;
+				if (cpld_update_status.Region[2].Recoveryregion == 1)
+					intent |= PchRecoveryUpdate;
+				cpld_update_status.PchStatus = 0;
+				cpld_update_status.Region[2].ActiveRegion = 0;
+				cpld_update_status.Region[2].Recoveryregion = 0;
+			}
+
+			/* Clear the pending flags */
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+
+			if (intent) {
+				union aspeed_event_data data;
+				update_reset = true;
+				data.bit8[0] = BmcUpdateIntent;
+				data.bit8[1] = intent;
+				GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
+			}
+		}
+
+		/* No pending update, verify images */
+		if (update_reset == false) {
+			/* BMC Verification */
 			SetPlatformState(BMC_FLASH_AUTH);
 			{
 				EVENT_CONTEXT evt_wrap;
@@ -151,10 +202,8 @@ void handle_image_verification(void *o)
 					state->bmc_active_object.ActiveImageStatus = Failure;
 				}
 			}
-		}
 
-		/* PCH Verification */
-		{
+			/* PCH Verification */
 			SetPlatformState(PCH_FLASH_AUTH);
 			{
 				EVENT_CONTEXT evt_wrap;
@@ -183,36 +232,35 @@ void handle_image_verification(void *o)
 					state->pch_active_object.ActiveImageStatus = Failure;
 				}
 			}
-		}
+			/* Success = 0, Failure = 1 */
+			LOG_INF("BMC image verification recovery=%s active=%s",
+					state->bmc_active_object.RecoveryImageStatus ? "Bad" : "Good",
+					state->bmc_active_object.ActiveImageStatus ? "Bad" : "Good");
+			LOG_INF("PCH image verification recovery=%s active=%s",
+					state->pch_active_object.RecoveryImageStatus ? "Bad" : "Good",
+					state->pch_active_object.ActiveImageStatus ? "Bad" : "Good");
 
-		/* Success = 0, Failure = 1 */
-		LOG_INF("BMC image verification recovery=%s active=%s",
-				state->bmc_active_object.RecoveryImageStatus ? "Bad" : "Good",
-				state->bmc_active_object.ActiveImageStatus ? "Bad" : "Good");
-		LOG_INF("PCH image verification recovery=%s active=%s",
-				state->pch_active_object.RecoveryImageStatus ? "Bad" : "Good",
-				state->pch_active_object.ActiveImageStatus ? "Bad" : "Good");
-
-		/* Handling platform recovery matrix, the detail logic will be handled in recover_image() */
-		if ((state->pch_active_object.ActiveImageStatus == Success && state->pch_active_object.RecoveryImageStatus == Success)
-			&& (state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Success)) {
-			/* All good, we're good to go. */
-			GenerateStateMachineEvent(VERIFY_DONE, NULL);
-		} else if ((state->pch_active_object.ActiveImageStatus == Failure && state->pch_active_object.RecoveryImageStatus == Success)
-			|| (state->bmc_active_object.ActiveImageStatus == Failure && state->bmc_active_object.RecoveryImageStatus == Success)) {
-			/* Active currupted but recovery good, recovery -> active */
-			GenerateStateMachineEvent(VERIFY_ACT_FAILED, NULL);
-		} else if ((state->pch_active_object.ActiveImageStatus == Success && state->pch_active_object.RecoveryImageStatus == Failure)
-			|| (state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Failure)) {
-			/* Active good but recovery bad, staging -> recovery if possible */
-			GenerateStateMachineEvent(VERIFY_RCV_FAILED, NULL);
-		} else if (evt_ctx->event == RECOVERY_DONE
-			&& state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Success) {
-			/* BMC is (Good, Good) but PCH is (Bad, Bad), boot BMC but lockdown PCH */
-			GenerateStateMachineEvent(VERIFY_DONE, NULL);
-		} else {
-			/* BMC is (Bad, Bad), stg->rcv->act */
-			GenerateStateMachineEvent(VERIFY_RCV_FAILED, NULL);
+			/* Handling platform recovery matrix, the detail logic will be handled in recover_image() */
+			if ((state->pch_active_object.ActiveImageStatus == Success && state->pch_active_object.RecoveryImageStatus == Success)
+					&& (state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Success)) {
+				/* All good, we're good to go. */
+				GenerateStateMachineEvent(VERIFY_DONE, NULL);
+			} else if ((state->pch_active_object.ActiveImageStatus == Failure && state->pch_active_object.RecoveryImageStatus == Success)
+					|| (state->bmc_active_object.ActiveImageStatus == Failure && state->bmc_active_object.RecoveryImageStatus == Success)) {
+				/* Active currupted but recovery good, recovery -> active */
+				GenerateStateMachineEvent(VERIFY_ACT_FAILED, NULL);
+			} else if ((state->pch_active_object.ActiveImageStatus == Success && state->pch_active_object.RecoveryImageStatus == Failure)
+					|| (state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Failure)) {
+				/* Active good but recovery bad, staging -> recovery if possible */
+				GenerateStateMachineEvent(VERIFY_RCV_FAILED, NULL);
+			} else if (evt_ctx->event == RECOVERY_DONE
+					&& state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Success) {
+				/* BMC is (Good, Good) but PCH is (Bad, Bad), boot BMC but lockdown PCH */
+				GenerateStateMachineEvent(VERIFY_DONE, NULL);
+			} else {
+				/* BMC is (Bad, Bad), stg->rcv->act */
+				GenerateStateMachineEvent(VERIFY_RCV_FAILED, NULL);
+			}
 		}
 	}
 }
@@ -449,95 +497,96 @@ void handle_update_requested(void *o)
 		break;
 	}
 
-	if (!update_reset) {
-		uint32_t handled_region = 0;
-		while(update_region) {
-			uint32_t image_type = 0xFFFFFFFF;
-			do {
-				/* BMC Active */
-				if (update_region & BmcActiveUpdate) {
-					SetPlatformState(BMC_FW_UPDATE);
-					LOG_INF("BMC Active Firmware Update");
-					image_type = BMC_TYPE;
-					evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
-					update_region &= ~BmcActiveUpdate;
-					handled_region |= BmcActiveUpdate;
-					ao_data_wrap = &state->bmc_active_object;
-					break;
-				}
-
-				/* BMC Recovery */
-				if (update_region & BmcRecoveryUpdate) {
-					SetPlatformState(BMC_FW_UPDATE);
-					LOG_INF("BMC Recovery Firmware Update");
-					image_type = BMC_TYPE;
-					evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
-					update_region &= ~BmcRecoveryUpdate;
-					handled_region |= BmcRecoveryUpdate;
-					ao_data_wrap = &state->bmc_active_object;
-					break;
-				}
-
-				/* PCH Active */
-				if (update_region & PchActiveUpdate) {
-					SetPlatformState(PCH_FW_UPDATE);
-					LOG_INF("PCH Active Firmware Update");
-					image_type = PCH_TYPE;
-					evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
-					update_region &= ~PchActiveUpdate;
-					handled_region |= PchActiveUpdate;
-					ao_data_wrap = &state->pch_active_object;
-					break;
-				}
-
-				/* PCH Recovery */
-				if (update_region & PchRecoveryUpdate) {
-					SetPlatformState(PCH_FW_UPDATE);
-					LOG_INF("PCH Recovery Firmware Update");
-					image_type = PCH_TYPE;
-					evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
-					update_region &= ~PchRecoveryUpdate;
-					handled_region |= PchRecoveryUpdate;
-					ao_data_wrap = &state->pch_active_object;
-					break;
-				}
-
-				/* ROT Active */
-				if (update_region & HROTActiveUpdate) {
-					SetPlatformState(CPLD_FW_UPDATE);
-					LOG_INF("ROT Active Firmware Update");
-					image_type = ROT_TYPE;
-					update_region &= ~HROTActiveUpdate;
-					handled_region |= HROTActiveUpdate;
-					break;
-				}
-
-				/* ROT Recovery */
-				if (update_region & HROTRecoveryUpdate) {
-					SetPlatformState(CPLD_FW_UPDATE);
-					LOG_INF("ROT Recovery Firmware Update");
-					image_type = ROT_TYPE;
-					update_region &= ~HROTRecoveryUpdate;
-					handled_region |= HROTRecoveryUpdate;
-					break;
-				}
-
-			} while (0);
-
-			if (image_type != 0xFFFFFFFF) {
-				ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
-			}
-
-			if (ret != Success) {
-				/* TODO: Log failed reason and handle it properly */
-				GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
+	/* Immediate Update */
+	uint32_t handled_region = 0;
+	while(update_region) {
+		uint32_t image_type = 0xFFFFFFFF;
+		do {
+			/* BMC Active */
+			if (update_region & BmcActiveUpdate) {
+				SetPlatformState(BMC_FW_UPDATE);
+				LOG_INF("BMC Active Firmware Update");
+				image_type = BMC_TYPE;
+				evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
+				update_region &= ~BmcActiveUpdate;
+				handled_region |= BmcActiveUpdate;
+				ao_data_wrap = &state->bmc_active_object;
 				break;
 			}
+
+			/* BMC Recovery */
+			if (update_region & BmcRecoveryUpdate) {
+				SetPlatformState(BMC_FW_UPDATE);
+				LOG_INF("BMC Recovery Firmware Update");
+				image_type = BMC_TYPE;
+				evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
+				update_region &= ~BmcRecoveryUpdate;
+				handled_region |= BmcRecoveryUpdate;
+				ao_data_wrap = &state->bmc_active_object;
+				break;
+			}
+
+			/* PCH Active */
+			if (update_region & PchActiveUpdate) {
+				SetPlatformState(PCH_FW_UPDATE);
+				LOG_INF("PCH Active Firmware Update");
+				image_type = PCH_TYPE;
+				evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
+				update_region &= ~PchActiveUpdate;
+				handled_region |= PchActiveUpdate;
+				ao_data_wrap = &state->pch_active_object;
+				break;
+			}
+
+			/* PCH Recovery */
+			if (update_region & PchRecoveryUpdate) {
+				SetPlatformState(PCH_FW_UPDATE);
+				LOG_INF("PCH Recovery Firmware Update");
+				image_type = PCH_TYPE;
+				evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
+				update_region &= ~PchRecoveryUpdate;
+				handled_region |= PchRecoveryUpdate;
+				ao_data_wrap = &state->pch_active_object;
+				break;
+			}
+
+			/* ROT Active */
+			if (update_region & HROTActiveUpdate) {
+				SetPlatformState(CPLD_FW_UPDATE);
+				LOG_INF("ROT Active Firmware Update");
+				image_type = ROT_TYPE;
+				update_region &= ~HROTActiveUpdate;
+				handled_region |= HROTActiveUpdate;
+				break;
+			}
+
+			/* ROT Recovery */
+			if (update_region & HROTRecoveryUpdate) {
+				SetPlatformState(CPLD_FW_UPDATE);
+				LOG_INF("ROT Recovery Firmware Update");
+				image_type = ROT_TYPE;
+				update_region &= ~HROTRecoveryUpdate;
+				handled_region |= HROTRecoveryUpdate;
+				break;
+			}
+
+		} while (0);
+
+		if (image_type != 0xFFFFFFFF) {
+			ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
 		}
 
-		if (update_region == 0 && ret == Success) {
-			GenerateStateMachineEvent(UPDATE_DONE, (void *)handled_region);
+		if (ret != Success) {
+			/* TODO: Log failed reason and handle it properly */
+			GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
+			break;
 		}
+	}
+
+	if (update_region == 0 && ret == Success) {
+		GenerateStateMachineEvent(UPDATE_DONE, (void *)handled_region);
+	} else {
+		GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
 	}
 }
 
@@ -565,6 +614,45 @@ void enter_runtime(void *o)
 	LOG_DBG("End");
 }
 
+void handle_update_at_reset(void *o)
+{
+	struct smf_context *state = (struct smf_context *)o;
+	struct event_context *evt_ctx = state->event_ctx;
+
+	/* Update At Reset save status to UFM */
+	CPLD_STATUS cpld_update_status;
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+	if (evt_ctx->data.bit8[1] & PchActiveUpdate) { 
+		cpld_update_status.PchStatus = 1;
+		cpld_update_status.Region[2].ActiveRegion = 1;
+	}
+	if (evt_ctx->data.bit8[1] & PchRecoveryUpdate) {
+		cpld_update_status.PchStatus = 1;
+		cpld_update_status.Region[2].Recoveryregion = 1;
+	}
+	if (evt_ctx->data.bit8[1] & HROTActiveUpdate) {
+		cpld_update_status.CpldStatus = 1;
+		cpld_update_status.CpldRecovery = 1;
+		cpld_update_status.Region[0].ActiveRegion = 1;
+	}
+	if (evt_ctx->data.bit8[1] & BmcActiveUpdate) {
+		cpld_update_status.BmcStatus = 1;
+		cpld_update_status.Region[1].ActiveRegion = 1;
+	}
+	if (evt_ctx->data.bit8[1] & BmcRecoveryUpdate) {
+		cpld_update_status.BmcStatus = 1;
+		cpld_update_status.Region[1].Recoveryregion = 1;
+	}
+	if (evt_ctx->data.bit8[1] & HROTRecoveryUpdate) {
+		LOG_ERR("HROTRecoveryUpdate not supported");
+	}
+	if (evt_ctx->data.bit8[1] & DymanicUpdate) {
+		LOG_ERR("DymanicUpdate not supported");
+	}
+	/* Setting updated cpld status to ufm */
+	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+}
+
 void do_runtime(void *o)
 {
 	LOG_DBG("Start");
@@ -575,6 +663,9 @@ void do_runtime(void *o)
 		break;
 	case WDT_CHECKPOINT:
 		handle_checkpoint(o);
+		break;
+	case UPDATE_REQUESTED:
+		handle_update_at_reset(o);
 		break;
 	default:
 		break;
@@ -684,6 +775,10 @@ void AspeedStateMachine()
 			}
 		} else if (current_state == &state_table[FIRMWARE_VERIFY]) {
 			switch (fifo_in->event) {
+			case UPDATE_REQUESTED:
+				/* Update at reset flag is set */
+				next_state = &state_table[FIRMWARE_UPDATE];
+				break;
 			case VERIFY_UNPROVISIONED:
 				next_state = &state_table[UNPROVISIONED];
 				break;
@@ -734,8 +829,14 @@ void AspeedStateMachine()
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;
 			case UPDATE_REQUESTED:
-				// Check update intent, seamless or tmin1 update
-				next_state = &state_table[FIRMWARE_UPDATE];
+				/* Check update intent, seamless or tmin1 update */
+				if (fifo_in->data.bit8[1] & UpdateAtReset) {
+					/* Update at reset, just set the status and don't go Tmin1 */
+					run_state = true;
+				} else {
+					/* Immediate update */
+					next_state = &state_table[FIRMWARE_UPDATE];
+				}
 				break;
 			case PROVISION_CMD:
 			case WDT_CHECKPOINT:
@@ -904,6 +1005,31 @@ static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
 	return 0;
 }
 
+static int cmd_asm_ufm_status(const struct shell *shell, size_t argc,
+			char **argv)
+{
+	CPLD_STATUS cpld_update_status;
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+
+	shell_print(shell, "CpldStatus = 0x%02x", cpld_update_status.CpldStatus);
+	shell_print(shell, "BmcStatus = 0x%02x", cpld_update_status.BmcStatus);
+	shell_print(shell, "PchStatus = 0x%02x", cpld_update_status.PchStatus);
+	shell_print(shell, "DecommissionFlag = 0x%02x", cpld_update_status.DecommissionFlag);
+	shell_print(shell, "CpldRecovery = 0x%02x", cpld_update_status.CpldRecovery);
+	shell_print(shell, "BmcToPchStatus = 0x%02x", cpld_update_status.BmcToPchStatus);
+
+	shell_print(shell, "Region[0].ActiveRegion = %02x", cpld_update_status.Region[0].ActiveRegion);
+	shell_print(shell, "Region[0].Recoveryregion = %02x", cpld_update_status.Region[0].Recoveryregion);
+
+	shell_print(shell, "Region[1].ActiveRegion = %02x", cpld_update_status.Region[1].ActiveRegion);
+	shell_print(shell, "Region[2].Recoveryregion = %02x", cpld_update_status.Region[1].Recoveryregion);
+
+	shell_print(shell, "Region[1].ActiveRegion = %02x", cpld_update_status.Region[2].ActiveRegion);
+	shell_print(shell, "Region[2].Recoveryregion = %02x", cpld_update_status.Region[2].Recoveryregion);
+
+
+	return 0;
+}
 
 SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(INIT_DONE, INIT_DONE),
@@ -927,6 +1053,7 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(UPDATE_REQUESTED_BMC_PCH_RCV, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | PchRecoveryUpdate << 16)))),
 	(UPDATE_REQUESTED_BMC_PFR_ACT, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | HROTActiveUpdate << 16)))),
 	(UPDATE_REQUESTED_BMC_PFR_RCV, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | HROTRecoveryUpdate << 16)))),
+	(UPDATE_REQUESTED_BMC_PFR_ACTRCV, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | HROTActiveAndRecoveryUpdate << 16)))),
 
 	/* PCH Update Intent */
 	(UPDATE_REQUESTED_PCH_PCH_ACT, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchActiveUpdate << 16)))),
@@ -941,6 +1068,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(abr, NULL, "Control FMCWDT2 timer manually: enable or disable", cmd_asm_abr),
 	SHELL_CMD(cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
 	SHELL_CMD(rot_rc, NULL, "ROT firmware recoery", cmd_asm_rot_recovery),
+	SHELL_CMD(ufm_status, NULL, "Dump UFM status flag for update flow", cmd_asm_ufm_status),
 	SHELL_SUBCMD_SET_END
 );
 
