@@ -79,4 +79,4 @@ struct smf_context {
 extern struct k_fifo aspeed_sm_fifo;
 
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data);
-void AspeedStateMachine();
+void AspeedStateMachine(void);

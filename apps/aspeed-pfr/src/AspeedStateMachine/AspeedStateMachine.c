@@ -36,6 +36,7 @@ size_t event_log_idx = 0;
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 {
 	struct event_context *event = (struct event_context *)k_malloc(sizeof(struct event_context));
+
 	LOG_INF("Send event:%d data:%p to state machine", evt, data);
 	event_log[event_log_idx % 128] = evt;
 	event_log_idx++;
@@ -49,6 +50,7 @@ void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 void do_init(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
+
 	LOG_DBG("Start");
 
 	initializeEngines();
@@ -111,7 +113,7 @@ void enter_tmin1(void *o)
 
 void handle_image_verification(void *o)
 {
-	struct smf_context *state = (struct smf_context*)o;
+	struct smf_context *state = (struct smf_context *)o;
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 	int ret;
 
@@ -125,11 +127,13 @@ void handle_image_verification(void *o)
 		/* Check pending firmware update (update at reset) */
 		CPLD_STATUS cpld_update_status;
 		bool update_reset = false;
+
 		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 		if (cpld_update_status.CpldStatus == 1
 				|| cpld_update_status.BmcStatus == 1
 				|| cpld_update_status.PchStatus == 1) {
 			uint8_t intent = 0x00;
+
 			if (cpld_update_status.CpldStatus == 1) {
 				if (cpld_update_status.Region[0].ActiveRegion == 1)
 					intent |= HROTActiveUpdate;
@@ -165,6 +169,7 @@ void handle_image_verification(void *o)
 
 			if (intent) {
 				union aspeed_event_data data;
+
 				update_reset = true;
 				data.bit8[0] = BmcUpdateIntent;
 				data.bit8[1] = intent;
@@ -178,59 +183,59 @@ void handle_image_verification(void *o)
 			SetPlatformState(BMC_FLASH_AUTH);
 			{
 				EVENT_CONTEXT evt_wrap;
+
 				evt_wrap.image = BMC_EVENT;
 				evt_wrap.operation = VERIFY_BACKUP;
 				evt_wrap.flash = SECONDARY_FLASH_REGION;
 				ret = authentication_image(NULL, &evt_wrap);
 				LOG_INF("authentication_image bmc backup return %d", ret);
-				if (ret == 0) {
+				if (ret == 0)
 					state->bmc_active_object.RecoveryImageStatus = Success;
-				} else {
+				else
 					state->bmc_active_object.RecoveryImageStatus = Failure;
-				}
 			}
 
 			{
 				EVENT_CONTEXT evt_wrap;
+
 				evt_wrap.image = BMC_EVENT;
 				evt_wrap.operation = VERIFY_ACTIVE;
 				ret = authentication_image(NULL, &evt_wrap);
 				LOG_INF("authentication_image bmc active return %d", ret);
-				if (ret == 0) {
+				if (ret == 0)
 					state->bmc_active_object.ActiveImageStatus = Success;
-				} else {
+				else
 					state->bmc_active_object.ActiveImageStatus = Failure;
-				}
 			}
 
 			/* PCH Verification */
 			SetPlatformState(PCH_FLASH_AUTH);
 			{
 				EVENT_CONTEXT evt_wrap;
+
 				evt_wrap.image = PCH_EVENT;
 				evt_wrap.operation = VERIFY_BACKUP;
 				evt_wrap.flash = SECONDARY_FLASH_REGION;
 				ret = authentication_image(NULL, &evt_wrap);
 				LOG_INF("authentication_image host backup return %d", ret);
-				if (ret == 0) {
+				if (ret == 0)
 					state->pch_active_object.RecoveryImageStatus = Success;
-				} else {
+				else
 					state->pch_active_object.RecoveryImageStatus = Failure;
-				}
 			}
 
 			{
 				EVENT_CONTEXT evt_wrap;
+
 				evt_wrap.image = PCH_EVENT;
 				evt_wrap.operation = VERIFY_ACTIVE;
 				evt_wrap.flash = PRIMARY_FLASH_REGION;
 				ret = authentication_image(NULL, &evt_wrap);
 				LOG_INF("authentication_image host active return %d", ret);
-				if (ret == 0) {
+				if (ret == 0)
 					state->pch_active_object.ActiveImageStatus = Success;
-				} else {
+				else
 					state->pch_active_object.ActiveImageStatus = Failure;
-				}
 			}
 			/* Success = 0, Failure = 1 */
 			LOG_INF("BMC image verification recovery=%s active=%s",
@@ -302,29 +307,26 @@ void handle_recovery(void *o)
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 			LOG_INF("BMC Recovery return=%d", ret);
-			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery) {
+			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
 				recovery_done = 1;
-			}
 		}
 
 		if (state->pch_active_object.ActiveImageStatus == Failure || state->pch_active_object.RecoveryImageStatus == Failure) {
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
-			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery) {
+			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
 				recovery_done = 1;
-			}
 		}
 		break;
 	default:
 		break;
 	}
 
-	if (recovery_done) {
+	if (recovery_done)
 		GenerateStateMachineEvent(RECOVERY_DONE, NULL);
-	} else {
+	else
 		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
-	}
 }
 
 void do_recovery(void *o)
@@ -348,7 +350,7 @@ void do_rot_recovery(void *o)
 	clear_abr_indicator();
 
 	LOG_INF("Erase PFR Active region size=%08x", region_size);
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, region_size)){
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, region_size)) {
 		LOG_ERR("Erase PFR active region failed, SYSTEM LOCKDOWN");
 		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
 	}
@@ -372,7 +374,7 @@ void enter_tzero(void *o)
 	LOG_DBG("Start");
 	SetPlatformState(ENTER_T0);
 
-	struct smf_context *state = (struct smf_context*)o;
+	struct smf_context *state = (struct smf_context *)o;
 	/* Arm reset monitor */
 	platform_monitor_init();
 #if defined(CONFIG_ASPEED_DC_SCM)
@@ -390,11 +392,10 @@ void enter_tzero(void *o)
 			LOG_ERR("BMC firmware is invalid, lockdown the platform");
 		}
 
-		if (state->pch_active_object.ActiveImageStatus == Success) {
+		if (state->pch_active_object.ActiveImageStatus == Success)
 			PCHBootRelease();
-		} else {
+		else
 			LOG_ERR("Host firmware is invalid, host won't boot");
-		}
 	} else {
 		/* Unprovisioned - Releasing System Reset */
 		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
@@ -424,20 +425,27 @@ void handle_provision_event(void *o)
 {
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 
-	if (evt_ctx->data.bit8[1] & EXECUTE_UFM_COMMAND) {
-		LOG_DBG("UFM Trigger Execute");
+	if ((evt_ctx->data.bit8[1] & EXECUTE_UFM_COMMAND) ||
+	    (evt_ctx->data.bit8[1] & FLUSH_WRITE_FIFO) ||
+	    (evt_ctx->data.bit8[1] & FLUSH_READ_FIFO)) {
 		ClearUfmStatusValue(UFM_CLEAR_ON_NEW_COMMAND);
+		// Clear UFM command trigger
+		SetUfmCmdTriggerValue(0x00);
 		SetUfmStatusValue(COMMAND_BUSY);
-		process_provision_command();
+		if (evt_ctx->data.bit8[1] & EXECUTE_UFM_COMMAND) {
+			LOG_DBG("UFM Trigger Execute");
+			process_provision_command();
+		} else if (evt_ctx->data.bit8[1] & FLUSH_WRITE_FIFO) {
+			memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
+			swmbx_flush_fifo(gSwMbxDev, UfmWriteFIFO);
+			gFifoData = 0;
+		} else if (evt_ctx->data.bit8[1] & FLUSH_READ_FIFO) {
+			memset(&gReadFifoData, 0, sizeof(gReadFifoData));
+			swmbx_flush_fifo(gSwMbxDev, UfmReadFIFO);
+			gFifoData = 0;
+		}
+		ClearUfmStatusValue(COMMAND_BUSY);
 		SetUfmStatusValue(COMMAND_DONE);
-	} else if (evt_ctx->data.bit8[1] & FLUSH_WRITE_FIFO) {
-		memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
-		swmbx_flush_fifo(gSwMbxDev, UfmWriteFIFO);
-		gFifoData = 0;
-	} else if (evt_ctx->data.bit8[1] & FLUSH_READ_FIFO) {
-		memset(&gReadFifoData, 0, sizeof(gReadFifoData)); 
-		swmbx_flush_fifo(gSwMbxDev, UfmReadFIFO); 
-		gFifoData = 0; 
 	}
 }
 
@@ -480,7 +488,7 @@ void handle_update_requested(void *o)
 
 	LOG_DBG("FIRMWARE_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
-	switch(evt_ctx->data.bit8[0]) {
+	switch (evt_ctx->data.bit8[0]) {
 	case PchUpdateIntent:
 		/* CPU/PCH only has access to bit[7:6] and bit[1:0] */
 		update_region &= UpdateAtReset | DymanicUpdate | PchRecoveryUpdate | PchActiveUpdate;
@@ -499,8 +507,10 @@ void handle_update_requested(void *o)
 
 	/* Immediate Update */
 	uint32_t handled_region = 0;
-	while(update_region) {
+
+	while (update_region) {
 		uint32_t image_type = 0xFFFFFFFF;
+
 		do {
 			/* BMC Active */
 			if (update_region & BmcActiveUpdate) {
@@ -572,9 +582,8 @@ void handle_update_requested(void *o)
 
 		} while (0);
 
-		if (image_type != 0xFFFFFFFF) {
+		if (image_type != 0xFFFFFFFF)
 			ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
-		}
 
 		if (ret != Success) {
 			/* TODO: Log failed reason and handle it properly */
@@ -583,17 +592,17 @@ void handle_update_requested(void *o)
 		}
 	}
 
-	if (update_region == 0 && ret == Success) {
+	if (update_region == 0 && ret == Success)
 		GenerateStateMachineEvent(UPDATE_DONE, (void *)handled_region);
-	} else {
+	else
 		GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
-	}
 }
 
 void do_unprovisioned(void *o)
 {
 	LOG_DBG("Start");
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+
 	switch (evt_ctx->event) {
 	case PROVISION_CMD:
 		handle_provision_event(o);
@@ -621,8 +630,9 @@ void handle_update_at_reset(void *o)
 
 	/* Update At Reset save status to UFM */
 	CPLD_STATUS cpld_update_status;
+
 	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-	if (evt_ctx->data.bit8[1] & PchActiveUpdate) { 
+	if (evt_ctx->data.bit8[1] & PchActiveUpdate) {
 		cpld_update_status.PchStatus = 1;
 		cpld_update_status.Region[2].ActiveRegion = 1;
 	}
@@ -643,12 +653,10 @@ void handle_update_at_reset(void *o)
 		cpld_update_status.BmcStatus = 1;
 		cpld_update_status.Region[1].Recoveryregion = 1;
 	}
-	if (evt_ctx->data.bit8[1] & HROTRecoveryUpdate) {
+	if (evt_ctx->data.bit8[1] & HROTRecoveryUpdate)
 		LOG_ERR("HROTRecoveryUpdate not supported");
-	}
-	if (evt_ctx->data.bit8[1] & DymanicUpdate) {
+	if (evt_ctx->data.bit8[1] & DymanicUpdate)
 		LOG_ERR("DymanicUpdate not supported");
-	}
 	/* Setting updated cpld status to ufm */
 	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 }
@@ -657,6 +665,7 @@ void do_runtime(void *o)
 {
 	LOG_DBG("Start");
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+
 	switch (evt_ctx->event) {
 	case PROVISION_CMD:
 		handle_provision_event(o);
@@ -724,17 +733,17 @@ static const struct smf_state state_table[] = {
 	[SYSTEM_REBOOT] = SMF_CREATE_STATE(NULL, do_reboot, NULL, NULL),
 };
 
-
-void AspeedStateMachine()
+void AspeedStateMachine(void)
 {
 	smf_set_initial(SMF_CTX(&s_obj), &state_table[BOOT]);
 	GenerateStateMachineEvent(START_STATE_MACHINE, NULL);
 
 	while (1) {
 		struct event_context *fifo_in = (struct event_context *)k_fifo_get(&aspeed_sm_fifo, K_FOREVER);
-		if (fifo_in == NULL) {
+
+		if (fifo_in == NULL)
 			continue;
-		}
+
 		s_obj.event_ctx = fifo_in;
 
 		LOG_INF("EVENT IN [%p] EVT=%d DATA=%p", fifo_in, fifo_in->event, fifo_in->data.ptr);
@@ -865,13 +874,11 @@ void AspeedStateMachine()
 			}
 		}
 
-		if (next_state) {
+		if (next_state)
 			smf_set_state(SMF_CTX(&s_obj), next_state);
-		}
 
-		if (run_state || next_state) {
+		if (run_state || next_state)
 			smf_run_state(SMF_CTX(&s_obj));
-		}
 
 		s_obj.event_ctx = NULL;
 		k_free(fifo_in);
@@ -880,7 +887,7 @@ void AspeedStateMachine()
 
 #ifdef CONFIG_SHELL
 static int cmd_asm_event(const struct shell *shell,
-		         size_t argc, char **argv, void *data)
+			size_t argc, char **argv, void *data)
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
@@ -895,20 +902,19 @@ static int cmd_asm_event(const struct shell *shell,
 }
 
 static int cmd_asm_show(const struct shell *shell, size_t argc,
-                        char **argv)
+			char **argv)
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 	shell_print(shell, "State List:");
-	for (int i=0; i < ARRAY_SIZE(state_table); ++i) {
+	for (int i = 0; i < ARRAY_SIZE(state_table); ++i)
 		shell_print(shell, "[%d] %p", i, &state_table[i]);
-	}
 	shell_print(shell, "Current state: %p", SMF_CTX(&s_obj)->current);
 	return 0;
 }
 
 static int cmd_asm_log(const struct shell *shell, size_t argc,
-                        char **argv)
+			char **argv)
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
@@ -918,7 +924,7 @@ static int cmd_asm_log(const struct shell *shell, size_t argc,
 }
 
 static int cmd_asm_abr(const struct shell *shell, size_t argc,
-                        char **argv)
+			char **argv)
 {
 	bool control = false;
 
@@ -926,6 +932,7 @@ static int cmd_asm_abr(const struct shell *shell, size_t argc,
 		shell_print(shell, "Enable ABR FMCWDT2");
 #define ABR_CTRL_REG    0x7e620064
 		uint32_t reg_val;
+
 		reg_val = sys_read32(ABR_CTRL_REG);
 		reg_val |= BIT(0);
 		sys_write32(reg_val, ABR_CTRL_REG);
@@ -952,6 +959,7 @@ static int cmd_asm_flash_cmp(const struct shell *shell, size_t argc,
 	shell_print(shell, "Hash Dev:%s Offset_A:%p Offset_B:%p Length:%p", dev_name, offset_a, offset_b, length);
 
 	struct device *dev = device_get_binding(dev_name);
+
 	if (dev == NULL) {
 		shell_print(shell, "Failed to bind device:%s", dev_name);
 		return 0;
@@ -963,6 +971,7 @@ static int cmd_asm_flash_cmp(const struct shell *shell, size_t argc,
 
 	while (byte_read <= length) {
 		size_t len = MIN(128, length - byte_read);
+
 		if (len == 0)
 			break;
 		flash_read(dev, offset_a + byte_read, buffer_a, len);
@@ -987,7 +996,7 @@ static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
 	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_RECOVERY);
 
 	LOG_INF("Erase PFR Active region size=%08x", region_size);
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, region_size)){
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, 0, region_size)) {
 		LOG_ERR("Erase PFR active region failed");
 		return 0;
 	}
@@ -996,11 +1005,10 @@ static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
 	status = pfr_spi_region_read_write_between_spi(ROT_INTERNAL_RECOVERY, 0,
 			ROT_INTERNAL_ACTIVE, 0, region_size);
 
-	if (!status) {
+	if (!status)
 		LOG_INF("Copy PFR Recovery region to Active region done");
-	} else {
+	else
 		LOG_ERR("Recover PFR active region failed");
-	}
 
 	return 0;
 }
@@ -1009,6 +1017,7 @@ static int cmd_asm_ufm_status(const struct shell *shell, size_t argc,
 			char **argv)
 {
 	CPLD_STATUS cpld_update_status;
+
 	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
 
 	shell_print(shell, "CpldStatus = 0x%02x", cpld_update_status.CpldStatus);
