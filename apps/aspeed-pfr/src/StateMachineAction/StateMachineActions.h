@@ -92,17 +92,3 @@ static enum OPERATIONS {
 } OPERATIONS;
 #pragma pack()
 
-void LockDownPlatform(void *AoData);
-void handleLockDownState(void *AoData);
-void handlePostRecoveryFailure(void *AoData, void *EventContext);
-void handlePostVerifyFailure(void *AoData, void *EventContext);
-int lastRecoveryReason(int type, void *AoData);
-int lastPanicReason(int ImageType);
-void PublishInitialEvents(void);
-void handlePostRecoverySuccess(void *AoData, void *EventContext);
-void handlePostVerifySuccess(void *AoData, void *EventContext);
-int StartBmcAOWithEvent(void);
-int StartPchAOWithEvent(void);
-int process_i2c_command(void *static_data, void *event_context);
-void T0Transition(int releaseBmc, int releasePCH);
-

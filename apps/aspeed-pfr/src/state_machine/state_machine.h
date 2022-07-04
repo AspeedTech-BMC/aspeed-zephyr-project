@@ -5,7 +5,6 @@
  */
 
 #pragma once
-
 #include <smf.h>
 #include "common_smc.h"
 
