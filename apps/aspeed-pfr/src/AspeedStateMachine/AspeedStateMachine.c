@@ -386,6 +386,7 @@ void enter_tzero(void *o)
 		/* Provisioned */
 		/* Arm SPI/I2C Filter */
 		apply_pfm_protection(BMC_SPI);
+		apply_pfm_protection(PCH_SPI);
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
 			BMCBootRelease();
