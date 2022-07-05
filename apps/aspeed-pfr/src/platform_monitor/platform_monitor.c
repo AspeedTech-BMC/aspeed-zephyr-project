@@ -6,7 +6,6 @@
 #include <zephyr.h>
 #include <drivers/gpio.h>
 #include <logging/log.h>
-#include "state_machine/state_machine.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 

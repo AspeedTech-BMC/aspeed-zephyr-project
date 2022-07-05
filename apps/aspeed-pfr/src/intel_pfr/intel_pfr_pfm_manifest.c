@@ -7,7 +7,7 @@
 #include <logging/log.h>
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_definitions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_update.h"
 #include "pfr/pfr_common.h"

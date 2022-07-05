@@ -5,7 +5,7 @@
  */
 
 #include "flash/flash_wrapper.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 
 

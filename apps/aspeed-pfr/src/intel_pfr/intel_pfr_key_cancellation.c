@@ -13,7 +13,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_key_cancellation.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 

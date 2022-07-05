@@ -285,7 +285,6 @@ void handle_recovery(void *o)
 	/* Check Staging Image */
 	bool recovery_done = 0;
 	int ret;
-	int verify_staging = -1;
 	EVENT_CONTEXT evt_wrap;
 
 	recovery_initialize();
@@ -336,15 +335,11 @@ void do_recovery(void *o)
 	LOG_DBG("End");
 }
 
-static uint8_t recovery_buffer[1024] __aligned(16);
-
 void do_rot_recovery(void *o)
 {
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
 	uint8_t status;
-	size_t offset = 0;
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_RECOVERY);
 
 	clear_abr_indicator();
@@ -482,8 +477,6 @@ void handle_update_requested(void *o)
 	EVENT_CONTEXT evt_ctx_wrap;
 	int ret;
 	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
-	bool update_dynamic = evt_ctx->data.bit8[1] & DymanicUpdate;
-	bool update_reset = evt_ctx->data.bit8[1] & UpdateAtReset;
 	CPLD_STATUS cpld_update_status;
 
 	LOG_DBG("FIRMWARE_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
@@ -991,8 +984,6 @@ static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
 			char **argv)
 {
 	uint8_t status;
-	size_t offset = 0;
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_RECOVERY);
 
 	LOG_INF("Erase PFR Active region size=%08x", region_size);

@@ -7,7 +7,7 @@
 #include <logging/log.h>
 #include "intel_pfr/intel_pfr_authentication.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_common.h"

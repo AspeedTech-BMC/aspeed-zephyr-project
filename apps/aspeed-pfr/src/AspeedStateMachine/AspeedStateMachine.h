@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #pragma once
+#include <smf.h>
 #include <zephyr.h>
 #include <StateMachineAction/StateMachineActions.h>
 

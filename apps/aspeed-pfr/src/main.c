@@ -7,8 +7,6 @@
 #include <logging/log.h>
 #include <zephyr.h>
 
-#include "state_machine.h"
-#include "common_smc.h"
 #include "common/common.h"
 #include "include/SmbusMailBoxCom.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"

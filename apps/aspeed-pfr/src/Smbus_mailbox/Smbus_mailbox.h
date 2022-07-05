@@ -8,9 +8,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-// #include <HrotStateMachine.h>
 #include "include/SmbusMailBoxCom.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "StateMachineAction/StateMachineActions.h"
 
 extern int systemState;

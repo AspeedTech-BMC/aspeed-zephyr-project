@@ -10,7 +10,7 @@
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "manifest/pfm/pfm_manager.h"
 #include "intel_pfr_recovery.h"
 #include "intel_pfr_pfm_manifest.h"

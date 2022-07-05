@@ -10,7 +10,7 @@
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "include/SmbusMailBoxCom.h"

@@ -6,9 +6,6 @@
 
 #pragma once
 
-#include "state_machine.h"
-#include "common_smc.h"
-
 #define BMC_RELEASE                             1U
 #define PCH_RELEASE                             1U
 

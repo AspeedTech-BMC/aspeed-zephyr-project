@@ -6,7 +6,7 @@
 
 #include <logging/log.h>
 #include "StateMachineActions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "include/SmbusMailBoxCom.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
@@ -35,7 +35,7 @@ LOG_MODULE_DECLARE(aspeed_state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 #define DEBUG_PRINTF(...)
 #endif
 
-static EVENT_CONTEXT BmcData[2], PchData[2], TemperlateEvent;
+//static EVENT_CONTEXT BmcData[2], PchData[2], TemperlateEvent;
 AO_DATA BmcActiveObjectData, PchActiveObjectData;
 
 static void wdt_callback_bmc_timeout(void)
@@ -55,9 +55,8 @@ static void wdt_callback_pch_timeout(void)
 void AspeedPFR_EnableTimer(int type)
 {
 	struct watchdog_config wdt_config;
-	const struct device *wdt_dev;
+	const struct device *wdt_dev = NULL;
 	int ret = 0;
-	uint32_t count = 0;
 
 	wdt_config.wdt_cfg.window.min = 0;
 	wdt_config.reset_option = WDT_FLAG_RESET_NONE;

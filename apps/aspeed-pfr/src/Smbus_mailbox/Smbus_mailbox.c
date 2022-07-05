@@ -261,7 +261,7 @@ void InitializeSoftwareMailbox(void)
 
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
-		DEBUG_PRINTF("%s: fail to bind %s", "SWMBX");
+		DEBUG_PRINTF("%s: fail to bind %s", __FUNCTION__, "SWMBX");
 		return;
 	}
 	gSwMbxDev = swmbx_dev;
@@ -979,130 +979,5 @@ void UpdateBiosCheckpoint(byte Data)
 	if (gBmcBootDone == TRUE && gBiosBootDone == TRUE)
 		SetPlatformState(T0_BOOT_COMPLETED);
 	SetBiosCheckpoint(Data);
-}
-
-void PublishUpdateEvent(uint8_t ImageType, uint8_t FlashRegion)
-{
-	// Posting the Update signal
-	UpdateActiveObject.type = ImageType;
-	UpdateActiveObject.ProcessNewCommand = 1;
-
-	UpdateEventData.operation = UPDATE_BACKUP;
-	UpdateEventData.flash = FlashRegion;
-	UpdateEventData.image = ImageType;
-
-	if (post_smc_action(UPDATE, &UpdateActiveObject, &UpdateEventData)) {
-		DEBUG_PRINTF("%s : event queue not available !", __func__);
-		return;
-	}
-}
-
-void UpdateIntentHandle(byte Data, uint32_t Source)
-{
-	uint8_t Index;
-	uint8_t PchActiveStatus;
-	uint8_t BmcActiveStatus;
-
-	DEBUG_PRINTF(" Update Intent = 0x%x", Data);
-
-	if (Data & UpdateAtReset) {
-		// Getting cpld status from UFM
-
-		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-		if (Data & PchActiveUpdate) {
-			cpld_update_status.PchStatus = 1;
-			cpld_update_status.Region[2].ActiveRegion = 1;
-		}
-		if (Data & PchRecoveryUpdate) {
-			cpld_update_status.PchStatus = 1;
-			cpld_update_status.Region[2].Recoveryregion = 1;
-		}
-		if (Data & HROTActiveUpdate) {
-			cpld_update_status.CpldStatus = 1;
-			cpld_update_status.CpldRecovery = 1;
-			cpld_update_status.Region[0].ActiveRegion = 1;
-		}
-		if (Data & BmcActiveUpdate) {
-			cpld_update_status.BmcStatus = 1;
-			cpld_update_status.Region[1].ActiveRegion = 1;
-		}
-		if (Data & BmcRecoveryUpdate) {
-			cpld_update_status.BmcStatus = 1;
-			cpld_update_status.Region[1].Recoveryregion = 1;
-		}
-		if (Data & HROTRecoveryUpdate)
-			DEBUG_PRINTF("HROTRecoveryUpdate not supported");
-		if (Data & DymanicUpdate)
-			DEBUG_PRINTF("DymanicUpdate not supported");
-		// Setting updated cpld status to ufm
-		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-	} else {
-		if (Data & PchActiveUpdate) {
-			if ((Data & PchActiveUpdate) && (Data & PchRecoveryUpdate)) {
-				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				cpld_update_status.PchStatus = 1;
-				cpld_update_status.Region[2].ActiveRegion = 1;
-				cpld_update_status.Region[2].Recoveryregion = 1;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				PublishUpdateEvent(PCH_EVENT, PRIMARY_FLASH_REGION);
-				return;
-			}
-			if (Source == BmcUpdateIntent) {
-				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				cpld_update_status.BmcToPchStatus = 1;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-			}
-
-			PublishUpdateEvent(PCH_EVENT, PRIMARY_FLASH_REGION);
-		}
-
-		if (Data & PchRecoveryUpdate) {
-			if (Source == BmcUpdateIntent) {
-				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				cpld_update_status.BmcToPchStatus = 1;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-			}
-			PublishUpdateEvent(PCH_EVENT, SECONDARY_FLASH_REGION);
-		}
-		if (Data & HROTActiveUpdate)
-			PublishUpdateEvent(ROT_TYPE, PRIMARY_FLASH_REGION);
-
-		if (Data & BmcActiveUpdate) {
-			if ((Data & BmcActiveUpdate) && (Data & BmcRecoveryUpdate)) {
-				PublishUpdateEvent(BMC_EVENT, PRIMARY_FLASH_REGION);
-				return;
-			}
-			PublishUpdateEvent(BMC_EVENT, PRIMARY_FLASH_REGION);
-		}
-		if (Data & BmcRecoveryUpdate)
-			PublishUpdateEvent(BMC_EVENT, SECONDARY_FLASH_REGION);
-		if (Data & HROTRecoveryUpdate)
-			DEBUG_PRINTF("HROTRecoveryUpdate not supported");
-		if (Data & DymanicUpdate)
-			DEBUG_PRINTF("DymanicUpdate not supported");
-	}
-
-}
-
-/**
- * Function to Check if system boots fine based on TimerISR
- * Returns Status
- */
-bool WatchDogTimer(int ImageType)
-{
-	DEBUG_PRINTF("WDT Update Tiggers");
-	if (ImageType == PCH_EVENT) {
-		gPCHWatchDogTimer = 0;
-		gBiosBootDone = FALSE;
-	}
-	if (ImageType == BMC_EVENT) {
-		gBMCWatchDogTimer = 0;
-		gBmcBootDone = FALSE;
-	}
-
-	gBootCheckpointReceived = false;
-	gWDTUpdate = 1;
-
-	return true;
 }
 

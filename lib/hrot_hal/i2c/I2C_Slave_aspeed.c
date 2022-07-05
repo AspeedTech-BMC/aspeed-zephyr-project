@@ -8,7 +8,6 @@
 #include <drivers/clock_control.h>
 #include <drivers/i2c.h>
 
-//static SMBUS_MAIL_BOX gSmbusMailboxData = {0};
 I2C_Slave_Process gI2cSlaveProcess = {0};
 
 /**
