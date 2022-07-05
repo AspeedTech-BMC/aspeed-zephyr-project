@@ -162,8 +162,6 @@ K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
 	struct k_poll_event events[8];
-	AO_DATA aodata[8];
-	EVENT_CONTEXT evt_ctx[8];
 	uint8_t buffer[8][2] = { { 0 } };
 
 	k_poll_event_init(&events[0], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_write_fifo_data_sem);
@@ -205,10 +203,6 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 			/* UFM Provision Trigger */
 			k_sem_take(events[2].sem, K_NO_WAIT);
-			aodata[2].ProcessNewCommand = 1;
-			aodata[2].type = I2C_EVENT;
-			evt_ctx[2].operation = I2C_HANDLE;
-			evt_ctx[2].i2c_data = buffer[2];
 			data.bit8[0] = UfmCmdTriggerValue;
 			swmbx_get_msg(0, UfmCmdTriggerValue, &data.bit8[1]);
 
@@ -216,10 +210,6 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		} else if (events[3].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Update Intent */
 			k_sem_take(events[3].sem, K_NO_WAIT);
-			aodata[3].ProcessNewCommand = 1;
-			aodata[3].type = I2C_EVENT;
-			evt_ctx[3].operation = I2C_HANDLE;
-			evt_ctx[3].i2c_data = buffer[3];
 			data.bit8[0] = BmcUpdateIntent;
 			swmbx_get_msg(0, BmcUpdateIntent, &data.bit8[1]);
 
@@ -227,13 +217,13 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		} else if (events[4].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* PCH Update Intent */
 			k_sem_take(events[4].sem, K_NO_WAIT);
+			data.bit8[0] = PchUpdateIntent;
+			swmbx_get_msg(0, PchUpdateIntent, &data.bit8[1]);
+
+			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 		} else if (events[5].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Checkpoint */
 			k_sem_take(events[5].sem, K_NO_WAIT);
-			aodata[5].ProcessNewCommand = 1;
-			aodata[5].type = I2C_EVENT;
-			evt_ctx[5].operation = I2C_HANDLE;
-			evt_ctx[5].i2c_data = buffer[5];
 			data.bit8[0] = BmcCheckpoint;
 			swmbx_get_msg(0, BmcCheckpoint, &data.bit8[1]);
 
@@ -241,10 +231,16 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		} else if (events[6].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* ACM Checkpoint */
 			k_sem_take(events[6].sem, K_NO_WAIT);
+			data.bit8[0] = AcmCheckpoint;
+			swmbx_get_msg(0, AcmCheckpoint, &data.bit8[1]);
+
 			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		} else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BIOS Checkpoint */
 			k_sem_take(events[7].sem, K_NO_WAIT);
+			data.bit8[0] = BiosCheckpoint;
+			swmbx_get_msg(0, BiosCheckpoint, &data.bit8[1]);
+
 			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		}
 
@@ -924,9 +920,9 @@ void UpdateBmcCheckpoint(byte Data)
 		AspeedPFR_EnableTimer(BMC_EVENT);
 
 	// BMC boot completed
-	if (Data == CompletingexecutionBlock || Data == ReadToBootOS) {
+	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
 		// If execution completed disable timer
-		DEBUG_PRINTF("Enter Completingexecution: Block Disable Timer");
+		DEBUG_PRINTF("Enter CompletingExecution: Block Disable Timer");
 		AspeedPFR_DisableTimer(BMC_EVENT);
 		gBmcBootDone = TRUE;
 		gBMCWatchDogTimer = -1;
@@ -962,7 +958,7 @@ void UpdateBiosCheckpoint(byte Data)
 	if (Data == ResumedExecutionBlock)
 		AspeedPFR_EnableTimer(PCH_EVENT);
 	// BIOS boot completed
-	if (Data == CompletingexecutionBlock || Data == ReadToBootOS) {
+	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
 		AspeedPFR_DisableTimer(PCH_EVENT);
 		gBiosBootDone = TRUE;
 		gBootCheckpointReceived = true;

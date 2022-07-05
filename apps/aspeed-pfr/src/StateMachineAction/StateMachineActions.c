@@ -29,27 +29,22 @@ LOG_MODULE_DECLARE(aspeed_state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 #define MAX_LENGTH 32
 #define SMBUS_WRITE 0x45
 
-#if PF_STATUS_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
-//static EVENT_CONTEXT BmcData[2], PchData[2], TemperlateEvent;
-AO_DATA BmcActiveObjectData, PchActiveObjectData;
-
 static void wdt_callback_bmc_timeout(void)
 {
-	DEBUG_PRINTF("enter %s", __func__);
+	LOG_ERR("BMC Boot WDT Timeout");
+	union aspeed_event_data data = {0};
+	data.bit8[0] = BMC_EVENT;
+	GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
 	SetLastPanicReason(BMC_WDT_EXPIRE);
-	GenerateStateMachineEvent(WDT_TIMEOUT, NULL);
 }
 
 static void wdt_callback_pch_timeout(void)
 {
-	DEBUG_PRINTF("enter %s", __func__);
+	LOG_ERR("PCH Boot WDT Timeout");
+	union aspeed_event_data data = {0};
+	data.bit8[0] = PCH_EVENT;
+	GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
 	SetLastPanicReason(ACM_WDT_EXPIRE);
-	GenerateStateMachineEvent(WDT_TIMEOUT, NULL);
 }
 
 void AspeedPFR_EnableTimer(int type)
@@ -62,23 +57,20 @@ void AspeedPFR_EnableTimer(int type)
 	wdt_config.reset_option = WDT_FLAG_RESET_NONE;
 
 	if (type == BMC_EVENT) {
-		DEBUG_PRINTF("---------------------------------------");
-		DEBUG_PRINTF("     Start BMC Timer");
-		DEBUG_PRINTF("---------------------------------------");
+		LOG_INF("Start BMC Timer");
 		wdt_config.wdt_cfg.window.max = BMC_MAXTIMEOUT;
 		wdt_config.wdt_cfg.callback = wdt_callback_bmc_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[0]);
-
+		gBmcBootDone = FALSE;
 	} else if (type == PCH_EVENT) {
-		DEBUG_PRINTF("---------------------------------------");
-		DEBUG_PRINTF("     Start PCH Timer");
-		DEBUG_PRINTF("---------------------------------------");
+		LOG_INF("Start PCH Timer");
 		wdt_config.wdt_cfg.window.max = BIOS_MAXTIMEOUT;
 		wdt_config.wdt_cfg.callback = wdt_callback_pch_timeout;
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
+		gBiosBootDone = FALSE;
 	}
 	if (!wdt_dev) {
-		DEBUG_PRINTF("wdt_timer_err: cannot find wdt device.");
+		LOG_ERR("wdt_timer_err: cannot find wdt device.");
 		return;
 	}
 	ret = watchdog_init(wdt_dev, &wdt_config);
@@ -91,15 +83,11 @@ void AspeedPFR_DisableTimer(int type)
 	const struct device *wdt_dev;
 
 	if (type == BMC_EVENT) {
-		DEBUG_PRINTF("---------------------------------------");
-		DEBUG_PRINTF("     Disable BMC Timer");
-		DEBUG_PRINTF("---------------------------------------");
+		LOG_INF("Disable BMC Timer");
 		wdt_dev = device_get_binding(WDT_Devices_List[0]);
 
 	} else if (type == PCH_EVENT) {
-		DEBUG_PRINTF("---------------------------------------");
-		DEBUG_PRINTF("     Disable PCH Timer");
-		DEBUG_PRINTF("---------------------------------------");
+		LOG_INF("Disable PCH Timer");
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
 
 	}

@@ -292,11 +292,18 @@ void handle_recovery(void *o)
 	/* TODO: Verify Staging? */
 	SetPlatformState(T_MINUS_1_FW_RECOVERY);
 	switch (evt_ctx->event) {
-#if defined(CONFIG_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
 	case WDT_TIMEOUT:
 		// WDT Checkpoint Timeout
 		SetPlatformState(WDT_TIMEOUT_RECOVERY);
-		state->bmc_active_object.ActiveImageStatus = Failure;
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+		if (evt_ctx->data.bit8[0] == BMC_EVENT)
+			state->bmc_active_object.ActiveImageStatus = Failure;
+#endif
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+		if (evt_ctx->data.bit8[0] == PCH_EVENT)
+			state->pch_active_object.ActiveImageStatus = Failure;
+#endif
 		__attribute__ ((fallthrough));
 #endif
 	case VERIFY_ACT_FAILED:
@@ -611,8 +618,12 @@ void enter_runtime(void *o)
 {
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
 	AspeedPFR_EnableTimer(BMC_EVENT);
-	//AspeedPFR_EnableTimer(PCH_EVENT);
+#endif
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+	AspeedPFR_EnableTimer(PCH_EVENT);
+#endif
 	LOG_DBG("End");
 }
 
@@ -845,11 +856,16 @@ void AspeedStateMachine(void)
 				// Just run provision handling
 				run_state = true;
 				break;
-#if defined(CONFIG_CHECKPOINT_RECOVERY)
 			case WDT_TIMEOUT:
-				next_state = &state_table[FIRMWARE_RECOVERY];
-				break;
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+				if (fifo_in->data.bit8[0] == BMC_EVENT)
+					next_state = &state_table[FIRMWARE_RECOVERY];
 #endif
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+				if (fifo_in->data.bit8[0] == PCH_EVENT)
+					next_state = &state_table[FIRMWARE_RECOVERY];
+#endif
+				break;
 			default:
 				break;
 			}
@@ -1044,7 +1060,8 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(UPDATE_DONE, UPDATE_DONE),
 	(UPDATE_FAILED, UPDATE_FAILED),
 	(PROVISION_CMD, PROVISION_CMD),
-	(WDT_TIMEOUT, WDT_TIMEOUT),
+	(WDT_TIMEOUT_BMC, (WDT_TIMEOUT | BMC_EVENT << 8)),
+	(WDT_TIMEOUT_PCH, (WDT_TIMEOUT | PCH_EVENT << 8)),
 
 	/* BMC Update Intent */
 	(UPDATE_REQUESTED_BMC_BMC_ACT, (UPDATE_REQUESTED | ((BmcUpdateIntent << 8 | BmcActiveUpdate << 16)))),

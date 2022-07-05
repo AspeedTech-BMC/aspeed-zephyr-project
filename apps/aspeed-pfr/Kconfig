@@ -19,11 +19,17 @@ config SPI_MUX_INVERSE
 	help
 	  Enable if SPI MUX connected to BMC/ROT is inverted
 
-config CHECKPOINT_RECOVERY
+config BMC_CHECKPOINT_RECOVERY
 	default n
-	bool "Checkpoint timeout recovery function"
+	bool "BMC Checkpoint timeout recovery function"
 	help
-	  Enable if BMC/PCH supports mailbox checkpoint
+	  Enable if BMC supports mailbox checkpoint
+
+config PCH_CHECKPOINT_RECOVERY
+	default n
+	bool "PCH Checkpoint timeout recovery function"
+	help
+	  Enable if PCH supports mailbox checkpoint
 
 config PLATFORM_STATE_LED
 	default n

@@ -167,7 +167,7 @@ typedef enum _EXECUTION_CHECKPOINT {
 	ReturnedFromExternalExecutionBlock,
 	PausingExecutionBlock,
 	ResumedExecutionBlock,
-	CompletingexecutionBlock,
+	CompletingExecutionBlock,
 	EnteredManagementMode,
 	LeavingManagementMode,
 	ReadToBootOS = 0x80
