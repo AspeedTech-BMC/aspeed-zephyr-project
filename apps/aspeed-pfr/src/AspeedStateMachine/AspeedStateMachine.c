@@ -326,8 +326,7 @@ void handle_recovery(void *o)
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
-			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
-				recovery_done = 1;
+			recovery_done = 1;
 		}
 		break;
 	default:
