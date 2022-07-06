@@ -18,6 +18,13 @@
 			<&sgpiom_a_d 2 0>, <&sgpiom_a_d 3 0>,
 			<&sgpiom_a_d 4 0>, <&sgpiom_a_d 5 0>,
 			<&sgpiom_a_d 6 0>, <&sgpiom_a_d 7 0>;
+
+		/* NOTICE:
+		 * Normally, these two pin should be GPIO_ACTIVE_LOW, but currently this EVB
+		 * doesn't produce correct power sequence by itself.
+		 */
+		rst-srst-bmc-in-gpios = <&gpio0_q_t 27 GPIO_ACTIVE_HIGH>; /* GPIO_T3 */
+		rst-rsmrst-in-gpios = <&gpio0_q_t 24 GPIO_ACTIVE_HIGH>; /* GPIO_T0 */
 	};
 };
 

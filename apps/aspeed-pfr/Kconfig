@@ -61,4 +61,11 @@ config PCH_STAGING_SIZE
 	help
 	  The max size of PCH staging area for putting signed PCH capsule.
 
+config INIT_POWER_SEQUENCE
+	default n
+	bool "Wait for CPLD power sequence to start PFR functionality"
+	help
+	  PFR state machine will stay in INIT state until CPLD power sequence releases
+	  RST_SRST_BMC_N and RST_RSMRST_N.
+
 source "Kconfig.zephyr"

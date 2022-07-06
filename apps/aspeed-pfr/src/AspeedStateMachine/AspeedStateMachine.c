@@ -82,6 +82,7 @@ void do_init(void *o)
 	enum boot_indicator rot_boot_from = get_boot_indicator();
 
 	disable_abr_wdt();
+
 	if (rot_boot_from == BOOT_FROM_ALTERNATE_PART) {
 		/* ABR secondary booted, copy recovery image to active image */
 		LOG_ERR("ROT boot from secondary image, need to recovery ROT active region");
@@ -90,12 +91,16 @@ void do_init(void *o)
 		/* ABR primary booted */
 #if SMBUS_MAILBOX_SUPPORT
 		InitializeSmbusMailbox();
-		SetPlatformState(CPLD_NIOS_II_PROCESSOR_STARTED);
 #endif
 
-		// TODO: Wait for Power Sequence signal to leave INIT state
-		//       Populate INIT_DONE event will enter FIRMWARE_VERIFY state
+		SetPlatformState(CPLD_NIOS_II_PROCESSOR_WAITING_TO_START);
+#if defined(CONFIG_INIT_POWER_SEQUENCE)
+		LOG_INF("Wait for power sequence");
+		power_sequence();
+#else
 		GenerateStateMachineEvent(INIT_DONE, NULL);
+		SetPlatformState(CPLD_NIOS_II_PROCESSOR_STARTED);
+#endif
 	}
 	LOG_DBG("End");
 }

@@ -81,3 +81,13 @@ properties:
       type: phandle-array
       required: false
       description: 8 bit leds for displaying platform state
+
+    rst-srst-bmc-in-gpios:
+      type: phandle-array
+      required: false
+      description: Power sequence from CPLD indicates BMC SRST released
+
+    rst-rsmrst-in-gpios:
+      type: phandle-array
+      required: false
+      description: Power sequence from CPLD indicates PCH RSMRST released
