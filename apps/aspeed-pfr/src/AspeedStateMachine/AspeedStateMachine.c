@@ -424,6 +424,17 @@ void enter_tzero(void *o)
 		/* Unprovisioned - Releasing System Reset */
 		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
 		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		SPI_Monitor_Enable("spi_m1", false);
+		Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		SPI_Monitor_Enable("spi_m2", false);
+		Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		SPI_Monitor_Enable("spi_m3", false);
+		Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+		SPI_Monitor_Enable("spi_m4", false);
+
 		BMCBootRelease();
 		PCHBootRelease();
 	}
