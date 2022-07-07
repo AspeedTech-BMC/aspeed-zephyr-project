@@ -443,10 +443,12 @@ void handle_provision_event(void *o)
 			LOG_DBG("UFM Trigger Execute");
 			process_provision_command();
 		} else if (evt_ctx->data.bit8[1] & FLUSH_WRITE_FIFO) {
+			LOG_DBG("UFM Flush Write FIFO");
 			memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
 			swmbx_flush_fifo(gSwMbxDev, UfmWriteFIFO);
 			gFifoData = 0;
 		} else if (evt_ctx->data.bit8[1] & FLUSH_READ_FIFO) {
+			LOG_DBG("UFM Flush Read FIFO");
 			memset(&gReadFifoData, 0, sizeof(gReadFifoData));
 			swmbx_flush_fifo(gSwMbxDev, UfmReadFIFO);
 			gFifoData = 0;

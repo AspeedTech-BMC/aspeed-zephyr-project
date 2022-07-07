@@ -333,7 +333,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 		manifest->address = payload_address;
 		status = pfr_decommission(manifest);
 		return status;
-	} else if (pc_type_status ==  KEY_CANCELLATION_CAPSULE) {
+	} else if (pc_type_status == KEY_CANCELLATION_CAPSULE) {
 		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t),
 				(uint8_t *)&cancelled_id);
 		if (status != Success) {
