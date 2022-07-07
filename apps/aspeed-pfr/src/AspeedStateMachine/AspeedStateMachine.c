@@ -205,6 +205,7 @@ void handle_image_verification(void *o)
 
 				evt_wrap.image = BMC_EVENT;
 				evt_wrap.operation = VERIFY_ACTIVE;
+				evt_wrap.flash = PRIMARY_FLASH_REGION;
 				ret = authentication_image(NULL, &evt_wrap);
 				LOG_INF("authentication_image bmc active return %d", ret);
 				if (ret == 0)
@@ -250,26 +251,26 @@ void handle_image_verification(void *o)
 					state->pch_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->pch_active_object.ActiveImageStatus ? "Bad" : "Good");
 
-			/* Handling platform recovery matrix, the detail logic will be handled in recover_image() */
-			if ((state->pch_active_object.ActiveImageStatus == Success && state->pch_active_object.RecoveryImageStatus == Success)
-					&& (state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Success)) {
-				/* All good, we're good to go. */
-				GenerateStateMachineEvent(VERIFY_DONE, NULL);
-			} else if ((state->pch_active_object.ActiveImageStatus == Failure && state->pch_active_object.RecoveryImageStatus == Success)
-					|| (state->bmc_active_object.ActiveImageStatus == Failure && state->bmc_active_object.RecoveryImageStatus == Success)) {
-				/* Active currupted but recovery good, recovery -> active */
-				GenerateStateMachineEvent(VERIFY_ACT_FAILED, NULL);
-			} else if ((state->pch_active_object.ActiveImageStatus == Success && state->pch_active_object.RecoveryImageStatus == Failure)
-					|| (state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Failure)) {
-				/* Active good but recovery bad, staging -> recovery if possible */
-				GenerateStateMachineEvent(VERIFY_RCV_FAILED, NULL);
-			} else if (evt_ctx->event == RECOVERY_DONE
-					&& state->bmc_active_object.ActiveImageStatus == Success && state->bmc_active_object.RecoveryImageStatus == Success) {
-				/* BMC is (Good, Good) but PCH is (Bad, Bad), boot BMC but lockdown PCH */
-				GenerateStateMachineEvent(VERIFY_DONE, NULL);
+			if (evt_ctx->event != RECOVERY_DONE) {
+				if (state->pch_active_object.ActiveImageStatus == Failure
+						|| state->bmc_active_object.ActiveImageStatus == Failure
+						|| state->pch_active_object.RecoveryImageStatus == Failure
+						|| state->bmc_active_object.RecoveryImageStatus == Failure) {
+					/* ACT/RCV region went wrong, go recovery */
+					GenerateStateMachineEvent(VERIFY_FAILED, NULL);
+				} else {
+					/* Everything good, done */
+					GenerateStateMachineEvent(VERIFY_DONE, NULL);
+				}
 			} else {
-				/* BMC is (Bad, Bad), stg->rcv->act */
-				GenerateStateMachineEvent(VERIFY_RCV_FAILED, NULL);
+				/* Coming back from RECOVERY, relax some condition */
+				if (state->bmc_active_object.ActiveImageStatus == Success) {
+					/* If BMC is good to go, just boot the BMC. It wiil be checked by Tzero */
+					GenerateStateMachineEvent(VERIFY_DONE, NULL);
+				} else {
+					/* SYSTEM LOCKDOWN */
+					GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+				}
 			}
 		}
 	}
@@ -311,18 +312,34 @@ void handle_recovery(void *o)
 #endif
 		__attribute__ ((fallthrough));
 #endif
-	case VERIFY_ACT_FAILED:
-	case VERIFY_RCV_FAILED:
+	case VERIFY_FAILED:
 		// Recovery matrix can be handled in recover_image
-		if (state->bmc_active_object.ActiveImageStatus == Failure || state->bmc_active_object.RecoveryImageStatus == Failure) {
+		if (state->bmc_active_object.RecoveryImageStatus == Failure) {
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
-			LOG_INF("BMC Recovery return=%d", ret);
+
+			LOG_INF("BMC recover recovery region return=%d", ret);
 			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
 				recovery_done = 1;
 		}
 
-		if (state->pch_active_object.ActiveImageStatus == Failure || state->pch_active_object.RecoveryImageStatus == Failure) {
+		if (state->bmc_active_object.ActiveImageStatus == Failure) {
+			evt_wrap.image = BMC_EVENT;
+			ret = recover_image(&state->bmc_active_object, &evt_wrap);
+			LOG_INF("BMC recover active region return=%d", ret);
+			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
+				recovery_done = 1;
+
+		}
+
+		if (state->pch_active_object.RecoveryImageStatus == Failure) {
+			evt_wrap.image = PCH_EVENT;
+			ret = recover_image(&state->pch_active_object, &evt_wrap);
+			LOG_INF("PCH Recovery return=%d", ret);
+			recovery_done = 1;
+		}
+
+		if (state->pch_active_object.ActiveImageStatus == Failure) {
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
@@ -802,15 +819,17 @@ void AspeedStateMachine(void)
 			case VERIFY_UNPROVISIONED:
 				next_state = &state_table[UNPROVISIONED];
 				break;
-			case VERIFY_STG_FAILED:
-			case VERIFY_RCV_FAILED:
-			case VERIFY_ACT_FAILED:
+			case VERIFY_FAILED:
 				next_state = &state_table[FIRMWARE_RECOVERY];
 				break;
 			case VERIFY_DONE:
 				// Firmware is authenticated -> RUNTIME
 				// Non provisioned -> UNPROVISIONED
 				next_state = &state_table[RUNTIME];
+				break;
+			case RECOVERY_FAILED:
+				/* Recovery -> Verify(BMC Failed) -> Lockdown */
+				next_state = &state_table[SYSTEM_LOCKDOWN];
 				break;
 			default:
 				break;
@@ -1057,9 +1076,7 @@ static int cmd_asm_ufm_status(const struct shell *shell, size_t argc,
 SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	(INIT_DONE, INIT_DONE),
 	(VERIFY_UNPROVISIONED, VERIFY_UNPROVISIONED),
-	(VERIFY_STG_FAILED, VERIFY_STG_FAILED),
-	(VERIFY_RCV_FAILED, VERIFY_RCV_FAILED),
-	(VERIFY_ACT_FAILED, VERIFY_ACT_FAILED),
+	(VERIFY_FAILED, VERIFY_FAILED),
 	(VERIFY_DONE, VERIFY_DONE),
 	(RECOVERY_DONE, RECOVERY_DONE),
 	(RECOVERY_FAILED, RECOVERY_FAILED),
