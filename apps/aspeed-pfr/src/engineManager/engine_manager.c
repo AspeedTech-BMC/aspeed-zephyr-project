@@ -229,11 +229,14 @@ void apply_pfm_protection(int spi_device_id)
 							0,
 							0);
 					LOG_DBG("ast_i2c_filter_en ret=%d", status);
+					// The i2c device address in the manifest is 8-bit format.
+					// It should be 7-bit format for i2c filter api.
+					uint8_t slave_addr = region_record[7] >> 1;
 					status = ast_i2c_filter_update(
 							flt_dev,
 							region_record[6] - 1, // Rule ID
-							region_record[7], // Device Address
-							&region_record[8] // cmd_whitelist
+							slave_addr,           // Device Address
+							&region_record[8]     // cmd_whitelist
 							);
 					LOG_DBG("ast_i2c_filter_update ret=%d", status);
 				} else {
