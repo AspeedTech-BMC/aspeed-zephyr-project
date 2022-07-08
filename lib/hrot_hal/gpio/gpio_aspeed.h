@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <drivers/misc/aspeed/pfr_aspeed.h>
 
 #if defined(CONFIG_SPI_MUX_INVERSE)
 #define SPIM_EXT_MUX_BMC_PCH        SPIM_EXT_MUX_SEL_1

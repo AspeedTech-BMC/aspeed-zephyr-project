@@ -19,6 +19,12 @@ config SPI_MUX_INVERSE
 	help
 	  Enable if SPI MUX connected to BMC/ROT is inverted
 
+config ASPEED_STATE_MACHINE_SHELL
+	default n
+	bool "Aspeed State Machine Shell"
+	help
+	  Enable if user need debug shell to interact with state machine
+
 config BMC_CHECKPOINT_RECOVERY
 	default n
 	bool "BMC Checkpoint timeout recovery function"
