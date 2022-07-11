@@ -5,4 +5,5 @@ menu "Additional libraries"
 rsource "modules/Kconfig"
 rsource "lib/smf/Kconfig"
 rsource "lib/hrot_hal/Kconfig"
+rsource "lib/hrot_wrapper/Kconfig"
 endmenu

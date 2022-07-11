@@ -1,0 +1,7 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config HROT_WRAPPER
+	default n
+	bool "Hardware root of trust wrapper layer"
+

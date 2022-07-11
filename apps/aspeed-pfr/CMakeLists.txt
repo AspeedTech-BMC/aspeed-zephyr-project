@@ -16,27 +16,18 @@ target_sources(app PRIVATE ${app_sources})
 set(CERBERUS_ROOT $ENV{ZEPHYR_BASE}/../middlewares/cerberus)
 
 #message(STATUS "Printing app_sources - ${app_sources}")
+zephyr_link_libraries(hrot_hal)
+zephyr_link_libraries(hrot_wrapper)
 zephyr_link_libraries(smf)
+zephyr_link_libraries(cerberus)
 target_include_directories(
 	app
 	PRIVATE
 	${CERBERUS_ROOT}/core
 	${CERBERUS_ROOT}/projects/zephyr
-	../../lib/hrot_hal
 	${ASPEED_PFR_ROOT}/src
 	${ASPEED_PFR_ROOT}/src/state_machine
 	${ZEPHYR_BASE}/include
 	${PROJECT_BINARY_DIR}/include/generated
 )
 
-#target_compile_options(
-#	app
-#	PRIVATE
-# 		-fno-builtin
-#		-fdata-sections
-#		-Wall
-#		-Wextra
-## 		-Werror
-#		-Wno-unused-parameter
-#		-g -ggdb3
-#)

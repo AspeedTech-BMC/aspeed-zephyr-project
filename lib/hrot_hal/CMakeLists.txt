@@ -4,10 +4,13 @@
 if (CONFIG_HROT_HAL)
 
 	set(HROT_PORT_ROOT ${CMAKE_CURRENT_LIST_DIR} CACHE INTERNAL "HROT_PORT_ROOT")
-	
-	zephyr_interface_library_named(hrot_middleware)
+
+	zephyr_interface_library_named(hrot_hal)
+
+	target_include_directories(hrot_hal INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+
 	zephyr_library()
-	
+
 	set(HROT_MIDDLEWARE_ROOT ${CMAKE_CURRENT_LIST_DIR} CACHE INTERNAL "HROT_MIDDLEWARE_ROOT")
 	zephyr_library_sources(
 	    ${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed.c
@@ -27,7 +30,7 @@ if (CONFIG_HROT_HAL)
 	    $ENV{ZEPHYR_BASE}/build/zephyr/include/generated/
 	    $ENV{ZEPHYR_BASE}/include/storage/
 	)
-	
-	zephyr_library_link_libraries(hrot_middleware)
+
+	zephyr_library_link_libraries(hrot_hal)
 
 endif()
