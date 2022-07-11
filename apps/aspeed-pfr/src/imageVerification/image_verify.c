@@ -11,6 +11,8 @@
 #include "image_verify.h"
 #include "common/common.h"
 #include "common/pfm_headers.h"
+#include "engineManager/engine_manager.h"
+#include "manifestProcessor/manifestProcessor.h"
 
 LOG_MODULE_REGISTER(verification, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -34,19 +36,17 @@ int read_rsa_public_key(struct rsa_public_key *public_key)
 	uint16_t module_length;
 	uint8_t exponent_length;
 
-	flash_device->read(flash_device, PFM_FLASH_MANIFEST_ADDRESS, &manifestFlash.header, sizeof(manifestFlash.header));
-	flash_device->read(flash_device, PFM_FLASH_MANIFEST_ADDRESS + manifestFlash.header.length, &module_length, sizeof(module_length));
+	flash_device->read(flash_device, PFM_FLASH_MANIFEST_ADDRESS, (uint8_t *)&manifestFlash.header, sizeof(manifestFlash.header));
+	flash_device->read(flash_device, PFM_FLASH_MANIFEST_ADDRESS + manifestFlash.header.length, (uint8_t *)&module_length, sizeof(module_length));
 
 	public_key_offset = PFM_FLASH_MANIFEST_ADDRESS + manifestFlash.header.length + sizeof(module_length);
 	public_key->mod_length = module_length;
-
-	uint8_t buf[public_key->mod_length];
 
 	flash_device->read(flash_device, public_key_offset, public_key->modulus, public_key->mod_length);
 
 	exponent_offset = public_key_offset + public_key->mod_length;
 	flash_device->read(flash_device, exponent_offset, &exponent_length, sizeof(exponent_length));
-	flash_device->read(flash_device, exponent_offset + sizeof(exponent_length), &public_key->exponent, exponent_length);
+	flash_device->read(flash_device, exponent_offset + sizeof(exponent_length), (uint8_t *)&public_key->exponent, exponent_length);
 
 	return 0;
 }
@@ -76,7 +76,6 @@ int signature_verification_init(struct signature_verification *verification)
 int perform_image_verification(void)
 {
 	int status = 0;
-	uint8_t flash_signature[256];
 	uint32_t firmware_offset;
 	int i;
 	struct manifest_toc_entry entry;
@@ -108,7 +107,7 @@ int perform_image_verification(void)
 	// 32 bytes
 	firmware_offset += manifest_flash->toc_hash_length;
 
-	manifest_flash->flash->read(manifest_flash->flash, firmware_offset, &plat_id_header,
+	manifest_flash->flash->read(manifest_flash->flash, firmware_offset, (uint8_t *)&plat_id_header,
 				    sizeof(plat_id_header));
 
 	// 4 bytes
@@ -123,7 +122,7 @@ int perform_image_verification(void)
 	// flash device 4 bytes
 	firmware_offset += sizeof(struct manifest_flash_device);
 
-	manifest_flash->flash->read(manifest_flash->flash, firmware_offset, &fw_header,
+	manifest_flash->flash->read(manifest_flash->flash, firmware_offset, (uint8_t *)&fw_header,
 				    sizeof(fw_header));
 
 	// fw_elements 8 bytes
@@ -131,7 +130,7 @@ int perform_image_verification(void)
 
 	struct allowable_fw allow_firmware;
 
-	manifest_flash->flash->read(manifest_flash->flash, firmware_offset, &allow_firmware,
+	manifest_flash->flash->read(manifest_flash->flash, firmware_offset, (uint8_t *)&allow_firmware,
 				    sizeof(allow_firmware));
 
 
@@ -148,7 +147,7 @@ int perform_image_verification(void)
 		status = read_rsa_public_key(&pub_key);
 
 		memset(&firmware_info, 0, sizeof(firmware_info));
-		manifest_flash->flash->read(manifest_flash->flash, firmware_offset, &firmware_info, sizeof(struct signature_firmware_region));
+		manifest_flash->flash->read(manifest_flash->flash, firmware_offset, (uint8_t *)&firmware_info, sizeof(struct signature_firmware_region));
 
 		status = flash_verify_contents(manifest_flash->flash,
 					       *((uint32_t *) firmware_info.start_address),

@@ -5,6 +5,7 @@
  */
 
 #include <spi_filter/spi_filter_wrapper.h>
+#include <string.h>
 
 #define SPIM_NUM  4
 
@@ -48,8 +49,8 @@ int  spi_filter_wrapper_init(struct spi_filter_engine_wrapper *spi_filter)
 
 	memset(spi_filter, 0, sizeof(struct spi_filter_engine_wrapper));
 
-	spi_filter->base.enable_filter = (int (*)(struct spi_filter_interface, bool))Wrapper_spi_filter_enable;
-	spi_filter->base.set_filter_rw_region = (int (*)(struct spi_filter_interface, uint8_t, uint32_t, uint32_t))Wrapper_spi_filter_rw_region;
+	spi_filter->base.enable_filter = (int (*)(struct spi_filter_interface *, bool))Wrapper_spi_filter_enable;
+	spi_filter->base.set_filter_rw_region = (int (*)(struct spi_filter_interface *, uint8_t, uint32_t, uint32_t))Wrapper_spi_filter_rw_region;
 
 	return 0;
 }

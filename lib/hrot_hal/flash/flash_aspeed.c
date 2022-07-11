@@ -49,7 +49,7 @@ static void Data_dump_buf(uint8_t *buf, uint32_t len)
 
 int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
-	struct device *flash_device;
+	const struct device *flash_device;
 	uint8_t DeviceId = flash->device_id[0];
 	int AdrOffset = xfer->address;
 	int Datalen = xfer->length;
@@ -57,7 +57,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	uint32_t FlashSize = 0;
 	int ret = 0;
 	int page_sz = 0;
-	int sector_sz = 0;
+
 	flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
 	if (!flash_device) {
 
@@ -146,12 +146,10 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 
 int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
-	struct device *flash_device;
-	struct flash_area *partition_device;
+	const struct device *flash_device;
+	const struct flash_area *partition_device;
 	uint32_t buf_addr = xfer->data;
 	uint32_t FlashSize = 0;
-	uint32_t page_sz = 0;
-	uint32_t sector_sz = 0;
 	int AdrOffset = 0;
 	int Datalen = 0;
 	int err, ret = 0;
@@ -234,17 +232,8 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 
 int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
-	struct device *flash_device;
-	uint32_t FlashSize = 0;
 	uint8_t DeviceId = flash->device_id[0];
-	//uint8_t DeviceId = 0;
-	uint32_t sector_sz = 0;
-	uint32_t page_sz = 0;
 	int ret  = 0;
-	int i = 0;
-	int AdrOffset = 0;
-	int Datalen = 0;
-	struct device *dev;
 
 	if (DeviceId <= PCH_SPI)
 		ret = BMC_PCH_SPI_Command(flash, xfer);

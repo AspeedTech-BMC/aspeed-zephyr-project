@@ -29,8 +29,10 @@ LOG_MODULE_DECLARE(aspeed_state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 #define MAX_LENGTH 32
 #define SMBUS_WRITE 0x45
 
-static void wdt_callback_bmc_timeout(void)
+static void wdt_callback_bmc_timeout(const struct device *dev, int channel_id)
 {
+	ARG_UNUSED(dev);
+	ARG_UNUSED(channel_id);
 	LOG_ERR("BMC Boot WDT Timeout");
 	union aspeed_event_data data = {0};
 	data.bit8[0] = BMC_EVENT;
@@ -38,8 +40,10 @@ static void wdt_callback_bmc_timeout(void)
 	SetLastPanicReason(BMC_WDT_EXPIRE);
 }
 
-static void wdt_callback_pch_timeout(void)
+static void wdt_callback_pch_timeout(const struct device *dev, int channel_id)
 {
+	ARG_UNUSED(dev);
+	ARG_UNUSED(channel_id);
 	LOG_ERR("PCH Boot WDT Timeout");
 	union aspeed_event_data data = {0};
 	data.bit8[0] = PCH_EVENT;

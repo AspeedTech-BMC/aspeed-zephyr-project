@@ -209,10 +209,8 @@ typedef struct _PFM_STRUCTURE {
 
 #pragma pack()
 
-static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
-
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);
-void get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
+int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
 // void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
 unsigned char erase_provision_data_in_flash(void);
 void GetUpdateStatus(uint8_t *DataBuffer, uint8_t DataSize);
@@ -256,6 +254,8 @@ bool IsUfmStatusPITL2CompleteSuccess(void);
 byte GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
 void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
+int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
+void SetUfmCmdTriggerValue(byte);
 byte get_provision_command(void);
 void set_provision_command(byte UfmCommandValue);
 void set_provision_commandTrigger(byte UfmCommandTrigger);

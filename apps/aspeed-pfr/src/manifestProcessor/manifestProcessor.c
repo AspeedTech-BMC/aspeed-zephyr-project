@@ -7,8 +7,10 @@
 #include <logging/log.h>
 #include <assert.h>
 
+#include "imageVerification/image_verify.h"
 #include "include/definitions.h"
 #include "manifestProcessor.h"
+#include "pfr/pfr_common.h"
 #include "common/common.h"
 #include "firmware/app_image.h"
 

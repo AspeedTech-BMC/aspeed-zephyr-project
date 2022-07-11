@@ -12,6 +12,7 @@ if (CONFIG_HROT_HAL)
 	zephyr_library()
 
 	set(HROT_MIDDLEWARE_ROOT ${CMAKE_CURRENT_LIST_DIR} CACHE INTERNAL "HROT_MIDDLEWARE_ROOT")
+
 	zephyr_library_sources(
 	    ${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/gpio/gpio_aspeed.c
@@ -21,7 +22,7 @@ if (CONFIG_HROT_HAL)
 	    ${HROT_MIDDLEWARE_ROOT}/i2c/i2c_filter_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/i2c/I2C_Slave_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/watchdog/watchdog_aspeed.c
-	    ${HROT_MIDDLEWARE_ROOT}/otp/otp_aspeed.c
+	    # ${HROT_MIDDLEWARE_ROOT}/otp/otp_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/abr/abr_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/spi_filter/spi_filter_aspeed.c
 	)

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <zephyr.h>
+#include <drivers/i2c.h>
+#include <drivers/i2c/pfr/swmbx.h>
 #include <logging/log.h>
 #include <drivers/gpio.h>
 #include "Smbus_mailbox.h"
@@ -11,8 +14,8 @@
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
-#include <drivers/i2c.h>
-#include <drivers/i2c/pfr/swmbx.h>
+#include "intel_pfr/intel_pfr_update.h"
+#include "pfr/pfr_ufm.h"
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
@@ -30,7 +33,8 @@ LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 #define PRIMARY_FLASH_REGION    1
 #define SECONDARY_FLASH_REGION  2
 
-struct device *gSwMbxDev = NULL;
+static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
+const struct device *gSwMbxDev = NULL;
 uint8_t gReadOnlyRfAddress[READ_ONLY_RF_COUNT] = { 0x1, 0x2, 0x3, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x14, 0x15, 0x16, 0x17,
 						   0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
 uint8_t gReadAndWriteRfAddress[READ_WRITE_RF_COUNT] = { 0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E };
@@ -93,14 +97,18 @@ unsigned char erase_provision_flash(void)
  * @Param  NULL
  * @retval NULL
  **/
-void get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length)
+int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length)
 {
-	uint8_t status;
+	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read(&spi_flash->spi, addr, DataBuffer, length);
 
+	if (status == 0)
+		return Success;
+	else
+		return Failure;
 }
 
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize)
@@ -162,7 +170,6 @@ K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
 	struct k_poll_event events[8];
-	uint8_t buffer[8][2] = { { 0 } };
 
 	k_poll_event_init(&events[0], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_write_fifo_data_sem);
 	k_poll_event_init(&events[1], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_read_fifo_state_sem);
@@ -347,7 +354,6 @@ void InitializeSmbusMailbox(void)
 
 	SetCpldIdentifier(0xDE);
 	SetCpldReleaseVersion(CPLD_RELEASE_VERSION);
-	uint8_t CurrentSvn = 0;
 
 	// get root key hash
 	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
@@ -489,10 +495,10 @@ MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
 #define TIMER_DEVICE "TIMER0"
 
 static struct aspeed_timer_user_config timer_conf;
-static struct device *led_dev = NULL;
-static struct deivce *led_timer_dev = NULL;
-static struct deivce *bmc_fp_green_in = NULL;
-static struct deivce *bmc_fp_amber_in = NULL;
+static const struct device *led_dev = NULL;
+static const struct device *led_timer_dev = NULL;
+static const struct device *bmc_fp_green_in = NULL;
+static const struct device *bmc_fp_amber_in = NULL;
 static bool fp_green_on;
 static bool fp_amber_on;
 static bool bypass_bmc_fp_signal;
@@ -639,7 +645,6 @@ void SetFPLEDState(byte PlatformStateData)
 void SetPlatformState(byte PlatformStateData)
 {
 #if defined(CONFIG_PLATFORM_STATE_LED)
-	uint8_t bit;
 	static const struct gpio_dt_spec leds[] = {
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 0),
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 1),
@@ -682,7 +687,7 @@ void ClearUfmStatusValue(uint8_t UfmStatusBitMask)
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 {
 	UfmStatus &= ~UfmStatusBitMask;
-	set_provision_data_in_flash(UFM_STATUS, &UfmStatus, 4);
+	set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, 4);
 }
 
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
@@ -852,7 +857,7 @@ unsigned char ProvisionRootKeyHash(void)
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
-		Status = set_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
+		Status = set_provision_data_in_flash(ROOT_KEY_HASH, (uint8_t *)gRootKeyHash, SHA384_DIGEST_LENGTH);
 		if (Status == Success) {
 			DEBUG_PRINTF("Root key provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
@@ -875,7 +880,7 @@ unsigned char ProvisionPchOffsets(void)
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
+		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)gPchOffsets, sizeof(gPchOffsets));
 		if (Status == Success) {
 			DEBUG_PRINTF("PCH offsets provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK);
@@ -899,7 +904,7 @@ unsigned char ProvisionBmcOffsets(void)
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
+		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)gBmcOffsets, sizeof(gBmcOffsets));
 		if (Status == Success) {
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK);
 			DEBUG_PRINTF("BMC offsets provisioned");
@@ -1049,10 +1054,10 @@ void process_provision_command(void)
 
 		CPLD_STATUS cpld_status;
 
-		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_status, sizeof(CPLD_STATUS));
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 		if (cpld_status.DecommissionFlag == TRUE) {
 			cpld_status.DecommissionFlag = 0;
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_status, sizeof(CPLD_STATUS));
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 		}
 	}
 }

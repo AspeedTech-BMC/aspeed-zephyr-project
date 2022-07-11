@@ -27,10 +27,10 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 		}				  \
 }
 
+extern void aspeed_print_sysrst_info(void);
+
 void main(void)
 {
-	int status = 0;
-
 	LOG_INF("*** ASPEED_PFR version 01.01 Board:%s ***", CONFIG_BOARD);
 
 	aspeed_print_sysrst_info();

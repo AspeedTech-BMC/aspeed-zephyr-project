@@ -35,3 +35,4 @@ struct xfer_engine_wrapper {
 	}
 
 int flash_wrapper_init(struct spi_engine_wrapper *spi, struct flash_master_wrapper *engine);
+int flash_master_wrapper_init(struct flash_master_wrapper *spi);

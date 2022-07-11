@@ -68,7 +68,7 @@ struct recovery_image_header {
 	uint8_t sig_length[4];
 };
 
-struct recovery_image {
+struct recovery_image_info {
 	uint16_t header_length;
 	uint16_t format;
 	uint8_t magic_num[4];

@@ -9,5 +9,6 @@
 #include <zephyr.h>
 
 int initializeManifestProcessor(void);
+void uninitializeManifestProcessor(void);
 int processPfmFlashManifest(void);
 

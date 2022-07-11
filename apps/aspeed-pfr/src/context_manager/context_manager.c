@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <string.h>
 
 #include "common/common.h"
 #include "context_manager.h"
@@ -21,7 +22,7 @@ struct Context_Manager *get_Context_Manager(void)
 void set_Context_Manager(struct Context_Manager *new_context)
 {
 	if (new_context)
-		memcpy(context_manager, new_context, sizeof(struct Context_Manager));
+		memcpy(&context_manager, new_context, sizeof(struct Context_Manager));
 }
 
 unsigned char erase_context_data_flash(void)

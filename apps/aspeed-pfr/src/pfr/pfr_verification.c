@@ -6,6 +6,7 @@
 
 #include <logging/log.h>
 #include "intel_pfr/intel_pfr_authentication.h"
+#include "intel_pfr/intel_pfr_verification.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "flash/flash_aspeed.h"
@@ -26,7 +27,6 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 int authentication_image(void *AoData, void *EventContext)
 {
 	int status = 0;
-	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
 	// init_pfr_manifest();

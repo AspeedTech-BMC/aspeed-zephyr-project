@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "common/common.h"
 #include "flash/flash_wrapper.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "intel_pfr/intel_pfr_definitions.h"
+#include "pfr/pfr_util.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 
 
 int get_cpld_status(uint8_t *data, uint32_t data_length)

@@ -71,14 +71,14 @@ typedef struct _AO_DATA {
 	};
 } AO_DATA;
 
-static enum SystemState {
+enum SystemState {
 	Initial = 1,
 	Verify,
 	Recovery,
 	Update
-} SystemState;
+};
 
-static enum OPERATIONS {
+enum OPERATIONS {
 	VERIFY_ACTIVE = 1,
 	VERIFY_BACKUP,
 	RECOVER_ACTIVE,
@@ -86,6 +86,8 @@ static enum OPERATIONS {
 	UPDATE_BACKUP,
 	RELEASE_HOLD,
 	I2C_HANDLE
-} OPERATIONS;
+};
 #pragma pack()
 
+void AspeedPFR_EnableTimer(int type);
+void AspeedPFR_DisableTimer(int type);

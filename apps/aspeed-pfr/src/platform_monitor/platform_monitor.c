@@ -12,8 +12,6 @@
 
 LOG_MODULE_REGISTER(monitor, CONFIG_LOG_DEFAULT_LEVEL);
 
-AO_DATA BmcAOData;
-static EVENT_CONTEXT BmcData[2];
 static struct gpio_callback bmc_rstind_cb_data;
 void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {

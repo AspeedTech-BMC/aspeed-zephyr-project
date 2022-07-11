@@ -45,8 +45,6 @@ int I2CSlave_wrapper_InitSlaveDev(struct i2c_slave_interface *i2c, char *DevName
  */
 int I2C_Slave_wrapper_init(struct I2CSlave_engine_wrapper *I2CSlaveEngine)
 {
-	int status;
-
 	if (I2CSlaveEngine == NULL) {
 		return I2C_SLAVE_INVALID_ARGUMENT;
 	}

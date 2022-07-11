@@ -14,7 +14,7 @@ struct watchdog_config {
 	uint8_t reset_option; //WDT_FLAG_RESET_SHIFT , WDT_FLAG_RESET_CPU_CORE , WDT_FLAG_RESET_SOC
 };
 
-static char *WDT_Devices_List[4] = {
+static const char *WDT_Devices_List[4] = {
 	"wdt1",
 	"wdt2",
 	"wdt3",

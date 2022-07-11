@@ -15,13 +15,21 @@
 #include "AspeedStateMachine.h"
 #include "include/SmbusMailBoxCom.h"
 #include "intel_pfr/intel_pfr_definitions.h"
+#include "intel_pfr/intel_pfr_update.h"
+#include "imageRecovery/image_recovery.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "StateMachineAction/StateMachineActions.h"
 #include "pfr/pfr_util.h"
 #include "gpio/gpio_aspeed.h"
+#include "logging/logging_wrapper.h"
+#include "manifestProcessor/manifestProcessor.h"
+#include "pfr/pfr_recovery.h"
+#include "pfr/pfr_verification.h"
 #include "platform_monitor/platform_monitor.h"
 #include "platform_monitor/spim_monitor.h"
 #include "engineManager/engine_manager.h"
 #include "spi_filter/spi_filter_wrapper.h"
+#include "pfr/pfr_ufm.h"
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 
@@ -32,6 +40,8 @@ static const struct smf_state state_table[];
 
 enum aspeed_pfr_event event_log[128] = {START_STATE_MACHINE};
 size_t event_log_idx = 0;
+
+extern enum boot_indicator get_boot_indicator(void);
 
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 {
@@ -135,7 +145,7 @@ void handle_image_verification(void *o)
 		CPLD_STATUS cpld_update_status;
 		bool update_reset = false;
 
-		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		if (cpld_update_status.CpldStatus == 1
 				|| cpld_update_status.BmcStatus == 1
 				|| cpld_update_status.PchStatus == 1) {
@@ -172,7 +182,7 @@ void handle_image_verification(void *o)
 			}
 
 			/* Clear the pending flags */
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 
 			if (intent) {
 				union aspeed_event_data data;
@@ -533,9 +543,9 @@ void handle_update_requested(void *o)
 	case BmcUpdateIntent:
 		/* BMC has full access */
 		if ((update_region & PchActiveUpdate) || (update_region & PchRecoveryUpdate)) {
-			ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+			ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 			cpld_update_status.BmcToPchStatus = 1;
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		}
 		break;
 	default:
@@ -672,7 +682,7 @@ void handle_update_at_reset(void *o)
 	/* Update At Reset save status to UFM */
 	CPLD_STATUS cpld_update_status;
 
-	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	if (evt_ctx->data.bit8[1] & PchActiveUpdate) {
 		cpld_update_status.PchStatus = 1;
 		cpld_update_status.Region[2].ActiveRegion = 1;
@@ -699,7 +709,7 @@ void handle_update_at_reset(void *o)
 	if (evt_ctx->data.bit8[1] & DymanicUpdate)
 		LOG_ERR("DymanicUpdate not supported");
 	/* Setting updated cpld status to ufm */
-	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 }
 
 void do_runtime(void *o)

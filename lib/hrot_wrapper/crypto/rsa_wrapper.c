@@ -74,8 +74,6 @@ int rsa_wrapper_sig_verify(struct rsa_engine *engine, const struct rsa_public_ke
  */
 int rsa_wrapper_init(struct rsa_engine_wrapper *engine)
 {
-	int status;
-
 	if (engine == NULL) {
 		return RSA_ENGINE_INVALID_ARGUMENT;
 	}

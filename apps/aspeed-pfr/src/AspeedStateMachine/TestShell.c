@@ -8,6 +8,7 @@
 #include <shell/shell.h>
 #include <logging/log.h>
 #include <drivers/flash.h>
+#include <drivers/misc/aspeed/abr_aspeed.h>
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
@@ -16,6 +17,8 @@
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 #include "gpio/gpio_aspeed.h"
+#include "pfr/pfr_ufm.h"
+#include "pfr/pfr_util.h"
 
 LOG_MODULE_REGISTER(asm_test, LOG_LEVEL_DBG);
 
@@ -48,8 +51,6 @@ static int cmd_asm_log(const struct shell *shell, size_t argc,
 static int cmd_asm_abr(const struct shell *shell, size_t argc,
 			char **argv)
 {
-	bool control = false;
-
 	if (argc > 1 && !strncmp(argv[1], "enable", 6)) {
 		shell_print(shell, "Enable ABR FMCWDT2");
 #define ABR_CTRL_REG    0x7e620064
@@ -80,7 +81,7 @@ static int cmd_asm_flash_cmp(const struct shell *shell, size_t argc,
 
 	shell_print(shell, "Hash Dev:%s Offset_A:%p Offset_B:%p Length:%p", dev_name, offset_a, offset_b, length);
 
-	struct device *dev = device_get_binding(dev_name);
+	const struct device *dev = device_get_binding(dev_name);
 
 	if (dev == NULL) {
 		shell_print(shell, "Failed to bind device:%s", dev_name);
@@ -126,8 +127,8 @@ static int cmd_asm_flash_copy(const struct shell *shell, size_t argc,
 	shell_print(shell, "Hash Dev_src:%s Offset_src:%p Dev_dest:%s Offset_dest:%p Length:%p",
 			dev_name_a, offset_a, dev_name_b, offset_b, length);
 
-	struct device *dev_a = device_get_binding(dev_name_a);
-	struct device *dev_b = device_get_binding(dev_name_b);
+	const struct device *dev_a = device_get_binding(dev_name_a);
+	const struct device *dev_b = device_get_binding(dev_name_b);
 
 	if (dev_a == NULL) {
 		shell_print(shell, "Failed to bind device:%s", dev_name_a);
@@ -186,7 +187,7 @@ static int cmd_asm_ufm_status(const struct shell *shell, size_t argc,
 {
 	CPLD_STATUS cpld_update_status;
 
-	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 
 	shell_print(shell, "CpldStatus = 0x%02x", cpld_update_status.CpldStatus);
 	shell_print(shell, "BmcStatus = 0x%02x", cpld_update_status.BmcStatus);
@@ -221,8 +222,8 @@ static void inject_spi_error(const struct shell *shell, uint32_t flag)
 	 */
 	if (flag & 0x0FFFF000) {
 		/* BMC Flash */
-		struct device *dev_mon = device_get_binding("spi_m1");
-		struct device *dev_flash = device_get_binding("spi1_cs0");
+		const struct device *dev_mon = device_get_binding("spi_m1");
+		const struct device *dev_flash = device_get_binding("spi1_cs0");
 		spim_ext_mux_config(dev_mon, SPIM_EXT_MUX_ROT);
 		if (flag & 0x0F000000) {
 			/* ACT */
@@ -269,8 +270,8 @@ static void inject_spi_error(const struct shell *shell, uint32_t flag)
 
 	if (flag & 0x00000FFF) {
 		/* PCH Flash */
-		struct device *dev_mon = device_get_binding("spi_m3");
-		struct device *dev_flash = device_get_binding("spi2_cs0");
+		const struct device *dev_mon = device_get_binding("spi_m3");
+		const struct device *dev_flash = device_get_binding("spi2_cs0");
 		spim_ext_mux_config(dev_mon, SPIM_EXT_MUX_ROT);
 		if (flag & 0x00000F00) {
 			/* ACT */
