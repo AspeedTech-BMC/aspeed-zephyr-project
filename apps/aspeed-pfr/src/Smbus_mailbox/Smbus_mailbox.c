@@ -423,7 +423,7 @@ void InitializeSmbusMailbox(void)
 	void Set##REG(byte Data) \
 	{ \
 		swmbx_write(gSwMbxDev, false, REG, &Data); \
-	} 
+	}
 
 #define MBX_REG_INC(REG) \
 	void Inc##REG() \
@@ -432,7 +432,7 @@ void InitializeSmbusMailbox(void)
 		swmbx_read(gSwMbxDev, false, REG, &data); \
 		++data; \
 		swmbx_write(gSwMbxDev, false, REG, &data); \
-	} 
+	}
 
 #define MBX_REG_GETTER(REG) \
 	byte Get##REG(void) \
@@ -480,6 +480,162 @@ MBX_REG_SETTER_GETTER(BmcPfmRecoverSvn);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
 
+#if defined(CONFIG_FRONT_PANEL_LED)
+#include <drivers/timer/aspeed_timer.h>
+#include <drivers/led.h>
+
+#define GPIO_SPEC(node_id) GPIO_DT_SPEC_GET_OR(node_id, gpios, {0})
+#define LED_DEVICE "leds"
+#define TIMER_DEVICE "TIMER0"
+
+static struct aspeed_timer_user_config timer_conf;
+static struct device *led_dev = NULL;
+static struct deivce *led_timer_dev = NULL;
+static struct deivce *bmc_fp_green_in = NULL;
+static struct deivce *bmc_fp_amber_in = NULL;
+static bool fp_green_on;
+static bool fp_amber_on;
+static bool bypass_bmc_fp_signal;
+
+static const struct gpio_dt_spec bmc_fp_green = GPIO_SPEC(DT_ALIAS(fp_input0));
+static const struct gpio_dt_spec bmc_fp_amber = GPIO_SPEC(DT_ALIAS(fp_input1));
+
+static struct gpio_callback bmc_fp_green_cb_data;
+static struct gpio_callback bmc_fp_amber_cb_data;
+
+enum {
+	FP_GREEN_LED  = 0x00,
+	FP_AMBER_LED,
+};
+
+enum {
+	ONE_SHOT_TIMER = 0x00,
+	PERIOD_TIMER,
+};
+
+void fp_amber_led_ctrl_callback()
+{
+	fp_amber_on ? led_off(led_dev, FP_AMBER_LED) : led_on(led_dev, FP_AMBER_LED);
+	fp_amber_on = !fp_amber_on;
+}
+
+void bmc_fp_led_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+	int led_id;
+	if (bypass_bmc_fp_signal)
+		return;
+
+	uint8_t gpio_pin = 31 - __builtin_clz(pins);
+	if (gpio_pin == bmc_fp_green.pin)
+		led_id = FP_GREEN_LED;
+	else if (gpio_pin == bmc_fp_amber.pin)
+		led_id = FP_AMBER_LED;
+	else
+		return;
+
+	int ret = gpio_pin_get(dev, gpio_pin);
+	if (ret < 0) {
+		LOG_ERR("Failed to get BMC_FP_GREEN_LED status");
+		return;
+	}
+
+	ret ? led_on(led_dev, led_id) : led_off(led_dev, led_id);
+	if (led_id == FP_GREEN_LED)
+		fp_green_on = (bool)ret;
+	else
+		fp_amber_on = (bool)ret;
+}
+
+void initializeFPLEDs(void)
+{
+	// init led
+	led_dev = device_get_binding(LED_DEVICE);
+	led_off(led_dev, FP_GREEN_LED);
+	fp_green_on = false;
+	led_off(led_dev, FP_AMBER_LED);
+	fp_amber_on = false;
+
+	// init timer
+	led_timer_dev = device_get_binding(TIMER_DEVICE);
+	timer_conf.millisec = 500;
+	timer_conf.timer_type = PERIOD_TIMER;
+	timer_conf.user_data = NULL;
+	timer_conf.callback = fp_amber_led_ctrl_callback;
+
+	// init bmc_fp_green_led
+	bmc_fp_green_in = device_get_binding(DT_GPIO_LABEL(DT_ALIAS(fp_input0), gpios));
+	gpio_pin_configure(bmc_fp_green_in, DT_GPIO_PIN(DT_ALIAS(fp_input0), gpios),
+			DT_GPIO_FLAGS(DT_ALIAS(fp_input0), gpios) | GPIO_INPUT);
+	gpio_pin_interrupt_configure(bmc_fp_green_in, DT_GPIO_PIN(DT_ALIAS(fp_input0), gpios),
+			GPIO_INT_EDGE_BOTH);
+	gpio_init_callback(&bmc_fp_green_cb_data, bmc_fp_led_handler,
+			BIT(DT_GPIO_PIN(DT_ALIAS(fp_input0), gpios)));
+	gpio_add_callback(bmc_fp_green_in, &bmc_fp_green_cb_data);
+
+	// init bmc_fp_amber_led
+	bmc_fp_amber_in = device_get_binding(DT_GPIO_LABEL(DT_ALIAS(fp_input1), gpios));
+	gpio_pin_configure(bmc_fp_amber_in, DT_GPIO_PIN(DT_ALIAS(fp_input1), gpios),
+			DT_GPIO_FLAGS(DT_ALIAS(fp_input1), gpios) | GPIO_INPUT);
+	gpio_pin_interrupt_configure(bmc_fp_amber_in, DT_GPIO_PIN(DT_ALIAS(fp_input1), gpios),
+			GPIO_INT_EDGE_BOTH);
+	gpio_init_callback(&bmc_fp_amber_cb_data, bmc_fp_led_handler,
+			BIT(DT_GPIO_PIN(DT_ALIAS(fp_input1), gpios)));
+	gpio_add_callback(bmc_fp_amber_in, &bmc_fp_amber_cb_data);
+}
+
+void SetFPLEDState(byte PlatformStateData)
+{
+	// FP LED behavior
+	//
+	// |  Green  |  Amber  | State    |
+	// --------------------------------
+	// |   Lit   |  Off    | Verify   |
+	// |   Off   |  Blink  | Recovery |
+	// |   Off   |  Lit    | Update   |
+	// | PassThr | PassThr | Tzero    |
+	if (PlatformStateData == PCH_FW_UPDATE ||
+	    PlatformStateData == BMC_FW_UPDATE ||
+	    PlatformStateData == CPLD_FW_UPDATE) {
+		bypass_bmc_fp_signal = true;
+		timer_aspeed_stop(led_timer_dev);
+		led_off(led_dev, FP_GREEN_LED);
+		fp_green_on = false;
+		led_on(led_dev, FP_AMBER_LED);
+		fp_amber_on = true;
+	} else if (PlatformStateData == T_MINUS_1_FW_RECOVERY) {
+		bypass_bmc_fp_signal = true;
+		led_off(led_dev, FP_GREEN_LED);
+		fp_green_on = false;
+		timer_aspeed_start(led_timer_dev, &timer_conf);
+	} else if (PlatformStateData == ENTER_T_MINUS_1) {
+		bypass_bmc_fp_signal = true;
+		timer_aspeed_stop(led_timer_dev);
+		led_on(led_dev, FP_GREEN_LED);
+		fp_green_on = true;
+		led_off(led_dev, FP_AMBER_LED);
+		fp_amber_on = false;
+	} else if (PlatformStateData == ENTER_T0) {
+		timer_aspeed_stop(led_timer_dev);
+		bypass_bmc_fp_signal = false;
+		int pin_state = gpio_pin_get(bmc_fp_green_in, bmc_fp_green.pin);
+		if (pin_state < 0) {
+			LOG_ERR("Failed to get BMC_FP_GREEN_LED");
+			return;
+		}
+		pin_state ? led_on(led_dev, FP_GREEN_LED) : led_off(led_dev, FP_GREEN_LED);
+		fp_green_on = pin_state;
+
+		pin_state = gpio_pin_get(bmc_fp_amber_in, bmc_fp_amber.pin);
+		if (pin_state < 0) {
+			LOG_ERR("Failed to get BMC_FP_AMBER_LED");
+			return;
+		}
+		pin_state ? led_on(led_dev, FP_AMBER_LED) : led_off(led_dev, FP_AMBER_LED);
+		fp_amber_on = pin_state;
+	}
+}
+#endif
+
 void SetPlatformState(byte PlatformStateData)
 {
 #if defined(CONFIG_PLATFORM_STATE_LED)
@@ -498,6 +654,10 @@ void SetPlatformState(byte PlatformStateData)
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
 		gpio_pin_set(leds[bit].port, leds[bit].pin, !(PlatformStateData & BIT(bit)));
 	}
+#endif
+
+#if defined(CONFIG_FRONT_PANEL_LED)
+	SetFPLEDState(PlatformStateData);
 #endif
 	swmbx_write(gSwMbxDev, false, PlatformState, &PlatformStateData);
 }

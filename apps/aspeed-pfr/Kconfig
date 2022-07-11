@@ -43,6 +43,12 @@ config PLATFORM_STATE_LED
 	help
 	  Enable if the system has PlatformState LEDs
 
+config FRONT_PANEL_LED
+	default n
+	bool "Enable PFR front panel LED signals"
+	help
+	  Enable if the system has PFR front panel design.
+
 config BMC_STAGING_SIZE
 	default 0x03DE0000
 	hex "BMC staging region size in BMC flash"

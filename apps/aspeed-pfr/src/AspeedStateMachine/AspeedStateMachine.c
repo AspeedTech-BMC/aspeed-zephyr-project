@@ -46,13 +46,15 @@ void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 	k_fifo_put(&aspeed_sm_fifo, event);
 }
 
-
 void do_init(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
 
 	LOG_DBG("Start");
 
+#if defined(CONFIG_FRONT_PANEL_LED)
+	initializeFPLEDs();
+#endif
 	initializeEngines();
 	initializeManifestProcessor();
 	debug_log_init();// State Machine log saving
@@ -930,3 +932,4 @@ void AspeedStateMachine(void)
 		k_free(fifo_in);
 	}
 }
+

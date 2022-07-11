@@ -369,6 +369,24 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_spi_error, cmd_asm_spi_error,
 	(BBBBBBB, 0x0FFFFFFF)
 );
 
+static int cmd_test_plat_state_led(const struct shell *shell, size_t argc,
+			char **argv)
+{
+	if (argc != 2) {
+		shell_print(shell, "asm pstate STATE");
+		return 0;
+	}
+
+	size_t pstate = strtol(argv[1], NULL, 16);
+
+	if (pstate > LOCKDOWN_ON_PIT_L2_BMC_HASH_MISMATCH) {
+		shell_print(shell, "State is not supported");
+		return 0;
+	}
+
+	SetPlatformState(pstate);
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
 	SHELL_CMD(event, &sub_event, "State Machine Event", NULL),
@@ -378,6 +396,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(spi_error_inject, &sub_spi_error, "Inject error to SPI for testing", NULL),
 	SHELL_CMD(flash_cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
 	SHELL_CMD(flash_copy, NULL, "Copy data between Flash", cmd_asm_flash_copy),
+	SHELL_CMD(pstate, NULL, "Test Platform State LED", cmd_test_plat_state_led),
 	SHELL_SUBCMD_SET_END
 );
 

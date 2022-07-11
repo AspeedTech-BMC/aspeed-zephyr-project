@@ -322,6 +322,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source);
 bool WatchDogTimer(int ImageType);
 uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag);
 void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion);
+void initializeFPLEDs(void);
 
 #define UFM_STATUS_LOCK_BIT_MASK                      0b1
 #define UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK 0b10
