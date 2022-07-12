@@ -203,8 +203,12 @@ void apply_pfm_protection(int spi_device_id)
 			 * 0b00000100: SHA512 present
 			 * Otherwise: Reserved
 			 */
-			if ((region_record[2] & 0x01) == 0x01)
+			if (region_record[2] & 0x01)
 				pfm_region_Start = pfm_region_Start + 48;
+			else if (region_record[2] & 0x02)
+				pfm_region_Start = pfm_region_Start + 64;
+			else if (region_record[2] & 0x04)
+				pfm_region_Start = pfm_region_Start + 80;
 			else
 				pfm_region_Start = pfm_region_Start + 16;
 			break;
