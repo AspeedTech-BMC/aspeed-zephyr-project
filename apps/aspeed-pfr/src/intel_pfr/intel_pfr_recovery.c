@@ -75,11 +75,11 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
-	size_t area_size;
+	size_t area_size = 0;
 
 	if (image_type == BMC_TYPE)
 		area_size = CONFIG_BMC_STAGING_SIZE;
-	else if (image_type == PCH_TYPE)
+	else /* if (image_type == PCH_TYPE) */
 		area_size = CONFIG_PCH_STAGING_SIZE;
 
 	spi_flash->spi.device_id[0] = image_type;

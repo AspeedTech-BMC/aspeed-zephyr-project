@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <logging/log.h>
 #include <zephyr.h>
+#include <device.h>
 #include <logging/log.h>
 #include <drivers/i2c/pfr/i2c_filter.h>
 
@@ -134,6 +135,10 @@ void apply_pfm_protection(int spi_device_id)
 	// cerberus define region_id start from 1
 	int region_id = 1;
 	uint8_t region_record[40];
+
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	int flash_size;
+#endif
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.device_id[0] = spi_device_id;

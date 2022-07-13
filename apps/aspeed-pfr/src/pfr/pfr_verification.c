@@ -125,8 +125,6 @@ void manifest_free_platform_id(struct manifest *manifest, char *id)
 {
 	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
-
-	return Success;
 }
 
 /**

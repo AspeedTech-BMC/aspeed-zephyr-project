@@ -84,7 +84,7 @@ void AspeedPFR_EnableTimer(int type)
 
 void AspeedPFR_DisableTimer(int type)
 {
-	const struct device *wdt_dev;
+	const struct device *wdt_dev = NULL;
 
 	if (type == BMC_EVENT) {
 		LOG_INF("Disable BMC Timer");
@@ -93,8 +93,8 @@ void AspeedPFR_DisableTimer(int type)
 	} else if (type == PCH_EVENT) {
 		LOG_INF("Disable PCH Timer");
 		wdt_dev = device_get_binding(WDT_Devices_List[1]);
-
 	}
-	watchdog_disable(wdt_dev);
+	if (wdt_dev)
+		watchdog_disable(wdt_dev);
 }
 
