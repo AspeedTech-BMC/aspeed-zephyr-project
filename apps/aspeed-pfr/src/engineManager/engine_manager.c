@@ -18,9 +18,12 @@
 #include "common/common.h"
 #include "imageVerification/image_verify.h"
 #include "intel_pfr/intel_pfr_verification.h"
+#include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_provision.h"
+#include "intel_pfr/intel_pfr_definitions.h"
 #include "manifestProcessor/manifestProcessor.h"
 #include "flash/flash_wrapper.h"
+#include "gpio/gpio_aspeed.h"
 
 LOG_MODULE_REGISTER(engine, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -95,6 +98,71 @@ void uninitializeEngines(void)
 	pfm_flash_release(getPfmFlashInstance());
 }
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm_addr)
+{
+	uint32_t fvm_offset = fvm_addr + PFM_SIG_BLOCK_SIZE;
+	uint32_t fvm_body_offset = fvm_offset + sizeof(FVM_STRUCTURE);
+	FVM_STRUCTURE fvm;
+	PFM_SPI_DEFINITION spi_def;
+	uint32_t fvm_body_end_addr;
+
+	spi_flash->spi.device_id[0] = PCH_SPI;
+	spi_flash->spi.base.read(&spi_flash->spi, fvm_offset, &fvm, sizeof(FVM_STRUCTURE));
+	fvm_body_end_addr = fvm_offset + fvm.Length;
+
+	while(fvm_body_offset < fvm_body_end_addr) {
+		spi_flash->spi.base.read(&spi_flash->spi, fvm_body_offset, &spi_def,
+				sizeof(PFM_SPI_DEFINITION));
+		if (spi_def.PFMDefinitionType == SPI_REGION) {
+			if (spi_def.ProtectLevelMask.ReadAllowed) {
+				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, spi_def.RegionStartAddress,
+						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				LOG_INF("SPI_ID[2] fvm read enable 0x%08x to 0x%08x",
+					spi_def.RegionStartAddress,
+					spi_def.RegionEndAddress);
+			} else {
+				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_DISABLE, spi_def.RegionStartAddress,
+						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				LOG_INF("SPI_ID[2] fvm read disable 0x%08x to 0x%08x",
+					spi_def.RegionStartAddress,
+					spi_def.RegionEndAddress);
+			}
+
+			if (spi_def.ProtectLevelMask.WriteAllowed) {
+				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, spi_def.RegionStartAddress,
+						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				LOG_INF("SPI_ID[2] fvm write enable 0x%08x to 0x%08x",
+					spi_def.RegionStartAddress,
+					spi_def.RegionEndAddress);
+			} else {
+				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_DISABLE, spi_def.RegionStartAddress,
+						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				LOG_INF("SPI_ID[2] fvm write disable 0x%08x to 0x%08x",
+					spi_def.RegionStartAddress,
+					spi_def.RegionEndAddress);
+			}
+
+			if (spi_def.HashAlgorithmInfo.SHA256HashPresent) {
+				fvm_body_offset += sizeof(PFM_SPI_DEFINITION) + SHA256_SIZE;
+			} else if (spi_def.HashAlgorithmInfo.SHA384HashPresent) {
+				fvm_body_offset += sizeof(PFM_SPI_DEFINITION) + SHA384_SIZE;
+			} else {
+				fvm_body_offset += SPI_REGION_DEF_MIN_SIZE;
+			}
+		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
+			fvm_body_offset += sizeof(FVM_CAPABLITIES);
+		} else {
+			break;
+		}
+	}
+}
+#endif
+
 void apply_pfm_protection(int spi_device_id)
 {
 
@@ -135,6 +203,9 @@ void apply_pfm_protection(int spi_device_id)
 	// cerberus define region_id start from 1
 	int region_id = 1;
 	uint8_t region_record[40];
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
+#endif
 
 #if defined(CONFIG_BMC_DUAL_FLASH)
 	int flash_size;
@@ -153,7 +224,7 @@ void apply_pfm_protection(int spi_device_id)
 		/* Read PFM Record */
 		spi_flash->spi.base.read(&spi_flash->spi, pfm_region_Start, region_record, default_region_length);
 		switch(region_record[0]) {
-		case 0x01:
+		case SPI_REGION:
 			/* SPI Region: 0x01 */
 			/* Region protect level mask:
 			 * 0b00000001: Protect: Read allowed
@@ -183,7 +254,7 @@ void apply_pfm_protection(int spi_device_id)
 				spi_filter->base.set_filter_rw_region(&spi_filter->base,
 						region_id, region_start_address, region_end_address);
 				region_id++;
-				LOG_INF("SPI_ID[%d] write enable  0x%08x to 0x%08x", 
+				LOG_INF("SPI_ID[%d] write enable  0x%08x to 0x%08x",
 					spi_device_id, region_start_address, region_end_address);
 			} else {
 				/* Write not allowed region */
@@ -191,7 +262,7 @@ void apply_pfm_protection(int spi_device_id)
 				Set_SPI_Filter_RW_Region(spim_devs[spi_device_id],
 						SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
-				LOG_INF("SPI_ID[%d] write disable 0x%08x to 0x%08x", 
+				LOG_INF("SPI_ID[%d] write disable 0x%08x to 0x%08x",
 					spi_device_id, region_start_address, region_end_address);
 			}
 
@@ -201,7 +272,7 @@ void apply_pfm_protection(int spi_device_id)
 				Set_SPI_Filter_RW_Region(spim_devs[spi_device_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE,
 						region_start_address, region_length);
-				LOG_INF("SPI_ID[%d] read  enable  0x%08x to 0x%08x", 
+				LOG_INF("SPI_ID[%d] read  enable  0x%08x to 0x%08x",
 					spi_device_id, region_start_address, region_end_address);
 			} else {
 				/* Read not allowed region */
@@ -209,7 +280,7 @@ void apply_pfm_protection(int spi_device_id)
 				Set_SPI_Filter_RW_Region(spim_devs[spi_device_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
-				LOG_INF("SPI_ID[%d] read  disable 0x%08x to 0x%08x", 
+				LOG_INF("SPI_ID[%d] read  disable 0x%08x to 0x%08x",
 					spi_device_id, region_start_address, region_end_address);
 			}
 
@@ -228,7 +299,7 @@ void apply_pfm_protection(int spi_device_id)
 			else
 				pfm_region_Start = pfm_region_Start + 16;
 			break;
-		case 0x02:
+		case SMBUS_RULE:
 			/* SMBus Rule Definition: 0x02 */
 			LOG_INF("SMBus Rule Bus[%d] RuleId[%d] DeviceAddr[%x]",
 					region_record[5], region_record[6], region_record[7]);
@@ -266,8 +337,15 @@ void apply_pfm_protection(int spi_device_id)
 				LOG_HEXDUMP_ERR(region_record, 40, "Invalid Bus ID or Rule ID");
 			}
 
-			pfm_region_Start += 40;
+			pfm_region_Start += sizeof(PFM_SMBUS_RULE);;
 			break;
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		case FVM_ADDR_DEF:
+			fvm_def = region_record;
+			apply_fvm_spi_protection(spi_flash, fvm_def->FVMAddress);
+			pfm_region_Start += sizeof(PFM_FVM_ADDRESS_DEFINITION);
+			break;
+#endif
 		default:
 			done = true;
 			break;

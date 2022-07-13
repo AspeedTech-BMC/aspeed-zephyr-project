@@ -8,6 +8,7 @@
 #include "pfr_recovery.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_recovery.h"
 #include "intel_pfr/intel_pfr_definitions.h"
@@ -34,7 +35,7 @@ int recover_image(void *AoData, void *EventContext)
 	// init_pfr_manifest();
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 
-	pfr_manifest->state = RECOVERY;
+	pfr_manifest->state = FIRMWARE_RECOVERY;
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI

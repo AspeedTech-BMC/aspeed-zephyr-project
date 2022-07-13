@@ -87,13 +87,15 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 	uint32_t bit_offset;
 	int status = 0;
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	if (manifest->pc_type == PFR_PCH_SEAMLESS_UPDATE_CAPSULE)
+		return Success;
+#endif
+
 	if (!ufm_offset) {
 		LOG_ERR("%s: Invalid provisioned UFM offset for key cancellation", __func__);
 		return Failure;
 	}
-
-	if (manifest->pc_type == PFR_PCH_CPU_Seamless_Update_Capsule)
-		return Success;
 
 	// key id must be within 0-127
 	if (key_id > KEY_CANCELLATION_MAX_KEY_ID) {

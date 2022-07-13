@@ -6,10 +6,6 @@
 
 #pragma once
 
-
-/* List of HRoT states */
-enum HRoT_state { IDLE, INITIALIZE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
-
 typedef enum {
 	Success,
 	Failure,

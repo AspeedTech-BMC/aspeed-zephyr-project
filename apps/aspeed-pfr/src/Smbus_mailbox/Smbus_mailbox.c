@@ -155,6 +155,13 @@ void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *Ma
 }
 
 #define SWMBX_NOTIFYEE_STACK_SIZE 1024
+
+#if defined(CONFIG_SEAMLESS_UPDATE)
+#define TOTAL_MBOX_EVENT 10
+#else
+#define TOTAL_MBOX_EVENT 8
+#endif
+
 struct k_thread swmbx_notifyee_thread;
 K_THREAD_STACK_DEFINE(swmbx_notifyee_stack, SWMBX_NOTIFYEE_STACK_SIZE);
 K_SEM_DEFINE(ufm_write_fifo_state_sem, 0, 1);
@@ -167,9 +174,14 @@ K_SEM_DEFINE(bmc_checkpoint_sem, 0, 1);
 K_SEM_DEFINE(acm_checkpoint_sem, 0, 1);
 K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+K_SEM_DEFINE(bmc_seamless_update_intent_sem, 0, 1);
+K_SEM_DEFINE(pch_seamless_update_intent_sem, 0, 1);
+#endif
+
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
-	struct k_poll_event events[8];
+	struct k_poll_event events[TOTAL_MBOX_EVENT];
 
 	k_poll_event_init(&events[0], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_write_fifo_data_sem);
 	k_poll_event_init(&events[1], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_read_fifo_state_sem);
@@ -179,11 +191,15 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	k_poll_event_init(&events[5], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_checkpoint_sem);
 	k_poll_event_init(&events[6], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &acm_checkpoint_sem);
 	k_poll_event_init(&events[7], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bios_checkpoint_sem);
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	k_poll_event_init(&events[8], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_seamless_update_intent_sem);
+	k_poll_event_init(&events[9], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &pch_seamless_update_intent_sem);
+#endif
 
 	int ret;
 
 	while (1) {
-		ret = k_poll(events, 8, K_FOREVER);
+		ret = k_poll(events, TOTAL_MBOX_EVENT, K_FOREVER);
 
 		union aspeed_event_data data = {0};
 		if (ret < 0) {
@@ -250,8 +266,25 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		}
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		else if (events[8].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* BMC Seamless Update Intent */
+			k_sem_take(events[8].sem, K_NO_WAIT);
+			data.bit8[0] = BmcSeamlessUpdateIntent;
+			swmbx_get_msg(0, BmcSeamlessUpdateIntent, &data.bit8[1]);
 
-		for (size_t i = 0; i < 8; ++i)
+			GenerateStateMachineEvent(SEAMLESS_UPDATE_REQUESTED, data.ptr);
+		} else if (events[9].state == K_POLL_STATE_SEM_AVAILABLE) {
+			/* PCH Seamless Update Intent */
+			k_sem_take(events[9].sem, K_NO_WAIT);
+			data.bit8[0] = PchSeamlessUpdateIntent;
+			swmbx_get_msg(0, PchSeamlessUpdateIntent, &data.bit8[1]);
+
+			GenerateStateMachineEvent(SEAMLESS_UPDATE_REQUESTED, data.ptr);
+		}
+#endif
+
+		for (size_t i = 0; i < TOTAL_MBOX_EVENT; ++i)
 			events[i].state = K_POLL_STATE_NOT_READY;
 	}
 }
@@ -282,6 +315,10 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x0, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_update_intent_sem, BmcUpdateIntent, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	swmbx_update_notify(swmbx_dev, 0x0, &bmc_seamless_update_intent_sem,
+			BmcSeamlessUpdateIntent, true);
+#endif
 
 	/* From PCH */
 	swmbx_update_notify(swmbx_dev, 0x1, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
@@ -289,6 +326,10 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent_sem, PchPfmActiveSvn, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &acm_checkpoint_sem, AcmCheckpoint, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &bios_checkpoint_sem, BiosCheckpoint, true);
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	swmbx_update_notify(swmbx_dev, 0x1, &pch_seamless_update_intent_sem,
+			PchSeamlessUpdateIntent, true);
+#endif
 
 	/* Protect bit:
 	 * 0 means readable/writable

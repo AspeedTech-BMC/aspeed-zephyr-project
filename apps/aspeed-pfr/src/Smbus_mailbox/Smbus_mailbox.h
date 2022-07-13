@@ -153,6 +153,10 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	BmcPfmRecoverMajorVersion = 0x1e,
 	BmcPfmRecoverMinorVersion = 0x1f,
 	CpldFPGARoTHash = 0x20, /* 0x20 - 0x5f */
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	PchSeamlessUpdateIntent = 0x61,
+	BmcSeamlessUpdateIntent = 0x62,
+#endif
 	Reserved                = 0x63,
 	AcmBiosScratchPad       = 0x80,
 	BmcScratchPad           = 0xc0,
@@ -195,6 +199,15 @@ typedef enum _UPDATE_INTENT {
 	BmcActiveAndDynamicUpdate               = 0x48,
 	ExceptBmcActiveUpdate                   = 0x37
 } UPDATE_INTENT;
+
+#if defined(CONFIG_SEAMLESS_UPDATE)
+typedef enum _SEAMLESS_UPDATE_INTENT {
+	PchFvSeamlessUpdate                     = 0x01,
+	AfmActiveUpdate                         = 0x02,
+	AfmRecoveryUpdate                       = 0x04,
+	AfmActiveAndRecoveryUpdate              = 0x06,
+} SEAMLESS_UPDATE_INTENT;
+#endif
 
 typedef struct _PFM_STRUCTURE {
 	uint32_t PfmTag;

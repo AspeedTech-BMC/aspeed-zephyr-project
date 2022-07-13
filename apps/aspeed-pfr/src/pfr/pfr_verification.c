@@ -9,6 +9,7 @@
 #include "intel_pfr/intel_pfr_verification.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_common.h"
@@ -32,7 +33,7 @@ int authentication_image(void *AoData, void *EventContext)
 	// init_pfr_manifest();
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 
-	pfr_manifest->state = VERIFY;
+	pfr_manifest->state = FIRMWARE_VERIFY;
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI

@@ -80,4 +80,11 @@ config INIT_POWER_SEQUENCE
 	  PFR state machine will stay in INIT state until CPLD power sequence releases
 	  RST_SRST_BMC_N and RST_RSMRST_N.
 
+config SEAMLESS_UPDATE
+	default n
+	bool "Seamless update support"
+	help
+	  Support FVM verification and host firmware update by seamless capsule.
+	  PFR will update host firmware without going to t-1 state and rebooting host.
+
 source "Kconfig.zephyr"

@@ -11,6 +11,7 @@
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "manifest/pfm/pfm_manager.h"
 #include "intel_pfr_recovery.h"
 #include "intel_pfr_pfm_manifest.h"
@@ -194,7 +195,15 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	manifest->image_type = BMC_TYPE;
 	manifest->address = source_address;
-	manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
+
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	if (manifest->state == SEAMLESS_UPDATE) {
+		manifest->pc_type = PFR_PCH_SEAMLESS_UPDATE_CAPSULE;
+	} else
+#endif
+	{
+		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
+	}
 
 	DEBUG_PRINTF("BMC's PCH Staging Area verfication");
 	DEBUG_PRINTF("Veriifying capsule signature, address=0x%08x", manifest->address);
@@ -226,6 +235,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	DEBUG_PRINTF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
 			source_address, target_address);
+
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
 			CONFIG_BMC_PCH_STAGING_SIZE))
 		return Failure;
@@ -234,7 +244,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 				target_address, CONFIG_BMC_PCH_STAGING_SIZE))
 		return Failure;
 
-	if (manifest->state == RECOVERY) {
+	if (manifest->state == FIRMWARE_RECOVERY) {
 		DEBUG_PRINTF("PCH staging region verification");
 		status = manifest->update_fw->base->verify((struct firmware_image *)manifest,
 				NULL, NULL);

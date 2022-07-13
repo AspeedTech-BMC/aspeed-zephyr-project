@@ -186,7 +186,7 @@ enum {
 	PFR_PCH_UPDATE_CAPSULE,
 	PFR_BMC_PFM,
 	PFR_BMC_UPDATE_CAPSULE,
-	PFR_PCH_CPU_Seamless_Update_Capsule,
+	PFR_PCH_SEAMLESS_UPDATE_CAPSULE,
 	PFR_AFM,
 	PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON = 0x200
 };
@@ -216,6 +216,10 @@ struct pfr_authentication {
 	int (*block1_csk_block0_entry_verify)(struct pfr_manifest *manifest);
 	int (*block1_verify)(struct pfr_manifest *manifest);
 	int (*block0_verify)(struct pfr_manifest *manifest);
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	int (*fvm_verify)(struct pfr_manifest *manifest);
+	int (*fvms_verify)(struct pfr_manifest *manifest);
+#endif
 };
 
 #pragma pack()
@@ -224,3 +228,8 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
 void init_pfr_authentication(struct pfr_authentication *pfr_authentication);
+
+#if defined(CONFIG_SEAMLESS_UPDATE)
+int intel_fvms_verify(struct pfr_manifest *manifest);
+int intel_fvm_verify(struct pfr_manifest *manifest);
+#endif

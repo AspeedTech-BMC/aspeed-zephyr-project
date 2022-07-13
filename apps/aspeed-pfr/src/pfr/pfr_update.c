@@ -99,7 +99,6 @@ int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 	return Success;
 }
 
-
 /**
  * Update the image referenced by an instance.
  *

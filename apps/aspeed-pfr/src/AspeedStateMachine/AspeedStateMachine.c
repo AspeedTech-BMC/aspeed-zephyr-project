@@ -647,6 +647,103 @@ void handle_update_requested(void *o)
 		GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
 }
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+void handle_seamless_update_requested(void *o)
+{
+	struct smf_context *state = (struct smf_context *)o;
+	struct event_context *evt_ctx = state->event_ctx;
+	AO_DATA *ao_data_wrap = NULL;
+	EVENT_CONTEXT evt_ctx_wrap;
+	int ret;
+	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
+	CPLD_STATUS cpld_update_status;
+
+	LOG_DBG("SEAMLESS_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
+
+	switch (evt_ctx->data.bit8[0]) {
+		case PchSeamlessUpdateIntent:
+			update_region &= PchFvSeamlessUpdate;
+			break;
+		case BmcSeamlessUpdateIntent:
+			update_region &= PchFvSeamlessUpdate;
+			ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			cpld_update_status.BmcToPchStatus = 1;
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			/* TODO: AFM update */
+			//update_region &= PchFvSeamlessUpdate | AfmActiveAndRecoveryUpdate;
+			break;
+		default:
+			break;
+	}
+
+	/* Immediate Update */
+	uint32_t handled_region = 0;
+
+	while (update_region) {
+		uint32_t image_type = 0xFFFFFFFF;
+		do {
+			/* PCH Seamless */
+			if (update_region & PchFvSeamlessUpdate) {
+				LOG_INF("PCH Seamless Update");
+				evt_ctx_wrap.operation = SEAMLESS_UPDATE_OP;
+				SetPlatformState(PCH_SEAMLESS_UPDATE);
+				image_type = PCH_TYPE;
+				update_region &= ~PchFvSeamlessUpdate;
+				handled_region |= PchFvSeamlessUpdate;
+				break;
+			}
+			/*TODO : AFM update */
+		} while (0);
+
+		if (evt_ctx_wrap.operation == SEAMLESS_UPDATE_OP)
+			ret = perform_seamless_update(image_type, ao_data_wrap, &evt_ctx_wrap);
+
+		if (ret != Success) {
+			/* TODO: Log failed reason and handle it properly */
+			break;
+		}
+	}
+
+	GenerateStateMachineEvent(SEAMLESS_UPDATE_DONE, (void *)handled_region);
+}
+
+void handle_seamless_update_verification(void *o)
+{
+	struct smf_context *state = (struct smf_context *)o;
+	const struct device *dev_m = NULL;
+	int ret;
+	SetPlatformState(PCH_FLASH_AUTH);
+	EVENT_CONTEXT evt_wrap;
+
+	evt_wrap.image = PCH_EVENT;
+	evt_wrap.operation = VERIFY_ACTIVE;
+	evt_wrap.flash = PRIMARY_FLASH_REGION;
+
+	LOG_INF("Switch PCH SPI MUX to ROT");
+	dev_m = device_get_binding(PCH_SPI_MONITOR);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+
+	ret = authentication_image(NULL, &evt_wrap);
+
+
+	LOG_INF("authentication_image host active return %d", ret);
+
+	if (ret == 0) {
+		LOG_INF("Applying PCH SPI Region protection");
+		apply_pfm_protection(PCH_SPI);
+		state->pch_active_object.ActiveImageStatus = Success;
+		GenerateStateMachineEvent(SEAMLESS_VERIFY_DONE, NULL);
+	}
+	else {
+		state->pch_active_object.ActiveImageStatus = Failure;
+		GenerateStateMachineEvent(SEAMLESS_VERIFY_FAILED, NULL);
+	}
+
+	LOG_INF("Switch PCH SPI MUX to PCH");
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+}
+#endif
+
 void do_unprovisioned(void *o)
 {
 	LOG_DBG("Start");
@@ -665,14 +762,25 @@ void do_unprovisioned(void *o)
 
 void enter_runtime(void *o)
 {
-	ARG_UNUSED(o);
 	LOG_DBG("Start");
+	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+	switch (evt_ctx->event) {
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		case SEAMLESS_UPDATE_DONE:
+		case SEAMLESS_UPDATE_FAILED:
+		case SEAMLESS_VERIFY_DONE:
+		case SEAMLESS_VERIFY_FAILED:
+			break;
+#endif
+		default:
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
-	AspeedPFR_EnableTimer(BMC_EVENT);
+			AspeedPFR_EnableTimer(BMC_EVENT);
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
-	AspeedPFR_EnableTimer(PCH_EVENT);
+			AspeedPFR_EnableTimer(PCH_EVENT);
 #endif
+			break;
+	}
 	LOG_DBG("End");
 }
 
@@ -742,6 +850,22 @@ void do_update(void *o)
 	LOG_DBG("End");
 }
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+void do_seamless_update(void *o)
+{
+	LOG_DBG("Start");
+	handle_seamless_update_requested(o);
+	LOG_DBG("End");
+}
+
+void do_seamless_verify(void *o)
+{
+	LOG_DBG("Start");
+	handle_seamless_update_verification(o);
+	LOG_DBG("End");
+}
+#endif
+
 void enter_lockdown(void *o)
 {
 	ARG_UNUSED(o);
@@ -781,7 +905,10 @@ static const struct smf_state state_table[] = {
 	[TZERO] = SMF_CREATE_STATE(enter_tzero, NULL, exit_tzero, NULL),
 	[UNPROVISIONED] = SMF_CREATE_STATE(NULL, do_unprovisioned, NULL, &state_table[TZERO]),
 	[RUNTIME] = SMF_CREATE_STATE(enter_runtime, do_runtime, NULL, &state_table[TZERO]),
-	// [SEAMLESS_UPDATE] = SMF_CREATE_STATE(NULL, do_seamless, NULL, NULL, &state_table[TZERO]),
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	[SEAMLESS_UPDATE] = SMF_CREATE_STATE(NULL, do_seamless_update, NULL, &state_table[TZERO]),
+	[SEAMLESS_VERIFY] = SMF_CREATE_STATE(NULL, do_seamless_verify, NULL, &state_table[TZERO]),
+#endif
 	[SYSTEM_LOCKDOWN] = SMF_CREATE_STATE(NULL, do_lockdown, NULL, NULL),
 	[SYSTEM_REBOOT] = SMF_CREATE_STATE(NULL, do_reboot, NULL, NULL),
 };
@@ -917,6 +1044,11 @@ void AspeedStateMachine(void)
 					next_state = &state_table[FIRMWARE_RECOVERY];
 #endif
 				break;
+#if defined(CONFIG_SEAMLESS_UPDATE)
+			case SEAMLESS_UPDATE_REQUESTED:
+				next_state = &state_table[SEAMLESS_UPDATE];
+				break;
+#endif
 			default:
 				break;
 			}
@@ -933,7 +1065,33 @@ void AspeedStateMachine(void)
 				break;
 			}
 		}
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		else if (current_state == &state_table[SEAMLESS_UPDATE]) {
+			switch (fifo_in->event) {
+				case SEAMLESS_UPDATE_DONE:
+					next_state = &state_table[SEAMLESS_VERIFY];
+					break;
+				case SEAMLESS_UPDATE_FAILED:
+					// Skip verification, firmware will be recovered in
+					// the next bootup.
+					next_state = &state_table[RUNTIME];
+					break;
+				default:
+					break;
+			}
 
+		} else if (current_state == &state_table[SEAMLESS_VERIFY]) {
+			next_state = &state_table[RUNTIME];
+			switch (fifo_in->event) {
+				case SEAMLESS_VERIFY_DONE:
+				case SEAMLESS_VERIFY_FAILED:
+					next_state = &state_table[RUNTIME];
+					break;
+				default:
+					break;
+			}
+		}
+#endif
 		if (next_state)
 			smf_set_state(SMF_CTX(&s_obj), next_state);
 

@@ -113,16 +113,16 @@ typedef struct _FVM_CAPABILITIES {
 #define Microcode1      0x02
 #define Microcode2      0x03
 
-#define SPI_REGION 0x1
-#define SMBUS_RULE 0x2
+#define SPI_REGION     0x1
+#define SMBUS_RULE     0x2
+#define FVM_ADDR_DEF   0x3
+#define FVM_CAP        0x4
+
 #define SIZE_OF_PCH_SMBUS_RULE 40
-#define PCH_PFM_SPI_REGION 0x01
-#define ACTIVE_PFM_SMBUS_RULE 0x02
-#define PCH_PFM_FVM_ADDRESS_DEFINITION 0x03
 #define SPI_REGION_DEF_MIN_SIZE 16
 
 #define PCH_FVM_SPI_REGION 0x01
-#define PCH_FVM_Capabilities 0x04
+#define PCH_FVM_CAP        0x04
 
 typedef struct {
 	uint8_t Calculated : 1;
