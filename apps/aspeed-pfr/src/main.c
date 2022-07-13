@@ -31,7 +31,7 @@ extern void aspeed_print_sysrst_info(void);
 
 void main(void)
 {
-	LOG_INF("*** ASPEED_PFR version 01.01 Board:%s ***", CONFIG_BOARD);
+	LOG_INF("*** ASPEED_PFR version 01.02 Board:%s ***", CONFIG_BOARD);
 
 	aspeed_print_sysrst_info();
 
