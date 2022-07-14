@@ -21,5 +21,5 @@ manifest:
           - mbedtls
     - name: cerberus
       remote: github
-      revision: 1ae338faf14c570107b4bfdde0d55ec5912f0644
+      revision: e51a3f307358d68fd81dec1f1abd401b9ff34ce3
       path: middlewares/cerberus
