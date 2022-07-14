@@ -10,7 +10,7 @@
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "manifest/pfm/pfm_manager.h"
 #include "intel_pfr_recovery.h"
 #include "intel_pfr_pfm_manifest.h"
@@ -75,14 +75,14 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
-	size_t area_size;
+	size_t area_size = 0;
 
 	if (image_type == BMC_TYPE)
 		area_size = CONFIG_BMC_STAGING_SIZE;
-	else if (image_type == PCH_TYPE)
+	else /* if (image_type == PCH_TYPE) */
 		area_size = CONFIG_PCH_STAGING_SIZE;
 
-	spi_flash->spi.device_id[0] = image_type; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.device_id[0] = image_type;
 	DEBUG_PRINTF("Recovering...");
 	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
 
@@ -180,11 +180,13 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	uint32_t target_address;
 	uint32_t image_type = manifest->image_type;
 
-	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
+	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+			sizeof(source_address));
 	if (status != Success)
 		return Failure;
 
-	status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
+	status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&target_address,
+			sizeof(target_address));
 	if (status != Success)
 		return Failure;
 
@@ -194,9 +196,12 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address = source_address;
 	manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 
-	DEBUG_PRINTF("BMC(PCH) Staging Area verfication");
+	DEBUG_PRINTF("BMC's PCH Staging Area verfication");
+	DEBUG_PRINTF("Veriifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verifcation
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
 		DEBUG_PRINTF("verify failed");
 		return Failure;
@@ -205,17 +210,22 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	// Recovery region PFM verification
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 	manifest->pc_type = PFR_PCH_PFM;
+	DEBUG_PRINTF("Verifying PFM signature, address=0x%08x", manifest->address);
 	// manifest verifcation
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success)
 		return Failure;
-	DEBUG_PRINTF("BMC PCH Staging verification successful");
+	DEBUG_PRINTF("BMC's PCH Staging verification successful");
 	manifest->address = target_address;
 	manifest->image_type = image_type;
 
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
+	DEBUG_PRINTF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
+			source_address, target_address);
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
 			CONFIG_BMC_PCH_STAGING_SIZE))
 		return Failure;
@@ -226,13 +236,13 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	if (manifest->state == RECOVERY) {
 		DEBUG_PRINTF("PCH staging region verification");
-		status = manifest->update_fw->base->verify((struct firmware_image *)manifest, NULL, NULL);
+		status = manifest->update_fw->base->verify((struct firmware_image *)manifest,
+				NULL, NULL);
 		if (status != Success)
 			return Failure;
 	}
 
-	DEBUG_PRINTF("BMC PCH %s region Update completed",
-			(manifest->state == RECOVERY) ? "Recovery" : "Staging");
+	DEBUG_PRINTF("PCH Staging region Update completed");
 
 	return Success;
 }

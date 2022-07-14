@@ -7,14 +7,20 @@
 #include <assert.h>
 #include <logging/log.h>
 #include <zephyr.h>
-
+#include <device.h>
 #include <logging/log.h>
+#include <drivers/i2c/pfr/i2c_filter.h>
+
+#include "Smbus_mailbox/Smbus_mailbox.h"
+#include "crypto/hash_wrapper.h"
 #include "engine_manager.h"
 #include "include/definitions.h"
 #include "common/common.h"
 #include "imageVerification/image_verify.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_provision.h"
+#include "manifestProcessor/manifestProcessor.h"
+#include "flash/flash_wrapper.h"
 
 LOG_MODULE_REGISTER(engine, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -110,14 +116,13 @@ void apply_pfm_protection(int spi_device_id)
 	status = initializeManifestProcessor();
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	uint8_t *data;
 	uint8_t pfm_length[4];
 	uint32_t pfm_read_address;
 
 	if (spi_device_id == BMC_SPI)
-		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, &pfm_read_address, sizeof(pfm_read_address));
+		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
 	else if (spi_device_id == PCH_SPI)
-		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, &pfm_read_address, sizeof(pfm_read_address));
+		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
 
 	// Block 0 + Block 1 = 1024 (0x400); PFM data(PFM Body = 0x20)
 	uint32_t pfm_region_Start = pfm_read_address + 0x400 + 0x20;
@@ -130,7 +135,10 @@ void apply_pfm_protection(int spi_device_id)
 	// cerberus define region_id start from 1
 	int region_id = 1;
 	uint8_t region_record[40];
+
+#if defined(CONFIG_BMC_DUAL_FLASH)
 	int flash_size;
+#endif
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.device_id[0] = spi_device_id;
@@ -203,8 +211,12 @@ void apply_pfm_protection(int spi_device_id)
 			 * 0b00000100: SHA512 present
 			 * Otherwise: Reserved
 			 */
-			if ((region_record[2] & 0x01) == 0x01)
+			if (region_record[2] & 0x01)
 				pfm_region_Start = pfm_region_Start + 48;
+			else if (region_record[2] & 0x02)
+				pfm_region_Start = pfm_region_Start + 64;
+			else if (region_record[2] & 0x04)
+				pfm_region_Start = pfm_region_Start + 80;
 			else
 				pfm_region_Start = pfm_region_Start + 16;
 			break;
@@ -220,7 +232,7 @@ void apply_pfm_protection(int spi_device_id)
 
 				char bus_dev_name[] = "I2C_FILTER_x";
 				bus_dev_name[11] = (region_record[5] - 1) + '0';
-				struct device *flt_dev = device_get_binding(bus_dev_name);
+				const struct device *flt_dev = device_get_binding(bus_dev_name);
 				if (flt_dev) {
 					status = ast_i2c_filter_en(
 							flt_dev,
@@ -229,11 +241,14 @@ void apply_pfm_protection(int spi_device_id)
 							0,
 							0);
 					LOG_DBG("ast_i2c_filter_en ret=%d", status);
+					// The i2c device address in the manifest is 8-bit format.
+					// It should be 7-bit format for i2c filter api.
+					uint8_t slave_addr = region_record[7] >> 1;
 					status = ast_i2c_filter_update(
 							flt_dev,
 							region_record[6] - 1, // Rule ID
-							region_record[7], // Device Address
-							&region_record[8] // cmd_whitelist
+							slave_addr,           // Device Address
+							&region_record[8]     // cmd_whitelist
 							);
 					LOG_DBG("ast_i2c_filter_update ret=%d", status);
 				} else {

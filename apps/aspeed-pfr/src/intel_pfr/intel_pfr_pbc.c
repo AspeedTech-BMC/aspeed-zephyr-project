@@ -7,7 +7,7 @@
 #include <logging/log.h>
 #include <stdint.h>
 #include <posix/time.h>
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
 #include "flash/flash_wrapper.h"
@@ -169,7 +169,8 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 
 	bitmap_size = pbc->bitmap_nbit / 8;
 
-	if (bitmap_size > PAGE_SIZE) {
+	// Supported decompression adrress range is 0 - 256MB
+	if (bitmap_size > (2 * PAGE_SIZE)) {
 		DEBUG_PRINTF("bitmap size is too big");
 		return Failure;
 	}

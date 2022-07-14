@@ -13,7 +13,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_key_cancellation.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -36,11 +36,29 @@ int get_cancellation_policy_offset(uint32_t pc_type)
 int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 {
 	uint32_t block1_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0);
+	uint8_t read_buffer[KCH_CAN_CERT_RESERVED_SIZE] = { 0 };
+	uint32_t reserved_address;
 	uint32_t status = 0;
 	uint32_t key_id = 0;
+	int i;
 
-	if ((manifest->pc_type == CPLD_CAPSULE_CANCELLATION) || (manifest->pc_type == PCH_PFM_CANCELLATION) || (manifest->pc_type == PCH_CAPSULE_CANCELLATION)
-	    || (manifest->pc_type == BMC_PFM_CANCELLATION) || (manifest->pc_type == BMC_CAPSULE_CANCELLATION)) {
+	if ((manifest->pc_type == CPLD_CAPSULE_CANCELLATION) || (manifest->pc_type == PCH_PFM_CANCELLATION)
+	    || (manifest->pc_type == PCH_CAPSULE_CANCELLATION) || (manifest->pc_type == BMC_PFM_CANCELLATION)
+	    || (manifest->pc_type == BMC_CAPSULE_CANCELLATION)) {
+		reserved_address = manifest->address + PFM_SIG_BLOCK_SIZE + 4;
+		status = pfr_spi_read(manifest->image_type, reserved_address, sizeof(read_buffer), (uint8_t *)read_buffer);
+		if (status != Success) {
+			LOG_ERR("Flash read reserved data failed for key cancellation capsule");
+			return Failure;
+		}
+
+		for (i = 0; i < sizeof(read_buffer); i++) {
+			if (read_buffer[i] != 0) {
+				LOG_ERR("Invalid reserved data for key cancellation capsule");
+				return Failure;
+			}
+		}
+
 		manifest->kc_flag = TRUE;
 	} else   {
 		// Read Csk key ID

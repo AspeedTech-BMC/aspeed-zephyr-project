@@ -8,9 +8,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-// #include <HrotStateMachine.h>
 #include "include/SmbusMailBoxCom.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "StateMachineAction/StateMachineActions.h"
 
 extern int systemState;
@@ -168,7 +167,7 @@ typedef enum _EXECUTION_CHECKPOINT {
 	ReturnedFromExternalExecutionBlock,
 	PausingExecutionBlock,
 	ResumedExecutionBlock,
-	CompletingexecutionBlock,
+	CompletingExecutionBlock,
 	EnteredManagementMode,
 	LeavingManagementMode,
 	ReadToBootOS = 0x80
@@ -210,10 +209,8 @@ typedef struct _PFM_STRUCTURE {
 
 #pragma pack()
 
-static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
-
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);
-void get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
+int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
 // void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
 unsigned char erase_provision_data_in_flash(void);
 void GetUpdateStatus(uint8_t *DataBuffer, uint8_t DataSize);
@@ -257,6 +254,8 @@ bool IsUfmStatusPITL2CompleteSuccess(void);
 byte GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
 void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
+int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
+void SetUfmCmdTriggerValue(byte);
 byte get_provision_command(void);
 void set_provision_command(byte UfmCommandValue);
 void set_provision_commandTrigger(byte UfmCommandTrigger);
@@ -323,6 +322,7 @@ void UpdateIntentHandle(byte Data, uint32_t Source);
 bool WatchDogTimer(int ImageType);
 uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag);
 void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion);
+void initializeFPLEDs(void);
 
 #define UFM_STATUS_LOCK_BIT_MASK                      0b1
 #define UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK 0b10

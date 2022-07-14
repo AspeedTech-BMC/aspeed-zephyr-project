@@ -22,7 +22,7 @@
 #include "common/common.h"
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "crypto/ecdsa_aspeed.h"

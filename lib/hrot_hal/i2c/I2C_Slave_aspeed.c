@@ -8,7 +8,6 @@
 #include <drivers/clock_control.h>
 #include <drivers/i2c.h>
 
-//static SMBUS_MAIL_BOX gSmbusMailboxData = {0};
 I2C_Slave_Process gI2cSlaveProcess = {0};
 
 /**
@@ -341,6 +340,8 @@ void PchBmcProcessCommands(unsigned char *CipherText)
  */
 int ast_i2c_slave_dev_init(const struct device *dev, uint8_t slave_addr)
 {
+#if 0
+	/* Not used anymore */
 	printk("%s\n", __func__);
 
 	if (i2c_slave_driver_register(dev))
@@ -348,5 +349,6 @@ int ast_i2c_slave_dev_init(const struct device *dev, uint8_t slave_addr)
 
 	SetCpldIdentifier(0xDE);	//initial CpldIdentifier to 0xDE for test
 	gI2cSlaveProcess.operation = SLAVE_IDLE;
+#endif
 	return 0;
 }

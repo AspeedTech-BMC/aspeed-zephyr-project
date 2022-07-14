@@ -7,8 +7,6 @@
 #include <logging/log.h>
 #include <zephyr.h>
 
-#include "state_machine.h"
-#include "common_smc.h"
 #include "common/common.h"
 #include "include/SmbusMailBoxCom.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
@@ -29,11 +27,11 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 		}				  \
 }
 
+extern void aspeed_print_sysrst_info(void);
+
 void main(void)
 {
-	int status = 0;
-
-	LOG_INF("*** ASPEED_PFR version 01.01 Board:%s ***", CONFIG_BOARD);
+	LOG_INF("*** ASPEED_PFR version 01.02 Board:%s ***", CONFIG_BOARD);
 
 	aspeed_print_sysrst_info();
 

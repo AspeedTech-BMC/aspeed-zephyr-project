@@ -3,3 +3,4 @@
 
 add_subdirectory(smf)
 add_subdirectory(hrot_hal)
+add_subdirectory(hrot_wrapper)

@@ -6,7 +6,7 @@
 
 #include <logging/log.h>
 #include <stdint.h>
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "pfr/pfr_util.h"
@@ -237,10 +237,7 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		}
 	}
 
-	manifest->pfr_hash->start_address = block1_address + CSK_START_ADDRESS + sizeof(block1_buffer->CskEntryInitial.Tag);
-	manifest->pfr_hash->length = CSK_ENTRY_PC_SIZE;
-
-	status = manifest->base->get_hash((struct manifest *)manifest, manifest->hash, manifest->pfr_hash->hash_out, hash_length);
+	status = get_buffer_hash(manifest, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic, CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out);
 	if (status != Success) {
 		LOG_ERR("Block1 CSK Entry: Get hash failed");
 		return Failure;
@@ -333,6 +330,7 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	uint32_t hash_length = 0;
 	uint8_t *ptr_sha;
 	int status = 0;
+	int i;
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(PFR_AUTHENTICATION_BLOCK0), buffer);
 	if (status != Success) {
@@ -352,9 +350,25 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	if (block0_buffer->PcType == DECOMMISSION_CAPSULE) {
-		if (block0_buffer->PcLength != DECOMMISSION_PC_SIZE) {
-			LOG_ERR("Block0: Decommission capsule PC length failed, %x", block0_buffer->PcLength);
+	// Both key cancellation certificate and decommission capsule have the same fixed size of 128 bytes.
+	if (block0_buffer->PcType & DECOMMISSION_CAPSULE) {
+		if (block0_buffer->PcLength != KCH_CAN_CERT_OR_DECOMM_CAP_PC_SIZE) {
+			LOG_ERR("Block0: Invalid decommission capsule PC length, %x", block0_buffer->PcLength);
+			return Failure;
+		}
+	}
+
+	if (block0_buffer->PcType & KEY_CANCELLATION_CAPSULE) {
+		if (block0_buffer->PcLength != KCH_CAN_CERT_OR_DECOMM_CAP_PC_SIZE) {
+			LOG_ERR("Block0: Invalid key cancellation capsule PC length, %x", block0_buffer->PcLength);
+			return Failure;
+		}
+	}
+
+	// Check for the 0s in the reserved field
+	for (i = 0; i < BLOCK0_SECOND_RESERVED_SIZE; i++) {
+		if (block0_buffer->Reserved2[i] != 0) {
+			LOG_ERR("Block0: Invalid reserved2 data");
 			return Failure;
 		}
 	}

@@ -6,15 +6,20 @@
 
 #include <logging/log.h>
 #include <stdint.h>
+#include <drivers/misc/aspeed/pfr_aspeed.h>
+#include <flash/flash_wrapper.h>
+
 #include "pfr_ufm.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
+#include "intel_pfr/intel_pfr_verification.h"
+#include "intel_pfr/intel_pfr_update.h"
+#include "gpio/gpio_aspeed.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "include/SmbusMailBoxCom.h"
-#include <drivers/misc/aspeed/pfr_aspeed.h>
-#include <StateMachineAction/StateMachineActions.h>
+#include "StateMachineAction/StateMachineActions.h"
 #include "pfr_common.h"
-#include <flash/flash_wrapper.h>
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -24,6 +29,47 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 #else
 #define DEBUG_PRINTF(...)
 #endif
+
+/**
+ * Function to handle Recover Entry
+ * Perform any recover library initialization if requred here
+ */
+
+int lastRecoveryReason(int ImageType, void* AoData)
+{
+	if (ImageType == BMC_EVENT)
+	{
+		if(((AO_DATA *)AoData)->ActiveImageStatus == Failure){
+			return BMC_ACTIVE_FAIL;
+		}
+		else if (((AO_DATA *)AoData)->RecoveryImageStatus == Failure){
+			return BMC_RECOVERY_FAIL;
+		}
+
+	}
+	else if (ImageType == PCH_EVENT)
+	{
+		if(((AO_DATA *)AoData)->ActiveImageStatus == Failure){
+			return PCH_ACTIVE_FAIL;
+		}
+		else if (((AO_DATA *)AoData)->RecoveryImageStatus == Failure){
+			return PCH_RECOVERY_FAIL;
+		}
+	}
+
+	return 0;
+}
+
+int lastPanicReason(int ImageType)
+{
+	if (ImageType == BMC_EVENT){
+		return BMC_UPDATE_INTENT;
+	}
+	else if (ImageType == PCH_EVENT){
+		return PCH_UPDATE_INTENT;
+	}
+	return 0;
+}
 
 int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 {

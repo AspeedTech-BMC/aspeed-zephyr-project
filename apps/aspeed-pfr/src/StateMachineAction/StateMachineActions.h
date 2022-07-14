@@ -6,9 +6,6 @@
 
 #pragma once
 
-#include "state_machine.h"
-#include "common_smc.h"
-
 #define BMC_RELEASE                             1U
 #define PCH_RELEASE                             1U
 
@@ -74,14 +71,14 @@ typedef struct _AO_DATA {
 	};
 } AO_DATA;
 
-static enum SystemState {
+enum SystemState {
 	Initial = 1,
 	Verify,
 	Recovery,
 	Update
-} SystemState;
+};
 
-static enum OPERATIONS {
+enum OPERATIONS {
 	VERIFY_ACTIVE = 1,
 	VERIFY_BACKUP,
 	RECOVER_ACTIVE,
@@ -89,20 +86,8 @@ static enum OPERATIONS {
 	UPDATE_BACKUP,
 	RELEASE_HOLD,
 	I2C_HANDLE
-} OPERATIONS;
+};
 #pragma pack()
 
-void LockDownPlatform(void *AoData);
-void handleLockDownState(void *AoData);
-void handlePostRecoveryFailure(void *AoData, void *EventContext);
-void handlePostVerifyFailure(void *AoData, void *EventContext);
-int lastRecoveryReason(int type, void *AoData);
-int lastPanicReason(int ImageType);
-void PublishInitialEvents(void);
-void handlePostRecoverySuccess(void *AoData, void *EventContext);
-void handlePostVerifySuccess(void *AoData, void *EventContext);
-int StartBmcAOWithEvent(void);
-int StartPchAOWithEvent(void);
-int process_i2c_command(void *static_data, void *event_context);
-void T0Transition(int releaseBmc, int releasePCH);
-
+void AspeedPFR_EnableTimer(int type);
+void AspeedPFR_DisableTimer(int type);

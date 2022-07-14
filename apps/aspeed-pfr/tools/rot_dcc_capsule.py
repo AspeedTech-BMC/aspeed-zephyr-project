@@ -25,7 +25,6 @@ def main(args):
                         required=True,
                         metavar="[input sign tool]",
                         dest='input_sign_tool',
-                        default=None,
                         help='sign tool')
     parser.add_argument('-c',
                         '--input_xml',
@@ -50,21 +49,21 @@ def main(args):
     with open(payload, 'wb') as fd:
         fd.write(b'\x00'*128)
 
-    logger.info("sign decommission payload")
-    cmd = "{} -c {} -o {} {}".format(args.input_sign_tool,
-                                     args.input_xml,
-                                     args.out_img,
-                                     payload)
+    logger.info("sign %s", payload)
+    cmd = "{} -c {} -o {} {} -v".format(args.input_sign_tool,
+                                        args.input_xml,
+                                        args.out_img,
+                                        payload)
     logger.info("issue: %s", cmd)
     p = subprocess.Popen(cmd,
                          shell=True,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     out, err = p.communicate()
+    logger.info(out.decode("utf-8"))
 
     if (p.returncode):
-        logger.error(err)
-        logger.error("create ROT decommission capsule failed")
+        logger.error(err.decode("utf-8"))
         exit(1)
 
     work_path = pathlib.Path(__file__).parent.absolute()

@@ -6,8 +6,9 @@
 
 #include <logging/log.h>
 #include "intel_pfr/intel_pfr_authentication.h"
+#include "intel_pfr/intel_pfr_verification.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_common.h"
@@ -26,7 +27,6 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 int authentication_image(void *AoData, void *EventContext)
 {
 	int status = 0;
-	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
 	// init_pfr_manifest();
@@ -125,8 +125,6 @@ void manifest_free_platform_id(struct manifest *manifest, char *id)
 {
 	ARG_UNUSED(manifest);
 	ARG_UNUSED(id);
-
-	return Success;
 }
 
 /**

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <zephyr.h>
+#include <drivers/i2c.h>
+#include <drivers/i2c/pfr/swmbx.h>
 #include <logging/log.h>
 #include <drivers/gpio.h>
 #include "Smbus_mailbox.h"
@@ -11,8 +14,8 @@
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
-#include <drivers/i2c.h>
-#include <drivers/i2c/pfr/swmbx.h>
+#include "intel_pfr/intel_pfr_update.h"
+#include "pfr/pfr_ufm.h"
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
@@ -30,7 +33,8 @@ LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 #define PRIMARY_FLASH_REGION    1
 #define SECONDARY_FLASH_REGION  2
 
-struct device *gSwMbxDev = NULL;
+static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
+const struct device *gSwMbxDev = NULL;
 uint8_t gReadOnlyRfAddress[READ_ONLY_RF_COUNT] = { 0x1, 0x2, 0x3, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x14, 0x15, 0x16, 0x17,
 						   0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
 uint8_t gReadAndWriteRfAddress[READ_WRITE_RF_COUNT] = { 0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E };
@@ -93,14 +97,18 @@ unsigned char erase_provision_flash(void)
  * @Param  NULL
  * @retval NULL
  **/
-void get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length)
+int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length)
 {
-	uint8_t status;
+	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read(&spi_flash->spi, addr, DataBuffer, length);
 
+	if (status == 0)
+		return Success;
+	else
+		return Failure;
 }
 
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize)
@@ -162,9 +170,6 @@ K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
 	struct k_poll_event events[8];
-	AO_DATA aodata[8];
-	EVENT_CONTEXT evt_ctx[8];
-	uint8_t buffer[8][2] = { { 0 } };
 
 	k_poll_event_init(&events[0], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_write_fifo_data_sem);
 	k_poll_event_init(&events[1], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &ufm_read_fifo_state_sem);
@@ -205,10 +210,6 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 			/* UFM Provision Trigger */
 			k_sem_take(events[2].sem, K_NO_WAIT);
-			aodata[2].ProcessNewCommand = 1;
-			aodata[2].type = I2C_EVENT;
-			evt_ctx[2].operation = I2C_HANDLE;
-			evt_ctx[2].i2c_data = buffer[2];
 			data.bit8[0] = UfmCmdTriggerValue;
 			swmbx_get_msg(0, UfmCmdTriggerValue, &data.bit8[1]);
 
@@ -216,10 +217,6 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		} else if (events[3].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Update Intent */
 			k_sem_take(events[3].sem, K_NO_WAIT);
-			aodata[3].ProcessNewCommand = 1;
-			aodata[3].type = I2C_EVENT;
-			evt_ctx[3].operation = I2C_HANDLE;
-			evt_ctx[3].i2c_data = buffer[3];
 			data.bit8[0] = BmcUpdateIntent;
 			swmbx_get_msg(0, BmcUpdateIntent, &data.bit8[1]);
 
@@ -227,13 +224,13 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		} else if (events[4].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* PCH Update Intent */
 			k_sem_take(events[4].sem, K_NO_WAIT);
+			data.bit8[0] = PchUpdateIntent;
+			swmbx_get_msg(0, PchUpdateIntent, &data.bit8[1]);
+
+			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 		} else if (events[5].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Checkpoint */
 			k_sem_take(events[5].sem, K_NO_WAIT);
-			aodata[5].ProcessNewCommand = 1;
-			aodata[5].type = I2C_EVENT;
-			evt_ctx[5].operation = I2C_HANDLE;
-			evt_ctx[5].i2c_data = buffer[5];
 			data.bit8[0] = BmcCheckpoint;
 			swmbx_get_msg(0, BmcCheckpoint, &data.bit8[1]);
 
@@ -241,10 +238,16 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		} else if (events[6].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* ACM Checkpoint */
 			k_sem_take(events[6].sem, K_NO_WAIT);
+			data.bit8[0] = AcmCheckpoint;
+			swmbx_get_msg(0, AcmCheckpoint, &data.bit8[1]);
+
 			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		} else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BIOS Checkpoint */
 			k_sem_take(events[7].sem, K_NO_WAIT);
+			data.bit8[0] = BiosCheckpoint;
+			swmbx_get_msg(0, BiosCheckpoint, &data.bit8[1]);
+
 			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
 		}
 
@@ -261,7 +264,7 @@ void InitializeSoftwareMailbox(void)
 
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
-		DEBUG_PRINTF("%s: fail to bind %s", "SWMBX");
+		DEBUG_PRINTF("%s: fail to bind %s", __FUNCTION__, "SWMBX");
 		return;
 	}
 	gSwMbxDev = swmbx_dev;
@@ -351,7 +354,6 @@ void InitializeSmbusMailbox(void)
 
 	SetCpldIdentifier(0xDE);
 	SetCpldReleaseVersion(CPLD_RELEASE_VERSION);
-	uint8_t CurrentSvn = 0;
 
 	// get root key hash
 	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
@@ -427,7 +429,7 @@ void InitializeSmbusMailbox(void)
 	void Set##REG(byte Data) \
 	{ \
 		swmbx_write(gSwMbxDev, false, REG, &Data); \
-	} 
+	}
 
 #define MBX_REG_INC(REG) \
 	void Inc##REG() \
@@ -436,7 +438,7 @@ void InitializeSmbusMailbox(void)
 		swmbx_read(gSwMbxDev, false, REG, &data); \
 		++data; \
 		swmbx_write(gSwMbxDev, false, REG, &data); \
-	} 
+	}
 
 #define MBX_REG_GETTER(REG) \
 	byte Get##REG(void) \
@@ -484,10 +486,165 @@ MBX_REG_SETTER_GETTER(BmcPfmRecoverSvn);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
 
+#if defined(CONFIG_FRONT_PANEL_LED)
+#include <drivers/timer/aspeed_timer.h>
+#include <drivers/led.h>
+
+#define GPIO_SPEC(node_id) GPIO_DT_SPEC_GET_OR(node_id, gpios, {0})
+#define LED_DEVICE "leds"
+#define TIMER_DEVICE "TIMER0"
+
+static struct aspeed_timer_user_config timer_conf;
+static const struct device *led_dev = NULL;
+static const struct device *led_timer_dev = NULL;
+static const struct device *bmc_fp_green_in = NULL;
+static const struct device *bmc_fp_amber_in = NULL;
+static bool fp_green_on;
+static bool fp_amber_on;
+static bool bypass_bmc_fp_signal;
+
+static const struct gpio_dt_spec bmc_fp_green = GPIO_SPEC(DT_ALIAS(fp_input0));
+static const struct gpio_dt_spec bmc_fp_amber = GPIO_SPEC(DT_ALIAS(fp_input1));
+
+static struct gpio_callback bmc_fp_green_cb_data;
+static struct gpio_callback bmc_fp_amber_cb_data;
+
+enum {
+	FP_GREEN_LED  = 0x00,
+	FP_AMBER_LED,
+};
+
+enum {
+	ONE_SHOT_TIMER = 0x00,
+	PERIOD_TIMER,
+};
+
+void fp_amber_led_ctrl_callback()
+{
+	fp_amber_on ? led_off(led_dev, FP_AMBER_LED) : led_on(led_dev, FP_AMBER_LED);
+	fp_amber_on = !fp_amber_on;
+}
+
+void bmc_fp_led_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+	int led_id;
+	if (bypass_bmc_fp_signal)
+		return;
+
+	uint8_t gpio_pin = 31 - __builtin_clz(pins);
+	if (gpio_pin == bmc_fp_green.pin)
+		led_id = FP_GREEN_LED;
+	else if (gpio_pin == bmc_fp_amber.pin)
+		led_id = FP_AMBER_LED;
+	else
+		return;
+
+	int ret = gpio_pin_get(dev, gpio_pin);
+	if (ret < 0) {
+		LOG_ERR("Failed to get BMC_FP_GREEN_LED status");
+		return;
+	}
+
+	ret ? led_on(led_dev, led_id) : led_off(led_dev, led_id);
+	if (led_id == FP_GREEN_LED)
+		fp_green_on = (bool)ret;
+	else
+		fp_amber_on = (bool)ret;
+}
+
+void initializeFPLEDs(void)
+{
+	// init led
+	led_dev = device_get_binding(LED_DEVICE);
+	led_off(led_dev, FP_GREEN_LED);
+	fp_green_on = false;
+	led_off(led_dev, FP_AMBER_LED);
+	fp_amber_on = false;
+
+	// init timer
+	led_timer_dev = device_get_binding(TIMER_DEVICE);
+	timer_conf.millisec = 500;
+	timer_conf.timer_type = PERIOD_TIMER;
+	timer_conf.user_data = NULL;
+	timer_conf.callback = fp_amber_led_ctrl_callback;
+
+	// init bmc_fp_green_led
+	bmc_fp_green_in = device_get_binding(DT_GPIO_LABEL(DT_ALIAS(fp_input0), gpios));
+	gpio_pin_configure(bmc_fp_green_in, DT_GPIO_PIN(DT_ALIAS(fp_input0), gpios),
+			DT_GPIO_FLAGS(DT_ALIAS(fp_input0), gpios) | GPIO_INPUT);
+	gpio_pin_interrupt_configure(bmc_fp_green_in, DT_GPIO_PIN(DT_ALIAS(fp_input0), gpios),
+			GPIO_INT_EDGE_BOTH);
+	gpio_init_callback(&bmc_fp_green_cb_data, bmc_fp_led_handler,
+			BIT(DT_GPIO_PIN(DT_ALIAS(fp_input0), gpios)));
+	gpio_add_callback(bmc_fp_green_in, &bmc_fp_green_cb_data);
+
+	// init bmc_fp_amber_led
+	bmc_fp_amber_in = device_get_binding(DT_GPIO_LABEL(DT_ALIAS(fp_input1), gpios));
+	gpio_pin_configure(bmc_fp_amber_in, DT_GPIO_PIN(DT_ALIAS(fp_input1), gpios),
+			DT_GPIO_FLAGS(DT_ALIAS(fp_input1), gpios) | GPIO_INPUT);
+	gpio_pin_interrupt_configure(bmc_fp_amber_in, DT_GPIO_PIN(DT_ALIAS(fp_input1), gpios),
+			GPIO_INT_EDGE_BOTH);
+	gpio_init_callback(&bmc_fp_amber_cb_data, bmc_fp_led_handler,
+			BIT(DT_GPIO_PIN(DT_ALIAS(fp_input1), gpios)));
+	gpio_add_callback(bmc_fp_amber_in, &bmc_fp_amber_cb_data);
+}
+
+void SetFPLEDState(byte PlatformStateData)
+{
+	// FP LED behavior
+	//
+	// |  Green  |  Amber  | State    |
+	// --------------------------------
+	// |   Lit   |  Off    | Verify   |
+	// |   Off   |  Blink  | Recovery |
+	// |   Off   |  Lit    | Update   |
+	// | PassThr | PassThr | Tzero    |
+	if (PlatformStateData == PCH_FW_UPDATE ||
+	    PlatformStateData == BMC_FW_UPDATE ||
+	    PlatformStateData == CPLD_FW_UPDATE) {
+		bypass_bmc_fp_signal = true;
+		timer_aspeed_stop(led_timer_dev);
+		led_off(led_dev, FP_GREEN_LED);
+		fp_green_on = false;
+		led_on(led_dev, FP_AMBER_LED);
+		fp_amber_on = true;
+	} else if (PlatformStateData == T_MINUS_1_FW_RECOVERY) {
+		bypass_bmc_fp_signal = true;
+		led_off(led_dev, FP_GREEN_LED);
+		fp_green_on = false;
+		timer_aspeed_start(led_timer_dev, &timer_conf);
+	} else if (PlatformStateData == ENTER_T_MINUS_1) {
+		bypass_bmc_fp_signal = true;
+		timer_aspeed_stop(led_timer_dev);
+		led_on(led_dev, FP_GREEN_LED);
+		fp_green_on = true;
+		led_off(led_dev, FP_AMBER_LED);
+		fp_amber_on = false;
+	} else if (PlatformStateData == ENTER_T0) {
+		timer_aspeed_stop(led_timer_dev);
+		bypass_bmc_fp_signal = false;
+		int pin_state = gpio_pin_get(bmc_fp_green_in, bmc_fp_green.pin);
+		if (pin_state < 0) {
+			LOG_ERR("Failed to get BMC_FP_GREEN_LED");
+			return;
+		}
+		pin_state ? led_on(led_dev, FP_GREEN_LED) : led_off(led_dev, FP_GREEN_LED);
+		fp_green_on = pin_state;
+
+		pin_state = gpio_pin_get(bmc_fp_amber_in, bmc_fp_amber.pin);
+		if (pin_state < 0) {
+			LOG_ERR("Failed to get BMC_FP_AMBER_LED");
+			return;
+		}
+		pin_state ? led_on(led_dev, FP_AMBER_LED) : led_off(led_dev, FP_AMBER_LED);
+		fp_amber_on = pin_state;
+	}
+}
+#endif
+
 void SetPlatformState(byte PlatformStateData)
 {
 #if defined(CONFIG_PLATFORM_STATE_LED)
-	uint8_t bit;
 	static const struct gpio_dt_spec leds[] = {
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 0),
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 1),
@@ -502,6 +659,10 @@ void SetPlatformState(byte PlatformStateData)
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
 		gpio_pin_set(leds[bit].port, leds[bit].pin, !(PlatformStateData & BIT(bit)));
 	}
+#endif
+
+#if defined(CONFIG_FRONT_PANEL_LED)
+	SetFPLEDState(PlatformStateData);
 #endif
 	swmbx_write(gSwMbxDev, false, PlatformState, &PlatformStateData);
 }
@@ -526,7 +687,7 @@ void ClearUfmStatusValue(uint8_t UfmStatusBitMask)
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 {
 	UfmStatus &= ~UfmStatusBitMask;
-	set_provision_data_in_flash(UFM_STATUS, &UfmStatus, 4);
+	set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, 4);
 }
 
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
@@ -696,7 +857,7 @@ unsigned char ProvisionRootKeyHash(void)
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
-		Status = set_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
+		Status = set_provision_data_in_flash(ROOT_KEY_HASH, (uint8_t *)gRootKeyHash, SHA384_DIGEST_LENGTH);
 		if (Status == Success) {
 			DEBUG_PRINTF("Root key provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
@@ -719,7 +880,7 @@ unsigned char ProvisionPchOffsets(void)
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
+		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)gPchOffsets, sizeof(gPchOffsets));
 		if (Status == Success) {
 			DEBUG_PRINTF("PCH offsets provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK);
@@ -743,7 +904,7 @@ unsigned char ProvisionBmcOffsets(void)
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
+		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)gBmcOffsets, sizeof(gBmcOffsets));
 		if (Status == Success) {
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK);
 			DEBUG_PRINTF("BMC offsets provisioned");
@@ -893,10 +1054,10 @@ void process_provision_command(void)
 
 		CPLD_STATUS cpld_status;
 
-		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_status, sizeof(CPLD_STATUS));
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 		if (cpld_status.DecommissionFlag == TRUE) {
 			cpld_status.DecommissionFlag = 0;
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_status, sizeof(CPLD_STATUS));
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 		}
 	}
 }
@@ -924,9 +1085,9 @@ void UpdateBmcCheckpoint(byte Data)
 		AspeedPFR_EnableTimer(BMC_EVENT);
 
 	// BMC boot completed
-	if (Data == CompletingexecutionBlock || Data == ReadToBootOS) {
+	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
 		// If execution completed disable timer
-		DEBUG_PRINTF("Enter Completingexecution: Block Disable Timer");
+		DEBUG_PRINTF("Enter CompletingExecution: Block Disable Timer");
 		AspeedPFR_DisableTimer(BMC_EVENT);
 		gBmcBootDone = TRUE;
 		gBMCWatchDogTimer = -1;
@@ -962,7 +1123,7 @@ void UpdateBiosCheckpoint(byte Data)
 	if (Data == ResumedExecutionBlock)
 		AspeedPFR_EnableTimer(PCH_EVENT);
 	// BIOS boot completed
-	if (Data == CompletingexecutionBlock || Data == ReadToBootOS) {
+	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
 		AspeedPFR_DisableTimer(PCH_EVENT);
 		gBiosBootDone = TRUE;
 		gBootCheckpointReceived = true;
@@ -981,183 +1142,3 @@ void UpdateBiosCheckpoint(byte Data)
 	SetBiosCheckpoint(Data);
 }
 
-void PublishUpdateEvent(uint8_t ImageType, uint8_t FlashRegion)
-{
-	// Posting the Update signal
-	UpdateActiveObject.type = ImageType;
-	UpdateActiveObject.ProcessNewCommand = 1;
-
-	UpdateEventData.operation = UPDATE_BACKUP;
-	UpdateEventData.flash = FlashRegion;
-	UpdateEventData.image = ImageType;
-
-	if (post_smc_action(UPDATE, &UpdateActiveObject, &UpdateEventData)) {
-		DEBUG_PRINTF("%s : event queue not available !", __func__);
-		return;
-	}
-}
-
-void UpdateIntentHandle(byte Data, uint32_t Source)
-{
-	uint8_t Index;
-	uint8_t PchActiveStatus;
-	uint8_t BmcActiveStatus;
-
-	DEBUG_PRINTF(" Update Intent = 0x%x", Data);
-
-	if (Data & UpdateAtReset) {
-		// Getting cpld status from UFM
-
-		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-		if (Data & PchActiveUpdate) {
-			cpld_update_status.PchStatus = 1;
-			cpld_update_status.Region[2].ActiveRegion = 1;
-		}
-		if (Data & PchRecoveryUpdate) {
-			cpld_update_status.PchStatus = 1;
-			cpld_update_status.Region[2].Recoveryregion = 1;
-		}
-		if (Data & HROTActiveUpdate) {
-			cpld_update_status.CpldStatus = 1;
-			cpld_update_status.CpldRecovery = 1;
-			cpld_update_status.Region[0].ActiveRegion = 1;
-		}
-		if (Data & BmcActiveUpdate) {
-			cpld_update_status.BmcStatus = 1;
-			cpld_update_status.Region[1].ActiveRegion = 1;
-		}
-		if (Data & BmcRecoveryUpdate) {
-			cpld_update_status.BmcStatus = 1;
-			cpld_update_status.Region[1].Recoveryregion = 1;
-		}
-		if (Data & HROTRecoveryUpdate)
-			DEBUG_PRINTF("HROTRecoveryUpdate not supported");
-		if (Data & DymanicUpdate)
-			DEBUG_PRINTF("DymanicUpdate not supported");
-		// Setting updated cpld status to ufm
-		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-	} else {
-		if (Data & PchActiveUpdate) {
-			if ((Data & PchActiveUpdate) && (Data & PchRecoveryUpdate)) {
-				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				cpld_update_status.PchStatus = 1;
-				cpld_update_status.Region[2].ActiveRegion = 1;
-				cpld_update_status.Region[2].Recoveryregion = 1;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				PublishUpdateEvent(PCH_EVENT, PRIMARY_FLASH_REGION);
-				return;
-			}
-			if (Source == BmcUpdateIntent) {
-				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				cpld_update_status.BmcToPchStatus = 1;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-			}
-
-			PublishUpdateEvent(PCH_EVENT, PRIMARY_FLASH_REGION);
-		}
-
-		if (Data & PchRecoveryUpdate) {
-			if (Source == BmcUpdateIntent) {
-				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-				cpld_update_status.BmcToPchStatus = 1;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, &cpld_update_status, sizeof(CPLD_STATUS));
-			}
-			PublishUpdateEvent(PCH_EVENT, SECONDARY_FLASH_REGION);
-		}
-		if (Data & HROTActiveUpdate)
-			PublishUpdateEvent(ROT_TYPE, PRIMARY_FLASH_REGION);
-
-		if (Data & BmcActiveUpdate) {
-			if ((Data & BmcActiveUpdate) && (Data & BmcRecoveryUpdate)) {
-				PublishUpdateEvent(BMC_EVENT, PRIMARY_FLASH_REGION);
-				return;
-			}
-			PublishUpdateEvent(BMC_EVENT, PRIMARY_FLASH_REGION);
-		}
-		if (Data & BmcRecoveryUpdate)
-			PublishUpdateEvent(BMC_EVENT, SECONDARY_FLASH_REGION);
-		if (Data & HROTRecoveryUpdate)
-			DEBUG_PRINTF("HROTRecoveryUpdate not supported");
-		if (Data & DymanicUpdate)
-			DEBUG_PRINTF("DymanicUpdate not supported");
-	}
-
-}
-
-/**
- * Function to Check if system boots fine based on TimerISR
- * Returns Status
- */
-bool WatchDogTimer(int ImageType)
-{
-	DEBUG_PRINTF("WDT Update Tiggers");
-	if (ImageType == PCH_EVENT) {
-		gPCHWatchDogTimer = 0;
-		gBiosBootDone = FALSE;
-	}
-	if (ImageType == BMC_EVENT) {
-		gBMCWatchDogTimer = 0;
-		gBmcBootDone = FALSE;
-	}
-
-	gBootCheckpointReceived = false;
-	gWDTUpdate = 1;
-
-	return true;
-}
-
-static unsigned int mailBox_index = 0;
-uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag)
-{
-
-	byte DataToSend = 0;
-	uint8_t i = 0;
-
-	DEBUG_PRINTF("%s CipherText: %02x %02x", __func__, CipherText[0], CipherText[1]);
-
-	switch (CipherText[0]) {
-	case UfmCmdTriggerValue:
-		if (CipherText[1] & EXECUTE_UFM_COMMAND) {       // If bit 0 set
-			// Execute command specified at UFM/Provisioning Command register
-			ClearUfmStatusValue(UFM_CLEAR_ON_NEW_COMMAND);
-			SetUfmStatusValue(COMMAND_BUSY);
-			process_provision_command();
-			ClearUfmStatusValue(COMMAND_BUSY);
-			SetUfmStatusValue(COMMAND_DONE);
-		} else if (CipherText[1] & FLUSH_WRITE_FIFO) {    // Flush Write FIFO
-			// Need to read UFM Write FIFO offest
-			memset(&gUfmFifoData, 0, sizeof(gUfmFifoData));
-			swmbx_flush_fifo(gSwMbxDev, UfmWriteFIFO);
-			gFifoData = 0;
-		} else if (CipherText[1] & FLUSH_READ_FIFO) {    // flush Read FIFO
-			// Need to read UFM Read FIFO offest
-			memset(&gReadFifoData, 0, sizeof(gReadFifoData));
-			swmbx_flush_fifo(gSwMbxDev, UfmReadFIFO);
-			gFifoData = 0;
-			mailBox_index = 0;
-		}
-		break;
-	case BmcCheckpoint:
-		UpdateBmcCheckpoint(CipherText[1]);
-		break;
-	case AcmCheckpoint:
-		// UpdateAcmCheckpoint(CipherText[1]);
-		break;
-	case BiosCheckpoint:
-		UpdateBiosCheckpoint(CipherText[1]);
-		break;
-	case PchUpdateIntent:
-		SetPchUpdateIntent(CipherText[1]);
-		UpdateIntentHandle(CipherText[1], PchUpdateIntent);
-		break;
-	case BmcUpdateIntent:
-		SetBmcUpdateIntent(CipherText[1]);
-		UpdateIntentHandle(CipherText[1], BmcUpdateIntent);
-		break;
-	default:
-		DEBUG_PRINTF("Mailbox command not found");
-		break;
-	}
-
-	return DataToSend;
-}

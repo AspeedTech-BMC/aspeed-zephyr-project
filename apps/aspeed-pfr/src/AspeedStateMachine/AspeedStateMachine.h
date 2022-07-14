@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #pragma once
+#include <smf.h>
 #include <zephyr.h>
 #include <StateMachineAction/StateMachineActions.h>
 
@@ -27,9 +28,7 @@ enum aspeed_pfr_event {
 	INIT_DONE,
 	INIT_ROT_SECONDARY_BOOTED,
 	VERIFY_UNPROVISIONED,
-	VERIFY_STG_FAILED,
-	VERIFY_RCV_FAILED,
-	VERIFY_ACT_FAILED,
+	VERIFY_FAILED,
 	VERIFY_DONE,
 	RECOVERY_FAILED,
 	RECOVERY_DONE,
@@ -77,6 +76,8 @@ struct smf_context {
 };
 
 extern struct k_fifo aspeed_sm_fifo;
+extern enum aspeed_pfr_event event_log[128];
+extern size_t event_log_idx;
 
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data);
-void AspeedStateMachine();
+void AspeedStateMachine(void);

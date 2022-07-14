@@ -7,9 +7,12 @@
 #include <logging/log.h>
 #include <assert.h>
 
+#include "engineManager/engine_manager.h"
+#include "imageVerification/image_verify.h"
 #include "include/definitions.h"
 #include "common/pfm_headers.h"
 #include "firmware/app_image.h"
+#include "manifestProcessor/manifestProcessor.h"
 #include "common/common.h"
 
 LOG_MODULE_REGISTER(recovery, CONFIG_LOG_DEFAULT_LEVEL);
@@ -45,7 +48,7 @@ int recovery_verification(struct flash *flash, struct hash_engine *hash, struct 
 	uint32_t recovery_signature_offset;
 	int signature_length;
 
-	flash->read(flash, RECOVERY_IMAGE_BASE_ADDRESS, &recovery_header, sizeof(recovery_header));
+	flash->read(flash, RECOVERY_IMAGE_BASE_ADDRESS, (uint8_t *)&recovery_header, sizeof(recovery_header));
 
 	status = recovery_header_magic_num_check(recovery_header.magic_num);
 	// if (status)
@@ -77,7 +80,7 @@ int recovery_action(struct flash *flash, uint8_t *recovery_address)
 {
 	int status = 0;
 	struct recovery_image_header recovery_header;
-	struct recovery_image recovery_info;
+	struct recovery_image_info recovery_info;
 	uint32_t image_offset = 0, recovery_signature_offset, erase_block_offset;
 	int match_flag = 0;
 	char buf[2048];
@@ -85,13 +88,13 @@ int recovery_action(struct flash *flash, uint8_t *recovery_address)
 	int block_count = 0;
 	int page_count = 0;
 
-	flash->read(flash, RECOVERY_IMAGE_BASE_ADDRESS, &recovery_header, sizeof(recovery_header));
+	flash->read(flash, RECOVERY_IMAGE_BASE_ADDRESS, (uint8_t *)&recovery_header, sizeof(recovery_header));
 
 	image_offset = RECOVERY_IMAGE_BASE_ADDRESS + recovery_header.header_length;
 	recovery_signature_offset = RECOVERY_IMAGE_BASE_ADDRESS + *((uint32_t *)  recovery_header.image_length) - *((uint32_t *)  recovery_header.sig_length);
 
 	do {
-		flash->read(flash, image_offset, &recovery_info, sizeof(recovery_info));
+		flash->read(flash, image_offset, (uint8_t *)&recovery_info, sizeof(recovery_info));
 
 		image_offset += sizeof(recovery_info); // image data start
 

@@ -7,10 +7,13 @@
 #include <logging/log.h>
 #include "pfr_recovery.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "pfr/pfr_common.h"
+#include "pfr/pfr_recovery.h"
 #include "intel_pfr/intel_pfr_definitions.h"
+#include "intel_pfr/intel_pfr_recovery.h"
 #include "include/SmbusMailBoxCom.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -46,7 +49,7 @@ int recover_image(void *AoData, void *EventContext)
 
 	if (ActiveObjectData->RecoveryImageStatus != Success) {
 		// status = pfr_staging_verify(pfr_manifest);
-		status = status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
+		status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
 		if (status != Success) {
 			DEBUG_PRINTF("PFR Staging Area Corrupted");
 			if (ActiveObjectData->ActiveImageStatus != Success) {
@@ -160,8 +163,6 @@ int recovery_get_version(struct recovery_image *image, char *version, size_t len
  */
 int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash)
 {
-
-	int status = 0;
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
 
 	return intel_pfr_recover_update_action(pfr_manifest);

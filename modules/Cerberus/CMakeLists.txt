@@ -7,44 +7,50 @@ if (CONFIG_CERBERUS)
 	set(CERBERUS_CORE_DIR ${CERBERUS_ROOT}/core)
 	set(CERBERUS_PLATFORM_DIR ${CERBERUS_ROOT}/projects/zephyr)
 
+	zephyr_interface_library_named(cerberus)
+	target_include_directories(cerberus INTERFACE
+		${CMAKE_CURRENT_SOURCE_DIR}
+		${CMAKE_CURRENT_SOURCE_DIR}/core
+		${CMAKE_CURRENT_SOURCE_DIR}/project/zephyr
+	)
 	zephyr_library()
 	zephyr_library_link_libraries(mbedTLS)
+	zephyr_library_link_libraries(hrot_hal)
 	zephyr_library_include_directories(
-		../../lib/hrot_hal
 		${CERBERUS_ROOT}/core
 		${CERBERUS_ROOT}/projects/zephyr
 	)
 
 	file(GLOB_RECURSE CERBERUS_CORE_SOURCES "${CERBERUS_ROOT}/core/*.c")
 	file(GLOB_RECURSE CERBERUS_PLATFORM_SOURCES "${CERBERUS_PLATFORM_DIR}/*.c")
-	
+
 	zephyr_library_sources(
 		${CERBERUS_PLATFORM_SOURCES}
 
-		${CERBERUS_CORE_DIR}/keystore/keystore_flash.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor_filtered.c
-		${CERBERUS_CORE_DIR}/host_fw/host_flash_manager.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor.c
-		${CERBERUS_CORE_DIR}/host_fw/host_flash_manager_dual.c
-		${CERBERUS_CORE_DIR}/host_fw/host_state_observer_dirty_reset.c
-		${CERBERUS_CORE_DIR}/host_fw/host_irq_handler_mask_irqs.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor_single_full_bypass.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor_dual.c
-		${CERBERUS_CORE_DIR}/host_fw/host_flash_manager_single.c
-		${CERBERUS_CORE_DIR}/host_fw/host_fw_util.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor_dual_full_bypass.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor_single.c
-		${CERBERUS_CORE_DIR}/host_fw/host_processor_observer_pcr.c
-		${CERBERUS_CORE_DIR}/host_fw/bmc_recovery.c
-		${CERBERUS_CORE_DIR}/host_fw/host_flash_initialization.c
-		${CERBERUS_CORE_DIR}/host_fw/host_irq_handler.c
-		${CERBERUS_CORE_DIR}/host_fw/host_irq_handler_auth_check.c
-		${CERBERUS_CORE_DIR}/host_fw/host_state_manager.c
-		${CERBERUS_CORE_DIR}/attestation/attestation_master.c
-		${CERBERUS_CORE_DIR}/attestation/pcr_store.c
-		${CERBERUS_CORE_DIR}/attestation/attestation_slave.c
-		${CERBERUS_CORE_DIR}/attestation/aux_attestation.c
-		${CERBERUS_CORE_DIR}/attestation/pcr.c
+		# ${CERBERUS_CORE_DIR}/keystore/keystore_flash.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor_filtered.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_flash_manager.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_flash_manager_dual.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_state_observer_dirty_reset.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_irq_handler_mask_irqs.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor_single_full_bypass.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor_dual.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_flash_manager_single.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_fw_util.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor_dual_full_bypass.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor_single.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_processor_observer_pcr.c
+		# ${CERBERUS_CORE_DIR}/host_fw/bmc_recovery.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_flash_initialization.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_irq_handler.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_irq_handler_auth_check.c
+		# ${CERBERUS_CORE_DIR}/host_fw/host_state_manager.c
+		# ${CERBERUS_CORE_DIR}/attestation/attestation_master.c
+		# ${CERBERUS_CORE_DIR}/attestation/pcr_store.c
+		# ${CERBERUS_CORE_DIR}/attestation/attestation_slave.c
+		# ${CERBERUS_CORE_DIR}/attestation/aux_attestation.c
+		# ${CERBERUS_CORE_DIR}/attestation/pcr.c
 		# ${CERBERUS_CORE_DIR}/testing/mctp_interface_test.c
 		# ${CERBERUS_CORE_DIR}/testing/host_processor_single_test_bypass_mode.c
 		# ${CERBERUS_CORE_DIR}/testing/spi_flash_sfdp_test.c
@@ -244,122 +250,114 @@ if (CONFIG_CERBERUS)
 		# ${CERBERUS_CORE_DIR}/testing/flash_common_test.c
 		# ${CERBERUS_CORE_DIR}/testing/host_processor_single_test_run_time_verification.c
 		# ${CERBERUS_CORE_DIR}/testing/ecc_mbedtls_test.c
-		${CERBERUS_CORE_DIR}/flash/spi_flash_sfdp.c
+		# ${CERBERUS_CORE_DIR}/flash/spi_flash_sfdp.c
 		${CERBERUS_CORE_DIR}/flash/flash_common.c
-		${CERBERUS_CORE_DIR}/flash/flash_updater.c
+		# ${CERBERUS_CORE_DIR}/flash/flash_updater.c
 		${CERBERUS_CORE_DIR}/flash/spi_flash.c
-		${CERBERUS_CORE_DIR}/flash/flash_store_encrypted.c
+		# ${CERBERUS_CORE_DIR}/flash/flash_store_encrypted.c
 		${CERBERUS_CORE_DIR}/flash/flash_util.c
-		${CERBERUS_CORE_DIR}/flash/flash_store.c
-		${CERBERUS_CORE_DIR}/logging/logging_flash.c
+		# ${CERBERUS_CORE_DIR}/flash/flash_store.c
+		# ${CERBERUS_CORE_DIR}/logging/logging_flash.c
 		${CERBERUS_CORE_DIR}/logging/logging_memory.c
 		${CERBERUS_CORE_DIR}/logging/debug_log.c
-		${CERBERUS_CORE_DIR}/recovery/recovery_image_manager.c
-		${CERBERUS_CORE_DIR}/recovery/recovery_image_section_header.c
-		${CERBERUS_CORE_DIR}/recovery/recovery_image.c
-		${CERBERUS_CORE_DIR}/recovery/recovery_image_observer_pcr.c
-		${CERBERUS_CORE_DIR}/recovery/recovery_image_header.c
-		${CERBERUS_CORE_DIR}/state_manager/state_manager.c
-		${CERBERUS_CORE_DIR}/riot/x509_riot.c
-		${CERBERUS_CORE_DIR}/riot/ecc_riot.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotSha1.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotHmac.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotEcc.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotDerEnc.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotAesTables.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotX509Bldr.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotDerDec.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotBase64.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotSha256.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotKdf.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotCrypt.c
-		${CERBERUS_CORE_DIR}/riot/reference/RiotAes128.c
-		${CERBERUS_CORE_DIR}/riot/riot_core.c
-		${CERBERUS_CORE_DIR}/riot/base64_riot.c
-		${CERBERUS_CORE_DIR}/riot/riot_core_common.c
-		${CERBERUS_CORE_DIR}/riot/hash_riot.c
-		${CERBERUS_CORE_DIR}/riot/riot_key_manager.c
-		${CERBERUS_CORE_DIR}/tpm/tpm.c
-		${CERBERUS_CORE_DIR}/spi_filter/spi_filter_interface.c
-		${CERBERUS_CORE_DIR}/spi_filter/spi_filter_irq_handler.c
-		${CERBERUS_CORE_DIR}/spi_filter/spi_filter_irq_handler_dirty.c
-		${CERBERUS_CORE_DIR}/mctp/mctp_interface.c
-		${CERBERUS_CORE_DIR}/mctp/mctp_interface_control.c
-		${CERBERUS_CORE_DIR}/mctp/mctp_protocol.c
-		${CERBERUS_CORE_DIR}/firmware/firmware_update.c
-		${CERBERUS_CORE_DIR}/firmware/firmware_header.c
-		${CERBERUS_CORE_DIR}/firmware/app_image.c
-		${CERBERUS_CORE_DIR}/firmware/firmware_component.c
-		${CERBERUS_CORE_DIR}/manifest/manifest_verification.c
-		${CERBERUS_CORE_DIR}/manifest/pcd/pcd_flash.c
-		${CERBERUS_CORE_DIR}/manifest/pcd/pcd_manager.c
-		${CERBERUS_CORE_DIR}/manifest/pcd/pcd_manager_flash.c
-		${CERBERUS_CORE_DIR}/manifest/pcd/pcd_observer_pcr.c
-		${CERBERUS_CORE_DIR}/manifest/manifest_flash.c
-		${CERBERUS_CORE_DIR}/manifest/manifest_manager_flash.c
-		${CERBERUS_CORE_DIR}/manifest/manifest_manager.c
-		${CERBERUS_CORE_DIR}/manifest/pfm/pfm_flash.c
-		${CERBERUS_CORE_DIR}/manifest/pfm/pfm_observer_pcr.c
-		${CERBERUS_CORE_DIR}/manifest/pfm/pfm_observer_pending_reset.c
-		${CERBERUS_CORE_DIR}/manifest/pfm/pfm_manager.c
-		${CERBERUS_CORE_DIR}/manifest/pfm/pfm_manager_flash.c
-		${CERBERUS_CORE_DIR}/manifest/cfm/cfm_manager_flash.c
-		${CERBERUS_CORE_DIR}/manifest/cfm/cfm_observer_pcr.c
-		${CERBERUS_CORE_DIR}/manifest/cfm/cfm_flash.c
-		${CERBERUS_CORE_DIR}/manifest/cfm/cfm_manager.c
-		${CERBERUS_CORE_DIR}/manifest/manifest_pcr.c
-		${CERBERUS_CORE_DIR}/crypto/kdf.c
+		# ${CERBERUS_CORE_DIR}/recovery/recovery_image_manager.c
+		# ${CERBERUS_CORE_DIR}/recovery/recovery_image_section_header.c
+		# ${CERBERUS_CORE_DIR}/recovery/recovery_image.c
+		# ${CERBERUS_CORE_DIR}/recovery/recovery_image_observer_pcr.c
+		# ${CERBERUS_CORE_DIR}/recovery/recovery_image_header.c
+		# ${CERBERUS_CORE_DIR}/state_manager/state_manager.c
+		# ${CERBERUS_CORE_DIR}/riot/x509_riot.c
+		# ${CERBERUS_CORE_DIR}/riot/ecc_riot.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotSha1.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotHmac.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotEcc.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotDerEnc.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotAesTables.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotX509Bldr.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotDerDec.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotBase64.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotSha256.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotKdf.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotCrypt.c
+		# ${CERBERUS_CORE_DIR}/riot/reference/RiotAes128.c
+		# ${CERBERUS_CORE_DIR}/riot/riot_core.c
+		# ${CERBERUS_CORE_DIR}/riot/base64_riot.c
+		# ${CERBERUS_CORE_DIR}/riot/riot_core_common.c
+		# ${CERBERUS_CORE_DIR}/riot/hash_riot.c
+		# ${CERBERUS_CORE_DIR}/riot/riot_key_manager.c
+		# ${CERBERUS_CORE_DIR}/tpm/tpm.c
+		# ${CERBERUS_CORE_DIR}/spi_filter/spi_filter_interface.c
+		# ${CERBERUS_CORE_DIR}/spi_filter/spi_filter_irq_handler.c
+		# ${CERBERUS_CORE_DIR}/spi_filter/spi_filter_irq_handler_dirty.c
+		# ${CERBERUS_CORE_DIR}/mctp/mctp_interface.c
+		# ${CERBERUS_CORE_DIR}/mctp/mctp_interface_control.c
+		# ${CERBERUS_CORE_DIR}/mctp/mctp_protocol.c
+		# ${CERBERUS_CORE_DIR}/firmware/firmware_update.c
+		# ${CERBERUS_CORE_DIR}/firmware/firmware_header.c
+		# ${CERBERUS_CORE_DIR}/firmware/app_image.c
+		# ${CERBERUS_CORE_DIR}/firmware/firmware_component.c
+		# ${CERBERUS_CORE_DIR}/manifest/manifest_verification.c
+		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_manager.c
+		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_manager_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_observer_pcr.c
+		# ${CERBERUS_CORE_DIR}/manifest/manifest_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/manifest_manager_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/manifest_manager.c
+		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_observer_pcr.c
+		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_observer_pending_reset.c
+		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_manager.c
+		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_manager_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/cfm/cfm_manager_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/cfm/cfm_observer_pcr.c
+		# ${CERBERUS_CORE_DIR}/manifest/cfm/cfm_flash.c
+		# ${CERBERUS_CORE_DIR}/manifest/cfm/cfm_manager.c
+		# ${CERBERUS_CORE_DIR}/manifest/manifest_pcr.c
+		# ${CERBERUS_CORE_DIR}/crypto/kdf.c
 		# ${CERBERUS_CORE_DIR}/crypto/rsa_mbedtls.c
 		# ${CERBERUS_CORE_DIR}/crypto/rng_mbedtls.c
-		${CERBERUS_CORE_DIR}/crypto/signature_verification_ecc.c
+		# ${CERBERUS_CORE_DIR}/crypto/signature_verification_ecc.c
 		# ${CERBERUS_CORE_DIR}/crypto/ecc_mbedtls.c
-		${CERBERUS_CORE_DIR}/crypto/base64_thread_safe.c
+		# ${CERBERUS_CORE_DIR}/crypto/base64_thread_safe.c
 		# ${CERBERUS_CORE_DIR}/crypto/hash_mbedtls.c
-		${CERBERUS_CORE_DIR}/crypto/rsa_thread_safe.c
+		# ${CERBERUS_CORE_DIR}/crypto/rsa_thread_safe.c
 		# ${CERBERUS_CORE_DIR}/crypto/base64_mbedtls.c
 		# ${CERBERUS_CORE_DIR}/crypto/x509_mbedtls.c
-		${CERBERUS_CORE_DIR}/crypto/checksum.c
-		${CERBERUS_CORE_DIR}/crypto/hash_thread_safe.c
-		${CERBERUS_CORE_DIR}/crypto/signature_verification_rsa.c
+		# ${CERBERUS_CORE_DIR}/crypto/checksum.c
+		# ${CERBERUS_CORE_DIR}/crypto/hash_thread_safe.c
+		# ${CERBERUS_CORE_DIR}/crypto/signature_verification_rsa.c
 		${CERBERUS_CORE_DIR}/crypto/hash.c
 		# ${CERBERUS_CORE_DIR}/crypto/aes_mbedtls.c
-		${CERBERUS_CORE_DIR}/crypto/rsa.c
-		${CERBERUS_CORE_DIR}/crypto/rng_thread_safe.c
-		${CERBERUS_CORE_DIR}/crypto/x509_thread_safe.c
-		${CERBERUS_CORE_DIR}/crypto/ecc_thread_safe.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cmd_channel.c
-		${CERBERUS_CORE_DIR}/cmd_interface/session_manager.c
-		${CERBERUS_CORE_DIR}/cmd_interface/counter_manager_registers.c
-		${CERBERUS_CORE_DIR}/cmd_interface/session_manager_ecc.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_diagnostic_commands.c
-		${CERBERUS_CORE_DIR}/cmd_interface/device_manager.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_debug_commands.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cmd_authorization.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_system.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_slave.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_dual_cmd_set.c
-		${CERBERUS_CORE_DIR}/cmd_interface/config_reset.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_required_commands.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_master_commands.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface.c
-		${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_optional_commands.c
-		${CERBERUS_CORE_DIR}/system/system_state_manager.c
-		${CERBERUS_CORE_DIR}/system/system.c
-		${CERBERUS_CORE_DIR}/common/observable.c
-		${CERBERUS_CORE_DIR}/common/authorization_allowed.c
-		${CERBERUS_CORE_DIR}/common/authorization_disallowed.c
-		${CERBERUS_CORE_DIR}/common/buffer_util.c
-		${CERBERUS_CORE_DIR}/common/authorization_challenge.c
-		${CERBERUS_CORE_DIR}/common/image_header.c
+		# ${CERBERUS_CORE_DIR}/crypto/rsa.c
+		# ${CERBERUS_CORE_DIR}/crypto/rng_thread_safe.c
+		# ${CERBERUS_CORE_DIR}/crypto/x509_thread_safe.c
+		# ${CERBERUS_CORE_DIR}/crypto/ecc_thread_safe.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_channel.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/session_manager.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/counter_manager_registers.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/session_manager_ecc.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_diagnostic_commands.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/device_manager.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_debug_commands.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_authorization.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_system.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_slave.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_dual_cmd_set.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/config_reset.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_required_commands.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_master_commands.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface.c
+		# ${CERBERUS_CORE_DIR}/cmd_interface/cerberus_protocol_optional_commands.c
+		# ${CERBERUS_CORE_DIR}/system/system_state_manager.c
+		# ${CERBERUS_CORE_DIR}/system/system.c
+		# ${CERBERUS_CORE_DIR}/common/observable.c
+		# ${CERBERUS_CORE_DIR}/common/authorization_allowed.c
+		# ${CERBERUS_CORE_DIR}/common/authorization_disallowed.c
+		# ${CERBERUS_CORE_DIR}/common/buffer_util.c
+		# ${CERBERUS_CORE_DIR}/common/authorization_challenge.c
+		# ${CERBERUS_CORE_DIR}/common/image_header.c
 
-	)
-
-	zephyr_compile_options(
-		-fno-builtin
-		-fdata-sections
-		-Wall
-		-Wextra
-		-Wno-sign-compare
 	)
 
 	zephyr_compile_definitions(
@@ -372,6 +370,6 @@ if (CONFIG_CERBERUS)
 		X509_ENABLE_CREATE_CERTIFICATES
 		X509_ENABLE_AUTHENTICATION
 	)
-	
+
 endif()
 

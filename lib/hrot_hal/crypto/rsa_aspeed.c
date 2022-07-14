@@ -18,7 +18,6 @@ int decrypt_aspeed(const struct rsa_key *key, const uint8_t *encrypted, size_t i
 	struct rsa_pkt pkt;
 	struct rsa_key *rk;
 	int ret;
-	int j;
 
 	rk = key;
 	pkt.in_buf = encrypted;
@@ -146,8 +145,6 @@ int rsa_sig_verify_test(void)
 	//const uint8_t *signature;
 	//size_t sig_length;
 	//const uint8_t *match;
-	size_t match_length;
-	int j;
 
 	ret = sig_verify_aspeed(rsa_pub_key, rsa_tv[0].c, rsa_tv[0].c_size, rsa_tv[0].p, rsa_tv[0].p_size);
 

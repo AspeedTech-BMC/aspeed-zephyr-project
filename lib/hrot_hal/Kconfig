@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 config HROT_HAL
+	default n
 	bool "Hardware root of trust hardware abstraction layer"
 
 config SPI_DMA_SUPPORT_ASPEED

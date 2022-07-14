@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include "common/common.h"
 #include "pfr_common.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "flash/flash_wrapper.h"
@@ -11,6 +12,9 @@
 #include "recovery/recovery_image.h"
 #include "intel_pfr/intel_pfr_key_cancellation.h"
 #include "intel_pfr/intel_pfr_update.h"
+#include "pfr/pfr_recovery.h"
+#include "pfr/pfr_verification.h"
+#include "pfr/pfr_update.h"
 #include "pfr_util.h"
 #include "intel_pfr/intel_pfr_authentication.h"
 

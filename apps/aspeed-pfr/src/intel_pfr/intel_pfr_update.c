@@ -10,7 +10,7 @@
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "include/SmbusMailBoxCom.h"
@@ -19,18 +19,13 @@
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_pbc.h"
 #include "intel_pfr_recovery.h"
+#include "intel_pfr_key_cancellation.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
 
 extern EVENT_CONTEXT DataContext;
 
@@ -42,24 +37,28 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	uint32_t target_address = 0;
 
 	if (manifest->image_type == BMC_TYPE) {
-		DEBUG_PRINTF("BMC Staging Region Verification");
-		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
+		LOG_INF("BMC Staging Region Verification");
+		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
 			return status;
 
-		status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
+		status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET,
+				(uint8_t *)&target_address, sizeof(target_address));
 		if (status != Success)
 			return status;
 
 		manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 
 	} else if (manifest->image_type == PCH_TYPE) {
-		DEBUG_PRINTF("PCH Staging Region Verification");
-		status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&read_address, sizeof(read_address));
+		LOG_INF("PCH Staging Region Verification");
+		status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET,
+				(uint8_t *)&read_address, sizeof(read_address));
 		if (status != Success)
 			return Failure;
 
-		status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
+		status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET,
+				(uint8_t *)&target_address, sizeof(target_address));
 		if (status != Success)
 			return Failure;
 
@@ -71,11 +70,13 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 	manifest->recovery_address = target_address;
 
-	DEBUG_PRINTF("manifest->address=0x%08x manifest->recovery_address=0x%08x", manifest->address, manifest->recovery_address);
+	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verification
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("Staging manifest verification failed");
+		LOG_ERR("Capsule signature verification failed");
 		return Failure;
 	}
 
@@ -86,14 +87,15 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	else if (manifest->image_type == PCH_TYPE)
 		manifest->pc_type = PFR_PCH_PFM;
 
-	// Recovery region PFM verification
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 
-	DEBUG_PRINTF("manifest->address=0x%08x manifest->recovery_address=0x%08x", manifest->address, manifest->recovery_address);
+	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
 	// manifest verification
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("Recovery manifest verification failed");
+		LOG_ERR("PFM signature verification failed");
 		return Failure;
 	}
 
@@ -101,7 +103,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 	manifest->staging_address = read_address;
 
-	DEBUG_PRINTF("Staging area verification successful");
+	LOG_INF("Staging area verification successful");
 
 	return Success;
 }
@@ -166,11 +168,13 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 	int status = 0;
 	uint32_t pc_type;
 
-	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)), sizeof(pc_type), (uint8_t *)&pc_type);
+	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)),
+			sizeof(pc_type), (uint8_t *)&pc_type);
 	if (pc_type == DECOMMISSION_CAPSULE) {
 		LOG_INF("Decommission Certificate found");
 		return DECOMMISSION_CAPSULE;
-	} else if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PCH_PFM_CANCELLATION) || (pc_type == PCH_CAPSULE_CANCELLATION)
+	} else if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PCH_PFM_CANCELLATION) ||
+			(pc_type == PCH_CAPSULE_CANCELLATION)
 		   || (pc_type == BMC_PFM_CANCELLATION) || (pc_type == BMC_CAPSULE_CANCELLATION)) {
 		return KEY_CANCELLATION_CAPSULE;
 	} else if (pc_type == PFR_CPLD_UPDATE_CAPSULE) {
@@ -184,7 +188,7 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 
 int pfr_decommission(struct pfr_manifest *manifest)
 {
-	uint8_t read_buffer[DECOMMISSION_PC_SIZE] = { 0 };
+	uint8_t read_buffer[DECOMM_CAP_RESERVED_SIZE] = { 0 };
 	CPLD_STATUS cpld_update_status;
 	int status = 0;
 	int i;
@@ -195,7 +199,7 @@ int pfr_decommission(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	for (i = 0; i < DECOMMISSION_PC_SIZE; i++) {
+	for (i = 0; i < sizeof(read_buffer); i++) {
 		if (read_buffer[i] != 0) {
 			LOG_ERR("Invalid decommission capsule data");
 			return Failure;
@@ -213,7 +217,8 @@ int pfr_decommission(struct pfr_manifest *manifest)
 
 	memset(&cpld_update_status, 0, sizeof(cpld_update_status));
 	cpld_update_status.DecommissionFlag = 1;
-	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status,
+			sizeof(CPLD_STATUS));
 	if (status != Success) {
 		LOG_ERR("Update ROT status in UPDATE_STATUS_UFM failed");
 		return Failure;
@@ -230,7 +235,8 @@ int update_rot_fw(uint32_t address, uint32_t length)
 	uint32_t rot_active_address = 0;
 	uint32_t length_page_align;
 
-	length_page_align = (length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
+	length_page_align =
+		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
 
 	if (length_page_align > region_size) {
 		LOG_ERR("length(%x) exceed region size(%x)", length_page_align, region_size);
@@ -239,7 +245,8 @@ int update_rot_fw(uint32_t address, uint32_t length)
 
 	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
 			region_size)) {
-		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x", rot_recovery_address, region_size);
+		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x",
+			rot_recovery_address, region_size);
 		return Failure;
 	}
 
@@ -252,7 +259,8 @@ int update_rot_fw(uint32_t address, uint32_t length)
 
 	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
 				region_size)) {
-		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x", rot_active_address, region_size);
+		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x",
+			rot_active_address, region_size);
 		return Failure;
 	}
 
@@ -297,7 +305,8 @@ int ast1060_update(struct pfr_manifest *manifest)
 	int status = 0;
 
 	// Checking the PC type
-	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)), sizeof(pc_type), (uint8_t *)&pc_type);
+	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)),
+			sizeof(pc_type), (uint8_t *)&pc_type);
 	if (status != Success) {
 		LOG_ERR("Flash read PC type failed");
 		return Failure;
@@ -306,7 +315,9 @@ int ast1060_update(struct pfr_manifest *manifest)
 	manifest->pc_type = pc_type;
 
 	LOG_INF("manifest->address=%x", manifest->address);
-	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("ROT update capsule verification failed");
 		SetMinorErrorCode(CPLD_UPD_CAPSULE_AUTH_FAIL);
@@ -322,8 +333,9 @@ int ast1060_update(struct pfr_manifest *manifest)
 		manifest->address = payload_address;
 		status = pfr_decommission(manifest);
 		return status;
-	} else if (pc_type_status ==  KEY_CANCELLATION_CAPSULE) {
-		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t), (uint8_t *)&cancelled_id);
+	} else if (pc_type_status == KEY_CANCELLATION_CAPSULE) {
+		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t),
+				(uint8_t *)&cancelled_id);
 		if (status != Success) {
 			LOG_ERR("Flash read key cancellation Id failed");
 			return Failure;
@@ -336,7 +348,8 @@ int ast1060_update(struct pfr_manifest *manifest)
 		return status;
 	} else if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE) {
 		LOG_INF("ROT update start");
-		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t), (uint8_t *)&hrot_svn);
+		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t),
+				(uint8_t *)&hrot_svn);
 		if (status != Success) {
 			LOG_ERR("ROT flash read svn failed");
 			return Failure;
@@ -362,24 +375,26 @@ int ast1060_update(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int check_svn_number(struct pfr_manifest *manifest, uint32_t read_address, uint8_t current_svn_number)
+int check_svn_number(struct pfr_manifest *manifest, uint32_t read_address,
+		uint8_t current_svn_number)
 {
 	int status = 0;
 	uint32_t pfm_start_address = read_address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
 	uint8_t buffer[sizeof(PFM_STRUCTURE_1)] = { 0 };
 	uint8_t staging_svn_number = 0;
 
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE_1), (uint8_t *)buffer);
+	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE_1),
+			(uint8_t *)buffer);
 	if (status != Success)
 		return Failure;
 
 	staging_svn_number = ((PFM_STRUCTURE_1 *)buffer)->SVN;
 
 	if (staging_svn_number > SVN_MAX) {
-		DEBUG_PRINTF("Invalid Staging area SVN Number");
+		LOG_ERR("Invalid Staging area SVN Number");
 		return Failure;
 	} else if (staging_svn_number < current_svn_number) {
-		DEBUG_PRINTF("Can't update with older version of SVN current=%02x staging=%02x",
+		LOG_ERR("Can't update with older version of SVN current=%02x staging=%02x",
 				current_svn_number, staging_svn_number);
 		return Failure;
 	}
@@ -420,7 +435,8 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	if (pfr_manifest->image_type == ROT_TYPE) {
 		pfr_manifest->image_type = BMC_TYPE;
-		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address))) {
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+					sizeof(source_address))) {
 			LOG_ERR("Read BMC staging region offset failed from UFM");
 			return Failure;
 		}
@@ -432,23 +448,28 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	}
 
 	if (pfr_manifest->image_type == BMC_TYPE) {
-		DEBUG_PRINTF("BMC Update in Progress");
-		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address)))
+		LOG_INF("BMC Update in Progress");
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+					sizeof(source_address)))
 			return Failure;
-		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset, sizeof(act_pfm_offset)))
+		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
 			return Failure;
 	} else if (pfr_manifest->image_type == PCH_TYPE) {
-		DEBUG_PRINTF("PCH Update in Progress");
-		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address)))
+		LOG_INF("PCH Update in Progress");
+		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+					sizeof(source_address)))
 			return Failure;
-		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset, sizeof(act_pfm_offset)))
+		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
 			return Failure;
 	}
 
 	pfr_manifest->staging_address = source_address;
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status,
+			sizeof(CPLD_STATUS));
 	LOG_HEXDUMP_INF(&cpld_update_status, sizeof(cpld_update_status), "CPLD Status");
 	if (status != Success)
 		return status;
@@ -456,11 +477,13 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	if (cpld_update_status.BmcToPchStatus == 1) {
 
 		cpld_update_status.BmcToPchStatus = 0;
-		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		if (status != Success)
 			return Failure;
 
-		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&address, sizeof(address));
+		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&address, sizeof(address));
 		if (status != Success)
 			return Failure;
 
@@ -485,18 +508,18 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return ast1060_update(pfr_manifest);
 
 	// Staging area verification
-	DEBUG_PRINTF("Staging Area verfication");
-	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest, NULL, NULL);
+	LOG_INF("Staging Area verfication");
+	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
+			NULL, NULL);
 	if (status != Success) {
-		DEBUG_PRINTF("Staging Area verfication failed");
+		LOG_ERR("Staging Area verfication failed");
 		SetMinorErrorCode(FW_UPD_CAPSULE_AUTH_FAIL);
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Staging Area verfication success");
-
 	// After staging manifest, Compression header will start
-	area_size = pfr_manifest->update_fw->pc_length - (PFM_SIG_BLOCK_SIZE + pfr_manifest->update_fw->pfm_length);
+	area_size = pfr_manifest->update_fw->pc_length -
+		(PFM_SIG_BLOCK_SIZE + pfr_manifest->update_fw->pfm_length);
 
 	// SVN number validation
 	if (pfr_manifest->image_type ==  BMC_TYPE)
@@ -507,16 +530,16 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	status = check_svn_number(pfr_manifest, source_address, active_svn_number);
 	if (status != Success) {
 		SetMinorErrorCode(PCH_BMC_FW_INVALID_SVN);
-		DEBUG_PRINTF("Anti rollback");
+		LOG_ERR("Anti rollback");
 		return Failure;
 	}
 
 	if (flash_select == PRIMARY_FLASH_REGION) {
 		// Active Update
-		DEBUG_PRINTF("Active Region Update");
+		LOG_INF("Active Region Update");
 
 		if (ActiveObjectData->RestrictActiveUpdate == 1) {
-			DEBUG_PRINTF("Restrict Active Update");
+			LOG_ERR("Restrict Active Update");
 			SetMinorErrorCode(UPD_NOT_ALLOWED);
 			return Failure;
 		}
@@ -528,23 +551,26 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			return Failure;
 
 		time_end = k_uptime_get_32();
-		DEBUG_PRINTF("Firmware update completed, elapsed time = %u milliseconds",
+		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
 				(time_end - time_start));
 	} else   {
 		if (pfr_manifest->image_type == BMC_TYPE) {
-			DEBUG_PRINTF("BMC Recovery Region Update");
-			status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
+			LOG_INF("BMC Recovery Region Update");
+			status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET,
+					(uint8_t *)&target_address, sizeof(target_address));
 		} else if (pfr_manifest->image_type == PCH_TYPE) {
-			DEBUG_PRINTF("PCH Recovery Region Update");
-			status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
+			LOG_INF("PCH Recovery Region Update");
+			status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET,
+					(uint8_t *)&target_address, sizeof(target_address));
 		}
 
 		if (status != Success)
 			return status;
 
-		status = update_recovery_region(pfr_manifest->image_type, source_address, target_address);
+		status = update_recovery_region(pfr_manifest->image_type, source_address,
+				target_address);
 		if (status != Success) {
-			DEBUG_PRINTF("Recovery capsule update failed");
+			LOG_ERR("Recovery capsule update failed");
 			return Failure;
 		}
 	}
@@ -563,7 +589,8 @@ void get_region_type(CPLD_STATUS region, void *AoData)
 			DataContext.flash = SECONDARY_FLASH_REGION;
 	}
 	if (region.BmcStatus == 1) {
-		if (region.Region[1].ActiveRegion == 1 || (region.Region[1].Recoveryregion == 1 && region.Region[1].ActiveRegion == 1)) {
+		if (region.Region[1].ActiveRegion == 1 || (region.Region[1].Recoveryregion == 1 &&
+					region.Region[1].ActiveRegion == 1)) {
 			((AO_DATA *)AoData)->RestrictActiveUpdate = 0;
 			DataContext.flash = PRIMARY_FLASH_REGION;
 		}
@@ -572,7 +599,8 @@ void get_region_type(CPLD_STATUS region, void *AoData)
 			DataContext.flash = SECONDARY_FLASH_REGION;
 	}
 	if (region.PchStatus == 1) {
-		if ((region.Region[2].ActiveRegion == 1) || (region.Region[2].Recoveryregion == 1 && region.Region[2].ActiveRegion == 1)) {
+		if ((region.Region[2].ActiveRegion == 1) || (region.Region[2].Recoveryregion == 1 &&
+					region.Region[2].ActiveRegion == 1)) {
 			((AO_DATA *)AoData)->RestrictActiveUpdate = 0;
 			DataContext.flash = PRIMARY_FLASH_REGION;
 		}
@@ -587,9 +615,9 @@ void watchdog_timer(uint32_t image_type)
 	ARG_UNUSED(image_type);
 #if 0
 	if (image_type == BMC_TYPE) {
-		DEBUG_PRINTF("Watchdog timer BMC TYPE");
+		LOG_INF("Watchdog timer BMC TYPE");
 	} else {
-		DEBUG_PRINTF("Watchdog timer PCH TYPE");
+		LOG_INF("Watchdog timer PCH TYPE");
 	}
 #endif
 }
@@ -600,15 +628,16 @@ int check_staging_area(void)
 	int flash_id;
 	void *AoData = NULL;
 
-	DEBUG_PRINTF("Check Staging Area");
+	LOG_INF("Check Staging Area");
 	CPLD_STATUS cpld_update_status;
 
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status,
+			sizeof(CPLD_STATUS));
 	if (status != Success)
 		return Failure;
 
 	if (cpld_update_status.CpldStatus == 1) {
-		DEBUG_PRINTF("CPLD Check");
+		LOG_INF("CPLD Check");
 		get_region_type(cpld_update_status, AoData);
 		DataContext.image = ROT_TYPE;
 		flash_id = BMC_TYPE;
@@ -616,40 +645,44 @@ int check_staging_area(void)
 		// Checking CPLD staging area
 		status = handle_update_image_action(ROT_TYPE, NULL, &DataContext);
 		if (status == Success) {
-			DEBUG_PRINTF("SuccessFully updated cpld");
+			LOG_INF("SuccessFully updated cpld");
 			cpld_update_status.CpldStatus = 0;
 			cpld_update_status.Region[0].ActiveRegion = 0;
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+					(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		}
 	}
 
 	if (cpld_update_status.BmcStatus == 1) {
-		DEBUG_PRINTF("BMC check");
+		LOG_INF("BMC check");
 		get_region_type(cpld_update_status, AoData);
 		flash_id = BMC_TYPE;
 		DataContext.image = flash_id;
 		// Checking BMC staging area
 		status = handle_update_image_action(flash_id, NULL, &DataContext);
 		if (status == Success) {
-			if (cpld_update_status.Region[1].ActiveRegion == 1 && cpld_update_status.Region[1].Recoveryregion == 1) {
+			if (cpld_update_status.Region[1].ActiveRegion == 1 &&
+					cpld_update_status.Region[1].Recoveryregion == 1) {
 				watchdog_timer(BMC_TYPE);
 			} else if ((cpld_update_status.Region[1].ActiveRegion == 1)
 				   || (cpld_update_status.Region[1].Recoveryregion == 1)) {
 				cpld_update_status.BmcStatus = 0;
 				cpld_update_status.Region[1].ActiveRegion = 0;
 				cpld_update_status.Region[1].Recoveryregion = 0;
-				status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+				status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+						(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 			}
 		} else {
 			cpld_update_status.BmcStatus = 0;
 			cpld_update_status.Region[1].ActiveRegion = 0;
 			cpld_update_status.Region[1].Recoveryregion = 0;
-			status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+					(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		}
 	}
 
 	if (cpld_update_status.PchStatus == 1) {
-		DEBUG_PRINTF("PCH check");
+		LOG_INF("PCH check");
 		// Checking PCH staging area
 		flash_id = PCH_TYPE;
 
@@ -657,19 +690,23 @@ int check_staging_area(void)
 		DataContext.image = flash_id;
 		status = handle_update_image_action(flash_id, NULL, &DataContext);
 		if (status == Success) {
-			if (cpld_update_status.Region[2].ActiveRegion == 1 && cpld_update_status.Region[2].Recoveryregion == 1) {
+			if (cpld_update_status.Region[2].ActiveRegion == 1 &&
+					cpld_update_status.Region[2].Recoveryregion == 1) {
 				watchdog_timer(PCH_TYPE);
-			} else if ((cpld_update_status.Region[2].ActiveRegion == 1) || (cpld_update_status.Region[2].Recoveryregion == 1)) {
+			} else if ((cpld_update_status.Region[2].ActiveRegion == 1) ||
+					(cpld_update_status.Region[2].Recoveryregion == 1)) {
 				cpld_update_status.PchStatus = 0;
 				cpld_update_status.Region[2].ActiveRegion = 0;
 				cpld_update_status.Region[2].Recoveryregion = 0;
-				status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+				status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+						(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 			}
 		} else {
 			cpld_update_status.PchStatus = 0;
 			cpld_update_status.Region[2].ActiveRegion = 0;
 			cpld_update_status.Region[2].Recoveryregion = 0;
-			status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+					(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		}
 	}
 

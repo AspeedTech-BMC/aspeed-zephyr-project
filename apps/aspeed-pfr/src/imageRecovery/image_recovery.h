@@ -3,6 +3,6 @@
  *
  * SPDX-License-Identifier: MIT
  */
-
 #pragma once
 
+void recovery_initialize(void);

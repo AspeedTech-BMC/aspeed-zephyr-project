@@ -29,4 +29,5 @@ struct engine_instances {
 };
 
 int initializeEngines(void);
+void uninitializeEngines(void);
 void apply_pfm_protection(int spi_device_id);

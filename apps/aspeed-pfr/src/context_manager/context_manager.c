@@ -3,10 +3,11 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <string.h>
 
 #include "common/common.h"
 #include "context_manager.h"
-#include "state_machine/common_smc.h"
+#include "AspeedStateMachine/common_smc.h"
 
 
 
@@ -21,7 +22,7 @@ struct Context_Manager *get_Context_Manager(void)
 void set_Context_Manager(struct Context_Manager *new_context)
 {
 	if (new_context)
-		memcpy(context_manager, new_context, sizeof(struct Context_Manager));
+		memcpy(&context_manager, new_context, sizeof(struct Context_Manager));
 }
 
 unsigned char erase_context_data_flash(void)
@@ -83,7 +84,6 @@ unsigned char set_context_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8
 static int save_cpld_context(struct app_context *context)
 {
 	int status = 0;
-	uint8_t Readbuffer[sizeof(context_manager)];
 
 	if (context == NULL) {
 		return APP_CONTEXT_INVALID_ARGUMENT;
