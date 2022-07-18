@@ -417,19 +417,21 @@ void enter_tzero(void *o)
 #endif
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		/* Provisioned */
-		/* Arm SPI/I2C Filter */
-		apply_pfm_protection(BMC_SPI);
-		apply_pfm_protection(PCH_SPI);
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
+			/* Arm SPI/I2C Filter */
+			apply_pfm_protection(BMC_SPI);
 			BMCBootRelease();
 		} else {
 			/* Should not enter here, redirect to LOCKDOWN */
 			LOG_ERR("BMC firmware is invalid, lockdown the platform");
 		}
 
-		if (state->pch_active_object.ActiveImageStatus == Success)
+		if (state->pch_active_object.ActiveImageStatus == Success) {
+			/* Arm SPI/I2C Filter */
+			apply_pfm_protection(PCH_SPI);
 			PCHBootRelease();
+		}
 		else
 			LOG_ERR("Host firmware is invalid, host won't boot");
 	} else {
