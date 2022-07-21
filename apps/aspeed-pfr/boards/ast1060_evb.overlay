@@ -30,12 +30,12 @@
         gpio_keys {
 		compatible = "gpio-keys";
 		bmc_fp_green_led_in: fp_green_led_in {
-			gpios = <&gpio0_a_d 17 1>; /* GPIO_C1 */
+			gpios = <&gpio0_a_d 22 1>; /* GPIO_C6 */
 			label = "BMC FP GREEN LED";
 		};
 
 		bmc_fp_amber_led_in: fp_amber_led_in {
-			gpios = <&gpio0_a_d 19 1>; /* GPIO_C3 */
+			gpios = <&gpio0_a_d 21 1>; /* GPIO_C5 */
 			label = "BMC FP AMBER LED";
 		};
 	};
@@ -44,12 +44,12 @@
 		compatible = "gpio-leds";
 
 		pfr_fp_green_led_out: green_led {
-			gpios = <&sgpiom_a_d 15 1>; /* SGPIO_B7 */
+			gpios = <&gpio0_m_p 18 1>; /* GPIO_O2 */
 			label = "PFR_FP_GREEN_LED";
 		};
 
 		pfr_fp_amber_led_out: amber_led {
-			gpios = <&sgpiom_a_d 23 1>; /* SGPIO_C7 */
+			gpios = <&gpio0_e_h 25 1>; /* GPIO_H1 */
 			label = "PFR_FP_AMBER_LED";
 		};
 	};
