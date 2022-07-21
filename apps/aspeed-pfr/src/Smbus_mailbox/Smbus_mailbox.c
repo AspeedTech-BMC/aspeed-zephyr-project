@@ -277,13 +277,18 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_fifo(swmbx_dev, &ufm_read_fifo_state_sem, 1, UfmReadFIFO, 0x40, SWMBX_FIFO_NOTIFY_STOP, true);
 
 	/* swmbx_update_notify(dev, port, sem, addr, enable) */
+	/* From BMC */
 	swmbx_update_notify(swmbx_dev, 0x0, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_update_intent_sem, BmcUpdateIntent, true);
-	swmbx_update_notify(swmbx_dev, 0x0, &pch_update_intent_sem, PchPfmActiveSvn, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
-	swmbx_update_notify(swmbx_dev, 0x0, &acm_checkpoint_sem, AcmCheckpoint, true);
-	swmbx_update_notify(swmbx_dev, 0x0, &bios_checkpoint_sem, BiosCheckpoint, true);
+
+	/* From PCH */
+	swmbx_update_notify(swmbx_dev, 0x1, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
+	swmbx_update_notify(swmbx_dev, 0x1, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
+	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent_sem, PchPfmActiveSvn, true);
+	swmbx_update_notify(swmbx_dev, 0x1, &acm_checkpoint_sem, AcmCheckpoint, true);
+	swmbx_update_notify(swmbx_dev, 0x1, &bios_checkpoint_sem, BiosCheckpoint, true);
 
 	/* Protect bit:
 	 * 0 means readable/writable

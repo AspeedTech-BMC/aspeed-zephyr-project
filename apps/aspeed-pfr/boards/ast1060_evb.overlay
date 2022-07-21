@@ -7,7 +7,7 @@
 		bmc-rst-ind-in-gpios = <&gpio0_m_p 19 0>; /* GPIO_O3 */
 		bmc-cpu1-mux-sel-out-gpios = <&gpio0_a_d 26 0>; /* GPIO_D2 */
 		bic-rst-ind-in-gpios = <&gpio0_a_d 16 0>; /* GPIO_C0 */
-		pch-rst-ctrl-out-gpios = <&gpio0_m_p 2 0>; /* GPIO_M2 */
+		pch-rst-ctrl-out-gpios = <&gpio0_m_p 4 0>; /* GPIO_M4 */
 		cpu0-rst-ind-in-gpios = <&gpio0_q_t 26 0>; /* GPIO_T2 */
 		cpu1-rst-ind-in-gpios = <&gpio0_q_t 28 0>; /* GPIO_T4 */
 		cpu0-flash-pwr-out-gpios = <&gpio0_i_l 26 0>; /* GPIO_L2 */
@@ -30,12 +30,12 @@
         gpio_keys {
 		compatible = "gpio-keys";
 		bmc_fp_green_led_in: fp_green_led_in {
-			gpios = <&gpio0_a_d 17 1>; /* GPIO_C1 */
+			gpios = <&gpio0_a_d 22 1>; /* GPIO_C6 */
 			label = "BMC FP GREEN LED";
 		};
 
 		bmc_fp_amber_led_in: fp_amber_led_in {
-			gpios = <&gpio0_a_d 19 1>; /* GPIO_C3 */
+			gpios = <&gpio0_a_d 21 1>; /* GPIO_C5 */
 			label = "BMC FP AMBER LED";
 		};
 	};
@@ -44,12 +44,12 @@
 		compatible = "gpio-leds";
 
 		pfr_fp_green_led_out: green_led {
-			gpios = <&sgpiom_a_d 15 1>; /* SGPIO_B7 */
+			gpios = <&gpio0_m_p 18 1>; /* GPIO_O2 */
 			label = "PFR_FP_GREEN_LED";
 		};
 
 		pfr_fp_amber_led_out: amber_led {
-			gpios = <&sgpiom_a_d 23 1>; /* SGPIO_C7 */
+			gpios = <&gpio0_e_h 25 1>; /* GPIO_H1 */
 			label = "PFR_FP_AMBER_LED";
 		};
 	};
@@ -72,9 +72,9 @@
 	status = "okay";
 	pinctrl-0 = <&pinctrl_i2c0_default>;
 
-	swmbx0: swmbx0@62 {
+	swmbx0: swmbx0@70 {
 		compatible = "aspeed,swmbx-dev";
-		reg = <0x62>;
+		reg = <0x70>;
 		label = "SWMBX_SLAVE_CPU";
 		size = <256>;
 		port = <1>;
