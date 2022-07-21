@@ -94,9 +94,9 @@
 	pinctrl-0 = <&pinctrl_i2c2_default>;
 	status = "okay";
 
-	swmbx1: swmbx1@62 {
+	swmbx1: swmbx1@70 {
 		compatible = "aspeed,swmbx-dev";
-		reg = <0x62>;
+		reg = <0x70>;
 		label = "SWMBX_SLAVE_CPU";
 		size = <256>;
 		port = <1>;
