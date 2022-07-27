@@ -644,7 +644,6 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 	if (status != Success)
 		return Failure;
 
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
 	LOG_INF("Switch PCH SPI MUX to ROT");
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
@@ -672,6 +671,7 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 #else
 		dev_m = device_get_binding(BMC_SPI_MONITOR);
 #endif
+		spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
 
 		// PFR Staging - PCH Staging offset after BMC staging offset
 		address += CONFIG_BMC_STAGING_SIZE;
