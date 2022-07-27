@@ -9,6 +9,7 @@
 #include <drivers/i2c/pfr/swmbx.h>
 #include <logging/log.h>
 #include <drivers/gpio.h>
+#include <build_config.h>
 #include "Smbus_mailbox.h"
 #include "common/common.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
@@ -399,7 +400,7 @@ void InitializeSmbusMailbox(void)
 	ResetMailBox();
 
 	SetCpldIdentifier(0xDE);
-	SetCpldReleaseVersion(CPLD_RELEASE_VERSION);
+	SetCpldReleaseVersion((PROJECT_VERSION_MAJOR << 4) | PROJECT_VERSION_MINOR);
 
 	// get root key hash
 	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
