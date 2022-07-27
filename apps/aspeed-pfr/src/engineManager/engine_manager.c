@@ -341,7 +341,7 @@ void apply_pfm_protection(int spi_device_id)
 			break;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 		case FVM_ADDR_DEF:
-			fvm_def = region_record;
+			fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)region_record;
 			apply_fvm_spi_protection(spi_flash, fvm_def->FVMAddress);
 			pfm_region_Start += sizeof(PFM_FVM_ADDRESS_DEFINITION);
 			break;

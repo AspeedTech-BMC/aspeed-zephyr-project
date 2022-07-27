@@ -479,7 +479,6 @@ int intel_fvm_verify(struct pfr_manifest *manifest)
 {
 	uint32_t image_type = manifest->image_type;
 	uint32_t read_address = manifest->address;
-	uint32_t state = manifest->state;
 	uint32_t signed_fvm_offset = read_address + PFM_SIG_BLOCK_SIZE;
 	uint32_t cap_fvm_offset = signed_fvm_offset + PFM_SIG_BLOCK_SIZE;
 	uint32_t act_fvm_offset;
@@ -570,7 +569,8 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 				+ read_address + PFM_SIG_BLOCK_SIZE;
 
 			manifest->address = fvm_addr;
-			if (manifest->base->verify(manifest, NULL, NULL, NULL, NULL)) {
+			if (manifest->base->verify((struct signature_verification *)manifest,
+						NULL, NULL, NULL, 0)) {
 				LOG_ERR("Verify FVM failed");
 			}
 			LOG_INF("FVM region verify succssful");

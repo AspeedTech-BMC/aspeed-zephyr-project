@@ -52,7 +52,7 @@ int update_active_pfm(struct pfr_manifest *manifest)
 
 	spi_flash->spi.device_id[0] = manifest->image_type;
 	// Updating PFM from capsule to active region
-	status = flash_copy_and_verify(&spi_flash->spi, manifest->active_pfm_addr,
+	status = flash_copy_and_verify((struct spi_flash *)&spi_flash->spi, manifest->active_pfm_addr,
 			capsule_offset, BLOCK_SIZE);
 	if (status != Success)
 		return Failure;
@@ -157,9 +157,6 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 		uint32_t pbc_offset, uint32_t start_addr, uint32_t end_addr)
 {
 	uint32_t image_type = manifest->image_type;
-	uint32_t read_address = (manifest->state == FIRMWARE_RECOVERY) ?
-		manifest->recovery_address : manifest->staging_address;
-	uint32_t cap_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE * 2;
 	uint32_t decomp_src_addr;
 	uint32_t active_bitmap;
 	uint32_t comp_bitmap;
@@ -442,7 +439,6 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 			PFM_FVM_ADDRESS_DEFINITION *fvm_def =
 				(PFM_FVM_ADDRESS_DEFINITION *)&spi_def;
 			uint32_t fvm_offset_in_pfm;
-			uint32_t fvm_def_offset = cap_pfm_body_offset;
 			uint32_t cap_fvm_offset;
 
 			fvm_offset_in_pfm = fvm_def->FVMAddress - manifest->active_pfm_addr;

@@ -600,20 +600,16 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContext)
 {
 	int status = 0;
-	uint32_t source_address, target_address, area_size;
+	uint32_t source_address;
 	uint32_t act_pfm_offset;
 	uint32_t address = 0;
 	uint32_t pc_type_status = 0;
-	uint8_t active_svn_number = 0;
 	CPLD_STATUS cpld_update_status;
 	const struct device *dev_m = NULL;
 #if defined(CONFIG_BMC_DUAL_FLASH)
 	uint32_t flash_size = flash_get_flash_size("spi1_cs0");
 	uint32_t staging_start_addr;
 #endif
-
-	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
-	DECOMPRESSION_TYPE_MASK_ENUM decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
 
 	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
 
@@ -689,7 +685,6 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 		// Release BMC SPI after copying capsule to PCH's flash.
 		// PCH SPI will be release after firmware update completed.
 		LOG_INF("Switch BMC SPI MUX to BMC");
-		dev_m = device_get_binding(BMC_SPI_MONITOR);
 		spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 	}
 
@@ -715,21 +710,19 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 release_both_muxes:
 	LOG_INF("Switch BMC SPI MUX to BMC");
 #if defined(CONFIG_BMC_DUAL_FLASH)
-		if (staging_start_addr >= flash_size)
-			dev_m = device_get_binding(BMC_SPI_MONITOR_2);
-		else
-			dev_m = device_get_binding(BMC_SPI_MONITOR);
-#else
+	if (staging_start_addr >= flash_size)
+		dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+	else
 		dev_m = device_get_binding(BMC_SPI_MONITOR);
-#endif
+#else
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
+#endif
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 release_pch_mux:
 	LOG_INF("Switch PCH SPI MUX to PCH");
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 
-seamless_post_update_done:
 	return status;
 }
 #endif

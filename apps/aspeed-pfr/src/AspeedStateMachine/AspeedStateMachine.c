@@ -700,6 +700,7 @@ void handle_seamless_update_requested(void *o)
 
 		if (ret != Success) {
 			/* TODO: Log failed reason and handle it properly */
+			GenerateStateMachineEvent(SEAMLESS_UPDATE_FAILED, (void *)handled_region);
 			break;
 		}
 	}

@@ -244,7 +244,7 @@ int fvm_spi_region_verification(struct pfr_manifest *manifest)
 
 	while (!done) {
 		if (pfr_spi_read(manifest->image_type, fvm_addr,
-					sizeof(PFM_SPI_DEFINITION), &spi_definition))
+					sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_definition))
 			return Failure;
 
 		switch(spi_definition.PFMDefinitionType){
@@ -296,7 +296,7 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 
 	while (!done) {
 		if (pfr_spi_read(manifest->image_type, pfm_addr,
-					sizeof(PFM_SPI_DEFINITION), &spi_definition))
+					sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_definition))
 			return Failure;
 
 		switch(spi_definition.PFMDefinitionType){
@@ -316,7 +316,7 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 				break;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 			case FVM_ADDR_DEF:
-				fvm_def = &spi_definition;
+				fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)&spi_definition;
 				manifest->address = fvm_def->FVMAddress;
 				if (fvm_spi_region_verification(manifest)) {
 					manifest->address = read_address;
