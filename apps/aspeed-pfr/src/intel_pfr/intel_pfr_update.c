@@ -340,7 +340,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("ROT update capsule verification failed");
-		SetMinorErrorCode(CPLD_UPD_CAPSULE_AUTH_FAIL);
+		LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 		return Failure;
 	}
 
@@ -378,7 +378,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 		status = rot_svn_policy_verify(manifest, hrot_svn);
 		if (status != Success) {
 			LOG_ERR("ROT verify svn failed");
-			SetMinorErrorCode(CPLD_INVALID_SVN);
+			LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
 			return Failure;
 		}
 		pc_length = manifest->pc_length - sizeof(uint32_t);
@@ -533,7 +533,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			NULL, NULL);
 	if (status != Success) {
 		LOG_ERR("Staging Area verfication failed");
-		SetMinorErrorCode(FW_UPD_CAPSULE_AUTH_FAIL);
+		if (flash_select == PRIMARY_FLASH_REGION) {
+			// Log failure for the case of active region update.
+			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+		} else {
+			// Log failure for the case of recovery region update.
+			LogUpdateFailure(UPD_CAPSULE_TO_RECOVERY_AUTH_FAIL, 1);
+		}
+
 		return Failure;
 	}
 
@@ -549,7 +556,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	status = check_svn_number(pfr_manifest, source_address, active_svn_number);
 	if (status != Success) {
-		SetMinorErrorCode(PCH_BMC_FW_INVALID_SVN);
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
 		LOG_ERR("Anti rollback");
 		return Failure;
 	}
@@ -560,15 +567,17 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		if (ActiveObjectData->RestrictActiveUpdate == 1) {
 			LOG_ERR("Restrict Active Update");
-			SetMinorErrorCode(UPD_NOT_ALLOWED);
+			LogUpdateFailure(UPD_NOT_ALLOWED, 0);
 			return Failure;
 		}
 
 		uint32_t time_start, time_end;
 		time_start = k_uptime_get_32();
 
-		if (decompress_capsule(pfr_manifest, decomp_event))
+		if (decompress_capsule(pfr_manifest, decomp_event)) {
+			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 			return Failure;
+		}
 
 		time_end = k_uptime_get_32();
 		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
@@ -698,14 +707,12 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 			NULL, NULL);
 	if (status != Success) {
 		LOG_ERR("Staging Area verfication failed");
-		SetMinorErrorCode(FW_UPD_CAPSULE_AUTH_FAIL);
 		goto release_pch_mux;
 	}
 
 	status = decompress_fv_capsule(pfr_manifest);
-	if (status != Success) {
+	if (status != Success)
 		LOG_ERR("Failed to decompress seamless capsule");
-	}
 
 	goto release_pch_mux;
 

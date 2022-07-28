@@ -36,8 +36,8 @@ static void wdt_callback_bmc_timeout(const struct device *dev, int channel_id)
 	LOG_ERR("BMC Boot WDT Timeout");
 	union aspeed_event_data data = {0};
 	data.bit8[0] = BMC_EVENT;
+	LogWatchdogRecovery(BMC_LAUNCH_FAIL, BMC_WDT_EXPIRE);
 	GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
-	SetLastPanicReason(BMC_WDT_EXPIRE);
 }
 
 static void wdt_callback_pch_timeout(const struct device *dev, int channel_id)
@@ -47,8 +47,8 @@ static void wdt_callback_pch_timeout(const struct device *dev, int channel_id)
 	LOG_ERR("PCH Boot WDT Timeout");
 	union aspeed_event_data data = {0};
 	data.bit8[0] = PCH_EVENT;
+	LogWatchdogRecovery(ACM_LAUNCH_FAIL, ACM_WDT_EXPIRE);
 	GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
-	SetLastPanicReason(ACM_WDT_EXPIRE);
 }
 
 void AspeedPFR_EnableTimer(int type)

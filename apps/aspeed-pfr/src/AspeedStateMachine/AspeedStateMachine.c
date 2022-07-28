@@ -33,6 +33,8 @@
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 
+#define MAX_UPD_FAILED_ALLOWED 10
+
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
 K_FIFO_DEFINE(aspeed_sm_fifo);
 struct smf_context s_obj;
@@ -119,8 +121,16 @@ void do_init(void *o)
 
 void enter_tmin1(void *o)
 {
-	ARG_UNUSED(o);
+	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+
 	LOG_DBG("Start");
+	if (evt_ctx->data.bit8[0] == BmcUpdateIntent)
+		LogLastPanic(BMC_UPDATE_INTENT);
+	else if (evt_ctx->data.bit8[0] == PchUpdateIntent)
+		LogLastPanic(PCH_UPDATE_INTENT);
+	else if (evt_ctx->event == RESET_DETECTED)
+		LogLastPanic(BMC_RESET_DETECT);
+
 	SetPlatformState(ENTER_T_MINUS_1);
 	/* TODO: BMC only reset */
 	BMCBootHold();
@@ -255,7 +265,26 @@ void handle_image_verification(void *o)
 				else
 					state->pch_active_object.ActiveImageStatus = Failure;
 			}
+
 			/* Success = 0, Failure = 1 */
+			if (state->bmc_active_object.ActiveImageStatus) {
+				if (state->bmc_active_object.RecoveryImageStatus)
+					LogErrorCodes(BMC_AUTH_FAIL, ACTIVE_RECOVERY_AUTH_FAIL);
+				else
+					LogErrorCodes(BMC_AUTH_FAIL, ACTIVE_AUTH_FAIL);
+			} else if (state->bmc_active_object.RecoveryImageStatus) {
+				LogErrorCodes(BMC_AUTH_FAIL, RECOVERY_AUTH_FAIL);
+			}
+
+			if (state->pch_active_object.ActiveImageStatus) {
+				if (state->pch_active_object.RecoveryImageStatus)
+					LogErrorCodes(PCH_AUTH_FAIL, ACTIVE_RECOVERY_AUTH_FAIL);
+				else
+					LogErrorCodes(PCH_AUTH_FAIL, ACTIVE_AUTH_FAIL);
+			} else if (state->pch_active_object.RecoveryImageStatus) {
+				LogErrorCodes(PCH_AUTH_FAIL, RECOVERY_AUTH_FAIL);
+			}
+
 			LOG_INF("BMC image verification recovery=%s active=%s",
 					state->bmc_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->bmc_active_object.ActiveImageStatus ? "Bad" : "Good");
@@ -327,6 +356,7 @@ void handle_recovery(void *o)
 	case VERIFY_FAILED:
 		// Recovery matrix can be handled in recover_image
 		if (state->bmc_active_object.RecoveryImageStatus == Failure) {
+			LogRecovery(BMC_RECOVERY_FAIL);
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 
@@ -336,15 +366,22 @@ void handle_recovery(void *o)
 		}
 
 		if (state->bmc_active_object.ActiveImageStatus == Failure) {
+			if (evt_ctx->event != WDT_TIMEOUT)
+				LogRecovery(BMC_ACTIVE_FAIL);
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 			LOG_INF("BMC recover active region return=%d", ret);
 			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
 				recovery_done = 1;
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+			if (evt_ctx->event == WDT_TIMEOUT)
+				inc_recovery_level(BMC_SPI);
+#endif
 
 		}
 
 		if (state->pch_active_object.RecoveryImageStatus == Failure) {
+			LogRecovery(PCH_RECOVERY_FAIL);
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
@@ -352,10 +389,16 @@ void handle_recovery(void *o)
 		}
 
 		if (state->pch_active_object.ActiveImageStatus == Failure) {
+			if (evt_ctx->event != WDT_TIMEOUT)
+				LogRecovery(PCH_ACTIVE_FAIL);
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
 			recovery_done = 1;
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+			if (evt_ctx->event == WDT_TIMEOUT)
+				inc_recovery_level(PCH_SPI);
+#endif
 		}
 		break;
 	default:
@@ -541,6 +584,8 @@ void handle_update_requested(void *o)
 	case PchUpdateIntent:
 		/* CPU/PCH only has access to bit[7:6] and bit[1:0] */
 		update_region &= UpdateAtReset | DymanicUpdate | PchRecoveryUpdate | PchActiveUpdate;
+		if (!update_region)
+			LogUpdateFailure(INVALID_UPD_INTENT, 0);
 		break;
 	case BmcUpdateIntent:
 		/* BMC has full access */
@@ -695,25 +740,22 @@ void handle_seamless_update_requested(void *o)
 			/*TODO : AFM update */
 		} while (0);
 
-		if (evt_ctx_wrap.operation == SEAMLESS_UPDATE_OP)
+		if (evt_ctx_wrap.operation == SEAMLESS_UPDATE_OP) {
 			ret = perform_seamless_update(image_type, ao_data_wrap, &evt_ctx_wrap);
-
-		if (ret != Success) {
-			/* TODO: Log failed reason and handle it properly */
-			GenerateStateMachineEvent(SEAMLESS_UPDATE_FAILED, (void *)handled_region);
-			break;
+			SetPlatformState(PCH_SEAMLESS_UPDATE_DONE);
+			if (ret != Success)
+				GenerateStateMachineEvent(SEAMLESS_UPDATE_FAILED, (void *)handled_region);
+			else
+				GenerateStateMachineEvent(SEAMLESS_UPDATE_DONE, (void *)handled_region);
 		}
 	}
-
-	GenerateStateMachineEvent(SEAMLESS_UPDATE_DONE, (void *)handled_region);
 }
 
 void handle_seamless_update_verification(void *o)
 {
-	struct smf_context *state = (struct smf_context *)o;
 	const struct device *dev_m = NULL;
 	int ret;
-	SetPlatformState(PCH_FLASH_AUTH);
+
 	EVENT_CONTEXT evt_wrap;
 
 	evt_wrap.image = PCH_EVENT;
@@ -732,11 +774,10 @@ void handle_seamless_update_verification(void *o)
 	if (ret == 0) {
 		LOG_INF("Applying PCH SPI Region protection");
 		apply_pfm_protection(PCH_SPI);
-		state->pch_active_object.ActiveImageStatus = Success;
 		GenerateStateMachineEvent(SEAMLESS_VERIFY_DONE, NULL);
 	}
 	else {
-		state->pch_active_object.ActiveImageStatus = Failure;
+		LogUpdateFailure(SEAMLESS_AUTH_FAILED_AFTER_UPDATE, 0);
 		GenerateStateMachineEvent(SEAMLESS_VERIFY_FAILED, NULL);
 	}
 
@@ -1001,6 +1042,8 @@ void AspeedStateMachine(void)
 		} else if (current_state == &state_table[FIRMWARE_UPDATE]) {
 			switch (fifo_in->event) {
 			case UPDATE_DONE:
+				ClearUpdateFailure();
+
 				if (fifo_in->data.bit32 & HROTActiveUpdate) {
 					/* Update PFR requires reboot platform */
 					next_state = &state_table[SYSTEM_REBOOT];
@@ -1021,6 +1064,10 @@ void AspeedStateMachine(void)
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;
 			case UPDATE_REQUESTED:
+				if (getFailedUpdateAttemptsCount() >= MAX_UPD_FAILED_ALLOWED) {
+					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
+					break;
+				}
 				/* Check update intent, seamless or tmin1 update */
 				if (fifo_in->data.bit8[1] & UpdateAtReset) {
 					/* Update at reset, just set the status and don't go Tmin1 */
@@ -1047,6 +1094,10 @@ void AspeedStateMachine(void)
 				break;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 			case SEAMLESS_UPDATE_REQUESTED:
+				if (getFailedUpdateAttemptsCount() >= MAX_UPD_FAILED_ALLOWED) {
+					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
+					break;
+				}
 				next_state = &state_table[SEAMLESS_UPDATE];
 				break;
 #endif
@@ -1070,11 +1121,13 @@ void AspeedStateMachine(void)
 		else if (current_state == &state_table[SEAMLESS_UPDATE]) {
 			switch (fifo_in->event) {
 				case SEAMLESS_UPDATE_DONE:
+					ClearUpdateFailure();
 					next_state = &state_table[SEAMLESS_VERIFY];
 					break;
 				case SEAMLESS_UPDATE_FAILED:
 					// Skip verification, firmware will be recovered in
 					// the next bootup.
+					LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 					next_state = &state_table[RUNTIME];
 					break;
 				default:

@@ -243,6 +243,14 @@ byte GetRecoveryCount(void);
 void IncRecoveryCount(void);
 byte GetLastRecoveryReason(void);
 
+int getFailedUpdateAttemptsCount(void);
+void LogErrorCodes(uint8_t major_err, uint8_t minor_err);
+void LogUpdateFailure(uint8_t minor_err, uint32_t failed_count);
+void ClearUpdateFailure(void);
+void LogLastPanic(uint8_t panic);
+void LogRecovery(uint8_t reason);
+void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason);
+
 // void SetLastRecoveryReason(LAST_RECOVERY_REASON_VALUE LastRecoveryReasonValue);
 void SetLastRecoveryReason(byte LastRecoveryReasonValue);
 

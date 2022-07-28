@@ -34,6 +34,7 @@ LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 #define PRIMARY_FLASH_REGION    1
 #define SECONDARY_FLASH_REGION  2
 
+static uint32_t gFailedUpdateAttempts = 0;
 static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 const struct device *gSwMbxDev = NULL;
 uint8_t gReadOnlyRfAddress[READ_ONLY_RF_COUNT] = { 0x1, 0x2, 0x3, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x14, 0x15, 0x16, 0x17,
@@ -714,6 +715,48 @@ void SetPlatformState(byte PlatformStateData)
 	swmbx_write(gSwMbxDev, false, PlatformState, &PlatformStateData);
 }
 
+int getFailedUpdateAttemptsCount(void)
+{
+	return gFailedUpdateAttempts;
+}
+
+void LogErrorCodes(uint8_t major_err, uint8_t minor_err)
+{
+	SetMajorErrorCode(major_err);
+	SetMinorErrorCode(minor_err);
+}
+
+void LogUpdateFailure(uint8_t minor_err, uint32_t failed_count)
+{
+	LogErrorCodes(FW_UPDATE_FAIL, minor_err);
+	gFailedUpdateAttempts += failed_count;
+}
+
+void ClearUpdateFailure(void)
+{
+	if (GetMajorErrorCode() == FW_UPDATE_FAIL)
+		LogErrorCodes(0, 0);
+	gFailedUpdateAttempts = 0;
+}
+
+void LogLastPanic(uint8_t panic)
+{
+	SetLastPanicReason(panic);
+	IncPanicEventCount();
+}
+
+void LogRecovery(uint8_t reason)
+{
+	SetLastRecoveryReason(reason);
+	IncRecoveryCount();
+}
+
+void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
+{
+	LogRecovery(recovery_reason);
+	LogLastPanic(panic_reason);
+}
+
 // UFM Status
 void SetUfmStatusValue(uint8_t UfmStatusBitMask)
 {
@@ -1138,6 +1181,9 @@ void UpdateBmcCheckpoint(byte Data)
 		AspeedPFR_DisableTimer(BMC_EVENT);
 		gBmcBootDone = TRUE;
 		gBMCWatchDogTimer = -1;
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+		reset_recovery_level(BMC_SPI);
+#endif
 		SetPlatformState(T0_BMC_BOOTED);
 	}
 	if (Data == AUTHENTICATION_FAILED) {
@@ -1176,6 +1222,9 @@ void UpdateBiosCheckpoint(byte Data)
 		gBootCheckpointReceived = true;
 		gPCHWatchDogTimer = -1;
 		SetPlatformState(T0_BIOS_BOOTED);
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+		reset_recovery_level(PCH_SPI);
+#endif
 		DEBUG_PRINTF("BIOS boot completed. Checkpoint update not allowed");
 	}
 	if (Data == AUTHENTICATION_FAILED) {

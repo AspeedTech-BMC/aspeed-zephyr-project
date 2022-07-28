@@ -100,7 +100,6 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("Verify active PFM failed");
-		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 		return Failure;
 	}
 
@@ -113,7 +112,6 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	status = pfm_spi_region_verification(manifest);
 	if (status != Success) {
-		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 		LOG_ERR("Verify active SPI region failed");
 		return Failure;
 	}

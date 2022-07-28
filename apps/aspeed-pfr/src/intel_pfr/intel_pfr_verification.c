@@ -497,6 +497,7 @@ int intel_fvm_verify(struct pfr_manifest *manifest)
 	target_fvm_addr = find_fvm_addr(manifest, cap_fvm_header.FvType);
 
 	if (target_fvm_addr == 0) {
+		LogUpdateFailure(SEAMLESS_UNKNOWN_FV_TYPE, 1);
 		LOG_ERR("Failed to find FVM address in active PFM");
 		return Failure;
 	}

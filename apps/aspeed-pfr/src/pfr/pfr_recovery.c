@@ -54,8 +54,9 @@ int recover_image(void *AoData, void *EventContext)
 		if (status != Success) {
 			DEBUG_PRINTF("PFR Staging Area Corrupted");
 			if (ActiveObjectData->ActiveImageStatus != Success) {
-				SetMajorErrorCode(pfr_manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
-				SetMinorErrorCode(ACTIVE_RECOVERY_STAGING_AUTH_FAIL);
+				LogErrorCodes((pfr_manifest->image_type == BMC_TYPE ?
+							BMC_AUTH_FAIL : PCH_AUTH_FAIL),
+						ACTIVE_RECOVERY_STAGING_AUTH_FAIL);
 				if (pfr_manifest->image_type == PCH_TYPE) {
 					status = pfr_staging_pch_staging(pfr_manifest);
 					if (status != Success)

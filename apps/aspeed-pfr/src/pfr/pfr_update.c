@@ -60,17 +60,6 @@ int lastRecoveryReason(int ImageType, void* AoData)
 	return 0;
 }
 
-int lastPanicReason(int ImageType)
-{
-	if (ImageType == BMC_EVENT){
-		return BMC_UPDATE_INTENT;
-	}
-	else if (ImageType == PCH_EVENT){
-		return PCH_UPDATE_INTENT;
-	}
-	return 0;
-}
-
 int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 {
 	CPLD_STATUS cpld_update_status;
@@ -86,10 +75,6 @@ int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 
 #if SMBUS_MAILBOX_SUPPORT
 	SetPlatformState(image_type == BMC_TYPE ? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
-	if (image_type != CPLD_FW_UPDATE) {
-		SetLastPanicReason(lastPanicReason(image_type));
-		IncPanicEventCount();
-	}
 #endif
 
 	status = update_firmware_image(image_type, AoData, EventContext);
