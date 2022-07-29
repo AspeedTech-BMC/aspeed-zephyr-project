@@ -78,6 +78,12 @@
 #define PUBLIC_RSA3K_TAG                0x684694E6
 #define PUBLIC_RSA4K_TAG                0xB73AA717
 #define PEM_TAG                         0x02B3CE1D
+#define AFM_TAG                         0x8883ce1d
+#define AFM_PUBLIC_SECP256_TAG          0xC7B88C74
+#define AFM_PUBLIC_SECP384_TAG          0x08F07B47
+#define AFM_PUBLIC_RSA_2K_TAG           0x6EBCE216
+#define AFM_PUBLIC_RSA_3K_TAG           0x6F37A4B5
+#define AFM_PUBLIC_RSA_4K_TAG           0xC21BB545
 #define PFM_SIG_BLOCK_SIZE              1024
 #define PFM_SIG_BLOCK_SIZE_3K           3072
 #define PFMTAG                          0x02B3CE1D

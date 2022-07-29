@@ -105,6 +105,52 @@ typedef struct _FVM_CAPABILITIES {
 	uint8_t Description[20];
 } FVM_CAPABLITIES;
 
+typedef struct _AFM_STRUCTURE {
+	uint32_t AfmTag; /* Should be 0x8883CE1D */
+	uint8_t SVN;
+	uint8_t Reserved;
+	uint16_t AfmRevision; /* Major:Minor */
+	uint8_t OemSpecificData[16];
+	uint32_t Length;
+	uint8_t AfmBody[];
+	/* Padding to nearest 128B bondary with 0xFF */
+} AFM_STRUCTURE;
+
+typedef struct _AFM_ADDRESS_DEFINITION {
+	uint8_t AfmDefinitionType; /* 0x03 AFM SPI region address definitions */
+	uint8_t DeviceAddress; /* 7-bit SMBus address of the device to be measured */
+	uint16_t UUID; /* Universal Unique ID of the device */
+	uint32_t Length; /* Length of the AFM in bytes */
+	uint32_t AfmAddress; /* Address of AFM must be at least 4k aligned */
+} AFM_ADDRESS_DEFINITION;
+
+typedef struct _AFM_DEVICE_MEASUREMENT_VALUE {
+	uint8_t PossibleMeasurements;
+	uint8_t ValueType; /* Defined in DSP0274 1.0.0 spec section 4.10 */
+	uint16_t ValueSize; /* Size of measurement value */
+	uint8_t Values[];
+} AFM_DEVICE_MEASUREMENT_VALUE;
+
+typedef struct _AFM_DEVICE_STRUCTURE {
+	uint16_t UUID;
+	uint8_t BusID;
+	uint8_t DeviceAddress; /* 7-bit SMBus address of the device to be measured */
+	uint8_t BindingSpec; /* MCTP physical trasport binding (SMBus or I3C) */
+	uint16_t BindingSpecVersion; /* Major:Minor */
+	uint8_t Policy;
+	uint8_t SVN;
+	uint8_t Reserved1;
+	uint16_t AfmVersion; /* Major:Minor */
+	uint32_t CurveMagic; /* AFM_PUBLIC_SECP256_TAG, AFM_PUBLIC_SECP384_TAG, AFM_PUBLIC_RSA2K_TAG ... */
+	uint16_t PlatformManufacturerStr;
+	uint16_t PlatformManufacturerIDModel;
+	uint8_t Reserved2[20];
+	uint8_t PublicKeyModuleXY[512];
+	uint32_t PublicKeyExponent;
+	uint32_t TotalMeasurements;
+	AFM_DEVICE_MEASUREMENT_VALUE Measurements[];
+} AFM_DEVICE_STRUCTURE;
+
 #define SHA384_SIZE 48
 #define SHA256_SIZE 32
 

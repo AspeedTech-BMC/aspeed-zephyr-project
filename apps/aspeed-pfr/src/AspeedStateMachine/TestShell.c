@@ -14,6 +14,7 @@
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
+#include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 #include "gpio/gpio_aspeed.h"
@@ -385,7 +386,151 @@ static int cmd_test_plat_state_led(const struct shell *shell, size_t argc,
 		return 0;
 	}
 
+
+
 	SetPlatformState(pstate);
+	return 0;
+}
+
+static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
+{
+	if (argc != 3) {
+		shell_print(shell, "afm FLASH_DEV FLASH_OFFSET");
+		return 0;
+	}
+
+	const struct device *dev = device_get_binding(argv[1]);
+	if (dev == NULL) {
+		shell_print(shell, "Unable to find device: %s", argv[1]);
+		return 0;
+	}
+
+	size_t offset = strtol(argv[2], NULL, 16);
+
+	PFR_AUTHENTICATION_BLOCK0 block0;
+	flash_read(dev, offset, (uint8_t *)&block0, sizeof(block0));
+
+	shell_print(shell, "--- BLOCK 0 ---");
+	shell_print(shell, "Tag:0x%08x  PCLength:0x%08x PCType:0x%08x",
+		block0.Block0Tag, block0.PcLength, block0.PcType);
+	shell_print(shell, "Sha256Pc:");
+	shell_hexdump(shell, block0.Sha256Pc, sizeof(block0.Sha256Pc));
+	shell_print(shell, "Sha384Pc:");
+	shell_hexdump(shell, block0.Sha384Pc, sizeof(block0.Sha384Pc));
+
+	if (block0.Block0Tag != BLOCK0TAG) {
+		shell_print(shell, "Block 0 tag mismatch.");
+		return 0;
+	}
+
+	PFR_AUTHENTICATION_BLOCK1 block1;
+	flash_read(dev, offset + 128, (uint8_t *)&block1, sizeof(block1));
+	shell_print(shell, "--- BLOCK 1 ---");
+	shell_print(shell, "Tag:0x%08x", block1.TagBlock1);
+	shell_print(shell, "KEY Tag:0x%08x CurveMagic:0x%08x Permission:0x%08x KeyId:0x%08x",
+		block1.RootEntry.Tag, block1.RootEntry.PubCurveMagic, block1.RootEntry.KeyPermission, block1.RootEntry.KeyId);
+	shell_print(shell, "Pubkey X:");
+	shell_hexdump(shell, block1.RootEntry.PubKeyX, sizeof(block1.RootEntry.PubKeyX));
+	shell_print(shell, "Pubkey Y:");
+	shell_hexdump(shell, block1.RootEntry.PubKeyY, sizeof(block1.RootEntry.PubKeyY));
+
+	if (block1.TagBlock1 != BLOCK1TAG) {
+		shell_print(shell, "Block 1 tag mismatch.");
+		return 0;
+	}
+
+	AFM_STRUCTURE afm;
+	flash_read(dev, offset + 1024, (uint8_t *)&afm, sizeof(afm));
+	shell_print(shell, "--- AFM ---");
+	shell_print(shell, "Tag:0x%08x SVN:0x%02x Revision:0x%04x Length:0x%08x",
+		afm.AfmTag, afm.SVN, afm.AfmRevision, afm.Length);
+
+	if (afm.AfmTag != AFM_TAG) {
+		shell_print(shell, "AFM tag mismatch.");
+		return 0;
+	}
+
+	shell_print(shell, "OEM Speicific Data");
+	shell_hexdump(shell, afm.OemSpecificData, sizeof(afm.OemSpecificData));
+
+	for (size_t i=0; i < afm.Length/sizeof(AFM_ADDRESS_DEFINITION); ++i) {
+		AFM_ADDRESS_DEFINITION addr;
+		const size_t partition_offset = 0x07e00000; /* Test image coming from Archer City */
+		flash_read(dev, offset + 1024 + sizeof(AFM_STRUCTURE) + i*sizeof(AFM_ADDRESS_DEFINITION), &addr, sizeof(AFM_ADDRESS_DEFINITION));
+		shell_print(shell, "+++ AFM ADDR DEFINITION[%d] +++", i);
+		shell_print(shell, "-> Type:0x%02x DevAddr:0x%02x UUID:0x%04x Length:0x%08x AfmAdd:0x%08x",
+			addr.AfmDefinitionType, addr.DeviceAddress, addr.UUID, addr.Length, addr.AfmAddress - partition_offset);
+		
+		PFR_AUTHENTICATION_BLOCK0 afm_block0;
+		flash_read(dev, offset + (addr.AfmAddress - partition_offset),
+			(uint8_t *)&afm_block0, sizeof(PFR_AUTHENTICATION_BLOCK0));
+
+		shell_print(shell, "--- AFM[%d] BLOCK 0 ---", i);
+		shell_print(shell, "Tag:0x%08x  PCLength:0x%08x PCType:0x%08x",
+			afm_block0.Block0Tag, afm_block0.PcLength, afm_block0.PcType);
+		shell_print(shell, "Sha256Pc:");
+		shell_hexdump(shell, afm_block0.Sha256Pc, sizeof(afm_block0.Sha256Pc));
+		shell_print(shell, "Sha384Pc:");
+		shell_hexdump(shell, afm_block0.Sha384Pc, sizeof(afm_block0.Sha384Pc));
+
+		if (afm_block0.Block0Tag != BLOCK0TAG) {
+			shell_print(shell, "Block 0 tag mismatch.");
+			return 0;
+		}
+
+		PFR_AUTHENTICATION_BLOCK1 afm_block1;
+		flash_read(dev, offset + (addr.AfmAddress - partition_offset) + sizeof(PFR_AUTHENTICATION_BLOCK0),
+			(uint8_t *)&afm_block1, sizeof(PFR_AUTHENTICATION_BLOCK1));
+
+		shell_print(shell, "--- AFM[%d] BLOCK 1 ---", i);
+
+		shell_print(shell, "Tag:0x%08x", afm_block1.TagBlock1);
+		shell_print(shell, "KEY Tag:0x%08x CurveMagic:0x%08x Permission:0x%08x KeyId:0x%08x",
+			afm_block1.RootEntry.Tag, afm_block1.RootEntry.PubCurveMagic, afm_block1.RootEntry.KeyPermission, afm_block1.RootEntry.KeyId);
+		shell_print(shell, "Pubkey X:");
+		shell_hexdump(shell, afm_block1.RootEntry.PubKeyX, sizeof(afm_block1.RootEntry.PubKeyX));
+		shell_print(shell, "Pubkey Y:");
+		shell_hexdump(shell, afm_block1.RootEntry.PubKeyY, sizeof(afm_block1.RootEntry.PubKeyY));
+
+		if (afm_block1.TagBlock1 != BLOCK1TAG) {
+			shell_print(shell, "Block 1 tag mismatch.");
+			return 0;
+		}
+
+		AFM_DEVICE_STRUCTURE afm_dev;
+		shell_print(shell, "AFM OFFSET 0x%08x", offset + (addr.AfmAddress - partition_offset) + 1024);
+		flash_read(dev, offset + (addr.AfmAddress - partition_offset) + 1024,
+			&afm_dev, sizeof(AFM_DEVICE_STRUCTURE));
+		shell_print(shell, "----> UUID:0x%04x BusID:0x%02x DevAddr:0x%02x Binding:%d BindingRev:0x%04x Policy:0x%02x SVN:0x%02x",
+			afm_dev.UUID, afm_dev.BusID, afm_dev.DeviceAddress, afm_dev.BindingSpec, afm_dev.BindingSpecVersion,
+			afm_dev.Policy, afm_dev.SVN);
+		shell_print(shell, "AfmVer:0x%04x CurveMagic:0x%08x ManuStr:0x%04x ManuId:0x%04x PublicKeyExp:0x%08x",
+			afm_dev.AfmVersion, afm_dev.CurveMagic, afm_dev.PlatformManufacturerStr, afm_dev.PlatformManufacturerIDModel,
+			afm_dev.PublicKeyExponent);
+		shell_print(shell, "PublicKeyXY:");
+		shell_hexdump(shell, afm_dev.PublicKeyModuleXY, 96);
+
+		shell_print(shell, "Total Measurements:%u", afm_dev.TotalMeasurements);
+
+		size_t offs_measurem = offset + (addr.AfmAddress - partition_offset) + 1024 + sizeof(AFM_DEVICE_STRUCTURE);
+		for (size_t j=0; j<afm_dev.TotalMeasurements; ++j) {
+			AFM_DEVICE_MEASUREMENT_VALUE measurement;
+			flash_read(dev, offs_measurem, &measurement, sizeof(AFM_DEVICE_MEASUREMENT_VALUE));
+
+			shell_print(shell, "Possible Measurements:%d ValueType:0x%02x ValueSize:0x%04x",
+				measurement.PossibleMeasurements, measurement.ValueType, measurement.ValueSize);
+			offs_measurem += sizeof(AFM_DEVICE_MEASUREMENT_VALUE);
+			for (size_t k=0; k<measurement.PossibleMeasurements; ++k) {
+				uint8_t buffer[128];
+				shell_print(shell, "Measurement[%d][%d]:", j, k);
+				flash_read(dev, offs_measurem, buffer, measurement.ValueSize);
+				shell_hexdump(shell, buffer, measurement.ValueSize);
+				offs_measurem += measurement.ValueSize;
+			}
+		}
+	}
+
+	return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
@@ -398,6 +543,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(flash_cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
 	SHELL_CMD(flash_copy, NULL, "Copy data between Flash", cmd_asm_flash_copy),
 	SHELL_CMD(pstate, NULL, "Test Platform State LED", cmd_test_plat_state_led),
+	SHELL_CMD(afm, NULL, "Dump AFM Structure: DEVICE OFFSET", cmd_afm),
 	SHELL_SUBCMD_SET_END
 );
 

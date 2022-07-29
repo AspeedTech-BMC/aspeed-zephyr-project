@@ -199,6 +199,8 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 		return PFR_CPLD_UPDATE_CAPSULE;
 	} else if (pc_type == PFR_PCH_SEAMLESS_UPDATE_CAPSULE) {
 		return PFR_PCH_SEAMLESS_UPDATE_CAPSULE;
+	} else if (pc_type == PFR_AFM) {
+		return PFR_AFM;
 	} else {
 		return 7;
 	}
