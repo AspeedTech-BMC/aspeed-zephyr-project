@@ -325,7 +325,7 @@ void InitializeSoftwareMailbox(void)
 	/* From PCH */
 	swmbx_update_notify(swmbx_dev, 0x1, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
-	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent_sem, PchPfmActiveSvn, true);
+	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent_sem, PchUpdateIntent, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &acm_checkpoint_sem, AcmCheckpoint, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &bios_checkpoint_sem, BiosCheckpoint, true);
 #if defined(CONFIG_SEAMLESS_UPDATE)

@@ -197,7 +197,8 @@ typedef enum _UPDATE_INTENT {
 	PchFwAndBmcFwUpdate                     = 0x1B,
 	PchBmcHROTActiveAndRecoveryUpdate       = 0x3f,
 	BmcActiveAndDynamicUpdate               = 0x48,
-	ExceptBmcActiveUpdate                   = 0x37
+	ExceptBmcActiveUpdate                   = 0x37,
+	ExceptPchActiveUpdate                   = 0x3E,
 } UPDATE_INTENT;
 
 #if defined(CONFIG_SEAMLESS_UPDATE)
