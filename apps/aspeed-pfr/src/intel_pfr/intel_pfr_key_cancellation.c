@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <shell/shell.h>
 
@@ -226,3 +227,5 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
 SHELL_CMD_REGISTER(kc, &sub_kc_cmds, "Key Cancellation Commands", NULL);
 
 #endif
+
+#endif // CONFIG_INTEL_PFR

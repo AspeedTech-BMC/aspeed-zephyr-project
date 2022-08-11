@@ -11,8 +11,15 @@
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_recovery.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_recovery.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_recovery.h"
+#endif
+
 #include "include/SmbusMailBoxCom.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
@@ -27,12 +34,10 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 int recover_image(void *AoData, void *EventContext)
 {
-
 	int status = 0;
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
-	// init_pfr_manifest();
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 
 	pfr_manifest->state = FIRMWARE_RECOVERY;
@@ -93,27 +98,6 @@ int recover_image(void *AoData, void *EventContext)
 }
 
 /**
- * Verify if the recovery image is valid.
- *
- * @param image The recovery image to validate.
- * @param hash The hash engine to use for validation.
- * @param verification Verification instance to use to verify the recovery image signature.
- * @param hash_out Optional output buffer for the recovery image hash calculated during
- * verification.  Set to null to not return the hash.
- * @param hash_length Length of the hash output buffer.
- * @param pfm_manager The PFM manager to use for validation.
- *
- * @return 0 if the recovery image is valid or an error code.
- */
-int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
-		    struct pfm_manager *pfm)
-{
-
-	return intel_pfr_recovery_verify(image, hash, verification, hash_out, hash_length, pfm);
-}
-
-/**
  * Get the SHA-256 hash of the recovery image data, not including the signature.
  *
  * @param image The recovery image to query.
@@ -152,22 +136,6 @@ int recovery_get_version(struct recovery_image *image, char *version, size_t len
 	ARG_UNUSED(len);
 
 	return Success;
-}
-
-/**
- * Apply the recovery image to host flash.  It is assumed that the host flash region is already
- * blank.
- *
- * @param image The recovery image to query.
- * @param flash The flash device to write the recovery image to.
- *
- * @return 0 if applying the recovery image to host flash was successful or an error code.
- */
-int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash)
-{
-	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
-
-	return intel_pfr_recover_update_action(pfr_manifest);
 }
 
 void init_recovery_manifest(struct recovery_image *image)

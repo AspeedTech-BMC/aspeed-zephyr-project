@@ -8,15 +8,21 @@
 #include "StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "include/SmbusMailBoxCom.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_authentication.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#include "cerberus_pfr/cerberus_pfr_authentication.h"
+#endif
 #include "pfr/pfr_verification.h"
 #include "pfr/pfr_update.h"
 #include "flash/flash_aspeed.h"
 #include <watchdog/watchdog_aspeed.h>
 #include "Smbus_mailbox/Smbus_mailbox.h"
-#include "intel_pfr/intel_pfr_definitions.h"
 #include "spi_filter/spi_filter_wrapper.h"
 #include "logging/debug_log.h"// State Machine log saving
 #include "AspeedStateMachine/AspeedStateMachine.h"

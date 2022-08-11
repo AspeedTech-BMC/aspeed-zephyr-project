@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
@@ -229,7 +230,12 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 
 void init_pfr_authentication(struct pfr_authentication *pfr_authentication);
 
+int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
+		    struct signature_verification *verification, uint8_t *hash_out,
+		    size_t hash_length);
 #if defined(CONFIG_SEAMLESS_UPDATE)
 int intel_fvms_verify(struct pfr_manifest *manifest);
 int intel_fvm_verify(struct pfr_manifest *manifest);
 #endif
+
+#endif // CONFIG_INTEL_PFR

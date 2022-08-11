@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include <drivers/flash.h>
@@ -734,5 +735,20 @@ release_pch_mux:
 
 	return status;
 }
-#endif
+#endif // CONFIG_SEAMLESS_UPDATE
 
+/**
+ * Verify the complete firmware image.  All components in the image will be fully validated.
+ * This includes checking image signatures and key revocation.
+ *
+ * @param fw The firmware image to validate.
+ * @param hash The hash engine to use for validation.
+ * @param rsa The RSA engine to use for signature checking.
+ *
+ * @return 0 if the firmware image is valid or an error code.
+ */
+int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
+{
+	return intel_pfr_update_verify(fw, hash, rsa);
+}
+#endif // CONFIG_INTEL_PFR

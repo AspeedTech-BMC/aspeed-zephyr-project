@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #define BMC_RELEASE                             1U
 #define PCH_RELEASE                             1U
 

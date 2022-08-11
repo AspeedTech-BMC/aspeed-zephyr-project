@@ -13,6 +13,19 @@ config BMC_DUAL_FLASH
 	help
 	  Enable if BMC has dual flash
 
+config INTEL_PFR
+	default y
+	bool "intel pfr solution"
+	help
+	  Intel PFR support
+
+config CERBERUS_PFR
+	depends on !INTEL_PFR
+	default n
+	bool "cerberus pfr solution"
+	help
+	  Cerberus PFR support
+
 config SPI_MUX_INVERSE
 	default n
 	bool "Invert SPI MUX"
@@ -81,6 +94,8 @@ config INIT_POWER_SEQUENCE
 	  RST_SRST_BMC_N and RST_RSMRST_N.
 
 config SEAMLESS_UPDATE
+	depends on INTEL_PFR
+	depends on !CERBERUS_PFR
 	default n
 	bool "Seamless update support"
 	help

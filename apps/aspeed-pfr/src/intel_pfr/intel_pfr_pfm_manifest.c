@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_definitions.h"
@@ -14,7 +15,7 @@
 #include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
-LOG_MODULE_REGISTER(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 uint32_t g_pfm_manifest_length = 1;
 uint32_t g_fvm_manifest_length = 1;
@@ -338,4 +339,4 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 
 	return Success;
 }
-
+#endif // CONFIG_INTEL_PFR

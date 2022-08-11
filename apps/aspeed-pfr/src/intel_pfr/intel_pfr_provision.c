@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include "AspeedStateMachine/common_smc.h"
@@ -105,3 +106,4 @@ int verify_root_key_entry(struct pfr_manifest *manifest, PFR_AUTHENTICATION_BLOC
 
 	return Success;
 }
+#endif // CONFIG_INTEL_PFR

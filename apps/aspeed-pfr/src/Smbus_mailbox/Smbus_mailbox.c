@@ -12,10 +12,17 @@
 #include <build_config.h>
 #include "Smbus_mailbox.h"
 #include "common/common.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_update.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#include "cerberus_pfr/cerberus_pfr_update.h"
+#endif
 #include "pfr/pfr_ufm.h"
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -29,7 +36,7 @@ LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 #endif
 
 #define READ_ONLY_RF_COUNT  20
-#define READ_WRITE_RF_COUNT 06
+#define READ_WRITE_RF_COUNT 6
 
 #define PRIMARY_FLASH_REGION    1
 #define SECONDARY_FLASH_REGION  2
@@ -1181,7 +1188,7 @@ void UpdateBmcCheckpoint(byte Data)
 		AspeedPFR_DisableTimer(BMC_EVENT);
 		gBmcBootDone = TRUE;
 		gBMCWatchDogTimer = -1;
-#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
 		reset_recovery_level(BMC_SPI);
 #endif
 		SetPlatformState(T0_BMC_BOOTED);
@@ -1222,7 +1229,7 @@ void UpdateBiosCheckpoint(byte Data)
 		gBootCheckpointReceived = true;
 		gPCHWatchDogTimer = -1;
 		SetPlatformState(T0_BIOS_BOOTED);
-#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
 		reset_recovery_level(PCH_SPI);
 #endif
 		DEBUG_PRINTF("BIOS boot completed. Checkpoint update not allowed");

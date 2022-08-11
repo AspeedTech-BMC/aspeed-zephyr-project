@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
@@ -120,5 +121,4 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	return Success;
 }
 
-
-
+#endif // CONFIG_INTEL_PFR

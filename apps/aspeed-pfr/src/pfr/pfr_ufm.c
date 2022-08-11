@@ -7,7 +7,12 @@
 #include "common/common.h"
 #include "flash/flash_wrapper.h"
 #include "AspeedStateMachine/common_smc.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#endif
 #include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 

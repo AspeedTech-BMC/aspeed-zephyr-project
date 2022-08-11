@@ -6,7 +6,6 @@
 #include <string.h>
 #include "common.h"
 
-struct flash flashDevice;
 struct flash_master flashMaster;			/**< Flash master for the PFM flash. */
 struct hash_engine hashEngine;				/**< Hashing engine for validation. */
 struct host_state_manager hostStateManager;
@@ -32,9 +31,7 @@ uint32_t gMaxTimeout = MAX_BIOS_BOOT_TIME;
 
 struct flash *getFlashDeviceInstance(void)
 {
-	flashDevice = spiEngineWrapper.spi.base;
-
-	return &flashDevice;
+	return &spiEngineWrapper.spi.base;
 }
 
 struct flash_master *getFlashMasterInstance(void)

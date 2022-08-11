@@ -5,15 +5,22 @@
  */
 
 #include <logging/log.h>
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_authentication.h"
 #include "intel_pfr/intel_pfr_verification.h"
+#include "intel_pfr/intel_pfr_definitions.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_authentication.h"
+#include "cerberus_pfr/cerberus_pfr_verification.h"
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#endif
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_common.h"
-#include "intel_pfr/intel_pfr_definitions.h"
 #include "pfr_util.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
@@ -30,7 +37,6 @@ int authentication_image(void *AoData, void *EventContext)
 	int status = 0;
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 
-	// init_pfr_manifest();
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 
 	pfr_manifest->state = FIRMWARE_VERIFY;
@@ -48,32 +54,11 @@ int authentication_image(void *AoData, void *EventContext)
 
 	if (EventData->operation == VERIFY_BACKUP) {
 		status = pfr_manifest->recovery_base->verify(pfr_manifest, pfr_manifest->hash, pfr_manifest->verification->base, pfr_manifest->pfr_hash->hash_out, pfr_manifest->pfr_hash->length, pfr_manifest->recovery_pfm);
-		// status = pfr_recovery_verify(pfr_manifest);
 	} else if (EventData->operation == VERIFY_ACTIVE) {
 		status = pfr_manifest->active_image_base->verify(pfr_manifest);
 	}
 
 	return status;
-}
-
-/**
- * Verify if the manifest is valid.
- *
- * @param manifest The manifest to validate.
- * @param hash The hash engine to use for validation.
- * @param verification Verification instance to use to verify the manifest signature.
- * @param hash_out Optional output buffer for manifest hash calculated during verification.  A
- * validation error does not necessarily mean the hash output is not valid.  If the manifest
- * hash was not calculated, this buffer will be cleared.  Set this to null to not return the
- * manifest hash.
- * @param hash_length Length of the hash output buffer.
- *
- * @return 0 if the manifest is valid or an error code.
- */
-int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out, size_t hash_length)
-{
-	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
 
 /**

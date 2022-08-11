@@ -24,7 +24,12 @@
 #include "flash/flash_util.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "pfr_common.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#endif
 #include "crypto/ecdsa_aspeed.h"
 #include <sys/reboot.h>
 #include <stdio.h>

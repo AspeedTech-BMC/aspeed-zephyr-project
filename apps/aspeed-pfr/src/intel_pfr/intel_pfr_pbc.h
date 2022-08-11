@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr_definitions.h"
 
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
@@ -20,3 +21,5 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 #if defined(CONFIG_SEAMLESS_UPDATE)
 int decompress_fv_capsule(struct pfr_manifest *manifest);
 #endif
+
+#endif // CONFIG_INTEL_PFR

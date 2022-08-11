@@ -11,10 +11,18 @@
 
 #include "pfr_ufm.h"
 #include "AspeedStateMachine/common_smc.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_update.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#include "cerberus_pfr/cerberus_pfr_verification.h"
+#include "cerberus_pfr/cerberus_pfr_update.h"
+#endif
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "include/SmbusMailBoxCom.h"
@@ -101,21 +109,6 @@ int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 int firmware_image_load(struct firmware_image *fw, struct flash *flash, uint32_t base_addr)
 {
 	return Success;
-}
-
-/**
- * Verify the complete firmware image.  All components in the image will be fully validated.
- * This includes checking image signatures and key revocation.
- *
- * @param fw The firmware image to validate.
- * @param hash The hash engine to use for validation.
- * @param rsa The RSA engine to use for signature checking.
- *
- * @return 0 if the firmware image is valid or an error code.
- */
-int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
-{
-	return intel_pfr_update_verify(fw, hash, rsa);
 }
 
 /**

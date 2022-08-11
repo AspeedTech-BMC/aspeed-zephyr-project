@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include <posix/time.h>
@@ -513,4 +514,4 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 
 	return Success;
 }
-
+#endif // CONFIG_INTEL_PFR

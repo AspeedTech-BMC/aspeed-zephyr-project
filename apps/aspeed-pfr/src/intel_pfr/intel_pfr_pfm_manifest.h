@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 #pragma pack(1)
@@ -190,4 +191,4 @@ int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version);
 int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
 int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address);
 int pfm_spi_region_verification(struct pfr_manifest *manifest);
-
+#endif // CONFIG_INTEL_PFR

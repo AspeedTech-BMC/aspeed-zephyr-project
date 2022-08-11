@@ -12,9 +12,15 @@
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#endif
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 #include "gpio/gpio_aspeed.h"
@@ -392,6 +398,7 @@ static int cmd_test_plat_state_led(const struct shell *shell, size_t argc,
 	return 0;
 }
 
+#if defined(CONFIG_INTEL_PFR)
 static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 {
 	if (argc != 3) {
@@ -460,7 +467,7 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 		shell_print(shell, "+++ AFM ADDR DEFINITION[%d] +++", i);
 		shell_print(shell, "-> Type:0x%02x DevAddr:0x%02x UUID:0x%04x Length:0x%08x AfmAdd:0x%08x",
 			addr.AfmDefinitionType, addr.DeviceAddress, addr.UUID, addr.Length, addr.AfmAddress - partition_offset);
-		
+
 		PFR_AUTHENTICATION_BLOCK0 afm_block0;
 		flash_read(dev, offset + (addr.AfmAddress - partition_offset),
 			(uint8_t *)&afm_block0, sizeof(PFR_AUTHENTICATION_BLOCK0));
@@ -532,6 +539,7 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 
 	return 0;
 }
+#endif // CONFIG_INTEL_PFR
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
@@ -543,7 +551,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(flash_cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
 	SHELL_CMD(flash_copy, NULL, "Copy data between Flash", cmd_asm_flash_copy),
 	SHELL_CMD(pstate, NULL, "Test Platform State LED", cmd_test_plat_state_led),
+#if defined(CONFIG_INTEL_PFR)
 	SHELL_CMD(afm, NULL, "Dump AFM Structure: DEVICE OFFSET", cmd_afm),
+#endif
 	SHELL_SUBCMD_SET_END
 );
 

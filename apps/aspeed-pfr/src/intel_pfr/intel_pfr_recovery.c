@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include "common/common.h"
@@ -262,3 +263,41 @@ int intel_pfr_recover_update_action(struct pfr_manifest *manifest)
 	ARG_UNUSED(manifest);
 	return Success;
 }
+
+/**
+ * Verify if the recovery image is valid.
+ *
+ * @param image The recovery image to validate.
+ * @param hash The hash engine to use for validation.
+ * @param verification Verification instance to use to verify the recovery image signature.
+ * @param hash_out Optional output buffer for the recovery image hash calculated during
+ * verification.  Set to null to not return the hash.
+ * @param hash_length Length of the hash output buffer.
+ * @param pfm_manager The PFM manager to use for validation.
+ *
+ * @return 0 if the recovery image is valid or an error code.
+ */
+int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
+		    struct signature_verification *verification, uint8_t *hash_out,
+		    size_t hash_length, struct pfm_manager *pfm)
+{
+
+	return intel_pfr_recovery_verify(image, hash, verification, hash_out, hash_length, pfm);
+}
+
+/**
+ * Apply the recovery image to host flash.  It is assumed that the host flash region is already
+ * blank.
+ *
+ * @param image The recovery image to query.
+ * @param flash The flash device to write the recovery image to.
+ *
+ * @return 0 if applying the recovery image to host flash was successful or an error code.
+ */
+int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash)
+{
+	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
+
+	return intel_pfr_recover_update_action(pfr_manifest);
+}
+#endif // CONFIG_INTEL_PFR

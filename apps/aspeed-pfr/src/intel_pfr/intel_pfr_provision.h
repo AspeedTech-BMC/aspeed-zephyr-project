@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "intel_pfr_verification.h"
 
@@ -38,4 +39,4 @@ enum {
 };
 
 int verify_root_key_entry(struct pfr_manifest *manifest, PFR_AUTHENTICATION_BLOCK1 *block1_buffer);
-
+#endif

@@ -14,9 +14,14 @@
 
 #include "AspeedStateMachine.h"
 #include "include/SmbusMailBoxCom.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_update.h"
-#include "imageRecovery/image_recovery.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_update.h"
+#endif
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "pfr/pfr_util.h"
@@ -368,7 +373,9 @@ void handle_recovery(void *o)
 	int ret;
 	EVENT_CONTEXT evt_wrap;
 
-	recovery_initialize();
+	initializeEngines();
+	initializeManifestProcessor();
+	//recovery_initialize();
 
 	/* TODO: Verify Staging? */
 	SetPlatformState(T_MINUS_1_FW_RECOVERY);
@@ -407,7 +414,7 @@ void handle_recovery(void *o)
 			LOG_INF("BMC recover active region return=%d", ret);
 			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
 				recovery_done = 1;
-#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
 			if (evt_ctx->event == WDT_TIMEOUT)
 				inc_recovery_level(BMC_SPI);
 #endif
@@ -429,7 +436,7 @@ void handle_recovery(void *o)
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
 			recovery_done = 1;
-#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
 			if (evt_ctx->event == WDT_TIMEOUT)
 				inc_recovery_level(PCH_SPI);
 #endif

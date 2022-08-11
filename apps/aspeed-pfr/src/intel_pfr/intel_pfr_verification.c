@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include "AspeedStateMachine/common_smc.h"
@@ -604,3 +605,25 @@ void init_pfr_authentication(struct pfr_authentication *pfr_authentication)
 	pfr_authentication->fvm_verify = intel_fvm_verify;
 #endif
 }
+
+/**
+ * Verify if the manifest is valid.
+ *
+ * @param manifest The manifest to validate.
+ * @param hash The hash engine to use for validation.
+ * @param verification Verification instance to use to verify the manifest signature.
+ * @param hash_out Optional output buffer for manifest hash calculated during verification.  A
+ * validation error does not necessarily mean the hash output is not valid.  If the manifest
+ * hash was not calculated, this buffer will be cleared.  Set this to null to not return the
+ * manifest hash.
+ * @param hash_length Length of the hash output buffer.
+ *
+ * @return 0 if the manifest is valid or an error code.
+ */
+int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
+		    struct signature_verification *verification, uint8_t *hash_out,
+		    size_t hash_length)
+{
+	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
+}
+#endif // CONFIG_INTEL_PFR

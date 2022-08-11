@@ -6,18 +6,30 @@
 
 #include "common/common.h"
 #include "pfr_common.h"
-#include "intel_pfr/intel_pfr_verification.h"
 #include "flash/flash_wrapper.h"
+#if defined(CONFIG_INTEL_PFR)
+#include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_recovery.h"
-#include "recovery/recovery_image.h"
 #include "intel_pfr/intel_pfr_key_cancellation.h"
 #include "intel_pfr/intel_pfr_update.h"
+#include "intel_pfr/intel_pfr_authentication.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_verification.h"
+#include "cerberus_pfr/cerberus_pfr_recovery.h"
+#include "cerberus_pfr/cerberus_pfr_key_cancellation.h"
+#include "cerberus_pfr/cerberus_pfr_update.h"
+#include "cerberus_pfr/cerberus_pfr_authentication.h"
+#endif
+
+#include "recovery/recovery_image.h"
 #include "pfr/pfr_recovery.h"
 #include "pfr/pfr_verification.h"
 #include "pfr/pfr_update.h"
 #include "pfr_util.h"
-#include "intel_pfr/intel_pfr_authentication.h"
+#include <logging/log.h>
 
+LOG_MODULE_REGISTER(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 struct pfr_manifest pfr_manifest;
 
 // Block0-Block1 verifcation
@@ -145,7 +157,7 @@ void init_active_image(struct active_image *active_image)
 	active_image->verify = pfr_active_verify;
 }
 
-static int init_intel_pfr_manifest(struct pfr_manifest *pfr_manifest,
+static int init_pfr_manifest(struct pfr_manifest *pfr_manifest,
 				   struct manifest *manifest,
 				   struct hash_engine *hash,
 				   struct pfr_signature_verification *verification,
@@ -178,15 +190,6 @@ static int init_intel_pfr_manifest(struct pfr_manifest *pfr_manifest,
 	init_signature_verifcation(pfr_manifest->verification->base);
 	init_active_image(pfr_manifest->active_image_base);
 
-	// pfr_manifest->base->verify = intel_pfr_manifest_verify;
-	// pfr_manifest->base->get_hash = get_hash;
-
-	// pfr_manifest->recovery_base->verify = intel_pfr_recovery_verify;
-
-	// pfr_manifest->update_fw->base->verify = intel_pfr_update_verify;
-
-	// pfr_manifest->verification->base->verify_signature = verify_signature;
-
 	return status;
 }
 
@@ -218,7 +221,7 @@ static int init_pfr_keystore(struct keystore *keystore, struct key_cancellation_
 	return status;
 }
 
-void init_pfr_manifest(void)
+void init_pfr_bases(void)
 {
 
 	init_pfr_keystore(get_keystore(), get_kc_flag());
@@ -227,7 +230,7 @@ void init_pfr_manifest(void)
 
 	init_pfr_firmware_image(get_update_fw_base(), get_update_base());
 
-	init_intel_pfr_manifest(get_pfr_manifest(),
+	init_pfr_manifest(get_pfr_manifest(),
 				get_manifest(),
 				get_pfr_hash_engine(),
 				get_pfr_signature_verification(),
