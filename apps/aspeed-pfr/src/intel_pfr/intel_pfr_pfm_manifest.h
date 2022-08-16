@@ -9,10 +9,27 @@
 #if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
+
+#define SHA384_SIZE 48
+#define SHA256_SIZE 32
+
+#define BIOS1_BIOS2 0x00
+#define ME_SPS          0x01
+#define Microcode1      0x02
+#define Microcode2      0x03
+
+#define SPI_REGION     0x1
+#define SMBUS_RULE     0x2
+#define FVM_ADDR_DEF   0x3
+#define FVM_CAP        0x4
+
+#define SIZE_OF_PCH_SMBUS_RULE 40
+#define SPI_REGION_DEF_MIN_SIZE 16
+
+#define PCH_FVM_SPI_REGION 0x01
+#define PCH_FVM_CAP        0x04
+
 #pragma pack(1)
-
-#define NUM_WHITESPACE 8
-
 typedef struct PFMSPIDEFINITION {
 	uint8_t PFMDefinitionType;
 	struct {
@@ -51,8 +68,6 @@ typedef struct _PFM_SPI_REGION {
 	uint32_t StartOffset;
 	uint32_t EndOffset;
 } PFM_SPI_REGION;
-
-
 
 typedef struct _PFM_STRUCTURE_1 {
 	uint32_t PfmTag;
@@ -152,25 +167,6 @@ typedef struct _AFM_DEVICE_STRUCTURE {
 	AFM_DEVICE_MEASUREMENT_VALUE Measurements[];
 } AFM_DEVICE_STRUCTURE;
 
-#define SHA384_SIZE 48
-#define SHA256_SIZE 32
-
-#define BIOS1_BIOS2 0x00
-#define ME_SPS          0x01
-#define Microcode1      0x02
-#define Microcode2      0x03
-
-#define SPI_REGION     0x1
-#define SMBUS_RULE     0x2
-#define FVM_ADDR_DEF   0x3
-#define FVM_CAP        0x4
-
-#define SIZE_OF_PCH_SMBUS_RULE 40
-#define SPI_REGION_DEF_MIN_SIZE 16
-
-#define PCH_FVM_SPI_REGION 0x01
-#define PCH_FVM_CAP        0x04
-
 typedef struct {
 	uint8_t Calculated : 1;
 	uint8_t Count : 2;
@@ -178,13 +174,6 @@ typedef struct {
 	uint8_t DynamicEraseTriggered : 1;
 	uint8_t Reserved : 2;
 } ProtectLevelMask;
-
-extern uint32_t g_manifest_length;
-extern uint32_t g_fvm_manifest_length;
-
-extern ProtectLevelMask pch_protect_level_mask_count;
-extern ProtectLevelMask bmc_protect_level_mask_count;
-
 #pragma pack()
 
 int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version);

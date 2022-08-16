@@ -17,16 +17,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-uint32_t g_pfm_manifest_length = 1;
-uint32_t g_fvm_manifest_length = 1;
-
-uint8_t g_active_pfm_svn;
-
-ProtectLevelMask pch_protect_level_mask_count;
-ProtectLevelMask bmc_protect_level_mask_count;
-
-int pfm_spi_region_verification(struct pfr_manifest *manifest);
-
 int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address)
 {
 	int status = 0;
@@ -231,8 +221,8 @@ int fvm_spi_region_verification(struct pfr_manifest *manifest)
 	}
 
 	if (pfr_spi_read(manifest->image_type, fvm_addr,
-				sizeof(FVM_STRUCTURE), (uint8_t *)&fvm_data))
-			return Failure;
+			sizeof(FVM_STRUCTURE), (uint8_t *)&fvm_data))
+		return Failure;
 
 	if (fvm_data.FvmTag != FVMTAG) {
 		LOG_ERR("FVMTag verification failed...\n expected: %x\n actual: %x",
@@ -245,27 +235,27 @@ int fvm_spi_region_verification(struct pfr_manifest *manifest)
 
 	while (!done) {
 		if (pfr_spi_read(manifest->image_type, fvm_addr,
-					sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_definition))
+				sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_definition))
 			return Failure;
 
-		switch(spi_definition.PFMDefinitionType){
-			case SPI_REGION:
-				fvm_addr += sizeof(PFM_SPI_DEFINITION);
-				fvm_addr += get_spi_region_hash(manifest, fvm_addr, &spi_definition,
-						&pfm_spi_hash);
-				if (spi_region_hash_verification(manifest, &spi_definition,
+		switch (spi_definition.PFMDefinitionType) {
+		case SPI_REGION:
+			fvm_addr += sizeof(PFM_SPI_DEFINITION);
+			fvm_addr += get_spi_region_hash(manifest, fvm_addr, &spi_definition,
+					&pfm_spi_hash);
+			if (spi_region_hash_verification(manifest, &spi_definition,
 							&pfm_spi_hash))
-					return Failure;
+				return Failure;
 
-				memset(&spi_definition, 0, sizeof(PFM_SPI_DEFINITION));
-				memset(pfm_spi_hash, 0, SHA384_SIZE);
-				break;
-			case PCH_FVM_CAP:
-				fvm_addr += sizeof(FVM_CAPABLITIES);
-				break;
-			default:
-				done = true;
-				break;
+			memset(&spi_definition, 0, sizeof(PFM_SPI_DEFINITION));
+			memset(pfm_spi_hash, 0, SHA384_SIZE);
+			break;
+		case PCH_FVM_CAP:
+			fvm_addr += sizeof(FVM_CAPABLITIES);
+			break;
+		default:
+			done = true;
+			break;
 		}
 
 		if (fvm_addr >= fvm_end_addr)
@@ -290,46 +280,46 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 	uint8_t pfm_spi_hash[SHA384_SIZE] = { 0 };
 
 	if (pfr_spi_read(manifest->image_type, pfm_addr,
-				sizeof(PFM_STRUCTURE_1), (uint8_t *)&pfm_data))
-			return Failure;
+			sizeof(PFM_STRUCTURE_1), (uint8_t *)&pfm_data))
+		return Failure;
 	pfm_end_addr = pfm_addr + pfm_data.Length;
 	pfm_addr += sizeof(PFM_STRUCTURE_1);
 
 	while (!done) {
 		if (pfr_spi_read(manifest->image_type, pfm_addr,
-					sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_definition))
+				sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_definition))
 			return Failure;
 
-		switch(spi_definition.PFMDefinitionType){
-			case SPI_REGION:
-				pfm_addr += sizeof(PFM_SPI_DEFINITION);
-				pfm_addr += get_spi_region_hash(manifest, pfm_addr, &spi_definition,
-						&pfm_spi_hash);
-				if (spi_region_hash_verification(manifest, &spi_definition,
-							&pfm_spi_hash))
-					return Failure;
+		switch (spi_definition.PFMDefinitionType) {
+		case SPI_REGION:
+			pfm_addr += sizeof(PFM_SPI_DEFINITION);
+			pfm_addr += get_spi_region_hash(manifest, pfm_addr, &spi_definition,
+					&pfm_spi_hash);
+			if (spi_region_hash_verification(manifest, &spi_definition,
+					&pfm_spi_hash))
+				return Failure;
 
-				memset(&spi_definition, 0, sizeof(PFM_SPI_DEFINITION));
-				memset(pfm_spi_hash, 0, SHA384_SIZE);
-				break;
-			case SMBUS_RULE:
-				pfm_addr += sizeof(PFM_SMBUS_RULE);
-				break;
+			memset(&spi_definition, 0, sizeof(PFM_SPI_DEFINITION));
+			memset(pfm_spi_hash, 0, SHA384_SIZE);
+			break;
+		case SMBUS_RULE:
+			pfm_addr += sizeof(PFM_SMBUS_RULE);
+			break;
 #if defined(CONFIG_SEAMLESS_UPDATE)
-			case FVM_ADDR_DEF:
-				fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)&spi_definition;
-				manifest->address = fvm_def->FVMAddress;
-				if (fvm_spi_region_verification(manifest)) {
-					manifest->address = read_address;
-					LOG_ERR("FVM SPI region verification failed");
-					return Failure;
-				}
-				pfm_addr += sizeof(PFM_FVM_ADDRESS_DEFINITION);
-				break;
+		case FVM_ADDR_DEF:
+			fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)&spi_definition;
+			manifest->address = fvm_def->FVMAddress;
+			if (fvm_spi_region_verification(manifest)) {
+				manifest->address = read_address;
+				LOG_ERR("FVM SPI region verification failed");
+				return Failure;
+			}
+			pfm_addr += sizeof(PFM_FVM_ADDRESS_DEFINITION);
+			break;
 #endif
-			default:
-				done = true;
-				break;
+		default:
+			done = true;
+			break;
 		}
 
 		if (pfm_addr >= pfm_end_addr)
