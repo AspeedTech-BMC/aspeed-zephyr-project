@@ -36,9 +36,9 @@ int rsa_verify_signature(struct signature_verification *verification,
 	get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &rsa_public);
 	status = rsa->base.sig_verify(&rsa->base, &rsa_public, signature, sig_length, digest, length);
 	if (status != Success) {
-		LOG_ERR("public mod length = 0x%x", rsa_public.mod_length);
-		LOG_ERR("public exponent = 0x%x", rsa_public.exponent);
-		LOG_HEXDUMP_ERR(rsa_public.modulus, rsa_public.mod_length, "public modulus:");
+		LOG_ERR("public key mod length = 0x%x", rsa_public.mod_length);
+		LOG_ERR("public key exponent = 0x%x", rsa_public.exponent);
+		LOG_HEXDUMP_ERR(rsa_public.modulus, rsa_public.mod_length, "public key modulus:");
 		LOG_HEXDUMP_ERR(signature, sig_length, "signature:");
 		LOG_HEXDUMP_ERR(digest, length, "expected hash:");
 	}
@@ -103,7 +103,7 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 
 	pfr_manifest->flash->device_id[0] = pfr_manifest->image_type;
 	status = pfm_flash_init(pfm_flash, &(pfr_manifest->flash->base), pfr_manifest->hash, pfr_manifest->address,
-		pfm_signature_cache, RSA_MAX_KEY_LENGTH, pfm_platform_id_cache, sizeof(pfm_platform_id_cache));
+		pfm_signature_cache, sizeof(pfm_signature_cache), pfm_platform_id_cache, sizeof(pfm_platform_id_cache));
 	if (status) {
 		LOG_ERR("PFM flash init failed");
 		return Failure;

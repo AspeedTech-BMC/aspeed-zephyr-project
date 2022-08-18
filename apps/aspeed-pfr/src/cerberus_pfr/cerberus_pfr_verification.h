@@ -44,4 +44,5 @@ int get_rsa_public_key(uint8_t flash_id, uint32_t address, struct rsa_public_key
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		struct signature_verification *verification, uint8_t *hash_out,
 		size_t hash_length);
+int cerberus_verify_regions(struct manifest *manifest);
 #endif // CONFIG_CERBERUS_PFR
