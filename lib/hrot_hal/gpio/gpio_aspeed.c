@@ -19,6 +19,7 @@
 #define LOG_MODULE_NAME gpio_api
 
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+static bool first_time_boot = true;
 
 int BMCBootHold(void)
 {
@@ -27,7 +28,10 @@ int BMCBootHold(void)
 	/* Hold BMC Reset */
 	pfr_bmc_extrst_enable_ctrl(true);
 #if !defined(CONFIG_ASPEED_DC_SCM)
-	pfr_bmc_srst_enable_ctrl(true);
+	// Only pull-up/down SRST in first bootup. Pull-up/down this pin in runtime will affect host
+	// VGA function.
+	if (first_time_boot)
+		pfr_bmc_srst_enable_ctrl(true);
 #endif
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 10);
@@ -81,7 +85,10 @@ int BMCBootRelease(void)
 #endif
 
 #if !defined(CONFIG_ASPEED_DC_SCM)
-	pfr_bmc_srst_enable_ctrl(false);
+	if (first_time_boot) {
+		pfr_bmc_srst_enable_ctrl(false);
+		first_time_boot = false;
+	}
 #endif
 
 	pfr_bmc_extrst_enable_ctrl(false);
