@@ -56,9 +56,9 @@ int rsa_wrapper_sig_verify(struct rsa_engine *engine, const struct rsa_public_ke
 {
 	struct rsa_key driver_key;
 
-	driver_key.m = key->modulus;
-	driver_key.m_bits = key->mod_length * 8;
-	driver_key.e = &key->exponent;
+	driver_key.m = (char *)key->modulus;
+	driver_key.m_bits = (uint32_t)(key->mod_length * 8);
+	driver_key.e = (char *)&key->exponent;
 	driver_key.e_bits = 24;
 	driver_key.d = NULL;
 	driver_key.d_bits =  0;

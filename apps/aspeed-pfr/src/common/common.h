@@ -52,5 +52,4 @@ struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void);
 struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper(void);
 struct spi_engine_wrapper *getSpiEngineWrapper(void);
 uint8_t *getNewHashStorage(void);
-struct manifest_flash *getManifestFlashInstance(void);
 struct flash_master_wrapper *getFlashEngineWrapper(void);

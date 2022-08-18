@@ -223,24 +223,20 @@ static int init_pfr_keystore(struct keystore *keystore, struct key_cancellation_
 
 void init_pfr_bases(void)
 {
-
 	init_pfr_keystore(get_keystore(), get_kc_flag());
-
 	init_pfr_signature(get_signature_verification(), get_pubkey());
-
 	init_pfr_firmware_image(get_update_fw_base(), get_update_base());
 
 	init_pfr_manifest(get_pfr_manifest(),
-				get_manifest(),
-				get_pfr_hash_engine(),
-				get_pfr_signature_verification(),
-				get_pfr_spi_flash(),
-				get_pfr_keystore(),
-				get_pfr_authentication(),
-				get_pfr_hash(),
-				get_recovery_base(),
-				get_recovery_pfm(),
-				get_update_fw_base(),
-				get_active_image());
-
+			get_manifest(),
+			get_pfr_hash_engine(),
+			get_pfr_signature_verification(),
+			get_pfr_spi_flash(),
+			get_pfr_keystore(),
+			get_pfr_authentication(),
+			get_pfr_hash(),
+			get_recovery_base(),
+			get_recovery_pfm(),
+			get_update_fw_base(),
+			get_active_image());
 }

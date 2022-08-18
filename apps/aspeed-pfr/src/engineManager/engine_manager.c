@@ -33,15 +33,11 @@
 
 LOG_MODULE_REGISTER(engine, CONFIG_LOG_DEFAULT_LEVEL);
 
-uint8_t signature[RSA_MAX_KEY_LENGTH];          /**< Buffer for the manifest signature. */
-uint8_t platform_id[256];                       /**< Cache for the platform ID. */
-
 static int initialize_I2cSlave(/*struct engine_instances *engineInstances*/)
 {
 	int status = I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
 	return status;
 }
-
 
 static int initialize_crypto(/*struct engine_instances *engineInstances*/)
 {
@@ -67,17 +63,6 @@ static int initialize_flash(void)
 	return status;
 }
 
-int initialize_pfm_flash(void)
-{
-	int status = 0;
-
-	status = pfm_flash_init(getPfmFlashInstance(), getFlashDeviceInstance(),
-			get_hash_engine_instance(), PFM_FLASH_MANIFEST_ADDRESS, signature,
-			RSA_MAX_KEY_LENGTH, platform_id, sizeof(platform_id));
-
-	return status;
-}
-
 int initializeEngines(void)
 {
 	int status = 0;
@@ -88,18 +73,8 @@ int initializeEngines(void)
 	assert(status == 0);
 	status = initialize_I2cSlave();
 	assert(status == 0);
-#if 0
-#if defined(CONFIG_CERBERUS_PFR)
-	status = initialize_pfm_flash();
-#endif
-#endif
 
 	return status;
-}
-
-void uninitializeEngines(void)
-{
-	pfm_flash_release(getPfmFlashInstance());
 }
 
 #if defined(CONFIG_SEAMLESS_UPDATE)

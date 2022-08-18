@@ -90,6 +90,6 @@ struct pfr_keystore {
 	struct key_cancellation_flag *kc_flag;
 };
 
-void init_pfr(void);
+void init_pfr_bases(void);
 struct pfr_manifest *get_pfr_manifest(void);
 

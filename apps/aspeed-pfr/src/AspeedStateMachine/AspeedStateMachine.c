@@ -21,6 +21,7 @@
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #include "cerberus_pfr/cerberus_pfr_update.h"
+#include "cerberus_pfr/cerberus_pfr_spi_filtering.h"
 #endif
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "StateMachineAction/StateMachineActions.h"
@@ -192,7 +193,7 @@ void verify_image(uint32_t image, uint32_t operation, uint32_t flash, struct smf
 			LOG_INF("authentication_image bmc backup return %d", ret);
 			state->bmc_active_object.RecoveryImageStatus = ret ? Failure : Success;
 		}
-	} else if (image == PCH_EVENT)
+	} else if (image == PCH_EVENT) {
 		if (operation == VERIFY_ACTIVE) {
 			LOG_INF("authentication_image host active return %d", ret);
 			state->pch_active_object.ActiveImageStatus = ret ? Failure : Success;
@@ -200,13 +201,13 @@ void verify_image(uint32_t image, uint32_t operation, uint32_t flash, struct smf
 			LOG_INF("authentication_image host backup return %d", ret);
 			state->pch_active_object.RecoveryImageStatus = ret ? Failure : Success;
 		}
+	}
 }
 
 void handle_image_verification(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
-	int ret;
 
 	byte provision_state = GetUfmStatusValue();
 

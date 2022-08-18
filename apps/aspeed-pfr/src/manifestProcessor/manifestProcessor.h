@@ -6,8 +6,5 @@
 
 #pragma once
 
-#include <zephyr.h>
-
 int initializeManifestProcessor(void);
-void uninitializeManifestProcessor(void);
 

@@ -73,19 +73,17 @@ int sig_verify_aspeed(const struct rsa_key *key, const uint8_t *signature, int s
 	memset(plain_text, 0, sig_length);
 	status = rsa_begin_session(dev, &ini, (struct rsa_key *)key);
 	if (status)
-		LOG_ERR("rsa_begin_session fail: %d", status);
+		LOG_ERR("begin session fail: %d", status);
 
 	rsa_verify(&ini, &pkt);
 	rsa_free_session(dev, &ini);
 	/* ignore pkcs1.5 padding, only compare the digest */
 	status = memcmp(plain_text + pkt.out_len - match_length, match, match_length);
 
-	if (status != 0) {
-		LOG_HEXDUMP_ERR(plain_text, sig_length, "Result Text:");
-		LOG_HEXDUMP_ERR(signature, sig_length, "Signature:");
-		LOG_HEXDUMP_ERR(match, match_length, "Expected Hash:");
-	} else
-		LOG_DBG("RSA Hardware verification Successful");
+	if (status != 0)
+		LOG_HEXDUMP_ERR(plain_text, sig_length, "result text:");
+	else
+		LOG_DBG("hardware verification successful");
 
 	return status;
 }

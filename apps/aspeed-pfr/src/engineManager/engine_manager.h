@@ -29,4 +29,3 @@ struct engine_instances {
 };
 
 int initializeEngines(void);
-void uninitializeEngines(void);
