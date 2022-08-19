@@ -442,13 +442,16 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	uint32_t pc_type_status = 0;
 	uint8_t active_svn_number = 0;
 	CPLD_STATUS cpld_update_status;
-
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
-	DECOMPRESSION_TYPE_MASK_ENUM decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
-
+	DECOMPRESSION_TYPE_MASK_ENUM decomp_event;
 	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
-
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+
+	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC) {
+		decomp_event = DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK;
+	} else {
+		decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
+	}
 
 	pfr_manifest->state = FIRMWARE_UPDATE;
 	pfr_manifest->image_type = image_type;

@@ -631,6 +631,7 @@ void handle_update_requested(void *o)
 	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
 	CPLD_STATUS cpld_update_status;
 
+
 	LOG_DBG("FIRMWARE_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
 	switch (evt_ctx->data.bit8[0]) {
@@ -664,6 +665,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(BMC_FW_UPDATE);
 				LOG_INF("BMC Active Firmware Update");
 				image_type = BMC_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 				update_region &= ~BmcActiveUpdate;
 				handled_region |= BmcActiveUpdate;
@@ -676,6 +678,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(BMC_FW_UPDATE);
 				LOG_INF("BMC Recovery Firmware Update");
 				image_type = BMC_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
 				update_region &= ~BmcRecoveryUpdate;
 				handled_region |= BmcRecoveryUpdate;
@@ -688,6 +691,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(PCH_FW_UPDATE);
 				LOG_INF("PCH Active Firmware Update");
 				image_type = PCH_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 				update_region &= ~PchActiveUpdate;
 				handled_region |= PchActiveUpdate;
@@ -700,6 +704,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(PCH_FW_UPDATE);
 				LOG_INF("PCH Recovery Firmware Update");
 				image_type = PCH_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
 				update_region &= ~PchRecoveryUpdate;
 				handled_region |= PchRecoveryUpdate;

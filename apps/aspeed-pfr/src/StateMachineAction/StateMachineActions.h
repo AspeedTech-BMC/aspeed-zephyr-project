@@ -50,7 +50,7 @@ typedef struct _EVENT_CONTEXT {
 	// 0 - primary->secondary
 	// 1 - secondary->primary
 	unsigned int flash;
-	unsigned int *i2c_data;
+	unsigned int flag;
 } EVENT_CONTEXT;
 
 typedef struct _AO_DATA {
