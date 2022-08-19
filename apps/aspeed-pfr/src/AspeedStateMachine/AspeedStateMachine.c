@@ -139,7 +139,7 @@ void do_init(void *o)
 void enter_tmin1(void *o)
 {
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
-	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
+	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	bool bmc_reset_only = false;
 	bool pch_reset_only = false;
 
@@ -628,7 +628,7 @@ void handle_update_requested(void *o)
 	AO_DATA *ao_data_wrap = NULL;
 	EVENT_CONTEXT evt_ctx_wrap;
 	int ret;
-	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
+	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	CPLD_STATUS cpld_update_status;
 
 
@@ -1139,12 +1139,18 @@ void AspeedStateMachine(void)
 					break;
 				}
 				/* Check update intent, seamless or tmin1 update */
-				if (fifo_in->data.bit8[1] & UpdateAtReset) {
-					/* Update at reset, just set the status and don't go Tmin1 */
-					run_state = true;
+				if (fifo_in->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate) {
+					if (fifo_in->data.bit8[1] & UpdateAtReset) {
+						/* Update at reset, just set the status and don't go Tmin1 */
+						run_state = true;
+					} else {
+						/* Immediate update */
+						next_state = &state_table[FIRMWARE_UPDATE];
+					}
 				} else {
-					/* Immediate update */
-					next_state = &state_table[FIRMWARE_UPDATE];
+					/* Discard the request */
+					LOG_ERR("UPDATE_INTENT %02x without any target (PCH/BMC/PFR), skipped",
+							fifo_in->data.bit8[1]);
 				}
 				break;
 			case PROVISION_CMD:
