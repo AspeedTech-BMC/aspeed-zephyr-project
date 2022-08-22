@@ -184,6 +184,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, data_length, key_whole_data);
 		pfr_spi_write(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, data_length, key_whole_data);
 
+		SetUfmStatusValue(UFM_PROVISIONED);
 		LOG_INF("Provisioning Done.");
 
 	}else{
