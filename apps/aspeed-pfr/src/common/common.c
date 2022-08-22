@@ -9,6 +9,7 @@
 struct flash_master flashMaster;			/**< Flash master for the PFM flash. */
 struct hash_engine hashEngine;				/**< Hashing engine for validation. */
 struct host_state_manager hostStateManager;
+struct manifest_flash manifestFlash;
 struct pfm_flash pfmFlash;					/**< PFM instance under test. */
 struct pfm_manager_flash pfmManagerFlash;
 struct signature_verification signatureVerification;	/**< PFM signature verification. */
@@ -46,6 +47,11 @@ struct hash_engine *get_hash_engine_instance(void)
 struct host_state_manager *getHostStateManagerInstance(void)
 {
 	return &hostStateManager;
+}
+
+struct manifest_flash *getManifestFlashInstance(void)
+{
+        return &manifestFlash;
 }
 
 struct pfm_flash *getPfmFlashInstance(void)

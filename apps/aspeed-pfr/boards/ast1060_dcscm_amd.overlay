@@ -367,10 +367,10 @@
 	flash-device = <&spi1_cs0>;
 	ext-mux-sel = <1>;
 	status = "okay";
-
-	write-forbidden-regions = <
-		0x00000000 0x10000000
-	>;
+	// temporary removed
+	//write-forbidden-regions = <
+	//	0x00000000 0x10000000
+	//>;
 };
 
 &spim3 {

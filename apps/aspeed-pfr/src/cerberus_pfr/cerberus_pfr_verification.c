@@ -14,6 +14,7 @@
 #include "AspeedStateMachine/common_smc.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
+#include "keystore/KeystoreManager.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -92,31 +93,37 @@ int get_rsa_public_key(uint8_t flash_id, uint32_t address, struct rsa_public_key
 int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
 {
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
-	struct pfm_flash *pfm_flash = getPfmFlashInstance();
+	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 	uint8_t *hashStorage = getNewHashStorage();
+	uint32_t pfm_read_address;
 	int status = 0;
-
 	status = signature_verification_init(getSignatureVerificationInstance());
 	if (status)
 		return Failure;
 
 	pfr_manifest->flash->device_id[0] = pfr_manifest->image_type;
-	status = pfm_flash_init(pfm_flash, &(pfr_manifest->flash->base), pfr_manifest->hash, pfr_manifest->address,
-		pfm_signature_cache, sizeof(pfm_signature_cache), pfm_platform_id_cache, sizeof(pfm_platform_id_cache));
+	if (pfr_manifest->image_type == BMC_SPI)
+		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
+	else
+		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
+
+	spi_flash->spi.device_id[0] = pfr_manifest->image_type;
+	status = manifest_flash_init(manifest_flash, getFlashDeviceInstance(), pfm_read_address,
+			PFM_V2_MAGIC_NUM);
 	if (status) {
-		LOG_ERR("PFM flash init failed");
+		LOG_ERR("manifest flash init failed");
 		return Failure;
 	}
-
-	status = pfm_flash->base.base.verify(&(pfm_flash->base.base), pfr_manifest->hash,
+	status = manifest_flash_verify(manifest_flash, get_hash_engine_instance(),
 			getSignatureVerificationInstance(), hashStorage, HASH_STORAGE_LENGTH);
 
-	if (true == pfm_flash->base_flash.manifest_valid) {
-		LOG_INF("PFM Manifest Verification Successful");
+	if (true == manifest_flash->manifest_valid) {
+		LOG_INF("Manifest Verification Successful");
 		status = Success;
 	} else {
-		LOG_ERR("PFM Manifest Verification Failure");
+		LOG_ERR("Manifest Verification Failure");
 		status = Failure;
 	}
 
@@ -125,7 +132,6 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 
 int cerberus_verify_regions(struct manifest *manifest)
 {
-#if 0
 	int status = 0;
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	uint8_t platfprm_id_length, fw_id_length;
@@ -143,7 +149,7 @@ int cerberus_verify_regions(struct manifest *manifest)
 	struct CERBERUS_SIGN_IMAGE_HEADER sign_region_header;
 
 	status = pfr_spi_read(pfr_manifest->image_type, read_address + CERBERUS_PLATFORM_HEADER_OFFSET, sizeof(platfprm_id_length), &platfprm_id_length);
-	printk("Platform ID Length: %x\r\n", platfprm_id_length);
+	LOG_INF("Platform ID Length: %x", platfprm_id_length);
 
 	read_address +=  CERBERUS_PLATFORM_HEADER_OFFSET + PLATFORM_ID_HEADER_LENGTH + platfprm_id_length + 2; //2 byte alignment
 	read_address += CERBERUS_FLASH_DEVICE_OFFSET_LENGTH;
@@ -186,11 +192,11 @@ int cerberus_verify_regions(struct manifest *manifest)
 
 		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(start_address), &start_address);
 		read_address += sizeof(start_address);
-		printk("start_address:%x \r\n", start_address);
+		LOG_INF("start_address: %x", start_address);
 
 		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(end_address), &end_address);
 		read_address += sizeof(end_address);
-		printk("end_address:%x \r\n", end_address);
+		LOG_INF("end_address: %x", end_address);
 
 		pfr_manifest->flash->device_id[0] = pfr_manifest->flash_id;	  // device_id will be changed by save_key function
 		status = flash_verify_contents((struct flash *)pfr_manifest->flash,
@@ -218,16 +224,13 @@ int cerberus_verify_regions(struct manifest *manifest)
 		}
 
 		if (status != Success) {
-			printk("cerberus_verify_image %d Verification Fail\n", sig_index);
+			LOG_ERR("cerberus_verify_image %d Verification Fail", sig_index);
 			return Failure;
 		} else
-			printk("cerberus_verify_image %d Verification Successful\n", sig_index);
+			LOG_INF("cerberus_verify_image %d Verification Successful", sig_index);
 	}
 
 	return status;
-#endif
-
-	return Success;
 }
 
 /**

@@ -23,10 +23,11 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 {
 	int status = 0;
 
-	if (manifest->image_type == BMC_TYPE)
+	if (manifest->image_type == BMC_TYPE) {
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&manifest->address, sizeof(manifest->address));
-	else
+	} else {
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&manifest->address, sizeof(manifest->address));
+	}
 
 	LOG_INF("Active Firmware Verification");
 	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);

@@ -50,6 +50,9 @@ int cerberus_pfr_recovery_verify(struct recovery_image *image, struct hash_engin
 		struct pfm_manager *pfm)
 {
 	int status = Success;
+	return status;
+#if 0
+	// TODO:
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) image;
 	struct recovery_header recovery_header;
 	struct rsa_public_key public_key;
@@ -106,6 +109,7 @@ int cerberus_pfr_recovery_verify(struct recovery_image *image, struct hash_engin
 	}
 
 	return status;
+#endif
 }
 
 int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
