@@ -596,6 +596,24 @@ void handle_provision_event(void *o)
 	}
 }
 
+#if defined(CONFIG_CERBERUS_PFR)
+void handle_provision_image(void *o)
+{
+	LOG_INF("Handle Provision Image");
+	AO_DATA *ao_data_wrap = NULL;
+	EVENT_CONTEXT evt_ctx_wrap;
+	uint32_t image_type = ROT_TYPE;
+	int ret;
+
+	const struct device *dev_m = device_get_binding(BMC_SPI_MONITOR);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+
+	LOG_INF("Provision result = %d", ret);
+}
+#endif
+
 void handle_checkpoint(void *o)
 {
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
@@ -852,6 +870,11 @@ void do_unprovisioned(void *o)
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 
 	switch (evt_ctx->event) {
+#if defined(CONFIG_CERBERUS_PFR)
+	case UPDATE_REQUESTED:
+		handle_provision_image(o);
+		break;
+#endif
 	case PROVISION_CMD:
 		handle_provision_event(o);
 		break;
@@ -1186,6 +1209,15 @@ void AspeedStateMachine(void)
 				// Just run provision handling
 				run_state = true;
 				break;
+#if defined(CONFIG_CERBERUS_PFR)
+			case UPDATE_REQUESTED:
+				// Only accept for provisioning capsule
+				if (fifo_in->data.bit8[1] & HROTActiveUpdate) {
+					run_state = true;
+					// next_state = &state_table[FIRMWARE_UPDATE];
+				}
+				break;
+#endif
 			case RESET_DETECTED:
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;

@@ -5,6 +5,7 @@
  */
 
 #if defined(CONFIG_CERBERUS_PFR)
+#include <logging/log.h>
 #include <stdint.h>
 #include "AspeedStateMachine/common_smc.h"
 #include "pfr/pfr_common.h"
@@ -15,12 +16,7 @@
 #include "include/SmbusMailBoxCom.h"
 #include "flash/flash_aspeed.h"
 
-#undef DEBUG_PRINTF
-#if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF printk
-#else
-#define DEBUG_PRINTF(...)
-#endif
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 uint8_t cRootKeyHash[SHA384_DIGEST_LENGTH] = {0};
 uint8_t cPchOffsets[12];
@@ -54,12 +50,12 @@ unsigned char CerberusProvisionBmcOffsets(void)
 
 		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, cBmcOffsets, sizeof(cBmcOffsets));
 		if (Status == Success) {
-			UfmStatus &= 0xF7;
+			UfmStatus &= 0xFFFFFFF7;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-			DEBUG_PRINTF("BMC Provisioned\r\n");
+			LOG_INF("BMC Provisioned");
 
 		} else {
-			DEBUG_PRINTF("BMC Offsets Provision failed...\r\n");
+			LOG_ERR("BMC Offsets Provision failed");
 			erase_provision_flash();
 			SetUfmStatusValue(COMMAND_ERROR);
 		}
@@ -80,11 +76,11 @@ unsigned char CerberusProvisionPchOffsets(void)
 
 		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, cPchOffsets, sizeof(cPchOffsets));
 		if (Status == Success) {
-			DEBUG_PRINTF("Ps\r\n");
-			UfmStatus &= 0xFB;
+			LOG_INF("Ps");
+			UfmStatus &= 0xFFFFFFFB;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
 		} else {
-			DEBUG_PRINTF("PCH Offsets Provision failed...\r\n");
+			LOG_ERR("PCH Offsets Provision failed");
 			erase_provision_flash();
 			SetUfmStatusValue(COMMAND_ERROR);
 		}
@@ -106,7 +102,7 @@ unsigned char CerberusProvisionRootKeyHash(void)
 	if (((UfmStatus & 1)) && ((UfmStatus & 2))) {
 		Status = set_provision_data_in_flash(ROOT_KEY_HASH, cRootKeyHash, SHA256_DIGEST_LENGTH);
 		if (Status == Success) {
-			UfmStatus &= 0xFD;
+			UfmStatus &= 0xFFFFFFFD;
 			Status = set_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(uint32_t) / sizeof(uint8_t));
 			return Success;
 		} else {
@@ -131,17 +127,18 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
 	struct PROVISIONING_MANIFEST_DATA provision_manifest;
 
 	pfr_spi_read(manifest->flash_id, manifest->address, sizeof(provision_header), &provision_header);
-	DEBUG_PRINTF("Verify Provisioning Type.\r\n");
+	LOG_HEXDUMP_INF(&provision_header, sizeof(provision_header), "Provision Header:");
+	LOG_INF("Verify Provisioning Type.");
 	status = verify_cerberus_provisioning_type(provision_header.image_type);
 	if (status != Success){
-		DEBUG_PRINTF("Provisioning Type Error.\r\n");
+		LOG_ERR("Provisioning Type Error.");
 		return Failure;
 	}
 
-	DEBUG_PRINTF("Verify Provisioning Magic Number.\r\n");
+	LOG_INF("Verify Provisioning Magic Number.");
 	status = verify_rcerberus_magic_number(provision_header.magic_num);
 	if (status != Success){
-		DEBUG_PRINTF("Magic Number is not Matched.\r\n");
+		LOG_ERR("Magic Number is not Matched.");
 		return Failure;
 	}
 
@@ -151,7 +148,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
 
 	if(provision_header.provisioning_flag[0] == PROVISION_ROOT_KEY_FLAG){
 		//Provision root Key Content
-		DEBUG_PRINTF("Provisioning ROOT Key.\r\n");
+		LOG_INF("Provisioning ROOT Key.");
 		uint16_t key_length = 0;
 
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_BMC_ACTIVE_OFFSET, 4, cBmcOffsets);
@@ -187,7 +184,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, data_length, key_whole_data);
 		pfr_spi_write(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, data_length, key_whole_data);
 
-		DEBUG_PRINTF("Provisioning Done.\r\n");
+		LOG_INF("Provisioning Done.");
 
 	}else{
 		return Failure;

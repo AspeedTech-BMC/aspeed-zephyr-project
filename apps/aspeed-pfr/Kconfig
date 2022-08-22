@@ -86,6 +86,12 @@ config PCH_STAGING_SIZE
 	help
 	  The max size of PCH staging area for putting signed PCH capsule.
 
+config BMC_PFR_STAGING_OFFSET
+	depends on CERBERUS_PFR
+	hex "PFR staging region offset in BMC flash"
+	help
+	  The starting offset of PFR staging region, and this is for Cerberus PFR provisioning.
+
 config INIT_POWER_SEQUENCE
 	default n
 	bool "Wait for CPLD power sequence to start PFR functionality"
