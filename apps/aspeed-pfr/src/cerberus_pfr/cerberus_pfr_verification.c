@@ -12,20 +12,15 @@
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
 #include "keystore/KeystoreManager.h"
+#include "manifest/manifest_format.h"
+#include "manifest/pfm/pfm_format.h"
+#include "crypto/rsa.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-
-#ifdef CONFIG_DUAL_SPI
-#define DUAL_SPI 1
-#else
-#define DUAL_SPI 0
-#endif
-
-uint8_t pfm_signature_cache[RSA_MAX_KEY_LENGTH]; /**< Buffer for the manifest signature. */
-uint8_t pfm_platform_id_cache[256]; /**< Cache for the platform ID. */
 
 int rsa_verify_signature(struct signature_verification *verification,
 		const uint8_t *digest, size_t length, const uint8_t *signature, size_t sig_length)
@@ -72,7 +67,7 @@ int get_rsa_public_key(uint8_t flash_id, uint32_t address, struct rsa_public_key
 	public_key->mod_length = key_length;
 	//rsa key modules
 	modules_address = address + sizeof(key_length);
-	status = pfr_spi_read(flash_id, modules_address, key_length, public_key->modulus);
+	status = pfr_spi_read(flash_id, modules_address, key_length, (uint8_t *)public_key->modulus);
 	if (status != Success) {
 		LOG_ERR("Flash read rsa key modules failed");
 		return Failure;
@@ -96,8 +91,8 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
-	uint8_t *hashStorage = getNewHashStorage();
-	uint32_t pfm_read_address;
+	struct manifest_toc_header *toc_header = &manifest_flash->toc_header;
+	uint32_t read_address;
 	int status = 0;
 	status = signature_verification_init(getSignatureVerificationInstance());
 	if (status)
@@ -105,19 +100,47 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 
 	pfr_manifest->flash->device_id[0] = pfr_manifest->image_type;
 	if (pfr_manifest->image_type == BMC_SPI)
-		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
+		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
+				sizeof(read_address));
 	else
-		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
+		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
+				sizeof(read_address));
 
 	spi_flash->spi.device_id[0] = pfr_manifest->image_type;
-	status = manifest_flash_init(manifest_flash, getFlashDeviceInstance(), pfm_read_address,
+	status = manifest_flash_init(manifest_flash, getFlashDeviceInstance(), read_address,
 			PFM_V2_MAGIC_NUM);
 	if (status) {
 		LOG_ERR("manifest flash init failed");
-		return Failure;
+		goto free_manifest;
 	}
+
+	// TOC header Offset
+	read_address = pfr_manifest->address + sizeof(struct manifest_header);
+	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(struct manifest_toc_header),
+			(uint8_t *)toc_header)) {
+		LOG_ERR("Failed to read TOC header");
+		status = Failure;
+		goto free_manifest;
+	}
+
+        switch (manifest_flash->toc_header.hash_type) {
+	case MANIFEST_HASH_SHA256:
+		manifest_flash->toc_hash_type = HASH_TYPE_SHA256;
+		manifest_flash->toc_hash_length = SHA256_HASH_LENGTH;
+		break;
+	// Cerberus manifest v1 only support SHA256
+	case MANIFEST_HASH_SHA384:
+	case MANIFEST_HASH_SHA512:
+	default:
+		LOG_ERR("Invalid or unsupported hash type");
+		status = Failure;
+		goto free_manifest;
+        }
+
+	uint8_t *hashStorage = getNewHashStorage();
 	status = manifest_flash_verify(manifest_flash, get_hash_engine_instance(),
-			getSignatureVerificationInstance(), hashStorage, HASH_STORAGE_LENGTH);
+			getSignatureVerificationInstance(), hashStorage,
+			manifest_flash->max_signature);
 
 	if (true == manifest_flash->manifest_valid) {
 		LOG_INF("Manifest Verification Successful");
@@ -127,110 +150,222 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 		status = Failure;
 	}
 
+free_manifest:
+	manifest_flash_release(manifest_flash);
+
 	return status;
 }
 
+/*
+ * Aspeed Cerberus PFM format:
+ *
+ * struct {
+ *     struct manifest_header
+ *     struct manifest_toc_header
+ *     struct manifest_toc_entry[toc_entry_count]
+ *     u8 toc_entry_hash[toc_entry_count][HASH_LEN]
+ *     u8 toc_hash[HASH_LEN]
+ *     struct manifest_platform_id
+ *     struct pfm_flash_device_element
+ *     struct pfm_firmware_element
+ *     struct pfm_firmware_version_element
+ *     struct pfm_fw_version_element_rw_region
+ *     struct pfm_fw_version_element_image
+ *     struct signed_region_def {
+ *         struct pfm_fw_version_element_image
+ *         u8 signature[256]
+ *         u16 modulus_length
+ *         u8 modulus[modulus_length]
+ *         u8 exponent_length
+ *         u8 exponent[exponent_length]
+ *         u32 region_start_addr
+ *         u32 region_end_addr
+ *     } signed_region[pfm_firmware_version_element.img_count]
+ * }
+ *
+ */
 int cerberus_verify_regions(struct manifest *manifest)
 {
-	int status = 0;
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
-	uint8_t platfprm_id_length, fw_id_length;
-	uint32_t read_address = pfr_manifest->address;
-	uint8_t fw_element_header[4], fw_list_header[4];
-	uint8_t sign_image_count, rw_image_count, fw_version_length;
-	uint8_t signature[HASH_STORAGE_LENGTH];
-	uint16_t module_length;
+	struct manifest_flash *manifest_flash = getManifestFlashInstance();
+	struct manifest_toc_header *toc_header = &manifest_flash->toc_header;
+	uint8_t signature[RSA_MAX_KEY_LENGTH];
+	uint32_t read_address;
+
+	// Manifest Header + TOC Header + TOC Entries + TOC Entries Hash + TOC Hash
+	read_address = pfr_manifest->address + sizeof(struct manifest_header) +
+		sizeof(struct manifest_toc_header) +
+		(toc_header->entry_count * sizeof(struct manifest_toc_entry)) +
+		(toc_header->entry_count * manifest_flash->toc_hash_length) +
+		manifest_flash->toc_hash_length;
+
+	// Platform Header Offset
+	struct manifest_platform_id plat_id_header;
+
+	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(plat_id_header),
+			(uint8_t *)&plat_id_header)) {
+		LOG_ERR("Failed to read TOC header");
+		return Failure;
+	}
+
+	// id length should be 4 byte aligned
+	uint8_t alignment = (plat_id_header.id_length % 4) ?
+		(4 - (plat_id_header.id_length % 4)) : 0;
+	uint16_t id_length = plat_id_header.id_length + alignment;
+	read_address += sizeof(plat_id_header) + id_length;
+
+	// Flash Device Element Offset
+	struct pfm_flash_device_element flash_dev;
+
+	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(flash_dev),
+			(uint8_t *)&flash_dev)) {
+		LOG_ERR("Failed to get flash device element");
+		return Failure;
+	}
+
+	if (flash_dev.fw_count == 0) {
+		LOG_ERR("Unknow firmware");
+		return Failure;
+	}
+
+	read_address += sizeof(flash_dev);
+
+	// PFM Firmware Element Offset
+	struct pfm_firmware_element fw_element;
+
+	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_element),
+			(uint8_t *)&fw_element)) {
+		LOG_ERR("Failed to get PFM firmware element");
+		return Failure;
+	}
+
+	// id length should be 4 byte aligned
+	alignment = (fw_element.id_length % 4) ? (4 - (fw_element.id_length % 4)) : 0;
+	id_length = fw_element.id_length + alignment;
+	read_address += sizeof(fw_element) - sizeof(fw_element.id) + id_length;
+
+	// PFM Firmware Version Element Offset
+	struct pfm_firmware_version_element fw_ver_element;
+
+	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_ver_element),
+			(uint8_t *)&fw_ver_element)) {
+		LOG_ERR("Failed to get PFM firmware version element");
+		return Failure;
+	}
+
+	// version length should be 4 byte aligned
+	alignment = (fw_ver_element.version_length % 4) ?
+		(4 - (fw_ver_element.version_length % 4)) : 0;
+	uint8_t ver_length = fw_ver_element.version_length + alignment;
+	read_address += sizeof(fw_ver_element) - sizeof(fw_ver_element.version) + ver_length;
+
+	// PFM Firmware Version Elenemt RW Region
+	read_address += fw_ver_element.rw_count * sizeof(struct pfm_fw_version_element_rw_region);
+
+	// PFM Firmware Version Element Image Offset
+	struct pfm_fw_version_element_image fw_ver_element_img;
+	uint8_t *hashStorage = getNewHashStorage();
 	struct rsa_public_key pub_key;
+	uint16_t module_length;
 	uint8_t exponent_length;
 	uint32_t start_address;
 	uint32_t end_address;
-	uint8_t *hashStorage = getNewHashStorage();
-	struct CERBERUS_PFM_RW_REGION rw_region_data;
-	struct CERBERUS_SIGN_IMAGE_HEADER sign_region_header;
 
-	status = pfr_spi_read(pfr_manifest->image_type, read_address + CERBERUS_PLATFORM_HEADER_OFFSET, sizeof(platfprm_id_length), &platfprm_id_length);
-	LOG_INF("Platform ID Length: %x", platfprm_id_length);
+	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
+			signed_region_id++) {
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_ver_element_img),
+					(uint8_t *)&fw_ver_element_img)) {
+			LOG_ERR("Failed to get PFM firmware version element image header");
+			return Failure;
+		}
 
-	read_address +=  CERBERUS_PLATFORM_HEADER_OFFSET + PLATFORM_ID_HEADER_LENGTH + platfprm_id_length + 2; //2 byte alignment
-	read_address += CERBERUS_FLASH_DEVICE_OFFSET_LENGTH;
+		read_address += sizeof(fw_ver_element_img);
 
-	status = pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_element_header), fw_element_header);
-	fw_id_length = fw_element_header[1];
-	read_address += sizeof(fw_element_header) + fw_id_length + 1; // 1 byte alignment
+		// Image Signature
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(signature),
+					(uint8_t *)signature)) {
+			LOG_ERR("Failed to get region signature");
+			return Failure;
+		}
 
-	//fw_list
-	status = pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_list_header), fw_list_header);
-	sign_image_count = fw_list_header[0];
-	rw_image_count = fw_list_header[1];
-	fw_version_length = fw_list_header[2];
+		read_address += manifest_flash->max_signature;
 
-	read_address += sizeof(fw_list_header) + CERRBERUS_FW_VERSION_ADDR_LENGTH + fw_version_length + 2; // 2 byte alignment
-	read_address += rw_image_count * sizeof(rw_region_data);
-
-	struct Keystore_Manager keystore_manager;
-
-	keystoreManager_init(&keystore_manager);
-
-	for (int sig_index = 0; sig_index < sign_image_count ; sig_index++) {
-		read_address += sizeof(sign_region_header);
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(signature), signature);
-		read_address += sizeof(signature);
-
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(module_length), &module_length);
+		// Modulus length of Public Key
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(module_length),
+					(uint8_t *)&module_length)) {
+			LOG_ERR("Failed to get modulus length");
+			return Failure;
+		}
 
 		pub_key.mod_length = module_length;
 		read_address += sizeof(module_length);
 
-		pfr_spi_read(pfr_manifest->image_type, read_address, module_length, pub_key.modulus);
+		// Modulus of Public Key
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, module_length,
+					(uint8_t *)&pub_key.modulus)) {
+			LOG_ERR("Failed to get modulus");
+			return Failure;
+		}
 		read_address += module_length;
 
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(exponent_length), &exponent_length);
+		// Exponent length of Public Key
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(exponent_length),
+				(uint8_t *)&exponent_length)) {
+			LOG_ERR("Failed to get exponent length");
+			return Failure;
+		}
 		read_address += sizeof(exponent_length);
 
-		pfr_spi_read(pfr_manifest->image_type, read_address, exponent_length, &pub_key.exponent);
+		// Exponent of Public Key
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, exponent_length,
+				(uint8_t *)&pub_key.exponent)) {
+			LOG_ERR("Failed to get exponent");
+			return Failure;
+		}
 		read_address += exponent_length;
 
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(start_address), &start_address);
+		// Region Start Address
+		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(start_address),
+				(uint8_t *)&start_address);
 		read_address += sizeof(start_address);
-		LOG_INF("start_address: %x", start_address);
 
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(end_address), &end_address);
+		// Region End Address
+		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(end_address),
+				(uint8_t *)&end_address);
 		read_address += sizeof(end_address);
-		LOG_INF("end_address: %x", end_address);
 
-		pfr_manifest->flash->device_id[0] = pfr_manifest->flash_id;	  // device_id will be changed by save_key function
-		status = flash_verify_contents((struct flash *)pfr_manifest->flash,
+		LOG_INF("RegionStartAddress: %x, RegionEndAddress: %x",
+				start_address, end_address);
+
+		// Bypass verification if validation flag of the region is not set.
+		if (!(fw_ver_element_img.flags & PFM_IMAGE_MUST_VALIDATE)) {
+			LOG_INF("Digest verification bypassed");
+			continue;
+		}
+
+		if (flash_verify_contents((struct flash *)pfr_manifest->flash,
 				start_address,
 				end_address - start_address + sizeof(uint8_t),
 				get_hash_engine_instance(),
-				HASH_TYPE_SHA256,
-				getRsaEngineInstance(),
+				manifest_flash->toc_hash_type,
+				&getRsaEngineInstance()->base,
 				signature,
-				256,
+				manifest_flash->max_signature,
 				&pub_key,
 				hashStorage,
-				256
-				);
-		if (status == Success) {
-			int get_key_id = 0xFF;
-			int last_key_id = 0xFF;
-
-			status = keystore_get_key_id(&keystore_manager.base, &pub_key.modulus, &get_key_id, &last_key_id);
-			if (status == KEYSTORE_NO_KEY)
-				status = keystore_manager.base.save_key(&keystore_manager.base, sig_index + 1, &pub_key.modulus, pub_key.mod_length);
-			else
-				// if key exist and be cancelled. return false.
-				status = pfr_manifest->keystore->kc_flag->verify_kc_flag(pfr_manifest, get_key_id);
+				manifest_flash->max_signature
+				)) {
+			LOG_ERR("Digest verification failed");
+			return Failure;
 		}
 
-		if (status != Success) {
-			LOG_ERR("cerberus_verify_image %d Verification Fail", sig_index);
-			return Failure;
-		} else
-			LOG_INF("cerberus_verify_image %d Verification Successful", sig_index);
+		// TODO: key management
+		// Validate the key of the region to check whether it was canceled.
+
+		LOG_INF("Digest verification succeeded");
 	}
 
-	return status;
+	return Success;
 }
 
 /**

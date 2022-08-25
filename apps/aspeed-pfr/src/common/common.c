@@ -22,7 +22,7 @@ struct spi_engine_wrapper spiEngineWrapper;
 struct flash_master_wrapper flashEngineWrapper;
 struct spi_filter_engine_wrapper spiFilterEngineWrapper;
 
-uint8_t hashStorage[hashStorageLength];
+static uint8_t hashStorage[RSA_MAX_KEY_LENGTH] __aligned(16);
 
 bool gBootCheckpointReceived;
 int gBMCWatchDogTimer = -1;
@@ -96,7 +96,7 @@ struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void)
 
 uint8_t *getNewHashStorage(void)
 {
-	memset(hashStorage, 0, hashStorageLength);
+	memset(hashStorage, 0, RSA_MAX_KEY_LENGTH);
 
 	return hashStorage;
 }

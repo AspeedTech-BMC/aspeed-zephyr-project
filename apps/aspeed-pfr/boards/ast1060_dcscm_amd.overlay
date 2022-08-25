@@ -383,9 +383,9 @@
 	flash-device = <&spi2_cs0>;
 	ext-mux-sel = <1>;
 	status = "okay";
-	write-forbidden-regions = <
-		0x00000000 0x08000000
-	>;
+	//write-forbidden-regions = <
+	//	0x00000000 0x08000000
+	//>;
 };
 
 &spim4 {

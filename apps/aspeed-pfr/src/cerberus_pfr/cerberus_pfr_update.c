@@ -17,6 +17,7 @@
 #include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_recovery.h"
 #include "flash/flash_aspeed.h"
+#include "common/common.h"
 
 #define DECOMMISSION_PC_SIZE		128
 
@@ -71,7 +72,7 @@ int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
 			(image_header.image_length - image_header.sign_length),
 			get_hash_engine_instance(),
 			1,
-			getRsaEngineInstance(),
+			&getRsaEngineInstance()->base,
 			sig_data,
 			SHA256_SIGNATURE_LENGTH,
 			&public_key,
