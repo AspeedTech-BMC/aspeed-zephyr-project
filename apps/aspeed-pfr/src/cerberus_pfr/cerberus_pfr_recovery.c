@@ -5,8 +5,11 @@
  */
 
 #if defined(CONFIG_CERBERUS_PFR)
+#include <logging/log.h>
+#include <storage/flash_map.h>
 #include "pfr/pfr_common.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "cerberus_pfr_recovery.h"
 #include "manifest/pfm/pfm_manager.h"
 #include "cerberus_pfr_authentication.h"
@@ -15,6 +18,8 @@
 #include "cerberus_pfr_verification.h"
 #include "flash/flash_util.h"
 #include "flash/flash_aspeed.h"
+
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 #if PF_UPDATE_DEBUG
 #define DEBUG_PRINTF printk
@@ -238,6 +243,79 @@ int active_region_pfm_update(struct pfr_manifest *manifest)
 
 int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 {
+	int status = Success;
+
+	uint32_t source_address;
+	uint32_t target_address;
+	uint32_t image_type = manifest->image_type;
+
+	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+			sizeof(source_address));
+	if (status != Success)
+		return Failure;
+
+	status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&target_address,
+			sizeof(target_address));
+	if(status != Success)
+		return Failure;
+
+	source_address += CONFIG_BMC_STAGING_SIZE;
+	manifest->image_type = BMC_TYPE;
+	manifest->address = source_address;
+
+	{
+		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
+	}
+
+	LOG_ERR("TODO: BMC's PCH Staging Area verfication");
+	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
+#if 0
+	//TODO: manifest verifcation
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
+	if (status != Success) {
+		DEBUG_PRINTF("verify failed");
+		return Failure;
+	}
+	// Recovery region PFM verification
+	manifest->address += PFM_SIG_BLOCK_SIZE;
+	manifest->pc_type = PFR_PCH_PFM;
+	DEBUG_PRINTF("Verifying PFM signature, address=0x%08x", manifest->address);
+	// manifest verifcation
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
+	if (status != Success)
+		return Failure;
+#endif
+	DEBUG_PRINTF("BMC's PCH Staging verification successful");
+	manifest->address = target_address;
+	manifest->image_type = image_type;
+	int sector_sz = pfr_spi_get_block_size(image_type);
+	bool support_block_erase = (sector_sz == BLOCK_SIZE);
+
+	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
+			source_address, target_address);
+
+	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
+				CONFIG_BMC_PCH_STAGING_SIZE))
+		return Failure;
+
+	if (pfr_spi_region_read_write_between_spi(BMC_TYPE, source_address, PCH_TYPE,
+				target_address, CONFIG_BMC_PCH_STAGING_SIZE))
+		return Failure;
+
+	if (manifest->state == FIRMWARE_RECOVERY) {
+		LOG_INF("PCH staging region verification");
+		status = manifest->update_fw->base->verify((struct firmware_image *)manifest,
+				NULL, NULL);
+		if (status != Success)
+			return Failure;
+	}
+
+	LOG_INF("PCH Staging region Update completed");
+
 	return Success;
 }
 

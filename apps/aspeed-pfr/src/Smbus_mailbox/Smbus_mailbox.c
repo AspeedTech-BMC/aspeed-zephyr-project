@@ -332,7 +332,7 @@ void InitializeSoftwareMailbox(void)
 	/* From PCH */
 	swmbx_update_notify(swmbx_dev, 0x1, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
-	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent_sem, PchUpdateIntent, true);
+	swmbx_update_notify(swmbx_dev, 0x0, &pch_update_intent_sem, PchUpdateIntent, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &acm_checkpoint_sem, AcmCheckpoint, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &bios_checkpoint_sem, BiosCheckpoint, true);
 #if defined(CONFIG_SEAMLESS_UPDATE)
@@ -372,10 +372,10 @@ void InitializeSoftwareMailbox(void)
 			0xffffffff, // ffh ~ e0h BMC scrachpad
 		},
 	};
-	result = swmbx_apply_protect(swmbx_dev, 0, access_control[0], 0, 8);
-	LOG_INF("Mailbox protection apply result=%d", result);
-	result = swmbx_apply_protect(swmbx_dev, 1, access_control[1], 0, 8);
-	LOG_INF("Mailbox protection apply result=%d", result);
+	// result = swmbx_apply_protect(swmbx_dev, 0, access_control[0], 0, 8);
+	// LOG_INF("Mailbox protection apply result=%d", result);
+	// result = swmbx_apply_protect(swmbx_dev, 1, access_control[1], 0, 8);
+	// LOG_INF("Mailbox protection apply result=%d", result);
 
 	/* Register slave device to bus device */
 	const struct device *dev = NULL;

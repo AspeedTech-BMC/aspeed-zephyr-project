@@ -5,9 +5,12 @@
  */
 
 #if defined(CONFIG_CERBERUS_PFR)
+#include <logging/log.h>
+
 #include "pfr/pfr_update.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
 #include "include/SmbusMailBoxCom.h"
 #include "StateMachineAction/StateMachineActions.h"
@@ -19,13 +22,9 @@
 #include "flash/flash_aspeed.h"
 #include "common/common.h"
 
-#define DECOMMISSION_PC_SIZE		128
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF printk
-#else
-#define DEBUG_PRINTF(...)
-#endif
+#define DECOMMISSION_PC_SIZE		128
 
 extern EVENT_CONTEXT DataContext;
 
@@ -37,41 +36,46 @@ int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
 
 	uint32_t signature_address;
 	uint8_t sig_data[SHA256_SIGNATURE_LENGTH];
-	uint8_t *hashStorage = getNewHashStorage();
+	uint8_t *hashStorage = NULL; // getNewHashStorage();
 
-	DEBUG_PRINTF("Stage Image Verification Start\r\n");
+	LOG_INF("Stage Image Verification Start");
 
+	LOG_INF("manifest->flash_id=%d manifest->address=%p", manifest->flash_id, manifest->address);
 	pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
 
 	status = verify_recovery_header_magic_number(image_header);
 	if (status != Success){
-		DEBUG_PRINTF("Image Header Magic Number is not Matched.\r\n");
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Image Header Magic Number is not Matched.");
 		return Failure;
 	}
 	// get public key and init signature
 	status = get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
+	LOG_INF("Public Key Exponent=%08x", public_key.exponent);
+	LOG_HEXDUMP_INF(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
 
 	if (status != Success){
-		DEBUG_PRINTF("Unable to get public Key.\r\n");
+		LOG_ERR("Unable to get public Key.");
 		return Failure;
 	}
 
 	//getSignature
 	signature_address = manifest->address + image_header.image_length - image_header.sign_length;
+	LOG_INF("signature_address=%p image_header.image_length=%p image_header.sign_length=%p", signature_address, image_header.image_length, image_header.sign_length);
 	status = get_signature(manifest->flash_id, signature_address, sig_data, SHA256_SIGNATURE_LENGTH);
 	if (status != Success){
-		DEBUG_PRINTF("Unable to get the Signature.\r\n");
+		LOG_ERR("Unable to get the Signature.");
 		return Failure;
 	}
 
 	//verify
 	manifest->flash->device_id[0] = manifest->flash_id;
-
+	LOG_HEXDUMP_INF(sig_data, SHA256_SIGNATURE_LENGTH, "Image Signature:");
 	status = flash_verify_contents( (struct flash *)manifest->flash,
 			manifest->address,
 			(image_header.image_length - image_header.sign_length),
 			get_hash_engine_instance(),
-			1,
+			HASH_TYPE_SHA256,
 			&getRsaEngineInstance()->base,
 			sig_data,
 			SHA256_SIGNATURE_LENGTH,
@@ -80,10 +84,10 @@ int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
 			SHA256_SIGNATURE_LENGTH
 			);
 	if (status != Success){
-		DEBUG_PRINTF("Image verify Fail.\r\n");
+		LOG_ERR("Image verify Fail manifest->flash_id=%d manifest->address=%p", manifest->flash_id, manifest->address);
 		return Failure;
 	}
-	DEBUG_PRINTF("Stage Image Verify Success.\r\n");
+	LOG_INF("Stage Image Verify Success.");
 
 	return Success;
 }
@@ -125,18 +129,18 @@ int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address, manifest->pc_length, read_buffer);
 	if(status != Success ){
-		DEBUG_PRINTF("PfrDecommission failed\r\n");
+		LOG_ERR("PfrDecommission failed.");
 		return Failure;
 	}
 
 	status = compare_buffer(read_buffer, decom_buffer, sizeof(read_buffer));
 	if(status != Success){
-		DEBUG_PRINTF("Invalid decommission capsule data\r\n");
+		LOG_ERR("Invalid decommission capsule data.");
 		return Failure;
 	}
 
 	// Erasing provisioned data
-	DEBUG_PRINTF("Decommission Success.Erasing the provisioned UFM data\r\n");
+	LOG_INF("Decommission Success.Erasing the provisioned UFM data.");
 
 	status = ufm_erase(PROVISION_UFM);
 	if (status != Success)
@@ -201,12 +205,12 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 
 	status = cerberus_update_HRoT_recovery_region();
 	if(status != Success){
-		DEBUG_PRINTF("HRoT update recovery failed\r\n");
+		LOG_ERR("HRoT update recovery failed.");
 		return Failure;
 	}
 	status = cerberus_update_HRoT_active_region(manifest);
 	if(status != Success){
-		DEBUG_PRINTF("HRoT update active failed\r\n");
+		LOG_ERR("HRoT update active failed.");
 		return Failure;
 	}
 	return Success;
@@ -221,19 +225,19 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
 		status = cerberus_pfr_staging_verify(manifest);
 		if(status != Success){
-			DEBUG_PRINTF("HRoT update pfr verification failed\r\n");
+			LOG_ERR("HRoT update pfr verification failed");
 			return Failure;
 		}
 
 		if (image_header.format == UPDATE_FORMAT_TPYE_HROT) {
 			status = cerberus_update_rot_fw(manifest);
 			if(status != Success){
-				DEBUG_PRINTF("HRoT update failed.\r\n");
+				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
 		}
 	}else{
-		DEBUG_PRINTF("Start HROT Provisioning \r\n");
+		LOG_INF("Start HROT Provisioning.");
 		return cerberus_provisioning_root_key_action(manifest);
 	}
 	return Success;
@@ -351,7 +355,7 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, uint8_t target_
 			if(image_section.magic_number != RECOVERY_SECTION_MAGIC)
 			{
 				status = Failure;
-				DEBUG_PRINTF("Recovery Section not matched..\n");
+				LOG_ERR("Recovery Section not matched.");
 				break;
 			}
 			start_address = image_section.start_addr;
@@ -394,40 +398,85 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	uint8_t status = Success;
 	uint8_t target_flash_id;
-	uint32_t source_address, target_address;
+	uint32_t source_address, target_address, address, act_pfm_offset;
+	CPLD_STATUS cpld_update_status;
 	uint8_t flash_select = EventData->flash;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
-	pfr_manifest->image_type == image_type;
 
-	DEBUG_PRINTF("Firmware Update Start.\r\n");
+	// TODO:
+	pfr_manifest->state = FIRMWARE_UPDATE;
+	pfr_manifest->image_type = image_type;
+	pfr_manifest->flash_id = flash_select;
 
-	if(image_type == BMC_TYPE){  //BMC Update/Provisioning
-		DEBUG_PRINTF("Image Type: BMC.\r\n");
-		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
-		pfr_manifest->flash_id = BMC_FLASH_ID;
-	}else if(image_type == PCH_TYPE){  //PCH Update
-		DEBUG_PRINTF("Image Type: PCH.\r\n");
-		pfr_manifest->flash_id = PCH_FLASH_ID;
-		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
+	LOG_INF("Firmware Update Start.");
 
-	}else if(image_type == ROT_TYPE){  //HROT Update/Decommisioning
-		DEBUG_PRINTF("Image Type: HRoT \r\n");
+	if (pfr_manifest->image_type == BMC_TYPE) {
+		// BMC Update/Provisioning
+		LOG_INF("BMC Update in Progress");
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+				sizeof(pfr_manifest->address)))
+			return Failure;
+		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset))) 
+			return Failure;
+	} else if(pfr_manifest->image_type == PCH_TYPE) {
+		// PCH Update
+		LOG_INF("PCH Update in Progress");
+		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+				sizeof(pfr_manifest->address)))
+			return Failure;
+		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
+			return Failure;
+	} else if(pfr_manifest->image_type == ROT_TYPE) {
+		//HROT Update/Decommisioning
+		LOG_INF("ROT Update in Progress");
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = BMC_CPLD_STAGING_ADDRESS;
 		pfr_manifest->flash_id = BMC_FLASH_ID;
 		return cerberus_hrot_update(pfr_manifest);
 	}
 
+	pfr_manifest->staging_address = source_address;
+	pfr_manifest->active_pfm_addr = act_pfm_offset;
+
+	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	if (status != Success)
+		return status;
+	if (cpld_update_status.BmcToPchStatus == 1) {
+		cpld_update_status.BmcToPchStatus = 0;
+		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+		if (status != Success)
+			return Failure;
+
+		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&address, sizeof(address));
+		if (status != Success)
+			return Failure;
+
+		address += CONFIG_BMC_STAGING_SIZE;
+
+		// Checking for key cancellation
+		pfr_manifest->address = address;
+
+		status = pfr_staging_pch_staging(pfr_manifest);
+		if (status != Success)
+		        return Failure;
+	}
+
+	pfr_manifest->image_type = image_type;
+	pfr_manifest->address = source_address;
+
 	//BMC/PCH Firmware Update for Active/Recovery Region
 	status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
 	if(status != Success){
-		DEBUG_PRINTF("Staging Area verification failed\r\n");
+		LOG_ERR("Staging Area verification failed.");
 		LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 		return Failure;
 	}
 
 	if(flash_select == PRIMARY_FLASH_REGION){ //Update Active
-		DEBUG_PRINTF("Update Type: Active Update.\r\n");
+		LOG_ERR("Update Type: Active Update.");
 		if(image_type == BMC_TYPE){  //BMC Update/Provisioning
 			target_flash_id = BMC_FLASH_ID;
 		}else if(image_type == PCH_TYPE){  //PCH Update
@@ -436,7 +485,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		status = cerberus_update_active_region(pfr_manifest, target_flash_id);
 	}else{ //Update Recovery
-		DEBUG_PRINTF("Update Type: Recovery Update.\r\n");
+		LOG_ERR("Update Type: Recovery Update.");
 		if(image_type == BMC_TYPE){  //BMC Update/Provisioning
 			get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
