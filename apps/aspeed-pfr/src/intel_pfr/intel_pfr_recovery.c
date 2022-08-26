@@ -71,39 +71,6 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
-{
-	int status = 0;
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	int sector_sz = pfr_spi_get_block_size(image_type);
-	bool support_block_erase = (sector_sz == BLOCK_SIZE);
-	size_t area_size = 0;
-
-	if (image_type == BMC_TYPE)
-		area_size = CONFIG_BMC_STAGING_SIZE;
-	else /* if (image_type == PCH_TYPE) */
-		area_size = CONFIG_PCH_STAGING_SIZE;
-
-	spi_flash->spi.device_id[0] = image_type;
-	DEBUG_PRINTF("Recovering...");
-	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
-
-		DEBUG_PRINTF("Recovery region erase failed");
-		return Failure;
-	}
-
-	// use read_write_between spi for supporting dual flash
-	if (pfr_spi_region_read_write_between_spi(image_type, source_address, image_type,
-				target_address, area_size)) {
-		DEBUG_PRINTF("Recovery region update failed");
-		return Failure;
-	}
-
-	DEBUG_PRINTF("Recovery region update completed");
-
-	return status;
-}
-
 int pfr_recover_active_region(struct pfr_manifest *manifest)
 {
 	uint32_t read_address;

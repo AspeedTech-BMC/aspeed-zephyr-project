@@ -36,7 +36,6 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 		    size_t hash_length, struct pfm_manager *pfm);
 int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash);
 int pfr_staging_pch_staging(struct pfr_manifest *manifest);
-int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address);
 int pfr_recover_active_region(struct pfr_manifest *manifest);
 int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest);
 #endif // CONFIG_CERBERUS_PFR

@@ -7,6 +7,7 @@
 #if defined(CONFIG_CERBERUS_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
+#include "common/common.h"
 #include "pfr/pfr_common.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -119,51 +120,6 @@ int cerberus_pfr_recovery_verify(struct recovery_image *image, struct hash_engin
 
 int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 {
-	return Success;
-}
-
-int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
-{
-	uint8_t status = Success;
-	uint8_t source_flash_id, target_flash_id;
-	struct recovery_header recovery_header;
-	uint32_t data_offset = 0;
-	uint32_t erase_address;
-
-	if(image_type == BMC_TYPE){
-		source_flash_id = BMC_FLASH_ID;
-		target_flash_id = BMC_RECOVERY_FLASH_ID;
-	}else if(image_type == PCH_TYPE){
-		source_flash_id = PCH_FLASH_ID;
-		target_flash_id = PCH_RECOVERY_FLASH_ID;
-	}else if(image_type == ROT_TYPE){
-		source_flash_id = ROT_INTERNAL_ACTIVE;
-		target_flash_id = ROT_INTERNAL_RECOVERY;
-	}
-
-	erase_address = target_address;
-
-	status = pfr_spi_read(source_flash_id, source_address, sizeof(recovery_header), &recovery_header);
-
-	//will remove after provisioning done
-	uint32_t total_image_length = recovery_header.image_length + 0x100 + 0x06;
-
-	for (int i = 0; i < (total_image_length / PAGE_SIZE); i++) {
-
-		status = pfr_spi_erase_4k(target_flash_id, erase_address);
-		if(status != Success){
-			return Failure;
-		}
-
-		erase_address += PAGE_SIZE;
-	}
-
-	for(int i = 0; i < (total_image_length / PAGE_SIZE); i++){
-		status = pfr_spi_page_read_write_between_spi(source_flash_id, &source_address, target_flash_id, &target_address);
-		if (status != Success)
-			return Failure;
-	}
-
 	return Success;
 }
 
@@ -289,7 +245,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 #endif
-	DEBUG_PRINTF("BMC's PCH Staging verification successful");
+	LOG_INF("BMC's PCH Staging verification successful");
 	manifest->address = target_address;
 	manifest->image_type = image_type;
 	int sector_sz = pfr_spi_get_block_size(image_type);

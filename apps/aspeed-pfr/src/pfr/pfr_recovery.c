@@ -9,8 +9,10 @@
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "common/common.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_recovery.h"
+#include "flash/flash_aspeed.h"
 #if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_recovery.h"
@@ -146,3 +148,36 @@ void init_recovery_manifest(struct recovery_image *image)
 	image->apply_to_flash = recovery_apply_to_flash;
 
 }
+
+int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
+{
+	int status = 0;
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	int sector_sz = pfr_spi_get_block_size(image_type);
+	bool support_block_erase = (sector_sz == BLOCK_SIZE);
+	size_t area_size = 0;
+
+	if (image_type == BMC_TYPE)
+		area_size = CONFIG_BMC_STAGING_SIZE;
+	else /* if (image_type == PCH_TYPE) */
+		area_size = CONFIG_PCH_STAGING_SIZE;
+	spi_flash->spi.device_id[0] = image_type;
+	LOG_INF("Recovering...");
+	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
+		LOG_ERR("Recovery region erase failed");
+		return Failure;
+	}
+
+
+	// use read_write_between spi for supporting dual flash
+	if (pfr_spi_region_read_write_between_spi(image_type, source_address,
+				image_type,target_address, area_size)) {
+		LOG_ERR("Recovery region update failed");
+		return Failure;
+	}
+
+	LOG_INF("Recovery region update completed");
+
+	return Success;
+}
+

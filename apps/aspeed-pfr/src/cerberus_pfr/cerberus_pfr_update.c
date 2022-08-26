@@ -51,8 +51,8 @@ int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
 	}
 	// get public key and init signature
 	status = get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
-	LOG_INF("Public Key Exponent=%08x", public_key.exponent);
-	LOG_HEXDUMP_INF(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
+	LOG_DBG("Public Key Exponent=%08x", public_key.exponent);
+	LOG_HEXDUMP_DBG(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
 
 	if (status != Success){
 		LOG_ERR("Unable to get public Key.");
@@ -61,8 +61,10 @@ int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
 
 	//getSignature
 	signature_address = manifest->address + image_header.image_length - image_header.sign_length;
-	LOG_INF("signature_address=%p image_header.image_length=%p image_header.sign_length=%p", signature_address, image_header.image_length, image_header.sign_length);
 	status = get_signature(manifest->flash_id, signature_address, sig_data, SHA256_SIGNATURE_LENGTH);
+	LOG_DBG("sig_addr=%p img_hdr.img_len=%p img_hdr.sig_len=%p", signature_address,
+			image_header.image_length, image_header.sign_length);
+	LOG_HEXDUMP_DBG(sig_data, SHA256_SIGNATURE_LENGTH, "Signature:");
 	if (status != Success){
 		LOG_ERR("Unable to get the Signature.");
 		return Failure;
@@ -70,7 +72,6 @@ int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
 
 	//verify
 	manifest->flash->device_id[0] = manifest->flash_id;
-	LOG_HEXDUMP_INF(sig_data, SHA256_SIGNATURE_LENGTH, "Image Signature:");
 	status = flash_verify_contents( (struct flash *)manifest->flash,
 			manifest->address,
 			(image_header.image_length - image_header.sign_length),
@@ -469,27 +470,33 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	//BMC/PCH Firmware Update for Active/Recovery Region
 	status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
-	if(status != Success){
+	if (status != Success) {
 		LOG_ERR("Staging Area verification failed.");
 		LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 		return Failure;
 	}
 
-	if(flash_select == PRIMARY_FLASH_REGION){ //Update Active
-		LOG_ERR("Update Type: Active Update.");
-		if(image_type == BMC_TYPE){  //BMC Update/Provisioning
+	if (flash_select == PRIMARY_FLASH_REGION) {
+		//Update Active
+		LOG_INF("Update Type: Active Update.");
+		if(image_type == BMC_TYPE){
+			//BMC Update/Provisioning
 			target_flash_id = BMC_FLASH_ID;
-		}else if(image_type == PCH_TYPE){  //PCH Update
+		} else if (image_type == PCH_TYPE) {
+			//PCH Update
 			target_flash_id = PCH_FLASH_ID;
 		}
 
 		status = cerberus_update_active_region(pfr_manifest, target_flash_id);
-	}else{ //Update Recovery
-		LOG_ERR("Update Type: Recovery Update.");
-		if(image_type == BMC_TYPE){  //BMC Update/Provisioning
+	} else {
+		//Update Recovery
+		LOG_INF("Update Type: Recovery Update.");
+		if (image_type == BMC_TYPE) {
+			//BMC Update/Provisioning
 			get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
-		}else if(image_type == PCH_TYPE){  //PCH Update
+		} else if(image_type == PCH_TYPE) {
+			//PCH Update
 			get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 		}

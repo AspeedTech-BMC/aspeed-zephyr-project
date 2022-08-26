@@ -8,7 +8,7 @@
 
 # if defined(CONFIG_CERBERUS_PFR)
 #define BMC_FLASH_ID                0
-#define BMC_RECOVERY_FLASH_ID       1
+#define BMC_RECOVERY_FLASH_ID       0
 #define PCH_FLASH_ID                2
 #define PCH_RECOVERY_FLASH_ID       3
 
