@@ -216,114 +216,12 @@
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
-
-	partitions {
-		compatible = "fixed-partitions";
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		/* 896KB */
-		bmc_uboot_partition: partition@0 {
-			label = "bmc-uboot";
-			reg = <0x00000000 0x000e0000>;
-		};
-
-		/* 128KB */
-		bmc_pfm_partition: partition@e0000{
-			reg = <0x000e0000 0x00020000>;
-			label = "bmc-pfm";
-		};
-
-		/* 128KB */
-		bmc_ub_env_partition: partition@100000{
-			reg = <0x00100000 0x00020000>;
-			label = "bmc-ub-env";
-		};
-
-		/* 16256KB */
-		bmc_rwfs_partition: partition@120000{
-			label = "bmc-rwfs";
-			reg = <0x00120000 0x00fe0000>;
-		};
-
-		/* 46080KB */
-		bmc_fitimg_partition: partition@1100000{
-			label = "bmc-fitimg";
-			reg = <0x01100000 0x02d00000>;
-		};
-
-		/* 2048KB */
-		reserved_1_partition: partition@3e00000{
-			reg = <0x03e00000 0x00200000>;
-			label = "reserved-1";
-		};
-
-		/* 65536KB */
-		bmc_rc_image_partition: partition@4000000{
-			label = "bmc-rc-image";
-			reg = <0x04000000 0x04000000>;
-		};
-
-		/* 65536KB  */
-		bmc_stg_partition: partition@8000000{
-			label = "bmc-stg";
-			reg = <0x08000000 0x04000000>;
-		};
-
-		/* 32768KB */
-		bmc_pch_stg_partition: partition@c000000{
-			label = "bmc-pch-stg";
-			reg = <0x0c000000 0x02000000>;
-		};
-
-		/* 5120KB */
-		bmc_pfr_stg_partition: partition@e000000{
-			label = "bmc-pfr-stg";
-			reg = <0x0e000000 0x00500000>;
-		};
-
-		/* 27648KB */
-		reserved_2_partition: partition@e500000 {
-			reg = <0x0e500000 0x01b00000>;
-			label = "reserved-2";
-		};
-	};
 };
 
 &spi2_cs0 {
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
-
-	partitions {
-		compatible = "fixed-partitions";
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		/* 8MB */
-		pch_active_partition: partition@0 {
-			label = "pch-act";
-			reg = <0x00000000 0x00800000>;
-		};
-
-		/* 8MB compressed pch recovery image */
-		pch_recovery_partition: partition@800000 {
-			label = "pch-rc";
-			reg = <0x00800000 0x00800000>;
-		};
-
-		/* 8MB compressed pch staging image */
-		pch_staging_partition: partition@1000000 {
-			label = "pch-stg";
-			reg = <0x01000000 0x00800000>;
-		};
-
-		/* 4MB */
-		pch_pfm_partition: partition@1800000 {
-			label = "pch-pfm";
-			reg = <0x01800000 0x00400000>;
-		};
-	};
 };
 
 &spi2_cs1 {
