@@ -20,6 +20,8 @@ zephyr_link_libraries(hrot_hal)
 zephyr_link_libraries(hrot_wrapper)
 zephyr_link_libraries(smf)
 zephyr_link_libraries(cerberus)
+zephyr_link_libraries(mbedTLS)
+zephyr_include_directories(mbedTLS)
 target_include_directories(
 	app
 	PRIVATE
