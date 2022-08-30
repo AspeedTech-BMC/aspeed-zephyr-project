@@ -258,6 +258,8 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, uint8_t target_
 	uint32_t sig_address, recovery_offset, data_offset, start_address = 0, erase_address = 0, section_length;
 	uint32_t target_address;
 	uint8_t platform_length;
+	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
+	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
 	//read recovery header
 	status = pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
@@ -285,22 +287,14 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, uint8_t target_
 			data_offset = recovery_offset;
 
 			//erase active region data BMC_FLASH_ID
-			for (int i = 0; i < (section_length / PAGE_SIZE); i++) {
+			if (pfr_spi_erase_region(manifest->image_type, support_block_erase,
+						erase_address, section_length))
+				return Failure;
 
-				status = pfr_spi_erase_4k(target_flash, erase_address);
-				if(status != Success){
-					return Failure;
-				}
+			if (pfr_spi_region_read_write_between_spi(manifest->image_type, data_offset,
+						manifest->image_type, start_address, section_length))
+				return Failure;
 
-				erase_address += PAGE_SIZE;
-			}
-
-			//copy data from BMC_RECOVERY_FLASH_ID to BMC_FLASH_ID
-			for(int i = 0; i < (section_length / PAGE_SIZE); i++){
-				status = pfr_spi_page_read_write_between_spi(manifest->flash_id, &data_offset,target_flash, &start_address);
-				if (status != Success)
-					return Failure;
-			}
 			recovery_offset = recovery_offset + image_section.section_length;
 		}
 	}
