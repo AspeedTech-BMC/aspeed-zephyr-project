@@ -22,12 +22,11 @@
 #include "cerberus_pfr_recovery.h"
 #include "flash/flash_aspeed.h"
 #include "common/common.h"
+#include "keystore/KeystoreManager.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 #define DECOMMISSION_PC_SIZE		128
-
-extern EVENT_CONTEXT DataContext;
 
 int cerberus_set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
 {
@@ -75,28 +74,14 @@ int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int cerberus_update_HRoT_recovery_region(void)
+int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 {
-	uint32_t active_length = HROT_ACTIVE_AREA_SIZE;
-	uint32_t rot_recovery_address = 0;
-	uint32_t rot_active_address= 0;
-	int status = 0;
-
-	for(int i = 0; i < (active_length / PAGE_SIZE); i++){
-		pfr_spi_erase_4k(ROT_INTERNAL_RECOVERY, rot_recovery_address);
-		status = pfr_spi_page_read_write_between_spi(ROT_INTERNAL_ACTIVE, &rot_active_address, ROT_INTERNAL_RECOVERY, &rot_recovery_address);
-		if(status != Success)
-			return Failure;
-	}
-	return Success;
-}
-
-int cerberus_update_HRoT_active_region(struct pfr_manifest *manifest)
-{
-	uint32_t length = 0;
-	uint32_t target_address = 0;
+	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
 	uint32_t source_address = manifest->address;
-	int status = 0;
+	uint32_t rot_recovery_address = 0;
+	uint32_t rot_active_address = 0;
+	uint32_t length_page_align;
+
 	struct recovery_header image_header;
 	struct recovery_section image_section;
 
@@ -105,33 +90,44 @@ int cerberus_update_HRoT_active_region(struct pfr_manifest *manifest)
 	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_section), &image_section);
 	source_address = source_address + image_section.header_length;
 
-	length = image_section.section_length;
+	length_page_align =
+		(image_section.section_length % PAGE_SIZE)
+		? (image_section.section_length + (PAGE_SIZE - (image_section.section_length % PAGE_SIZE))) : image_section.section_length;
 
-	for(int i = 0; i <= (length / PAGE_SIZE); i++){
-		pfr_spi_erase_4k(ROT_INTERNAL_ACTIVE, target_address);
-		status = pfr_spi_page_read_write_between_spi(BMC_SPI, &source_address, ROT_INTERNAL_ACTIVE, &target_address);
-		if(status != Success)
-			return Failure;
-	}
-	return Success;
-}
-
-int cerberus_update_rot_fw(struct pfr_manifest *manifest)
-{
-	uint32_t rot_recovery_address = 0;
-	uint32_t rot_active_address= 0;
-	int status = 0;
-
-	status = cerberus_update_HRoT_recovery_region();
-	if(status != Success){
-		LOG_ERR("HRoT update recovery failed.");
+	if (length_page_align > region_size) {
+		LOG_ERR("length(%x) exceed region size(%x)", length_page_align, region_size);
 		return Failure;
 	}
-	status = cerberus_update_HRoT_active_region(manifest);
-	if(status != Success){
-		LOG_ERR("HRoT update active failed.");
+
+	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
+				region_size)) {
+		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x",
+				rot_recovery_address, region_size);
 		return Failure;
 	}
+
+	if (pfr_spi_region_read_write_between_spi(ROT_INTERNAL_ACTIVE, rot_active_address,
+				ROT_INTERNAL_RECOVERY, rot_recovery_address, region_size)) {
+		LOG_ERR("read(ROT_INTERNAL_ACTIVE) address =%x, write(ROT_INTERNAL_RECOVERY) address = %x, length = %x",
+				rot_active_address, rot_recovery_address, region_size);
+		return Failure;
+	}
+
+	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
+				region_size)) {
+		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x",
+				rot_active_address, region_size);
+		return Failure;
+	}
+
+	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
+				ROT_INTERNAL_ACTIVE, rot_active_address, length_page_align)) {
+		LOG_ERR("read(BMC_SPI) address =%x, write(ROT_INTERNAL_ACTIVE) address = %x, length = %x",
+				source_address, rot_active_address, length_page_align);
+		return Failure;
+	}
+	LOG_INF("ROT Firmware update done");
+
 	return Success;
 }
 
@@ -139,7 +135,7 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 {
 	int status = 0;
 	byte provision_state = GetUfmStatusValue();
-	if (provision_state == UFM_PROVISIONED){
+	if (provision_state & UFM_PROVISIONED){
 		struct recovery_header image_header;
 		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
 		status =  cerberus_pfr_verify_image(manifest);
@@ -148,15 +144,18 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 			return Failure;
 		}
 
-		if (image_header.format == UPDATE_FORMAT_TPYE_HROT) {
+		if (image_header.format == ROT_TYPE) {
 			status = cerberus_update_rot_fw(manifest);
 			if(status != Success){
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
+		} else {
+			LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "Incorrect image header:");
+			return Failure;
 		}
-	}else{
-		LOG_INF("Start HROT Provisioning.");
+	} else {
+		LOG_INF("Start HROT Provisioning %02x.", provision_state);
 		return cerberus_provisioning_root_key_action(manifest);
 	}
 	return Success;
@@ -170,7 +169,6 @@ int cerberus_rot_svn_policy_verify(struct pfr_manifest *manifest, uint32_t hrot_
 
 int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_format)
 {
-#if 0
 	int status = 0;
 	uint8_t buffer;
 	uint16_t header_length;
@@ -179,15 +177,17 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 	uint32_t pc_type_status;
 
 	// Get the Header Length
-	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(header_length), (uint16_t *)&header_length);
+	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(header_length),
+			(uint16_t *)&header_length);
 	if(status != Success){
-		DEBUG_PRINTF("HROT update failed\r\n");
+		LOG_ERR("HROT update read header length failed");
 		return Failure;
 	}
 
-	status = pfr_spi_read(manifest->image_type, manifest->address + header_length, sizeof(section_header_length), (uint16_t *)&section_header_length);
+	status = pfr_spi_read(manifest->image_type, manifest->address + header_length,
+			sizeof(section_header_length), (uint16_t *)&section_header_length);
 	if(status != Success){
-		DEBUG_PRINTF("HROT update failed\r\n");
+		LOG_ERR("HROT update read header failed");
 		return Failure;
 	}
 
@@ -199,22 +199,27 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		struct Keystore_Manager keystore_manager;
 		keystoreManager_init(&keystore_manager);
 
-		status = pfr_spi_read(manifest->image_type, manifest->address + header_length + section_header_length - 2, sizeof(capsule_type), (uint16_t *)&capsule_type);
+		status = pfr_spi_read(manifest->image_type,
+				manifest->address + header_length + section_header_length - 2,
+				sizeof(capsule_type), (uint16_t *)&capsule_type);
 		manifest->pc_type = capsule_type;
-		printk("capsule_type is %x \n",capsule_type);
-		status = pfr_spi_read(manifest->image_type, manifest->address + header_length + section_header_length, 256, (uint8_t *)&pub_key);
+		LOG_INF("capsule_type is %x",capsule_type);
+		status = pfr_spi_read(manifest->image_type,
+				manifest->address + header_length + section_header_length,
+				256, (uint8_t *)&pub_key);
 		if(status != Success){
-			DEBUG_PRINTF("HROT update failed\r\n");
+			LOG_ERR("HROT update read signature failed");
 			status = Failure;
 		}
-		status = keystore_get_key_id(&keystore_manager.base, &pub_key, &get_key_id, &last_key_id);
+		status = keystore_get_key_id(&keystore_manager.base, &pub_key, &get_key_id,
+				&last_key_id);
 		if (get_key_id != 0xFF) {
 			if (get_key_id == 0) {
-				DEBUG_PRINTF("Root Key could not be Cancelled \r\n");
+				LOG_ERR("Root Key could not be Cancelled");
 			} else {
 				status = manifest->keystore->kc_flag->cancel_kc_flag(manifest, get_key_id);
 				if(status == Success)
-					DEBUG_PRINTF("Key cancellation success. Key Id :%d was cancelled\r\n",get_key_id);
+					LOG_INF("Key cancellation success. Key Id :%d was cancelled",get_key_id);
 			}
 		} else {
 			status = KEYSTORE_NO_KEY;
@@ -223,8 +228,6 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		status = cerberus_pfr_decommission(manifest);
 	}
 	return status;
-#endif
-	return Success;
 }
 
 int cerberus_check_svn_number(struct pfr_manifest *manifest, uint32_t read_address, uint8_t current_svn_number)

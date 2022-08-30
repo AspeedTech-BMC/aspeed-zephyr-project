@@ -31,8 +31,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-extern EVENT_CONTEXT DataContext;
-
 int pfr_staging_verify(struct pfr_manifest *manifest)
 {
 
