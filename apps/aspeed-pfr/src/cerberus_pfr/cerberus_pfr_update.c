@@ -8,6 +8,7 @@
 #include <logging/log.h>
 
 #include "pfr/pfr_update.h"
+#include "pfr/pfr_ufm.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -27,88 +28,6 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 #define DECOMMISSION_PC_SIZE		128
 
 extern EVENT_CONTEXT DataContext;
-
-int cerberus_pfr_staging_verify(struct pfr_manifest *manifest)
-{
-	int status = Success;
-	struct recovery_header image_header;
-	struct rsa_public_key public_key;
-
-	uint32_t signature_address;
-	uint8_t sig_data[SHA256_SIGNATURE_LENGTH];
-	uint8_t *hashStorage = NULL; // getNewHashStorage();
-
-	LOG_INF("Stage Image Verification Start");
-
-	LOG_INF("manifest->flash_id=%d manifest->address=%p", manifest->flash_id, manifest->address);
-	pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
-
-	status = verify_recovery_header_magic_number(image_header);
-	if (status != Success){
-		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
-		LOG_ERR("Image Header Magic Number is not Matched.");
-		return Failure;
-	}
-	// get public key and init signature
-	status = get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
-	LOG_DBG("Public Key Exponent=%08x", public_key.exponent);
-	LOG_HEXDUMP_DBG(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
-
-	if (status != Success){
-		LOG_ERR("Unable to get public Key.");
-		return Failure;
-	}
-
-	//getSignature
-	signature_address = manifest->address + image_header.image_length - image_header.sign_length;
-	status = get_signature(manifest->flash_id, signature_address, sig_data, SHA256_SIGNATURE_LENGTH);
-	LOG_DBG("sig_addr=%p img_hdr.img_len=%p img_hdr.sig_len=%p", signature_address,
-			image_header.image_length, image_header.sign_length);
-	LOG_HEXDUMP_DBG(sig_data, SHA256_SIGNATURE_LENGTH, "Signature:");
-	if (status != Success){
-		LOG_ERR("Unable to get the Signature.");
-		return Failure;
-	}
-
-	//verify
-	manifest->flash->device_id[0] = manifest->flash_id;
-	status = flash_verify_contents( (struct flash *)manifest->flash,
-			manifest->address,
-			(image_header.image_length - image_header.sign_length),
-			get_hash_engine_instance(),
-			HASH_TYPE_SHA256,
-			&getRsaEngineInstance()->base,
-			sig_data,
-			SHA256_SIGNATURE_LENGTH,
-			&public_key,
-			hashStorage,
-			SHA256_SIGNATURE_LENGTH
-			);
-	if (status != Success){
-		LOG_ERR("Image verify Fail manifest->flash_id=%d manifest->address=%p", manifest->flash_id, manifest->address);
-		return Failure;
-	}
-	LOG_INF("Stage Image Verify Success.");
-
-	return Success;
-}
-
-int cerberus_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
-{
-	int status = 0;
-	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) fw;
-	if(pfr_manifest->image_type == BMC_TYPE){
-		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
-		get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&pfr_manifest->recovery_address, sizeof(pfr_manifest->recovery_address));
-		pfr_manifest->flash_id = BMC_FLASH_ID;
-	}else if(pfr_manifest->image_type == PCH_TYPE){
-		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
-		get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&pfr_manifest->recovery_address, sizeof(pfr_manifest->recovery_address));
-		pfr_manifest->flash_id = PCH_FLASH_ID;
-	}
-
-	return cerberus_pfr_staging_verify(pfr_manifest);
-}
 
 int cerberus_set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
 {
@@ -224,7 +143,7 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 	if (provision_state == UFM_PROVISIONED){
 		struct recovery_header image_header;
 		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
-		status = cerberus_pfr_staging_verify(manifest);
+		status =  cerberus_pfr_verify_image(manifest);
 		if(status != Success){
 			LOG_ERR("HRoT update pfr verification failed");
 			return Failure;
@@ -536,6 +455,10 @@ int check_staging_area(void)
  */
 int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
 {
-	return cerberus_pfr_update_verify(fw, hash, rsa);
+	ARG_UNUSED(hash);
+	ARG_UNUSED(rsa);
+
+	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) fw;
+	return cerberus_pfr_verify_image(pfr_manifest);
 }
 #endif // CONFIG_CERBERUS_PFR

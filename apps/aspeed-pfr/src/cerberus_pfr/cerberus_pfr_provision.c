@@ -8,6 +8,7 @@
 #include <logging/log.h>
 #include <stdint.h>
 #include "AspeedStateMachine/common_smc.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_common.h"
 #include "cerberus_pfr_definitions.h"
 #include "pfr/pfr_util.h"
@@ -114,19 +115,20 @@ unsigned char CerberusProvisionRootKeyHash(void)
 	}
 }
 
-int getCerberusProvisionData(int offset, uint8_t *data, uint32_t length){
+int getCerberusProvisionData(int offset, uint8_t *data, uint32_t length)
+{
 	int status = 0;
 	status = pfr_spi_read(ROT_INTERNAL_INTEL_STATE, offset, length, data);
 	return status;
 }
 
-int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
+int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
+{
 	int status = Success;
 
 	struct PROVISIONING_IMAGE_HEADER provision_header;
-	struct PROVISIONING_MANIFEST_DATA provision_manifest;
 
-	pfr_spi_read(manifest->flash_id, manifest->address, sizeof(provision_header), &provision_header);
+	pfr_spi_read(manifest->flash_id, manifest->address, sizeof(provision_header), (uint8_t *)&provision_header);
 	LOG_HEXDUMP_INF(&provision_header, sizeof(provision_header), "Provision Header:");
 	LOG_INF("Verify Provisioning Type.");
 	status = verify_cerberus_provisioning_type(provision_header.image_type);
@@ -161,7 +163,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_PCH_STAGE_OFFSET, 4, cPchOffsets + 8);
 		CerberusProvisionPchOffsets();
 
-		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, sizeof(key_length), &key_length);
+		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, sizeof(key_length), (uint8_t *)&key_length);
 
 		uint8_t cerberus_root_key[key_length];
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY, key_length, cerberus_root_key);
@@ -169,7 +171,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest){
 		manifest->pfr_hash->start_address = manifest->address + CERBERUS_ROOT_KEY;
 		manifest->pfr_hash->length = key_length;
 		manifest->pfr_hash->type = HASH_TYPE_SHA256;
-		manifest->base->get_hash(manifest,manifest->hash,cRootKeyHash, SHA256_DIGEST_LENGTH);
+		manifest->base->get_hash((struct manifest *)manifest, manifest->hash,cRootKeyHash, SHA256_DIGEST_LENGTH);
 		CerberusProvisionRootKeyHash();
 		//write root key to d0200
 

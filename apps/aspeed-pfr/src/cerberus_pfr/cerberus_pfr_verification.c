@@ -11,16 +11,139 @@
 #include "common/common.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
+#include "cerberus_pfr_recovery.h"
 #include "keystore/KeystoreManager.h"
 #include "manifest/manifest_format.h"
 #include "manifest/pfm/pfm_format.h"
 #include "crypto/rsa.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
+int get_signature(uint8_t flash_id, uint32_t address, uint8_t *signature, size_t signature_length)
+{
+	int status = Success;
+	status = pfr_spi_read(flash_id, address, signature_length, signature);
+
+	return status;
+}
+
+int verify_recovery_header_magic_number(struct recovery_header rec_head)
+{
+	int status = Success;
+	if (rec_head.format == KEY_CANCELLATION_TYPE || rec_head.format == DECOMMISSION_TYPE) {
+		if (rec_head.magic_number != CANCELLATION_HEADER_MAGIC) {
+			status = Failure;
+		}
+	} else {
+		if(rec_head.magic_number != RECOVERY_HEADER_MAGIC)
+			status = Failure;
+	}
+	return status;
+
+}
+
+int cerberus_pfr_image_signature_verify(struct pfr_manifest *manifest)
+{
+	int status = Success;
+	struct recovery_header image_header;
+	struct rsa_public_key public_key;
+
+	uint32_t signature_address;
+	uint32_t verify_addr;
+	uint8_t sig_data[SHA256_SIGNATURE_LENGTH];
+	uint8_t *hashStorage = NULL;
+
+	if (manifest->state == FIRMWARE_UPDATE) {
+		LOG_INF("Stage Image Verification Start");
+		verify_addr = manifest->address;
+	} else {
+		LOG_INF("Recovery Image Verification Start");
+		verify_addr = manifest->recovery_address;
+	}
+
+	LOG_INF("manifest->flash_id=%d verify address=%x", manifest->flash_id, verify_addr);
+	pfr_spi_read(manifest->flash_id, verify_addr, sizeof(image_header), (uint8_t *)&image_header);
+
+	status = verify_recovery_header_magic_number(image_header);
+	if (status != Success){
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Image Header Magic Number is not Matched.");
+		return Failure;
+	}
+	// get public key and init signature
+	status = get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
+	LOG_INF("Public Key Exponent=%08x", public_key.exponent);
+	LOG_HEXDUMP_INF(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
+
+	if (status != Success){
+		LOG_ERR("Unable to get public Key.");
+		return Failure;
+	}
+
+	// get signature
+	signature_address = verify_addr + image_header.image_length - image_header.sign_length;
+	LOG_INF("signature_address=%x", signature_address);
+	LOG_INF("image_header.image_length=%x", image_header.image_length);
+	LOG_INF("image_header.sign_length=%x", image_header.sign_length);
+	status = get_signature(manifest->flash_id, signature_address, sig_data,
+			SHA256_SIGNATURE_LENGTH);
+	if (status != Success){
+		LOG_ERR("Unable to get the Signature.");
+		return Failure;
+	}
+
+	// verify
+	manifest->flash->device_id[0] = manifest->flash_id;
+	LOG_HEXDUMP_INF(sig_data, SHA256_SIGNATURE_LENGTH, "Image Signature:");
+	status = flash_verify_contents( (struct flash *)manifest->flash,
+			verify_addr,
+			(image_header.image_length - image_header.sign_length),
+			get_hash_engine_instance(),
+			HASH_TYPE_SHA256,
+			&getRsaEngineInstance()->base,
+			sig_data,
+			SHA256_SIGNATURE_LENGTH,
+			&public_key,
+			hashStorage,
+			SHA256_SIGNATURE_LENGTH
+			);
+	if (status != Success){
+		LOG_ERR("Image verify Fail manifest->flash_id=%d address=%x", manifest->flash_id,
+				verify_addr);
+		return Failure;
+	}
+
+	LOG_INF("%s Image Verify Success.",
+			(manifest->state == FIRMWARE_UPDATE) ? "Stage" : "Recovery");
+
+	return Success;
+}
+
+int cerberus_pfr_verify_image(struct pfr_manifest *pfr_manifest)
+{
+	if(pfr_manifest->image_type == BMC_TYPE) {
+		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
+		get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->recovery_address,
+				sizeof(pfr_manifest->recovery_address));
+		pfr_manifest->flash_id = BMC_FLASH_ID;
+	}else if(pfr_manifest->image_type == PCH_TYPE){
+		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
+		get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->recovery_address,
+				sizeof(pfr_manifest->recovery_address));
+		pfr_manifest->flash_id = PCH_FLASH_ID;
+	}
+
+	return cerberus_pfr_image_signature_verify(pfr_manifest);
+}
 
 int rsa_verify_signature(struct signature_verification *verification,
 		const uint8_t *digest, size_t length, const uint8_t *signature, size_t sig_length)
@@ -75,7 +198,8 @@ int get_rsa_public_key(uint8_t flash_id, uint32_t address, struct rsa_public_key
 
 	//rsa key exponent
 	exponent_address = address + sizeof(key_length) + key_length;
-	status = pfr_spi_read(flash_id, exponent_address, sizeof(public_key->exponent), (uint8_t *)&public_key->exponent);
+	status = pfr_spi_read(flash_id, exponent_address, sizeof(public_key->exponent),
+			(uint8_t *)&public_key->exponent);
 	public_key->exponent = public_key->exponent >> 8;
 	if (status != Success) {
 		LOG_ERR("Flash read rsa key exponent failed");
@@ -98,7 +222,6 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 	if (status)
 		return Failure;
 
-	pfr_manifest->flash->device_id[0] = pfr_manifest->image_type;
 	if (pfr_manifest->image_type == BMC_SPI)
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
@@ -123,7 +246,7 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 		goto free_manifest;
 	}
 
-        switch (manifest_flash->toc_header.hash_type) {
+	switch (manifest_flash->toc_header.hash_type) {
 	case MANIFEST_HASH_SHA256:
 		manifest_flash->toc_hash_type = HASH_TYPE_SHA256;
 		manifest_flash->toc_hash_length = SHA256_HASH_LENGTH;
@@ -135,7 +258,7 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 		LOG_ERR("Invalid or unsupported hash type");
 		status = Failure;
 		goto free_manifest;
-        }
+	}
 
 	uint8_t *hashStorage = getNewHashStorage();
 	status = manifest_flash_verify(manifest_flash, get_hash_engine_instance(),

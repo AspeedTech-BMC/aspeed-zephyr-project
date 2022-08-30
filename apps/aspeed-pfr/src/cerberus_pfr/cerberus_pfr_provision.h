@@ -8,7 +8,9 @@
 
 #if defined(CONFIG_CERBERUS_PFR)
 #include <stdint.h>
+#include <manifest/pfm/pfm_flash.h>
 #include "cerberus_pfr_definitions.h"
+#include "pfr/pfr_common.h"
 
 extern int g_provision_data;
 

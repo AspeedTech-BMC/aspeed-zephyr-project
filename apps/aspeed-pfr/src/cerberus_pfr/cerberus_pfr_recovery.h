@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include "manifest/pfm/pfm_manager.h"
 
-struct recovery_header{
+struct recovery_header {
 	uint16_t header_length;
 	uint16_t format;
 	uint32_t magic_number;
@@ -19,7 +19,7 @@ struct recovery_header{
 	uint32_t sign_length;
 };
 
-struct recovery_section{
+struct recovery_section {
 	uint16_t header_length;
 	uint16_t format;
 	uint32_t magic_number;

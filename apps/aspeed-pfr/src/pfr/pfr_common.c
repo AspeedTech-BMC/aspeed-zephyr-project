@@ -74,7 +74,7 @@ static struct manifest *get_manifest(void)
 	return &manifest_base;
 }
 
-static struct verifcation *get_signature_verification(void)
+static struct signature_verification *get_signature_verification(void)
 {
 	return &pfr_verification;
 }
