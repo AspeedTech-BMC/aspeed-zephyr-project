@@ -110,7 +110,6 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	uint32_t source_address;
 	uint32_t target_address;
-	uint32_t image_type = manifest->image_type;
 
 	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
 			sizeof(source_address));
@@ -123,23 +122,18 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		return Failure;
 
 	source_address += CONFIG_BMC_STAGING_SIZE;
-	manifest->image_type = BMC_TYPE;
-	manifest->address = source_address;
-	manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
-	manifest->address = target_address;
-	manifest->image_type = image_type;
-	int sector_sz = pfr_spi_get_block_size(image_type);
+	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
 	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
 			source_address, target_address);
 
-	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
-				CONFIG_BMC_PCH_STAGING_SIZE))
+	if (pfr_spi_erase_region(PCH_TYPE, support_block_erase, target_address,
+				CONFIG_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (pfr_spi_region_read_write_between_spi(BMC_TYPE, source_address, PCH_TYPE,
-				target_address, CONFIG_BMC_PCH_STAGING_SIZE))
+				target_address, CONFIG_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (manifest->state == FIRMWARE_RECOVERY) {
@@ -177,13 +171,15 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 		    struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length, struct pfm_manager *pfm)
 {
-
 	ARG_UNUSED(hash);
 	ARG_UNUSED(verification);
 	ARG_UNUSED(hash_out);
 	ARG_UNUSED(hash_length);
 	ARG_UNUSED(pfm);
-	return cerberus_pfr_verify_image((struct pfr_manifest *)image);
+	struct pfr_manifest *manifest = (struct pfr_manifest *)image;
+	init_stage_and_recovery_offset(manifest);
+	manifest->address = manifest->recovery_address;
+	return cerberus_pfr_verify_image(manifest);
 }
 
 int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash)

@@ -56,7 +56,6 @@ int recover_image(void *AoData, void *EventContext)
 	}
 
 	if (ActiveObjectData->RecoveryImageStatus != Success) {
-		// status = pfr_staging_verify(pfr_manifest);
 		status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
 		if (status != Success) {
 			DEBUG_PRINTF("PFR Staging Area Corrupted");

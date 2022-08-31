@@ -47,24 +47,35 @@ int verify_recovery_header_magic_number(struct recovery_header rec_head)
 
 }
 
-int cerberus_pfr_image_signature_verify(struct pfr_manifest *manifest)
+void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
+{
+	if(pfr_manifest->image_type == BMC_TYPE) {
+		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->staging_address, sizeof(pfr_manifest->address));
+		get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->recovery_address,
+				sizeof(pfr_manifest->recovery_address));
+		pfr_manifest->flash_id = BMC_FLASH_ID;
+	}else if(pfr_manifest->image_type == PCH_TYPE){
+		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->staging_address, sizeof(pfr_manifest->address));
+		get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET,
+				(uint8_t *)&pfr_manifest->recovery_address,
+				sizeof(pfr_manifest->recovery_address));
+		pfr_manifest->flash_id = PCH_FLASH_ID;
+	}
+}
+
+int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 {
 	int status = Success;
 	struct recovery_header image_header;
 	struct rsa_public_key public_key;
 
 	uint32_t signature_address;
-	uint32_t verify_addr;
+	uint32_t verify_addr = manifest->address;
 	uint8_t sig_data[SHA256_SIGNATURE_LENGTH];
 	uint8_t *hashStorage = NULL;
-
-	if (manifest->state == FIRMWARE_UPDATE) {
-		LOG_INF("Stage Image Verification Start");
-		verify_addr = manifest->address;
-	} else {
-		LOG_INF("Recovery Image Verification Start");
-		verify_addr = manifest->recovery_address;
-	}
 
 	LOG_INF("manifest->flash_id=%d verify address=%x", manifest->flash_id, verify_addr);
 	pfr_spi_read(manifest->flash_id, verify_addr, sizeof(image_header), (uint8_t *)&image_header);
@@ -122,27 +133,6 @@ int cerberus_pfr_image_signature_verify(struct pfr_manifest *manifest)
 			(manifest->state == FIRMWARE_UPDATE) ? "Stage" : "Recovery");
 
 	return Success;
-}
-
-int cerberus_pfr_verify_image(struct pfr_manifest *pfr_manifest)
-{
-	if(pfr_manifest->image_type == BMC_TYPE) {
-		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET,
-				(uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
-		get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET,
-				(uint8_t *)&pfr_manifest->recovery_address,
-				sizeof(pfr_manifest->recovery_address));
-		pfr_manifest->flash_id = BMC_FLASH_ID;
-	}else if(pfr_manifest->image_type == PCH_TYPE){
-		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET,
-				(uint8_t *)&pfr_manifest->address, sizeof(pfr_manifest->address));
-		get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET,
-				(uint8_t *)&pfr_manifest->recovery_address,
-				sizeof(pfr_manifest->recovery_address));
-		pfr_manifest->flash_id = PCH_FLASH_ID;
-	}
-
-	return cerberus_pfr_image_signature_verify(pfr_manifest);
 }
 
 int rsa_verify_signature(struct signature_verification *verification,

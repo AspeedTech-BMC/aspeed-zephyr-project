@@ -205,11 +205,11 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 			source_address, target_address);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
-			CONFIG_BMC_PCH_STAGING_SIZE))
+			CONFIG_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (pfr_spi_region_read_write_between_spi(BMC_TYPE, source_address, PCH_TYPE,
-				target_address, CONFIG_BMC_PCH_STAGING_SIZE))
+				target_address, CONFIG_PCH_STAGING_SIZE))
 		return Failure;
 
 	if (manifest->state == FIRMWARE_RECOVERY) {

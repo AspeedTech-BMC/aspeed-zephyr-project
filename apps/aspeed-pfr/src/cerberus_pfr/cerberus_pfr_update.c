@@ -452,7 +452,9 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 	ARG_UNUSED(hash);
 	ARG_UNUSED(rsa);
 
-	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) fw;
-	return cerberus_pfr_verify_image(pfr_manifest);
+	struct pfr_manifest *manifest = (struct pfr_manifest *) fw;
+	init_stage_and_recovery_offset(manifest);
+	manifest->address = manifest->staging_address;
+	return cerberus_pfr_verify_image(manifest);
 }
 #endif // CONFIG_CERBERUS_PFR
