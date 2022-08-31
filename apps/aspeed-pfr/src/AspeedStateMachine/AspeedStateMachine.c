@@ -489,6 +489,33 @@ void do_rot_recovery(void *o)
 	LOG_DBG("End");
 }
 
+void i2c_filter_release(const char *i2cf)
+{
+	const struct device *i2c_filter = device_get_binding(i2cf);
+	int ret;
+	if (i2c_filter) {
+		ret = ast_i2c_filter_init(i2c_filter);
+		if (ret) {
+			LOG_ERR("ast_i2c_filter_init(%s) ret=%d", i2cf, ret);
+		}
+
+		/*
+		 * dev: pointer to device structure
+		 * filter_en: value to enable filter device
+		 * wlist_en: value to enable white list
+		 * clr_idx: value to clear index table
+		 * clr_tbl: value to clear white list table
+		 */
+		ret = ast_i2c_filter_en(i2c_filter, true, false, false, false);
+		if (ret) {
+			LOG_ERR("ast_i2c_filter_en(%s) ret=%d", i2cf, ret);
+		}
+		LOG_INF("Bypass %s", i2cf);
+	} else {
+		LOG_ERR("Fail to find %s device, skipped", i2cf);
+	}
+}
+
 void enter_tzero(void *o)
 {
 	LOG_DBG("Start");
@@ -531,18 +558,65 @@ void enter_tzero(void *o)
 			LOG_ERR("Host firmware is invalid, host won't boot");
 	} else {
 		/* Unprovisioned - Releasing System Reset */
-		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m1", false);
-		Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m2", false);
-		Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m3", false);
-		Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m4", false);
+		if (device_get_binding("spi_m1")!=NULL) {
+			Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m1", false);
+			LOG_INF("Bypass %s", "spi_m1");
+		}
+
+		if (device_get_binding("spi_m2") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m2", false);
+			LOG_INF("Bypass %s", "spi_m2");
+		}
+
+		if (device_get_binding("spi_m3") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m3", false);
+			LOG_INF("Bypass %s", "spi_m3");
+		}
+
+		if (device_get_binding("spi_m4") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m4", false);
+			LOG_INF("Bypass %s", "spi_m4");
+		}
+
+		/* Releasing I2C Filter */
+		const struct device *dev = NULL;
+		if ( (dev = device_get_binding("I2C_FILTER_0")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+		
+		if ( (dev = device_get_binding("I2C_FILTER_1")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+		
+		if ( (dev = device_get_binding("I2C_FILTER_2")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+		
+		if ( (dev = device_get_binding("I2C_FILTER_3")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+
+		if ( (dev = device_get_binding("I2C_FILTER_4")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
 
 		BMCBootRelease();
 		PCHBootRelease();
