@@ -9,6 +9,7 @@
 #include <logging/log.h>
 #include <logging/log_ctrl.h>
 #include <drivers/i2c/pfr/swmbx.h>
+#include <drivers/i2c/pfr/i2c_filter.h>
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include <drivers/flash.h>
 
@@ -487,33 +488,6 @@ void do_rot_recovery(void *o)
 		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
 	}
 	LOG_DBG("End");
-}
-
-void i2c_filter_release(const char *i2cf)
-{
-	const struct device *i2c_filter = device_get_binding(i2cf);
-	int ret;
-	if (i2c_filter) {
-		ret = ast_i2c_filter_init(i2c_filter);
-		if (ret) {
-			LOG_ERR("ast_i2c_filter_init(%s) ret=%d", i2cf, ret);
-		}
-
-		/*
-		 * dev: pointer to device structure
-		 * filter_en: value to enable filter device
-		 * wlist_en: value to enable white list
-		 * clr_idx: value to clear index table
-		 * clr_tbl: value to clear white list table
-		 */
-		ret = ast_i2c_filter_en(i2c_filter, true, false, false, false);
-		if (ret) {
-			LOG_ERR("ast_i2c_filter_en(%s) ret=%d", i2cf, ret);
-		}
-		LOG_INF("Bypass %s", i2cf);
-	} else {
-		LOG_ERR("Fail to find %s device, skipped", i2cf);
-	}
 }
 
 void enter_tzero(void *o)
