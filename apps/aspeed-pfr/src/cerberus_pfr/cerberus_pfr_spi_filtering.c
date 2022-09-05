@@ -7,94 +7,81 @@
 #if defined(CONFIG_CERBERUS_PFR)
 
 #include <stdint.h>
+#include <logging/log.h>
 #include "common/common.h"
 #include "cerberus_pfr_definitions.h"
+#include "cerberus_pfr_provision.h"
+#include "cerberus_pfr_common.h"
+#include "flash/flash_aspeed.h"
+#include "pfr/pfr_util.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 
-#define	ADDR_MASK_0	GENMASK(7, 0)
-#define	ADDR_MASK_1	GENMASK(15, 8)
-#define	ADDR_SHIFT_1	8
-#define	ADDR_MASK_2	GENMASK(23, 16)
-#define	ADDR_SHIFT_2	16
-#define	ADDR_MASK_3	GENMASK(31, 24)
-#define	ADDR_SHIFT_3	24
+#define SPIM_NUM  4
 
-void apply_pfm_protection(int spi_device_id)
+LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
+void apply_pfm_protection(int spi_dev)
 {
-#if 0
-	int status = 0;
+	char *spim_devs[SPIM_NUM] = {
+		"spi_m1",
+		"spi_m2",
+		"spi_m3",
+		"spi_m4"
+	};
 
-	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
-
-	spi_flash->spi.device_id[0] = spi_device_id;
-
-	int region_id = 1;
-	int region_length;
-	int toc_element_length;
-	int allowable_fw_list_header_to_alignment_length;
-
-	uint32_t pfm_read_address = BMC_MANIFEST_OFFSET;
-	uint32_t toc_elements_list_start = pfm_read_address + TOC_ELEMENTS_LIST_START;
-	toc_elements_list_start = toc_elements_list_start + TOC_ELEMENT_LENGTH_OFFSET;
-	uint32_t pfm_rw_flash_region_start = pfm_read_address + PLATFORM_HEADER_START;
-	uint32_t rw_count_location;
-	uint32_t version_length_location;
 	uint32_t region_start_address;
 	uint32_t region_end_address;
-	uint8_t region_record[PFM_RW_FLASH_REGION_LENGTH];
-	uint8_t rw_count[1];
-	uint8_t version_length[1];
-	uint8_t toc_elements_list_length[2];
+	uint32_t pfm_addr;
+	uint32_t rw_region_addr;
+	uint16_t region_cnt;
+	int region_length;
 
-	/*
-	   if (spi_device_id == 0) {
-	   get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, &pfm_read_address, sizeof(pfm_read_address));
-
-	   } else if (spi_device_id == 1) {
-	   get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, &pfm_read_address, sizeof(pfm_read_address));
-	   }
-	   */
-	for (int i = 0; i < 3; i++) // platform_header, flash_device, fw_elements
-	{
-		spi_flash->spi.base.read(&spi_flash->spi, toc_elements_list_start, toc_elements_list_length, sizeof(toc_elements_list_length));
-
-		toc_element_length = (toc_elements_list_length[0] & ADDR_MASK_0) |
-			(toc_elements_list_length[1] << ADDR_SHIFT_1 & ADDR_MASK_1);
-		toc_elements_list_start = toc_elements_list_start + 8; // next toc element
-		pfm_rw_flash_region_start = pfm_rw_flash_region_start + toc_element_length;
-	}
-
-	rw_count_location = pfm_rw_flash_region_start + 1;
-	spi_flash->spi.base.read(&spi_flash->spi, rw_count_location, rw_count, sizeof(rw_count));
-	version_length_location = rw_count_location + 1;
-	spi_flash->spi.base.read(&spi_flash->spi, version_length_location, version_length, sizeof(version_length));
-	pfm_rw_flash_region_start = pfm_rw_flash_region_start +
-		ALLOWABLE_FW_LIST_HEADER_LENGTH +
-		ALLOWABLE_FW_LIST_VERSION_ADDR_LENGTH +
-		version_length[0] +
-		ALLOWABLE_FW_LIST_ALLIGNMENT_LENGTH;
-
-	for (int i = 0; i < rw_count[0]; i++)
-	{
-		spi_flash->spi.base.read(&spi_flash->spi, pfm_rw_flash_region_start, region_record, sizeof(region_record));
-		region_start_address = (region_record[4] & ADDR_MASK_0) |
-			(region_record[5] << ADDR_SHIFT_1 & ADDR_MASK_1) |
-			(region_record[6] << ADDR_SHIFT_2 & ADDR_MASK_2) |
-			(region_record[7] << ADDR_SHIFT_3 & ADDR_MASK_3);
-		region_end_address = (region_record[8] & ADDR_MASK_0) |
-			(region_record[9] << ADDR_SHIFT_1 & ADDR_MASK_1) |
-			(region_record[10] << ADDR_SHIFT_2 & ADDR_MASK_2) |
-			(region_record[11] << ADDR_SHIFT_3 & ADDR_MASK_3);
-		region_end_address = region_end_address + 1;
-		region_length = region_end_address - region_start_address;
-
-		spi_filter->base.set_filter_rw_region(&spi_filter->base, region_id, region_start_address, region_end_address);
-		pfm_rw_flash_region_start = pfm_rw_flash_region_start + 12;
-		region_id++;
-	}
-	spi_filter->base.enable_filter(spi_filter, true);
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	int flash_size;
 #endif
+
+	if (spi_dev == BMC_SPI)
+		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_addr,
+				sizeof(pfm_addr));
+	else if (spi_dev == PCH_SPI)
+		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_addr,
+				sizeof(pfm_addr));
+
+	rw_region_addr = cerberus_get_rw_region_addr(spi_dev, pfm_addr, &region_cnt);
+	if (rw_region_addr == 0) {
+		LOG_ERR("Failed to get read write regions");
+		return;
+	}
+
+	struct pfm_fw_version_element_rw_region rw_region;
+	for (int i = 0; i < region_cnt; i++) {
+		if (pfr_spi_read(spi_dev, rw_region_addr, sizeof(rw_region), (uint8_t *)&rw_region)) {
+			LOG_ERR("Failed to get read/write regions");
+			return;
+		}
+
+		region_start_address = rw_region.region.start_addr;
+		region_end_address = rw_region.region.end_addr;
+		region_length = region_end_address - region_start_address + 1;
+
+#if defined(CONFIG_BMC_DUAL_FLASH)
+		spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+		if (region_start_address >= flash_size && region_end_address >= flash_size) {
+			region_start_address -= flash_size;
+			region_end_address -= flash_size;
+			spi_dev = BMC_SPI_2;
+		}
+#endif
+		Set_SPI_Filter_RW_Region(spim_devs[spi_dev],
+				SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE,
+				region_start_address, region_length);
+		LOG_INF("SPI_ID[%d] write enable 0x%08x to 0x%08x",
+				spi_dev, region_start_address, region_end_address);
+		rw_region_addr += sizeof(rw_region);
+	}
+
+	SPI_Monitor_Enable(spim_devs[spi_dev], true);
 }
 
 #endif // CONFIG_CERBERUS_PFR

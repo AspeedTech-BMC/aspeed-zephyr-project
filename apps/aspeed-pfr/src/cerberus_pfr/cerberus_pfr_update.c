@@ -440,10 +440,12 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 		return cerberus_keystore_update(manifest, image_header.format);
 	}
 
-	update_regions = cerberus_get_update_regions(manifest, &image_header, &region_cnt);
-	if (!update_regions) {
-		LOG_ERR("Failed to get update regions from PFM");
-		return Failure;
+	if (!erase_rw_regions) {
+		update_regions = cerberus_get_update_regions(manifest, &image_header, &region_cnt);
+		if (!update_regions) {
+			LOG_ERR("Failed to get update regions from PFM");
+			return Failure;
+		}
 	}
 
 	sig_address = manifest->address + image_header.image_length -
@@ -497,7 +499,9 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 		}
 	}
 
-	free(update_regions);
+	if (update_regions)
+		free(update_regions);
+
 	return status;
 }
 

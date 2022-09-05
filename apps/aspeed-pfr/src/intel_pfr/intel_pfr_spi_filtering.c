@@ -19,7 +19,7 @@ void apply_pfm_protection(int spi_device_id)
 {
 
 	int status = 0;
-	static char *spim_devs[SPIM_NUM] = {
+	const char *spim_devs[SPIM_NUM] = {
 		"spi_m1",
 		"spi_m2",
 		"spi_m3",
@@ -28,8 +28,6 @@ void apply_pfm_protection(int spi_device_id)
 
 	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
 	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
-
-	spi_filter->dev_id = spi_device_id;  // 0: BMC , 1: PCH
 
 	// read PFR_Manifest
 	status = initializeEngines();
@@ -100,6 +98,7 @@ void apply_pfm_protection(int spi_device_id)
 				spi_device_id = BMC_SPI_2;
 			}
 #endif
+			spi_filter->dev_id = spi_device_id;
 			region_length = region_end_address - region_start_address;
 			if (region_record[1] & 0x02) {
 				/* Write allowed region */
