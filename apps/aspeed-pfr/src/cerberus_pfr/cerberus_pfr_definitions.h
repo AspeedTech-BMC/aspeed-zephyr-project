@@ -8,9 +8,7 @@
 
 # if defined(CONFIG_CERBERUS_PFR)
 #define BMC_FLASH_ID                0
-#define BMC_RECOVERY_FLASH_ID       0
 #define PCH_FLASH_ID                2
-#define PCH_RECOVERY_FLASH_ID       3
 
 #define BMC_TYPE                    0
 #define PCH_TYPE                    2
@@ -33,17 +31,6 @@
 #define EVERY_BOOT_SVN_VALIDATION   1
 #define SMBUS_MAILBOX_SUPPORT       1
 
-// BIOS/BMC SPI Region information
-#define BMC_RECOVERY_OFFSET         0
-#define BMC_MANIFEST_OFFSET         0x7C00000
-#define BMC_STAGE_OFFSET            0x3E00000
-#define BMC_STAGE_SIZE              0x3E00000
-
-#define PCH_RECOVERY_OFFSET         0
-#define PCH_MANIFEST_OFFSET         0
-#define PCH_STAGE_OFFSET            0
-#define PCH_STAGE_SIZE              0
-
 //Cerberus Content
 #define RECOVERY_HEADER_MAGIC       0x8A147C29
 #define RECOVERY_SECTION_MAGIC      0x4B172F31
@@ -60,16 +47,6 @@
 #define ALLOWABLE_FW_LIST_HEADER_LENGTH 4
 #define ALLOWABLE_FW_LIST_VERSION_ADDR_LENGTH   4
 #define ALLOWABLE_FW_LIST_ALLIGNMENT_LENGTH 2
-
-enum
-{
-	PFM_HEADER_INSTANCE_START,
-	TOC_HEADER_START = 0x00c,
-	TOC_ELEMENTS_LIST_START = 0x010,
-	TOC_ELEMENTS_HASH_LIST_START = 0x030,
-	PLATFORM_HEADER_START = 0x0D0
-};
-
 
 // Will Remove after test
 #define UFM0                        4
@@ -102,7 +79,7 @@ enum Ecc_Curve {
 typedef struct {
 	uint8_t  ActiveRegion;
 	uint8_t  Recoveryregion;
-}UPD_REGION;
+} UPD_REGION;
 
 typedef struct{
 	uint8_t CpldStatus;
@@ -113,6 +90,6 @@ typedef struct{
 	uint8_t  CpldRecovery;
 	uint8_t  BmcToPchStatus;
 	uint8_t  Reserved[4];
-}CPLD_STATUS;
+} CPLD_STATUS;
 
 #endif // CONFIG_CERBERUS_PFR

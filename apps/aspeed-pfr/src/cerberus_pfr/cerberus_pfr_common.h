@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(CONFIG_CERBERUS_PFR)
 #include <stdint.h>
 #include "cerberus_pfr_recovery.h"
 #include "pfr/pfr_common.h"
@@ -18,3 +19,5 @@ int cerberus_get_image_pfm_addr(struct pfr_manifest *manifest,
 		uint32_t *dest_pfm_addr);
 uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 		struct recovery_header *image_header, uint32_t *region_cnt);
+
+#endif // CONFIG_CERBERUS_PFR

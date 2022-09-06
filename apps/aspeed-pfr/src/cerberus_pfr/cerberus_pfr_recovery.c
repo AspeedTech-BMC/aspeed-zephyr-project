@@ -27,12 +27,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF printk
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
 int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 {
 	return Success;
@@ -133,7 +127,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 				sizeof(recovery_section), (uint8_t *)&recovery_section);
 		if(recovery_section.magic_number != RECOVERY_SECTION_MAGIC)
 		{
-			DEBUG_PRINTF("Recovery Section not matched..\n");
+			LOG_ERR("Recovery Section not matched..\n");
 			break;
 		}
 		start_address = recovery_section.start_addr;

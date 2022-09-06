@@ -335,10 +335,6 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	return status;
 }
 
-/*
-TODO:
-After provisioning, need to change the way to get stage offset
-*/
 int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 {
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
@@ -353,7 +349,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC)
 		erase_rw_regions = true;
 
-	// TODO:
 	pfr_manifest->state = FIRMWARE_UPDATE;
 	pfr_manifest->image_type = image_type;
 

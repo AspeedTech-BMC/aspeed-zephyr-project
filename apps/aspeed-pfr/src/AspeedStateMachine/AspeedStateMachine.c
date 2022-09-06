@@ -567,19 +567,19 @@ void enter_tzero(void *o)
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
-		
+
 		if ( (dev = device_get_binding("I2C_FILTER_1")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
-		
+
 		if ( (dev = device_get_binding("I2C_FILTER_2")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
-		
+
 		if ( (dev = device_get_binding("I2C_FILTER_3")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
