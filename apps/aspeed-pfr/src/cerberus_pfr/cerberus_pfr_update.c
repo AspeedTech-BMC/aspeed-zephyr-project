@@ -8,14 +8,18 @@
 #include <logging/log.h>
 
 #include "pfr/pfr_update.h"
+#include "pfr/pfr_recovery.h"
 #include "pfr/pfr_ufm.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
+#include "pfr/pfr_util.h"
 #include "include/SmbusMailBoxCom.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
+#include "cerberus_pfr_common.h"
+#include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_definitions.h"
@@ -85,9 +89,11 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 	struct recovery_header image_header;
 	struct recovery_section image_section;
 
-	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_header), &image_header);
+	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_header),
+			(uint8_t *)&image_header);
 	source_address = source_address + image_header.header_length;
-	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_section), &image_section);
+	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_section),
+			(uint8_t *)&image_section);
 	source_address = source_address + image_section.header_length;
 
 	length_page_align =
@@ -137,7 +143,8 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 	byte provision_state = GetUfmStatusValue();
 	if (provision_state & UFM_PROVISIONED){
 		struct recovery_header image_header;
-		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), &image_header);
+		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header),
+				(uint8_t *)&image_header);
 		status =  cerberus_pfr_verify_image(manifest);
 		if(status != Success){
 			LOG_ERR("HRoT update pfr verification failed");
@@ -170,15 +177,13 @@ int cerberus_rot_svn_policy_verify(struct pfr_manifest *manifest, uint32_t hrot_
 int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_format)
 {
 	int status = 0;
-	uint8_t buffer;
 	uint16_t header_length;
 	uint16_t capsule_type;
 	uint16_t section_header_length;
-	uint32_t pc_type_status;
 
 	// Get the Header Length
 	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(header_length),
-			(uint16_t *)&header_length);
+			(uint8_t *)&header_length);
 	if(status != Success){
 		LOG_ERR("HROT update read header length failed");
 		return Failure;
@@ -192,7 +197,6 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 	}
 
 	if (image_format == KEY_CANCELLATION_TYPE) {
-		uint8_t cancelled_key;
 		int get_key_id = 0xFF;
 		int last_key_id = 0xFF;
 		uint8_t pub_key[256];
@@ -201,7 +205,7 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 
 		status = pfr_spi_read(manifest->image_type,
 				manifest->address + header_length + section_header_length - 2,
-				sizeof(capsule_type), (uint16_t *)&capsule_type);
+				sizeof(capsule_type), (uint8_t *)&capsule_type);
 		manifest->pc_type = capsule_type;
 		LOG_INF("capsule_type is %x",capsule_type);
 		status = pfr_spi_read(manifest->image_type,
@@ -240,182 +244,6 @@ int cerberus_update_recovery_region(int image_type, uint32_t source_address, uin
 	return pfr_recover_recovery_region(image_type, source_address, target_address);
 }
 
-uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
-		struct recovery_header *image_header, uint32_t *region_cnt)
-{
-	struct recovery_section image_section;
-	struct manifest_header manifest_header;
-	bool found_pfm = false;
-	uint32_t sig_address = manifest->address + image_header->image_length -
-			image_header->sign_length;
-	uint32_t read_address = manifest->address + image_header->header_length;
-	// Find PFM in update image
-	while(read_address < sig_address) {
-		if (pfr_spi_read(manifest->image_type, read_address, sizeof(image_section),
-					(uint8_t *)&image_section)) {
-			LOG_ERR("Failed to read image section info in Flash : %d , Offset : %x",
-					manifest->image_type, read_address);
-			return NULL;
-		}
-
-		if (image_section.magic_number != RECOVERY_SECTION_MAGIC) {
-			LOG_ERR("Recovery Section magic number not matched.");
-			return NULL;
-		}
-
-		read_address = read_address + sizeof(image_section);
-		if (pfr_spi_read(manifest->image_type, read_address,
-					sizeof(struct manifest_header),
-					(uint8_t *)&manifest_header)) {
-			LOG_ERR("Failed to read PFM from update image");
-			return NULL;
-		}
-
-		if ((manifest_header.magic == PFM_V2_MAGIC_NUM) &&
-				(manifest_header.sig_length <
-				(manifest_header.length - sizeof(manifest_header))) &&
-				(manifest_header.sig_length <= RSA_KEY_LENGTH_2K)) {
-			found_pfm = true;
-			break;
-		}
-
-		read_address += image_section.section_length;
-	}
-
-	if (!found_pfm) {
-		LOG_ERR("PFM doesn't exist in update image");
-		return NULL;
-	}
-	uint32_t pfm_start_addr = image_section.start_addr;
-
-	// Get read only regions from PFM
-	read_address += sizeof(manifest_header);
-	// Get region counts
-	struct manifest_toc_header toc_header;
-	if (pfr_spi_read(manifest->image_type, read_address, sizeof(toc_header),
-				(uint8_t*)&toc_header)) {
-		LOG_ERR("Failed to read toc header");
-		return NULL;
-	}
-	read_address += sizeof(toc_header) +
-		(toc_header.entry_count * sizeof(struct manifest_toc_entry)) +
-		(toc_header.entry_count * SHA256_HASH_LENGTH) +
-		SHA256_HASH_LENGTH;
-
-	// Platform Header Offset
-	struct manifest_platform_id plat_id_header;
-
-	if (pfr_spi_read(manifest->image_type, read_address, sizeof(plat_id_header),
-				(uint8_t *)&plat_id_header)) {
-		LOG_ERR("Failed to read TOC header");
-		return NULL;
-	}
-
-	// id length should be 4 byte aligned
-	uint8_t alignment = (plat_id_header.id_length % 4) ?
-		(4 - (plat_id_header.id_length % 4)) : 0;
-	uint16_t id_length = plat_id_header.id_length + alignment;
-	read_address += sizeof(plat_id_header) + id_length;
-
-	// Flash Device Element Offset
-	struct pfm_flash_device_element flash_dev;
-
-	if (pfr_spi_read(manifest->image_type, read_address, sizeof(flash_dev),
-				(uint8_t *)&flash_dev)) {
-		LOG_ERR("Failed to get flash device element");
-		return NULL;
-	}
-
-	if (flash_dev.fw_count == 0) {
-		LOG_ERR("Unknow firmware");
-		return NULL;
-	}
-
-	read_address += sizeof(flash_dev);
-
-	// PFM Firmware Element Offset
-	struct pfm_firmware_element fw_element;
-
-	if (pfr_spi_read(manifest->image_type, read_address, sizeof(fw_element),
-				(uint8_t *)&fw_element)) {
-		LOG_ERR("Failed to get PFM firmware element");
-		return NULL;
-	}
-
-	// id length should be 4 byte aligned
-	alignment = (fw_element.id_length % 4) ? (4 - (fw_element.id_length % 4)) : 0;
-	id_length = fw_element.id_length + alignment;
-	read_address += sizeof(fw_element) - sizeof(fw_element.id) + id_length;
-
-	// PFM Firmware Version Element Offset
-	struct pfm_firmware_version_element fw_ver_element;
-
-	if (pfr_spi_read(manifest->image_type, read_address, sizeof(fw_ver_element),
-				(uint8_t *)&fw_ver_element)) {
-		LOG_ERR("Failed to get PFM firmware version element");
-		return NULL;
-	}
-
-	// version length should be 4 byte aligned
-	alignment = (fw_ver_element.version_length % 4) ?
-		(4 - (fw_ver_element.version_length % 4)) : 0;
-	uint8_t ver_length = fw_ver_element.version_length + alignment;
-	read_address += sizeof(fw_ver_element) - sizeof(fw_ver_element.version) + ver_length;
-
-	// PFM Firmware Version Elenemt RW Region
-	read_address += fw_ver_element.rw_count * sizeof(struct pfm_fw_version_element_rw_region);
-
-	// PFM Firmware Version Element Image Offset
-	uint8_t *hashStorage = getNewHashStorage();
-	uint16_t module_length;
-	uint8_t exponent_length;
-	uint32_t start_address;
-	uint32_t end_address;
-	uint32_t *update_regions = malloc(sizeof(uint32_t) * (fw_ver_element.img_count + 1));
-	*region_cnt = 0;
-	update_regions[*region_cnt] = pfm_start_addr;
-	++*region_cnt;
-
-	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
-			signed_region_id++) {
-		read_address += sizeof(struct pfm_fw_version_element_image);
-		read_address += RSA_KEY_LENGTH_2K;
-
-		// Modulus length of Public Key
-		if (pfr_spi_read(manifest->image_type, read_address, sizeof(module_length),
-					(uint8_t *)&module_length)) {
-			LOG_ERR("Failed to get modulus length");
-			return NULL;
-		}
-
-		read_address += sizeof(module_length);
-		read_address += module_length;
-
-		// Exponent length of Public Key
-		if (pfr_spi_read(manifest->image_type, read_address, sizeof(exponent_length),
-					(uint8_t *)&exponent_length)) {
-			LOG_ERR("Failed to get exponent length");
-			return NULL;
-		}
-		read_address += sizeof(exponent_length);
-		read_address += exponent_length;
-
-		// Region Start Address
-		pfr_spi_read(manifest->image_type, read_address, sizeof(start_address),
-				(uint8_t *)&start_address);
-		read_address += sizeof(start_address);
-
-		// Region End Address
-		pfr_spi_read(manifest->image_type, read_address, sizeof(end_address),
-				(uint8_t *)&end_address);
-		read_address += sizeof(end_address);
-		update_regions[*region_cnt] = start_address;
-		++*region_cnt;
-	}
-
-	return update_regions;
-}
-
 int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_regions)
 {
 	int status = Success;
@@ -425,7 +253,6 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 
 	uint32_t sig_address, recovery_offset, data_offset;
 	uint32_t start_address, erase_address, section_length;
-	uint32_t target_address;
 	uint32_t region_cnt;
 	uint32_t *update_regions = NULL;
 	uint8_t platform_length;
@@ -434,7 +261,7 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 
 	//read recovery header
 	if (pfr_spi_read(manifest->image_type, manifest->address, sizeof(image_header),
-			&image_header)) {
+			(uint8_t *)&image_header)) {
 		LOG_ERR("Failed to read image header");
 		return Failure;
 	}
@@ -459,9 +286,9 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	recovery_offset = recovery_offset + platform_length + 1;
 	bool should_update = false;
 
-	while(recovery_offset != sig_address) {
+	while(recovery_offset < sig_address) {
 		status = pfr_spi_read(manifest->image_type, recovery_offset,
-				sizeof(image_section), &image_section);
+				sizeof(image_section), (uint8_t *)&image_section);
 		if(image_section.magic_number != RECOVERY_SECTION_MAGIC) {
 			status = Failure;
 			LOG_ERR("Recovery Section not matched.");

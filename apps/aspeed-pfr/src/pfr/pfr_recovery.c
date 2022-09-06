@@ -11,6 +11,7 @@
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "common/common.h"
 #include "pfr/pfr_common.h"
+#include "pfr/pfr_util.h"
 #include "pfr/pfr_recovery.h"
 #include "flash/flash_aspeed.h"
 #if defined(CONFIG_INTEL_PFR)
@@ -150,7 +151,6 @@ void init_recovery_manifest(struct recovery_image *image)
 
 int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
 {
-	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);

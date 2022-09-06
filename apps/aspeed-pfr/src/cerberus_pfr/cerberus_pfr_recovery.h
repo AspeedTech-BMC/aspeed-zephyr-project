@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#pragma once
+
 #if defined(CONFIG_CERBERUS_PFR)
 #define DUAL_SPI 0
 

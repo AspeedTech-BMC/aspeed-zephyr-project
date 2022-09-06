@@ -29,11 +29,11 @@ void apply_pfm_protection(int spi_dev)
 		"spi_m4"
 	};
 
+	struct pfm_firmware_version_element fw_ver_element;
 	uint32_t region_start_address;
 	uint32_t region_end_address;
 	uint32_t pfm_addr;
 	uint32_t rw_region_addr;
-	uint16_t region_cnt;
 	int region_length;
 
 #if defined(CONFIG_BMC_DUAL_FLASH)
@@ -48,14 +48,13 @@ void apply_pfm_protection(int spi_dev)
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_addr,
 				sizeof(pfm_addr));
 
-	rw_region_addr = cerberus_get_rw_region_addr(spi_dev, pfm_addr, &region_cnt);
-	if (rw_region_addr == 0) {
+	if (cerberus_get_rw_region_info(spi_dev, pfm_addr, &rw_region_addr, &fw_ver_element)) {
 		LOG_ERR("Failed to get read write regions");
 		return;
 	}
 
 	struct pfm_fw_version_element_rw_region rw_region;
-	for (int i = 0; i < region_cnt; i++) {
+	for (int i = 0; i < fw_ver_element.rw_count; i++) {
 		if (pfr_spi_read(spi_dev, rw_region_addr, sizeof(rw_region), (uint8_t *)&rw_region)) {
 			LOG_ERR("Failed to get read/write regions");
 			return;

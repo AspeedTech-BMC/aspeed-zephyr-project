@@ -80,4 +80,5 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		size_t hash_length);
 int cerberus_pfr_verify_image(struct pfr_manifest *pfr_manifest);
 int cerberus_verify_regions(struct manifest *manifest);
+void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest);
 #endif // CONFIG_CERBERUS_PFR
