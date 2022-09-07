@@ -29,3 +29,14 @@ west build -b ast1060_dcscm -p auto aspeed-zephyr-project/apps/aspeed-pfr
 west build -b ast1060_dual_flash -p auto aspeed-zephyr-project/apps/aspeed-pfr
 ```
 
+## AST2600 DCSCM board for AMD
+
+```
+west build -b ast1060_dcscm_amd -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
+## AST2600 Dual Flash for AMD
+
+```
+west build -b ast1060_dual_flash_amd -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```

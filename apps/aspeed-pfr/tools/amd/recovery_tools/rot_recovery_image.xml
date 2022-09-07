@@ -1,0 +1,9 @@
+<RecoveryImage version="01.02.00" platform="rot" type="2">
+  <RecoverySection>
+    <WriteAddress>0x00000000</WriteAddress>
+    <Region>
+      <StartAddr>0x00000000</StartAddr>
+      <EndAddr>0x0005ffff</EndAddr>
+    </Region>
+  </RecoverySection>
+</RecoveryImage>
