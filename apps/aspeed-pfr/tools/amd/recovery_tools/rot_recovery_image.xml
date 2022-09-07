@@ -1,4 +1,4 @@
-<RecoveryImage version="01.02.00" platform="rot" type="2">
+<RecoveryImage version="01.03.00" platform="rot" type="2">
   <RecoverySection>
     <WriteAddress>0x00000000</WriteAddress>
     <Region>

@@ -36,3 +36,21 @@ python3 recovery_image_generator.py rot_recovery_image_generator.config
 
 rot_recovery_image.bin is the signed ast1060 firmware update/recovery image.
 
+# Create decommission image
+## decommission_image_generator.config
+- Xml: `decommission_image.xml`
+- Output: `decommission_image.bin`
+
+## decommission_image.xml
+- image format type: `5`
+
+## Run
+- Copy keys, config and xml from keys and key_management_tools to `cerberus/tools/key_management_tools`.
+- Sign the image (make sure keys, config and xml in key management tool location.)
+
+```
+python3 key_management_tool.py decommission_image_generator.config
+```
+
+decommission_image.bin is the signed ROT decommission image.
+
