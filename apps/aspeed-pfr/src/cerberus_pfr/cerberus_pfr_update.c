@@ -415,7 +415,11 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
 	if (status != Success) {
 		LOG_ERR("Staging Area verification failed.");
-		LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+		if (flash_select == PRIMARY_FLASH_REGION)
+			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+		else
+			LogUpdateFailure(UPD_CAPSULE_TO_RECOVERY_AUTH_FAIL, 1);
+
 		return Failure;
 	}
 
