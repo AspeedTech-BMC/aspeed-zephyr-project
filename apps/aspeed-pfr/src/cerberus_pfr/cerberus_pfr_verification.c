@@ -35,7 +35,7 @@ int get_signature(uint8_t flash_id, uint32_t address, uint8_t *signature, size_t
 int verify_recovery_header_magic_number(struct recovery_header rec_head)
 {
 	int status = Success;
-	if (rec_head.format == KEY_CANCELLATION_TYPE || rec_head.format == DECOMMISSION_TYPE) {
+	if (rec_head.format == UPDATE_FORMAT_TPYE_KCC || rec_head.format == UPDATE_FORMAT_TPYE_DCC) {
 		if (rec_head.magic_number != CANCELLATION_HEADER_MAGIC) {
 			status = Failure;
 		}

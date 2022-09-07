@@ -12,8 +12,11 @@
 
 #define BMC_TYPE                    0
 #define PCH_TYPE                    2
-#define KEY_CANCELLATION_TYPE       4
-#define DECOMMISSION_TYPE           5
+
+// Firmware Update Format Type in image header [2:3]
+#define UPDATE_FORMAT_TPYE_HROT     0x0002
+#define UPDATE_FORMAT_TPYE_KCC      0x0004
+#define UPDATE_FORMAT_TPYE_DCC      0x0005
 
 #define FALSE                       0
 #define TRUE                        1

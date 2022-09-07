@@ -151,7 +151,7 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 			return Failure;
 		}
 
-		if (image_header.format == ROT_TYPE) {
+		if (image_header.format == UPDATE_FORMAT_TPYE_HROT) {
 			status = cerberus_update_rot_fw(manifest);
 			if(status != Success){
 				LOG_ERR("HRoT update failed.");
@@ -196,7 +196,7 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		return Failure;
 	}
 
-	if (image_format == KEY_CANCELLATION_TYPE) {
+	if (image_format == UPDATE_FORMAT_TPYE_KCC) {
 		int get_key_id = 0xFF;
 		int last_key_id = 0xFF;
 		uint8_t pub_key[256];
@@ -228,7 +228,7 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		} else {
 			status = KEYSTORE_NO_KEY;
 		}
-	} else if (image_format == DECOMMISSION_TYPE) {
+	} else if (image_format == UPDATE_FORMAT_TPYE_DCC) {
 		status = cerberus_pfr_decommission(manifest);
 	}
 	return status;
@@ -265,8 +265,8 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 		LOG_ERR("Failed to read image header");
 		return Failure;
 	}
-	if (image_header.format == KEY_CANCELLATION_TYPE ||
-			image_header.format == DECOMMISSION_TYPE) {
+	if (image_header.format == UPDATE_FORMAT_TPYE_KCC ||
+			image_header.format == UPDATE_FORMAT_TPYE_DCC) {
 		return cerberus_keystore_update(manifest, image_header.format);
 	}
 
