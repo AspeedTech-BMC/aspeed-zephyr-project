@@ -273,7 +273,7 @@ bool IsUfmStatusLocked(void);
 bool IsUfmStatusUfmProvisioned(void);
 bool IsUfmStatusPitLevel1Enforced(void);
 bool IsUfmStatusPITL2CompleteSuccess(void);
-byte GetUfmStatusValue(void);
+uint8_t GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
 void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);

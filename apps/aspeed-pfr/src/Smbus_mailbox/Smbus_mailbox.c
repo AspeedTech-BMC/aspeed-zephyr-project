@@ -415,15 +415,6 @@ void InitializeSmbusMailbox(void)
 	get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 
-	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK |
-			   UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK |
-			   UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		SetUfmStatusValue(UFM_PROVISIONED);
-	}
-
-	if (CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK))
-		SetUfmStatusValue(UFM_LOCKED);
-
 	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
 		uint8_t PCHActiveMajorVersion, PCHActiveMinorVersion;
 		uint8_t PCHActiveSVN;
@@ -520,7 +511,6 @@ MBX_REG_INC_GETTER(PanicEventCount);
 MBX_REG_SETTER_GETTER(LastPanicReason);
 MBX_REG_SETTER_GETTER(MajorErrorCode);
 MBX_REG_SETTER_GETTER(MinorErrorCode);
-MBX_REG_GETTER(UfmStatusValue);
 MBX_REG_GETTER(UfmCommand);
 MBX_REG_SETTER_GETTER(UfmCmdTriggerValue);
 MBX_REG_SETTER_GETTER(BmcCheckpoint);
@@ -709,7 +699,7 @@ void SetPlatformState(byte PlatformStateData)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 6),
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 7)};
 
-	for(uint8_t bit = 0; bit < 8; ++bit) {
+	for (uint8_t bit = 0; bit < 8; ++bit) {
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
 		gpio_pin_set(leds[bit].port, leds[bit].pin, !(PlatformStateData & BIT(bit)));
 	}
@@ -764,10 +754,40 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
 }
 
 // UFM Status
+uint8_t GetUfmStatusValue(void)
+{
+	uint32_t UfmStatus;
+	uint8_t data;
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	swmbx_read(gSwMbxDev, false, UfmStatusValue, &data);
+
+	// set bit4 ~ bit7 status from UFM flash status
+	data = data & 0x0f;
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK))
+		data |= UFM_LOCKED;
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK |
+			   UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK |
+			   UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK))
+		data |= UFM_PROVISIONED;
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK))
+		data |= PIT_LEVEL_1_ENFORCED;
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_PASSED_BIT_MASK))
+		data |= PIT_L2_COMPLETE_SUCCESSFUL;
+
+	return data;
+}
+
 void SetUfmStatusValue(uint8_t UfmStatusBitMask)
 {
 	uint8_t status = GetUfmStatusValue();
 
+	// only set bit0 ~ bit2
+	UfmStatusBitMask &= 0x07;
 	status |= UfmStatusBitMask;
 	swmbx_write(gSwMbxDev, false, UfmStatusValue, &status);
 }
@@ -776,6 +796,8 @@ void ClearUfmStatusValue(uint8_t UfmStatusBitMask)
 {
 	uint8_t status = GetUfmStatusValue();
 
+	// only clear bit0 ~ bit2
+	UfmStatusBitMask &= 0x07;
 	status &= ~UfmStatusBitMask;
 	swmbx_write(gSwMbxDev, false, UfmStatusValue, &status);
 }
@@ -1075,7 +1097,6 @@ void process_provision_command(void)
 		Status = erase_provision_flash();
 		if (Status == Success) {
 			gProvisionCount = 0;
-			ClearUfmStatusValue(UFM_CLEAR_ON_ERASE_COMMAND);
 		} else {
 			SetUfmStatusValue(COMMAND_ERROR);
 		}
@@ -1102,7 +1123,6 @@ void process_provision_command(void)
 	case LOCK_UFM:
 		// lock ufm
 		lock_provision_flash();
-		SetUfmStatusValue(UFM_LOCKED);
 		break;
 	case READ_ROOT_KEY:
 		ReadRootKey();
@@ -1145,8 +1165,6 @@ void process_provision_command(void)
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
-
-		SetUfmStatusValue(UFM_PROVISIONED);
 
 		CPLD_STATUS cpld_status;
 
