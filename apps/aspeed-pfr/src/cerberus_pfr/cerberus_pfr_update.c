@@ -30,51 +30,38 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define DECOMMISSION_PC_SIZE		128
-
 int cerberus_set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
 {
 	return Success;
 }
 
-int get_ufm_svn(struct pfr_manifest *manifest, uint8_t offset){
-
+int get_ufm_svn(struct pfr_manifest *manifest, uint8_t offset)
+{
 	return 0;
 }
 
 int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 {
 	int status = 0;
-	uint8_t decom_buffer[DECOMMISSION_PC_SIZE] = {0};
-	uint8_t read_buffer[DECOMMISSION_PC_SIZE] = {0};
 
 	CPLD_STATUS cpld_update_status;
 
-	status = pfr_spi_read(manifest->image_type, manifest->address, manifest->pc_length, read_buffer);
-	if(status != Success ){
-		LOG_ERR("PfrDecommission failed.");
-		return Failure;
-	}
-
-	status = compare_buffer(read_buffer, decom_buffer, sizeof(read_buffer));
-	if(status != Success){
-		LOG_ERR("Invalid decommission capsule data.");
-		return Failure;
-	}
-
 	// Erasing provisioned data
-	LOG_INF("Decommission Success.Erasing the provisioned UFM data.");
-
 	status = ufm_erase(PROVISION_UFM);
 	if (status != Success)
 		return Failure;
 
-	memset(&cpld_update_status,0, sizeof(cpld_update_status));
+	LOG_INF("Decommission Success. Erasing the provisioned UFM data.");
+
+	memset(&cpld_update_status, 0, sizeof(cpld_update_status));
 
 	cpld_update_status.DecommissionFlag = 1;
-	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-	if (status != Success)
+	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	if (status != Success) {
+		LOG_ERR("Update ROT status in UPDATE_STATUS_UFM failed");
 		return Failure;
+	}
+
 	return Success;
 }
 
@@ -141,19 +128,19 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 {
 	int status = 0;
 	byte provision_state = GetUfmStatusValue();
-	if (provision_state & UFM_PROVISIONED){
+	if (provision_state & UFM_PROVISIONED) {
 		struct recovery_header image_header;
 		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header),
 				(uint8_t *)&image_header);
 		status =  cerberus_pfr_verify_image(manifest);
-		if(status != Success){
+		if (status != Success) {
 			LOG_ERR("HRoT update pfr verification failed");
 			return Failure;
 		}
 
 		if (image_header.format == UPDATE_FORMAT_TPYE_HROT) {
 			status = cerberus_update_rot_fw(manifest);
-			if(status != Success){
+			if (status != Success) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
@@ -184,14 +171,14 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 	// Get the Header Length
 	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(header_length),
 			(uint8_t *)&header_length);
-	if(status != Success){
+	if (status != Success) {
 		LOG_ERR("HROT update read header length failed");
 		return Failure;
 	}
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + header_length,
 			sizeof(section_header_length), (uint16_t *)&section_header_length);
-	if(status != Success){
+	if (status != Success) {
 		LOG_ERR("HROT update read header failed");
 		return Failure;
 	}
@@ -201,17 +188,18 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		int last_key_id = 0xFF;
 		uint8_t pub_key[256];
 		struct Keystore_Manager keystore_manager;
+
 		keystoreManager_init(&keystore_manager);
 
 		status = pfr_spi_read(manifest->image_type,
 				manifest->address + header_length + section_header_length - 2,
 				sizeof(capsule_type), (uint8_t *)&capsule_type);
 		manifest->pc_type = capsule_type;
-		LOG_INF("capsule_type is %x",capsule_type);
+		LOG_INF("capsule_type is %x", capsule_type);
 		status = pfr_spi_read(manifest->image_type,
 				manifest->address + header_length + section_header_length,
 				256, (uint8_t *)&pub_key);
-		if(status != Success){
+		if (status != Success) {
 			LOG_ERR("HROT update read signature failed");
 			status = Failure;
 		}
@@ -222,8 +210,8 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 				LOG_ERR("Root Key could not be Cancelled");
 			} else {
 				status = manifest->keystore->kc_flag->cancel_kc_flag(manifest, get_key_id);
-				if(status == Success)
-					LOG_INF("Key cancellation success. Key Id :%d was cancelled",get_key_id);
+				if (status == Success)
+					LOG_INF("Key cancellation success. Key Id :%d was cancelled", get_key_id);
 			}
 		} else {
 			status = KEYSTORE_NO_KEY;
@@ -286,10 +274,10 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	recovery_offset = recovery_offset + platform_length + 1;
 	bool should_update = false;
 
-	while(recovery_offset < sig_address) {
+	while (recovery_offset < sig_address) {
 		status = pfr_spi_read(manifest->image_type, recovery_offset,
 				sizeof(image_section), (uint8_t *)&image_section);
-		if(image_section.magic_number != RECOVERY_SECTION_MAGIC) {
+		if (image_section.magic_number != RECOVERY_SECTION_MAGIC) {
 			status = Failure;
 			LOG_ERR("Recovery Section not matched.");
 			break;
@@ -363,7 +351,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
 					sizeof(act_pfm_offset)))
 			return Failure;
-	} else if(pfr_manifest->image_type == PCH_TYPE) {
+	} else if (pfr_manifest->image_type == PCH_TYPE) {
 		// PCH Update
 		LOG_INF("PCH Update in Progress");
 		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
@@ -372,7 +360,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
 					sizeof(act_pfm_offset)))
 			return Failure;
-	} else if(pfr_manifest->image_type == ROT_TYPE) {
+	} else if (pfr_manifest->image_type == ROT_TYPE) {
 		//HROT Update/Decommisioning
 		LOG_INF("ROT Update in Progress");
 		pfr_manifest->image_type = BMC_TYPE;
@@ -434,7 +422,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			//BMC Update/Provisioning
 			get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
-		} else if(image_type == PCH_TYPE) {
+		} else if (image_type == PCH_TYPE) {
 			//PCH Update
 			get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
