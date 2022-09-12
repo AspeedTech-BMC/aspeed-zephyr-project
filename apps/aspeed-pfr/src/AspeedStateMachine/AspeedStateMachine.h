@@ -50,6 +50,9 @@ enum aspeed_pfr_event {
 	SEAMLESS_VERIFY_DONE,
 	SEAMLESS_VERIFY_FAILED,
 #endif
+#if defined(CONFIG_PIT_PROTECTION)
+	SEAL_FIRMWARE,
+#endif
 };
 
 union aspeed_event_data {

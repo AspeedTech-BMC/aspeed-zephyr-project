@@ -54,6 +54,9 @@ uint8_t gReadFifoData[64];
 uint8_t gRootKeyHash[SHA384_DIGEST_LENGTH];
 uint8_t gPchOffsets[12];
 uint8_t gBmcOffsets[12];
+#if defined(CONFIG_PIT_PROTECTION)
+uint8_t gPitPassword[8];
+#endif
 uint8_t gUfmFifoLength;
 uint8_t gbmcactivesvn;
 uint8_t gbmcactiveMajorVersion;
@@ -773,11 +776,13 @@ uint8_t GetUfmStatusValue(void)
 			   UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK))
 		data |= UFM_PROVISIONED;
 
+#if defined(CONFIG_PIT_PROTECTION)
 	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK))
 		data |= PIT_LEVEL_1_ENFORCED;
 
 	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_PASSED_BIT_MASK))
 		data |= PIT_L2_COMPLETE_SUCCESSFUL;
+#endif
 
 	return data;
 }
@@ -1038,6 +1043,61 @@ unsigned char ProvisionBmcOffsets(void)
 	return UnSupported;
 }
 
+#if defined(CONFIG_PIT_PROTECTION)
+void ProvisionPitKey(void)
+{
+	uint32_t UfmStatus;
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PIT_ID_BIT_MASK)) {
+		LOG_ERR("PIT password has been provisioned");
+		SetUfmStatusValue(COMMAND_ERROR);
+		return;
+	}
+
+	set_provision_data_in_flash(PIT_PASSWORD, (uint8_t *)gPitPassword, sizeof(gPitPassword));
+	SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PIT_ID_BIT_MASK);
+}
+
+void EnablePitLevel1(void)
+{
+	uint32_t UfmStatus;
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK)) {
+		LOG_ERR("PIT L1 check has been enabled");
+		return;
+	}
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PIT_ID_BIT_MASK)) {
+		SetUfmFlashStatus(UfmStatus, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK);
+	} else {
+		LOG_ERR("PIT ID is not configured");
+		SetUfmStatusValue(COMMAND_ERROR);
+	}
+}
+
+void EnablePitLevel2(void)
+{
+	uint32_t UfmStatus;
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_ENABLE_BIT_MASK)) {
+		LOG_ERR("PIT L2 check has been enabled");
+		return;
+	}
+
+	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK)) {
+		LOG_ERR("PIT L1 check should be enabled");
+		return;
+	}
+
+	SetUfmFlashStatus(UfmStatus, UFM_STATUS_PIT_L2_ENABLE_BIT_MASK);
+}
+#endif
+
 void lock_provision_flash(void)
 {
 	uint32_t UfmStatus;
@@ -1106,10 +1166,12 @@ void process_provision_command(void)
 		gProvisionCount |= 1 << 0;
 		gProvisionData = 1;
 		break;
+#if defined(CONFIG_PIT_PROTECTION)
 	case PROVISION_PIT_KEY:
-		// Update password to provsioned UFM
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
+		memcpy(gPitPassword, gUfmFifoData, sizeof(gPitPassword));
+		ProvisionPitKey();
 		break;
+#endif
 	case PROVISION_PCH_OFFSET:
 		memcpy(gPchOffsets, gUfmFifoData, sizeof(gPchOffsets));
 		gProvisionCount |= 1 << 1;
@@ -1133,14 +1195,14 @@ void process_provision_command(void)
 	case READ_BMC_OFFSET:
 		ReadBmcOffets();
 		break;
+#if defined(CONFIG_PIT_PROTECTION)
 	case ENABLE_PIT_LEVEL_1_PROTECTION:
-		// EnablePitLevel1();
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
+		EnablePitLevel1();
 		break;
 	case ENABLE_PIT_LEVEL_2_PROTECTION:
-		// EnablePitLevel2();
-		DEBUG_PRINTF("PIT IS NOT SUPPORTED");
+		EnablePitLevel2();
 		break;
+#endif
 	}
 
 	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {

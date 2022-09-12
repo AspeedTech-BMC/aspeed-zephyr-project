@@ -7,8 +7,11 @@
 #if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
+#include <drivers/flash.h>
+#include "common/common.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "flash/flash_aspeed.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "pfr/pfr_util.h"
@@ -19,6 +22,143 @@
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
+#if defined(CONFIG_PIT_PROTECTION)
+int intel_pfr_pit_level1_verify(void)
+{
+	// PIT level 1 verification should be customized.
+	// This is the sample code that use ast1060 internal flash offset 0xdf000 - dffff to
+	// simulate RF NVRAM.
+#define RF_NVRAM_OFFSET 0xf000
+	uint32_t ufm_status;
+	uint8_t pit_password[8];
+	uint8_t rf_pit_password[8];
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&ufm_status, sizeof(ufm_status));
+	if (!CheckUfmStatus(ufm_status, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK))
+		return Success;
+
+	ufm_read(PROVISION_UFM, PIT_PASSWORD,
+			(uint8_t *)pit_password, sizeof(pit_password));
+	pfr_spi_read(ROT_INTERNAL_INTEL_STATE, RF_NVRAM_OFFSET, sizeof(rf_pit_password),
+			rf_pit_password);
+	if (compare_buffer(pit_password, rf_pit_password, sizeof(pit_password))) {
+		SetPlatformState(LOCKDOWN_DUE_TO_PIT_L1);
+		LOG_ERR("PIT Level 1 verify failed, lockdown");
+		return Lockdown;
+	}
+
+	LOG_INF("PIT L1 verify successful");
+	return Success;
+}
+
+int intel_pfr_pit_level2_verify(void)
+{
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	const struct device *flash_dev;
+	PFR_AUTHENTICATION_BLOCK1 block1;
+	KEY_ENTRY *root_entry;
+	uint32_t ufm_status;
+	uint32_t act_pfm_offset;
+	uint32_t flash_size;
+	uint32_t hash_length;
+	uint8_t sha_buffer[SHA384_DIGEST_LENGTH] = { 0 };
+	uint8_t pit_hash_buffer[SHA384_DIGEST_LENGTH] = { 0 };
+	static char *flash_devices[4] = {
+		"spi1_cs0",
+		"spi1_cs1",
+		"spi2_cs0",
+		"spi2_cs1",
+	};
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&ufm_status, sizeof(ufm_status));
+	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_L2_PASSED_BIT_MASK) ||
+			!CheckUfmStatus(ufm_status, UFM_STATUS_PIT_L2_ENABLE_BIT_MASK))
+		return Success;
+
+	if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+				sizeof(act_pfm_offset))) {
+		LOG_ERR("Failed to get active PFM address");
+		return Failure;
+	}
+
+	if (pfr_spi_read(BMC_TYPE, act_pfm_offset + sizeof(PFR_AUTHENTICATION_BLOCK0),
+				sizeof(PFR_AUTHENTICATION_BLOCK1), &block1)) {
+		LOG_ERR("Failed to get block1");
+		return Failure;
+	}
+
+	root_entry = &block1.RootEntry;
+	if (root_entry->PubCurveMagic == PUBLIC_SECP384_TAG) {
+		pfr_manifest->pfr_hash->type = HASH_TYPE_SHA384;
+		hash_length = SHA384_DIGEST_LENGTH;
+	} else {
+		pfr_manifest->pfr_hash->type = HASH_TYPE_SHA256;
+		hash_length = SHA256_DIGEST_LENGTH;
+	}
+
+	pfr_manifest->pfr_hash->start_address = 0;
+	flash_dev = device_get_binding(flash_devices[BMC_TYPE]);
+	flash_size = flash_get_flash_size(flash_dev);
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
+	flash_size += flash_get_flash_size(flash_dev);
+#endif
+	spi_flash->spi.device_id[0] = BMC_TYPE;
+	pfr_manifest->image_type = BMC_TYPE;
+	pfr_manifest->pfr_hash->length = flash_size;
+	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
+			sha_buffer, hash_length);
+
+	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK)) {
+		ufm_read(PROVISION_UFM, PIT_BMC_FW_HASH,
+				(uint8_t *)pit_hash_buffer, sizeof(pit_hash_buffer));
+		if (compare_buffer(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
+			LOG_ERR("PIT L2 BMC hash mismatch");
+			LOG_HEXDUMP_ERR(sha_buffer, hash_length, "bmc pit hash :");
+			LOG_HEXDUMP_ERR(pit_hash_buffer, hash_length, "ufm pit hash :");
+			SetPlatformState(LOCKDOWN_ON_PIT_L2_BMC_HASH_MISMATCH);
+			return Lockdown;
+		}
+		LOG_INF("PIT L2 BMC hash verify successful");
+	} else {
+		ufm_write(PROVISION_UFM, PIT_BMC_FW_HASH, sha_buffer, SHA384_DIGEST_LENGTH);
+		LOG_INF("BMC firmware sealed");
+	}
+
+
+	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
+	flash_size = flash_get_flash_size(flash_dev);
+	spi_flash->spi.device_id[0] = PCH_TYPE;
+	pfr_manifest->image_type = PCH_TYPE;
+	pfr_manifest->pfr_hash->length = flash_size;
+	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
+			sha_buffer, hash_length);
+
+	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK)) {
+		ufm_read(PROVISION_UFM, PIT_PCH_FW_HASH,
+				(uint8_t *)pit_hash_buffer, sizeof(pit_hash_buffer));
+		if (compare_buffer(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
+			LOG_ERR("PIT L2 PCH hash mismatch");
+			LOG_HEXDUMP_ERR(sha_buffer, hash_length, "pch pit hash :");
+			LOG_HEXDUMP_ERR(pit_hash_buffer, hash_length, "ufm pit hash :");
+			SetPlatformState(LOCKDOWN_ON_PIT_L2_PCH_HASH_MISMATCH);
+			return Lockdown;
+		}
+		SetUfmFlashStatus(ufm_status, UFM_STATUS_PIT_L2_PASSED_BIT_MASK);
+		LOG_INF("PIT L2 PCH hash verify successful");
+	} else {
+		ufm_write(PROVISION_UFM, PIT_PCH_FW_HASH, sha_buffer, SHA384_DIGEST_LENGTH);
+		SetUfmFlashStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK);
+		SetPlatformState(PIT_L2_FW_SEALED);
+		LOG_INF("PCH firmware sealed");
+		// All firmware sealed, lockdown
+		return Lockdown;
+	}
+	return Success;
+}
+#endif
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
@@ -575,7 +715,7 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 						NULL, NULL, NULL, 0)) {
 				LOG_ERR("Verify FVM failed");
 			}
-			LOG_INF("FVM region verify succssful");
+			LOG_INF("FVM region verify successful");
 			cap_pfm_body_offset += sizeof(PFM_FVM_ADDRESS_DEFINITION);
 		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
 			cap_pfm_body_offset += sizeof(FVM_CAPABLITIES);

@@ -108,4 +108,13 @@ config SEAMLESS_UPDATE
 	  Support FVM verification and host firmware update by seamless capsule.
 	  PFR will update host firmware without going to t-1 state and rebooting host.
 
+config PIT_PROTECTION
+	depends on INTEL_PFR
+	depends on !CERBERUS_PFR
+	default n
+	bool "PIT protection support"
+	help
+	  Enable PIT protection functions and PIT mailbox commands.
+	  ROT will perform PIT check if PIT protection is enabled via mailbox command.
+
 source "Kconfig.zephyr"

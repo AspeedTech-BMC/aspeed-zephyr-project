@@ -17,7 +17,9 @@
 #include "include/SmbusMailBoxCom.h"
 #if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
+#include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_update.h"
+#include "intel_pfr/intel_pfr_verification.h"
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
@@ -205,6 +207,49 @@ void verify_image(uint32_t image, uint32_t operation, uint32_t flash, struct smf
 	}
 }
 
+#if defined(CONFIG_PIT_PROTECTION)
+void handle_pit_event(void *o)
+{
+	uint8_t provision_state = GetUfmStatusValue();
+	uint32_t UfmStatus;
+
+	if (!(provision_state & UFM_PROVISIONED))
+		return;
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_HASH_STORED_BIT_MASK) ||
+			CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_PASSED_BIT_MASK))
+		return;
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_ENABLE_BIT_MASK))
+		GenerateStateMachineEvent(SEAL_FIRMWARE, NULL);
+}
+
+int handle_pit_verification(void *o)
+{
+	byte provision_state = GetUfmStatusValue();
+
+	if (!(provision_state & UFM_PROVISIONED)) {
+		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
+		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
+	} else {
+		if (intel_pfr_pit_level1_verify()) {
+			// lockdown
+			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+			return Failure;
+		}
+		if (intel_pfr_pit_level2_verify()) {
+			// lockdown
+			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+			return Failure;
+		}
+	}
+
+	return Success;
+}
+#endif
+
 void handle_image_verification(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
@@ -360,8 +405,14 @@ void handle_image_verification(void *o)
 
 void do_verify(void *o)
 {
+	int status = Success;
 	LOG_DBG("Start");
-	handle_image_verification(o);
+#if defined(CONFIG_PIT_PROTECTION)
+	status = handle_pit_verification(o);
+#endif
+	if (status == Success)
+		handle_image_verification(o);
+
 	LOG_DBG("End");
 }
 
@@ -925,6 +976,9 @@ void do_unprovisioned(void *o)
 #endif
 	case PROVISION_CMD:
 		handle_provision_event(o);
+#if defined(CONFIG_PIT_PROTECTION)
+		handle_pit_event(o);
+#endif
 		break;
 	default:
 		break;
@@ -1013,6 +1067,9 @@ void do_runtime(void *o)
 	switch (evt_ctx->event) {
 	case PROVISION_CMD:
 		handle_provision_event(o);
+#if defined(CONFIG_PIT_PROTECTION)
+		handle_pit_event(o);
+#endif
 		break;
 	case WDT_CHECKPOINT:
 		handle_checkpoint(o);
@@ -1202,6 +1259,9 @@ void AspeedStateMachine(void)
 		} else if (current_state == &state_table[RUNTIME]) {
 			switch (fifo_in->event) {
 			case RESET_DETECTED:
+#if defined(CONFIG_PIT_PROTECTION)
+			case SEAL_FIRMWARE:
+#endif
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;
 			case UPDATE_REQUESTED:
@@ -1267,6 +1327,9 @@ void AspeedStateMachine(void)
 				break;
 #endif
 			case RESET_DETECTED:
+#if defined(CONFIG_PIT_PROTECTION)
+			case SEAL_FIRMWARE:
+#endif
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;
 			default:
