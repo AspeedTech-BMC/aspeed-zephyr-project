@@ -46,10 +46,10 @@ config BMC_CHECKPOINT_RECOVERY
 
 config BMC_CHECKPOINT_EXPIRE_TIME
 	default 175000
-	int "Maximum timeout value for BMC checkpoint"
+	int "Maximum timeout value for BMC checkpoint in mS"
 	help
 	  After system is provisioned, the watchdog will be armed during BMC
-	  booting. The expire time will be set to this number.
+	  booting. The expire time will be set to this number in milliseconds.
 
 config PCH_CHECKPOINT_RECOVERY
 	default n
@@ -59,10 +59,10 @@ config PCH_CHECKPOINT_RECOVERY
 
 config PCH_CHECKPOINT_EXPIRE_TIME
 	default 900000
-	int "Maximum timeout value for PCH checkpoint"
+	int "Maximum timeout value for PCH checkpoint in mS"
 	help
 	  After system is provisioned, the watchdog will be armed during BIOS
-	  booting. The expire time will be set to this number.
+	  booting. The expire time will be set to this number in milliseconds.
 
 config PLATFORM_STATE_LED
 	default n
