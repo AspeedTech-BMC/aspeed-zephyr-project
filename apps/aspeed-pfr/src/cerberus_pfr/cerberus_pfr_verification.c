@@ -40,7 +40,7 @@ int verify_recovery_header_magic_number(struct recovery_header rec_head)
 			status = Failure;
 		}
 	} else {
-		if(rec_head.magic_number != RECOVERY_HEADER_MAGIC)
+		if (rec_head.magic_number != RECOVERY_HEADER_MAGIC)
 			status = Failure;
 	}
 	return status;
@@ -49,14 +49,14 @@ int verify_recovery_header_magic_number(struct recovery_header rec_head)
 
 void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
 {
-	if(pfr_manifest->image_type == BMC_TYPE) {
+	if (pfr_manifest->image_type == BMC_TYPE) {
 		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET,
 				(uint8_t *)&pfr_manifest->staging_address, sizeof(pfr_manifest->address));
 		get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET,
 				(uint8_t *)&pfr_manifest->recovery_address,
 				sizeof(pfr_manifest->recovery_address));
 		pfr_manifest->flash_id = BMC_FLASH_ID;
-	}else if(pfr_manifest->image_type == PCH_TYPE){
+	} else if (pfr_manifest->image_type == PCH_TYPE) {
 		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET,
 				(uint8_t *)&pfr_manifest->staging_address, sizeof(pfr_manifest->address));
 		get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET,
@@ -81,7 +81,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	pfr_spi_read(manifest->flash_id, verify_addr, sizeof(image_header), (uint8_t *)&image_header);
 
 	status = verify_recovery_header_magic_number(image_header);
-	if (status != Success){
+	if (status != Success) {
 		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
 		LOG_ERR("Image Header Magic Number is not Matched.");
 		return Failure;
@@ -91,7 +91,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	LOG_INF("Public Key Exponent=%08x", public_key.exponent);
 	LOG_HEXDUMP_INF(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
 
-	if (status != Success){
+	if (status != Success) {
 		LOG_ERR("Unable to get public Key.");
 		return Failure;
 	}
@@ -103,7 +103,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	LOG_INF("image_header.sign_length=%x", image_header.sign_length);
 	status = get_signature(manifest->flash_id, signature_address, sig_data,
 			SHA256_SIGNATURE_LENGTH);
-	if (status != Success){
+	if (status != Success) {
 		LOG_ERR("Unable to get the Signature.");
 		return Failure;
 	}
@@ -111,7 +111,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	// verify
 	manifest->flash->device_id[0] = manifest->flash_id;
 	LOG_HEXDUMP_INF(sig_data, SHA256_SIGNATURE_LENGTH, "Image Signature:");
-	status = flash_verify_contents( (struct flash *)manifest->flash,
+	status = flash_verify_contents((struct flash *)manifest->flash,
 			verify_addr,
 			(image_header.image_length - image_header.sign_length),
 			get_hash_engine_instance(),
@@ -123,7 +123,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 			hashStorage,
 			SHA256_SIGNATURE_LENGTH
 			);
-	if (status != Success){
+	if (status != Success) {
 		LOG_ERR("Image verify Fail manifest->flash_id=%d address=%x", manifest->flash_id,
 				verify_addr);
 		return Failure;
@@ -174,6 +174,11 @@ int get_rsa_public_key(uint8_t flash_id, uint32_t address, struct rsa_public_key
 	status = pfr_spi_read(flash_id, address, sizeof(key_length), (uint8_t *)&key_length);
 	if (status != Success) {
 		LOG_ERR("Flash read rsa key length failed");
+		return Failure;
+	}
+
+	if (key_length > RSA_MAX_KEY_LENGTH) {
+		LOG_ERR("root key length(%d) exceed max length (%d)", key_length, RSA_MAX_KEY_LENGTH);
 		return Failure;
 	}
 
