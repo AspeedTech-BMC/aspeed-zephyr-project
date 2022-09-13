@@ -19,24 +19,20 @@
 #define KeyStoreOffset_200			0x200
 
 struct Keystore_Manager {
-    struct keystore base;
+	struct keystore base;
 };
 
-struct Keystore_Header
-{
+struct Keystore_Header {
 	uint8_t key_id;
 	uint16_t key_length;
-}__attribute__((packed));
+} __packed;
 
-struct Keystore_Package
-{
+struct Keystore_Package {
 	struct Keystore_Header keysotre_hdr;
 	uint8_t key_buffer[KEY_MAX_LENGTH];
 };
 
-
-
-int keystoreManager_init (struct Keystore_Manager *key_store);
+int keystoreManager_init(struct Keystore_Manager *key_store);
 int keystore_get_key_id(struct keystore *store, uint8_t *key, int *key_id, int *last_key_id);
 int keystore_get_root_key(struct rsa_public_key *pub_key);
 int keystore_save_root_key(struct rsa_public_key *pub_key);

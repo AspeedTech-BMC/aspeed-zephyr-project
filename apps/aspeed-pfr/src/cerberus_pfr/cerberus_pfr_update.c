@@ -190,7 +190,6 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		struct Keystore_Manager keystore_manager;
 
 		keystoreManager_init(&keystore_manager);
-
 		status = pfr_spi_read(manifest->image_type,
 				manifest->address + header_length + section_header_length - 2,
 				sizeof(capsule_type), (uint8_t *)&capsule_type);
@@ -203,7 +202,8 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 			LOG_ERR("HROT update read signature failed");
 			status = Failure;
 		}
-		status = keystore_get_key_id(&keystore_manager.base, &pub_key, &get_key_id,
+
+		status = keystore_get_key_id(&keystore_manager.base, (uint8_t *)&pub_key, &get_key_id,
 				&last_key_id);
 		if (get_key_id != 0xFF) {
 			if (get_key_id == 0) {

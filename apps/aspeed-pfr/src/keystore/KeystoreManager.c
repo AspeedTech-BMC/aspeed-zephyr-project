@@ -21,7 +21,6 @@ int keystore_save_key(struct keystore *store, int id, const uint8_t *key, size_t
 	uint16_t StoreBufIndex;
 	uint32_t BaseAddr;
 	uint8_t StoreBuf[KeyStoreKeyMaxLen] = { 0 };
-	uint8_t Read_key;
 
 	if (length > KEY_MAX_LENGTH) {
 		status = KEYSTORE_KEY_TOO_LONG;
@@ -45,26 +44,23 @@ int keystore_save_key(struct keystore *store, int id, const uint8_t *key, size_t
 	StoreBuf[StoreBufIndex] = ((length >> 8) & 0xFF);
 
 	//store key data to buffer
-	for(StoreBufIndex = KeyStoreHdrLen; StoreBufIndex < (length + KeyStoreHdrLen);StoreBufIndex++)
-	{
+	for (StoreBufIndex = KeyStoreHdrLen; StoreBufIndex < (length + KeyStoreHdrLen); StoreBufIndex++) {
 		//for buffer ,the key should be store after header
 		//for input key, the index should be start from 0
-		StoreBuf[StoreBufIndex] = key[StoreBufIndex- KeyStoreHdrLen];
+		StoreBuf[StoreBufIndex] = key[StoreBufIndex - KeyStoreHdrLen];
 	}
+
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 
-	status = spi_flash->spi.base.write(&spi_flash->spi, BaseAddr, &StoreBuf, KeyStoreKeyMaxLen);
+	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeyStoreKeyMaxLen);
 
-	if(status != KeyStoreKeyMaxLen)
-	{
-		LOG_ERR("key write error \n");
+	if (status != KeyStoreKeyMaxLen) {
+		LOG_ERR("key write error");
 		status = KEYSTORE_SAVE_FAILED;
-	}
-	else
-	{
-		LOG_INF("key write success \n");
+	} else {
+		LOG_INF("key write success");
 		status = Success;
 	}
 
@@ -74,8 +70,7 @@ int keystore_save_key(struct keystore *store, int id, const uint8_t *key, size_t
 int keystore_load_key(struct keystore *store, int id, uint8_t **key, size_t *length)
 {
 	uint32_t BaseAddr;
-	uint8_t  StoreBuf[KeyStoreHdrLen] ={0};
-	uint16_t StoreBufIndex;
+	uint8_t StoreBuf[KeyStoreHdrLen] = {0};
 	uint16_t StoreBufLen;
 	struct Keystore_Header *KeyStorePkgHdr;
 	int status;
@@ -85,10 +80,10 @@ int keystore_load_key(struct keystore *store, int id, uint8_t **key, size_t *len
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 	BaseAddr = id * KeyStoreKeyMaxLen;
 
-	status = spi_flash->spi.base.read(&spi_flash->spi, BaseAddr, &StoreBuf[0],KeyStoreHdrLen);
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeyStoreHdrLen);
 
 	if (status != Success) {
-		LOG_ERR("KeyStore_Load_key load header fail ;Flash read status= %x\n",status);
+		LOG_ERR("KeyStore_Load_key load header fail, Flash read status= %x", status);
 		return status;	// failed to load key header from SPI
 	}
 
@@ -103,9 +98,9 @@ int keystore_load_key(struct keystore *store, int id, uint8_t **key, size_t *len
 	StoreBufLen = KeyStorePkgHdr->key_length;
 
 	//store key from flash part
-	status = spi_flash->spi.base.read(&spi_flash->spi, BaseAddr + KeyStoreHdrLen, key,StoreBufLen);
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr + KeyStoreHdrLen, (uint8_t *)key, StoreBufLen);
 	if (status != Success) {
-		LOG_ERR("KeyStore_Load_key load key fail ;Flash read status= %x\n",status);
+		LOG_ERR("KeyStore_Load_key load key fail, Flash read status= %x", status);
 		status = KEYSTORE_LOAD_FAILED;
 	}
 
@@ -114,26 +109,25 @@ int keystore_load_key(struct keystore *store, int id, uint8_t **key, size_t *len
 
 int keystore_erase_key(struct keystore *store, int id)
 {
-	uint8_t  StoreBuf[KeySectionSize] ={0};
+	uint8_t StoreBuf[KeySectionSize] = {0};
 	uint32_t BaseAddr;
 	uint32_t WipeOutIndex;
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 
+	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 	BaseAddr = KeyStoreOffset_0;
 
-	status = spi_flash->spi.base.read(&spi_flash->spi, BaseAddr, &StoreBuf,KeySectionSize);
-	if(status)
-	{
-		LOG_ERR("KeyStore_Erase_key load key section fail ;Flash read status= %x\n",status);
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeySectionSize);
+	if (status) {
+		LOG_ERR("KeyStore_Erase_key load key section fail, Flash read status= %x", status);
 		return status;	// failed to load key header from SPI
 	}
-	status = spi_flash->spi.base.sector_erase(&spi_flash->spi, BaseAddr);
 
-	if(status)
-	{
-		LOG_ERR("KeyStore_Erase_key key section erase fail ;Flash erase status= %x\n",status);
+	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, BaseAddr);
+
+	if (status) {
+		LOG_ERR("KeyStore_Erase_key key section erase fail, Flash erase status= %x", status);
 		return status;	// failed to load key header from SPI
 	}
 
@@ -141,10 +135,10 @@ int keystore_erase_key(struct keystore *store, int id)
 
 	memset(&StoreBuf[WipeOutIndex], 0xff, KeyStoreKeyMaxLen);
 
-	status = spi_flash->spi.base.write(&spi_flash->spi, BaseAddr, &StoreBuf[0],KeySectionSize);
+	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeySectionSize);
 	if (status != Success) {
 		//Spi write suppose to return write Length
-		LOG_ERR("KeyStore_Erase_key buffer store fail; write status= %x\n",status);
+		LOG_ERR("KeyStore_Erase_key buffer store fail, write status= %x", status);
 		status = KEYSTORE_SAVE_FAILED;
 	} else {
 		status = 0;
@@ -158,27 +152,23 @@ int keystore_erase_all_keys(struct keystore *store)
 	uint32_t BaseAddr;
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 	BaseAddr = KeyStoreOffset_0;
+	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, BaseAddr);
 
-	status = spi_flash->spi.base.sector_erase(&spi_flash->spi, BaseAddr);
-
-	if (status != Success) {
-		LOG_ERR("KeyStore_Erase_All_Keys key section erase fail ;Flash erase status= %x\n",status);
-	}
+	if (status != Success)
+		LOG_ERR("KeyStore_Erase_All_Keys key section erase fail, Flash erase status= %x", status);
 
 	return status;
 }
 
-
-int keystoreManager_init (struct Keystore_Manager *key_store)
+int keystoreManager_init(struct Keystore_Manager *key_store)
 {
-	if (key_store == NULL){
+	if (key_store == NULL)
 		return KEYSTORE_INVALID_ARGUMENT;
-	}
 
-	memset (key_store, 0, sizeof (struct keystore));
-
+	memset(key_store, 0, sizeof(struct keystore));
 	key_store->base.save_key = keystore_save_key;
 	key_store->base.load_key = keystore_load_key;
 	key_store->base.erase_key = keystore_erase_key;
@@ -190,8 +180,7 @@ int keystoreManager_init (struct Keystore_Manager *key_store)
 int keystore_get_key_id(struct keystore *store, uint8_t *key, int *key_id, int *last_key_id)
 {
 	uint32_t BaseAddr;
-	uint8_t  StoreBuf[KeyStoreHdrLen] ={0};
-	uint16_t StoreBufIndex;
+	uint8_t StoreBuf[KeyStoreHdrLen] = {0};
 	uint16_t StoreBufLen;
 	struct Keystore_Header *KeyStorePkgHdr;
 	int status;
@@ -206,10 +195,10 @@ int keystore_get_key_id(struct keystore *store, uint8_t *key, int *key_id, int *
 	while (key_match == 0 && id < KEY_MAX_NUMBER) {
 		BaseAddr = id * KeyStoreKeyMaxLen;
 
-		status = spi_flash->spi.base.read(&spi_flash->spi, BaseAddr, &StoreBuf[0],KeyStoreHdrLen);
+		status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeyStoreHdrLen);
 
 		if (status != Success) {
-			LOG_ERR("KeyStore_Load_key load header fail ;Flash read status= %x\n",status);
+			LOG_ERR("KeyStore_Load_key load header fail, Flash read status= %x", status);
 			return status;	// failed to load key header from SPI
 		}
 
@@ -221,13 +210,13 @@ int keystore_get_key_id(struct keystore *store, uint8_t *key, int *key_id, int *
 
 		StoreBufLen = KeyStorePkgHdr->key_length;
 		//store key from flash part
-		status = spi_flash->spi.base.read(&spi_flash->spi, BaseAddr + KeyStoreHdrLen, &key_buffer, StoreBufLen);
+		status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr + KeyStoreHdrLen, (uint8_t *)&key_buffer, StoreBufLen);
 		if (status != Success) {
-			LOG_ERR("KeyStore_Load_key load key fail ;Flash read status= %x\n",status);
+			LOG_ERR("KeyStore_Load_key load key fail, Flash read status= %x", status);
 			status = KEYSTORE_LOAD_FAILED;
 		}
 		// Compare key and key_buffer
-		status = compare_buffer(key, &key_buffer, KEY_MAX_LENGTH);
+		status = compare_buffer(key, (uint8_t *)&key_buffer, KEY_MAX_LENGTH);
 		if (status == Success) {
 			key_match = 1;
 			*key_id = KeyStorePkgHdr->key_id;
@@ -245,7 +234,7 @@ int keystore_save_root_key(struct rsa_public_key *pub_key)
 	uint16_t StoreBufIndex;
 	uint16_t BaseAddr = KeyStoreOffset_200;
 	int rootkey_contain_size = 2 + pub_key->mod_length + sizeof(pub_key->exponent);
-	uint8_t StoreBuf[KEY_MAX_LENGTH + 2 + sizeof(pub_key->exponent) ] = { 0 };
+	uint8_t StoreBuf[KEY_MAX_LENGTH + 2 + sizeof(pub_key->exponent)] = { 0 };
 
 
 	if (pub_key->mod_length > KEY_MAX_LENGTH) {
@@ -262,12 +251,12 @@ int keystore_save_root_key(struct rsa_public_key *pub_key)
 	StoreBuf[StoreBufIndex] = ((pub_key->mod_length >> 8) & 0xFF);
 
 	//store key data to buffer
-	for(StoreBufIndex = 2; StoreBufIndex < (pub_key->mod_length + 2);StoreBufIndex++)
-	{
+	for (StoreBufIndex = 2; StoreBufIndex < (pub_key->mod_length + 2); StoreBufIndex++) {
 		//for buffer ,the key should be store after header
 		//for input key, the index should be start from 0
-		StoreBuf[StoreBufIndex] = pub_key->modulus[StoreBufIndex- 2];
+		StoreBuf[StoreBufIndex] = pub_key->modulus[StoreBufIndex - 2];
 	}
+
 	// store exponent
 	StoreBufIndex = pub_key->mod_length + 2;
 	StoreBuf[StoreBufIndex] = (pub_key->exponent & 0xFF);
@@ -285,16 +274,13 @@ int keystore_save_root_key(struct rsa_public_key *pub_key)
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Root Key save to Intel State
 
-	status = spi_flash->spi.base.write(&spi_flash->spi, BaseAddr, StoreBuf, rootkey_contain_size);
+	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)StoreBuf, rootkey_contain_size);
 
-	if(status != rootkey_contain_size)
-	{
-		LOG_ERR("key write error \n");
+	if (status != rootkey_contain_size) {
+		LOG_ERR("key write error");
 		status = KEYSTORE_SAVE_FAILED;
-	}
-	else
-	{
-		LOG_INF("key write success \n");
+	} else {
+		LOG_INF("key write success");
 		status = Success;
 	}
 
@@ -305,30 +291,29 @@ int keystore_get_root_key(struct rsa_public_key *pub_key)
 {
 	int status = Success;
 	uint16_t BaseAddr = KeyStoreOffset_200;
-
 	uint16_t key_length;
-	uint8_t exponent_length;
-	uint32_t modules_address,exponent_address;
+	uint32_t modules_address;
+	uint32_t exponent_address;
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Root Key save to Intel State
 
 	//Key Length
-	status = spi_flash->spi.base.read(&spi_flash->spi, BaseAddr, &key_length, sizeof(key_length));
-	if (status != Success){
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&key_length, sizeof(key_length));
+	if (status != Success)
 		return Failure;
-	}
+
 	pub_key->mod_length = key_length;
 	modules_address = BaseAddr + sizeof(key_length);
 	//rsa_key_module
-	status = spi_flash->spi.base.read(&spi_flash->spi, modules_address, pub_key->modulus, key_length);
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, modules_address, pub_key->modulus, key_length);
 
 	pub_key->mod_length = key_length;
 	exponent_address = BaseAddr + sizeof(key_length) + key_length;
 
 	//rsa_key_exponent
-	status = spi_flash->spi.base.read(&spi_flash->spi, exponent_address, &pub_key->exponent, sizeof(pub_key->exponent));
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, exponent_address, (uint8_t *)&pub_key->exponent, sizeof(pub_key->exponent));
 
 	return status;
 }
