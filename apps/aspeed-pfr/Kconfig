@@ -44,11 +44,25 @@ config BMC_CHECKPOINT_RECOVERY
 	help
 	  Enable if BMC supports mailbox checkpoint
 
+config BMC_CHECKPOINT_EXPIRE_TIME
+	default 175000
+	int "Maximum timeout value for BMC checkpoint"
+	help
+	  After system is provisioned, the watchdog will be armed during BMC
+	  booting. The expire time will be set to this number.
+
 config PCH_CHECKPOINT_RECOVERY
 	default n
 	bool "PCH Checkpoint timeout recovery function"
 	help
 	  Enable if PCH supports mailbox checkpoint
+
+config PCH_CHECKPOINT_EXPIRE_TIME
+	default 900000
+	int "Maximum timeout value for PCH checkpoint"
+	help
+	  After system is provisioned, the watchdog will be armed during BIOS
+	  booting. The expire time will be set to this number.
 
 config PLATFORM_STATE_LED
 	default n
