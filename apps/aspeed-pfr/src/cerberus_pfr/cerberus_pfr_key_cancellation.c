@@ -119,7 +119,7 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **argv)
 {
 	struct pfr_manifest test_manifest;
-	uint32_t key_id;
+	uint8_t key_id;
 
 	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
 	key_id = strtoul(argv[2], NULL, 10);
@@ -134,7 +134,7 @@ static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **
 static int cmd_verify_csk_key_id(const struct shell *shell, size_t argc, char **argv)
 {
 	struct pfr_manifest test_manifest;
-	uint32_t key_id;
+	uint8_t key_id;
 
 	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
 	key_id = strtoul(argv[2], NULL, 10);
