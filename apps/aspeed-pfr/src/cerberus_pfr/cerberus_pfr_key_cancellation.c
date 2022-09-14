@@ -38,7 +38,7 @@ static int get_cancellation_policy_offset(uint32_t pc_type)
 	return 0;
 }
 
-int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
+int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 {
 
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
@@ -75,7 +75,7 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 	return Success;
 }
 
-int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
+int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 {
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
 	uint32_t policy_data;

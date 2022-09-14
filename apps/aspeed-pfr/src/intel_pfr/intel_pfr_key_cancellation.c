@@ -81,7 +81,7 @@ int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
+int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 {
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
 	uint32_t policy_data;

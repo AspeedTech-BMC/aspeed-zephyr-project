@@ -177,7 +177,7 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 	}
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + header_length,
-			sizeof(section_header_length), (uint16_t *)&section_header_length);
+			sizeof(section_header_length), (uint8_t *)&section_header_length);
 	if (status != Success) {
 		LOG_ERR("HROT update read header failed");
 		return Failure;
@@ -400,7 +400,8 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	pfr_manifest->address = source_address;
 
 	//BMC/PCH Firmware Update for Active/Recovery Region
-	status = pfr_manifest->update_fw->base->verify(pfr_manifest, NULL, NULL);
+	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
+			NULL, NULL);
 	if (status != Success) {
 		LOG_ERR("Staging Area verification failed.");
 		if (flash_select == PRIMARY_FLASH_REGION)

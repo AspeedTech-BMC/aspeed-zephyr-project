@@ -46,7 +46,10 @@ int authentication_image(void *AoData, void *EventContext)
 	}
 
 	if (EventData->operation == VERIFY_BACKUP) {
-		status = pfr_manifest->recovery_base->verify(pfr_manifest, pfr_manifest->hash, pfr_manifest->verification->base, pfr_manifest->pfr_hash->hash_out, pfr_manifest->pfr_hash->length, pfr_manifest->recovery_pfm);
+		status = pfr_manifest->recovery_base->verify((struct recovery_image *)pfr_manifest,
+				pfr_manifest->hash, pfr_manifest->verification->base,
+				pfr_manifest->pfr_hash->hash_out, pfr_manifest->pfr_hash->length,
+				pfr_manifest->recovery_pfm);
 	} else if (EventData->operation == VERIFY_ACTIVE) {
 		status = pfr_manifest->active_image_base->verify(pfr_manifest);
 	}

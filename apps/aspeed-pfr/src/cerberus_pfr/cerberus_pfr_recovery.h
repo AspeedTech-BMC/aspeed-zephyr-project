@@ -11,6 +11,8 @@
 
 #include <stdint.h>
 #include "manifest/pfm/pfm_manager.h"
+#include "recovery/recovery_image.h"
+#include "pfr/pfr_common.h"
 
 struct recovery_header {
 	uint16_t header_length;
