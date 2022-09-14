@@ -165,6 +165,25 @@ static int cmd_asm_flash_copy(const struct shell *shell, size_t argc,
 	return 0;
 }
 
+static int cmd_asm_flash_rebind(const struct shell *shell, size_t argc,
+			char **argv)
+{
+	if (argc != 2) {
+		shell_print(shell, "asm flash_rebind spiN_csX");
+		return 0;
+	}
+
+	const struct device *dev = device_get_binding(argv[1]);
+	if (dev == NULL) {
+		shell_print(shell, "Device %s not found", argv[1]);
+		return 0;
+	}
+
+	int ret = spi_nor_re_init(dev);
+	shell_print(shell, "spi_nor_re_init(%s) return %d", argv[1], ret);
+	return 0;
+}
+
 static int cmd_asm_rot_recovery(const struct shell *shell, size_t argc,
 			char **argv)
 {
@@ -550,6 +569,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(spi_error_inject, &sub_spi_error, "Inject error to SPI for testing", NULL),
 	SHELL_CMD(flash_cmp, NULL, "Flash content compairson", cmd_asm_flash_cmp),
 	SHELL_CMD(flash_copy, NULL, "Copy data between Flash", cmd_asm_flash_copy),
+	SHELL_CMD(flash_rebind, NULL, "Rebind SPI Flash", cmd_asm_flash_rebind),
 	SHELL_CMD(pstate, NULL, "Test Platform State LED", cmd_test_plat_state_led),
 #if defined(CONFIG_INTEL_PFR)
 	SHELL_CMD(afm, NULL, "Dump AFM Structure: DEVICE OFFSET", cmd_afm),
