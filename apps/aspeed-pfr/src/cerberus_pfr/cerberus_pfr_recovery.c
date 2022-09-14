@@ -38,6 +38,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	int status = Failure;
 	uint32_t sig_address, recovery_offset, data_offset, start_address, erase_address;
 	uint32_t section_length;
+	struct pfm_fw_version_element_rw_region *rw_region = NULL;
 	struct recovery_section recovery_section;
 	uint8_t platform_length;
 	uint32_t source_address;
@@ -78,7 +79,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 
 	uint32_t rw_region_size = fw_ver_element.rw_count *
 		sizeof(struct pfm_fw_version_element_rw_region);
-	struct pfm_fw_version_element_rw_region *rw_region = malloc(rw_region_size);
+	rw_region = malloc(rw_region_size);
 
 	if (rw_region == NULL) {
 		LOG_ERR("Out of memory");
