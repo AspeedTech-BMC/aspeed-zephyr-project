@@ -23,8 +23,6 @@ uint8_t cRootKeyHash[SHA384_DIGEST_LENGTH] = {0};
 uint8_t cPchOffsets[12];
 uint8_t cBmcOffsets[12];
 
-int cerberus_g_provision_data;
-
 int verify_rcerberus_magic_number(uint32_t magic_number)
 {
 	int status = Success;

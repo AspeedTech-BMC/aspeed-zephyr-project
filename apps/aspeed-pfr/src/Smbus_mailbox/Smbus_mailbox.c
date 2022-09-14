@@ -125,7 +125,7 @@ int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize)
 {
 	uint8_t status;
-	uint8_t buffer[256];
+	uint8_t buffer[512];
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
@@ -137,9 +137,6 @@ unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uin
 		status = erase_provision_flash();
 
 		if (status == Success) {
-			for (int i = addr; i < DataSize + addr; i++)
-				buffer[i] = DataBuffer[i - addr];
-
 			memcpy(buffer + addr, DataBuffer, DataSize);
 			status = spi_flash->spi.base.write(&spi_flash->spi, 0, buffer, ARRAY_SIZE(buffer));
 		}
