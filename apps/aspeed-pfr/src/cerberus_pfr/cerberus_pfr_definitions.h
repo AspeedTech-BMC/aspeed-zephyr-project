@@ -22,8 +22,6 @@
 #define TRUE                        1
 #define START                       2
 
-#define BMC_SUPPORT                 1
-
 //Cerberus Content
 #define RECOVERY_HEADER_MAGIC       0x8A147C29
 #define RECOVERY_SECTION_MAGIC      0x4B172F31

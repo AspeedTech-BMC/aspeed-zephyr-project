@@ -131,4 +131,10 @@ config PIT_PROTECTION
 	  Enable PIT protection functions and PIT mailbox commands.
 	  ROT will perform PIT check if PIT protection is enabled via mailbox command.
 
+config PFR_SW_MAILBOX
+	default n
+        bool "SW mailbox solution"
+        help
+          Enable SW mailbox support.
+
 source "Kconfig.zephyr"

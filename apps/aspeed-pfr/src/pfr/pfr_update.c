@@ -74,7 +74,7 @@ int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 	PCHBootHold();
 
 
-#if SMBUS_MAILBOX_SUPPORT
+#if defined(CONFIG_PFR_SW_MAILBOX)
 	SetPlatformState(image_type == BMC_TYPE ? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
 #endif
 

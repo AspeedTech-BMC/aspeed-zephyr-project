@@ -123,7 +123,7 @@ void do_init(void *o)
 		GenerateStateMachineEvent(INIT_ROT_SECONDARY_BOOTED, NULL);
 	} else {
 		/* ABR primary booted */
-#if SMBUS_MAILBOX_SUPPORT
+#if defined(CONFIG_PFR_SW_MAILBOX)
 		InitializeSmbusMailbox();
 #endif
 

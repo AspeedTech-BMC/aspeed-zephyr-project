@@ -28,14 +28,6 @@
 #define UPDATE_STATUS_UFM UFM1
 #define UPDATE_STATUS_ADDRESS 0x00
 
-#define BMC_SUPPORT                     1
-#define EMULATION_SUPPORT               1
-#define LOG_DEBUG                       1
-#define LOG_ENABLE                      1
-#define SMBUS_MAILBOX_SUPPORT           1
-#define PFR_AUTO_PROVISION              1
-#define UART_ENABLE                     1
-
 #define CPLD_RELEASE_VERSION            1
 #define CPLD_RoT_SVN                    1
 
