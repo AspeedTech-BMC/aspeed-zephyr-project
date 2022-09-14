@@ -27,12 +27,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
 int intel_pfr_recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 		struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
 		struct pfm_manager *pfm)
@@ -64,7 +58,7 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 		active_svn = GetPchPfmActiveSvn();
 
 	if (active_svn != staging_svn) {
-		DEBUG_PRINTF("SVN error");
+		LOG_ERR("SVN error");
 		return Failure;
 	}
 
@@ -79,7 +73,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	PFR_AUTHENTICATION_BLOCK0 *block0_buffer;
 	uint8_t buffer[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
 
-	DEBUG_PRINTF("Active Data Corrupted");
+	LOG_INF("Active Data Corrupted");
 	if (manifest->image_type == BMC_TYPE) {
 		if (ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
 					sizeof(read_address)))
@@ -127,15 +121,15 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	time_start = k_uptime_get_32();
 
 	if (decompress_capsule(manifest, DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK)) {
-		DEBUG_PRINTF("Repair Failed");
+		LOG_ERR("Repair Failed");
 		return Failure;
 	}
 
 	time_end = k_uptime_get_32();
-	DEBUG_PRINTF("Firmware recovery completed, elapsed time = %u milliseconds",
+	LOG_INF("Firmware recovery completed, elapsed time = %u milliseconds",
 			(time_end - time_start));
 
-	DEBUG_PRINTF("Repair success");
+	LOG_INF("Repair success");
 
 	return Success;
 }
@@ -173,35 +167,35 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
 
-	DEBUG_PRINTF("BMC's PCH Staging Area verfication");
-	DEBUG_PRINTF("Veriifying capsule signature, address=0x%08x", manifest->address);
+	LOG_INF("BMC's PCH Staging Area verfication");
+	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verifcation
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
 	if (status != Success) {
-		DEBUG_PRINTF("verify failed");
+		LOG_ERR("verify failed");
 		return Failure;
 	}
 
 	// Recovery region PFM verification
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 	manifest->pc_type = PFR_PCH_PFM;
-	DEBUG_PRINTF("Verifying PFM signature, address=0x%08x", manifest->address);
+	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
 	// manifest verifcation
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
 	if (status != Success)
 		return Failure;
-	DEBUG_PRINTF("BMC's PCH Staging verification successful");
+	LOG_INF("BMC's PCH Staging verification successful");
 	manifest->address = target_address;
 	manifest->image_type = image_type;
 
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
-	DEBUG_PRINTF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
+	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
 			source_address, target_address);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
@@ -213,14 +207,14 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		return Failure;
 
 	if (manifest->state == FIRMWARE_RECOVERY) {
-		DEBUG_PRINTF("PCH staging region verification");
+		LOG_INF("PCH staging region verification");
 		status = manifest->update_fw->base->verify((struct firmware_image *)manifest,
 				NULL, NULL);
 		if (status != Success)
 			return Failure;
 	}
 
-	DEBUG_PRINTF("PCH Staging region Update completed");
+	LOG_INF("PCH Staging region Update completed");
 
 	return Success;
 }

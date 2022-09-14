@@ -18,12 +18,6 @@
 #define HASH_ENGINE_INIT_FUNC(name)             HASH_ENGINE_INIT_FUNC_DEF(name)
 #define HASH_ENGINE_INIT                                HASH_ENGINE_INIT_FUNC(HASH_ENGINE_NAME)
 
-#ifdef CONFIG_DEBUG
-#define DEBUG_PRINTF(val) printk(val)
-#else
-#define DEBUG_PRINTF(val)
-#endif
-
 enum {
 	DEBUG_LOG_ASPEED_PFR_MAIN = 0x20,
 };

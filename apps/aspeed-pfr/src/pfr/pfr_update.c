@@ -31,13 +31,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#undef DEBUG_PRINTF
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
 /**
  * Function to handle Recover Entry
  * Perform any recover library initialization if requred here

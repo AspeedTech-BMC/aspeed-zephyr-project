@@ -25,13 +25,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#undef DEBUG_PRINTF
-#if PFR_AUTHENTICATION_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
 int authentication_image(void *AoData, void *EventContext)
 {
 	int status = 0;
@@ -43,12 +36,12 @@ int authentication_image(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI
-		DEBUG_PRINTF("Image Type: BMC ");
+		LOG_INF("Image Type: BMC ");
 		pfr_manifest->image_type = BMC_TYPE;
 
 	} else  {
 		// PCH SPI
-		DEBUG_PRINTF("Image Type: PCH ");
+		LOG_INF("Image Type: PCH ");
 		pfr_manifest->image_type = PCH_TYPE;
 	}
 

@@ -23,16 +23,6 @@
 #define START                       2
 
 #define BMC_SUPPORT                 1
-// Debug configuration token
-#define PF_STATUS_DEBUG             1
-#define PF_VERIFY_DEBUG             1
-#define PF_UPDATE_DEBUG             1
-#define PFR_AUTHENTICATION_DEBUG    1
-#define HROT_STATE_DEBUG            1
-#define SMBUS_MAILBOX_DEBUG         1
-#define CERBERUS_MANIFEST_DEBUG     1
-#define EVERY_BOOT_SVN_VALIDATION   1
-#define SMBUS_MAILBOX_SUPPORT       1
 
 //Cerberus Content
 #define RECOVERY_HEADER_MAGIC       0x8A147C29

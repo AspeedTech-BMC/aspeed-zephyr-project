@@ -29,12 +29,6 @@
 
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if SMBUS_MAILBOX_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
 #define READ_ONLY_RF_COUNT  20
 #define READ_WRITE_RF_COUNT 6
 
@@ -211,7 +205,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 		union aspeed_event_data data = {0};
 		if (ret < 0) {
-			DEBUG_PRINTF("k_poll error ret=%d", ret);
+			LOG_ERR("k_poll error ret=%d", ret);
 			continue;
 		}
 
@@ -305,7 +299,7 @@ void InitializeSoftwareMailbox(void)
 
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
-		DEBUG_PRINTF("%s: fail to bind %s", __FUNCTION__, "SWMBX");
+		LOG_ERR("%s: fail to bind %s", __func__, "SWMBX");
 		return;
 	}
 	gSwMbxDev = swmbx_dev;
@@ -979,17 +973,17 @@ unsigned char ProvisionRootKeyHash(void)
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
 		Status = set_provision_data_in_flash(ROOT_KEY_HASH, (uint8_t *)gRootKeyHash, SHA384_DIGEST_LENGTH);
 		if (Status == Success) {
-			DEBUG_PRINTF("Root key provisioned");
+			LOG_INF("Root key provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
 			return Success;
 		}
 
-		DEBUG_PRINTF("Root key provision failed...");
+		LOG_ERR("Root key provision failed...");
 		erase_provision_flash();
 		return Failure;
 	}
 
-	DEBUG_PRINTF("%s, Provisioned or UFM Locked", __func__);
+	LOG_INF("%s, Provisioned or UFM Locked", __func__);
 	return UnSupported;
 }
 
@@ -1002,17 +996,17 @@ unsigned char ProvisionPchOffsets(void)
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
 		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)gPchOffsets, sizeof(gPchOffsets));
 		if (Status == Success) {
-			DEBUG_PRINTF("PCH offsets provisioned");
+			LOG_INF("PCH offsets provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK);
 			return Success;
 		}
 
-		DEBUG_PRINTF("PCH offsets provision failed...");
+		LOG_ERR("PCH offsets provision failed...");
 		erase_provision_flash();
 		return Failure;
 	}
 
-	DEBUG_PRINTF("%s, Provisioned or UFM Locked", __func__);
+	LOG_INF("%s, Provisioned or UFM Locked", __func__);
 	return UnSupported;
 }
 
@@ -1027,16 +1021,16 @@ unsigned char ProvisionBmcOffsets(void)
 		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)gBmcOffsets, sizeof(gBmcOffsets));
 		if (Status == Success) {
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK);
-			DEBUG_PRINTF("BMC offsets provisioned");
+			LOG_INF("BMC offsets provisioned");
 			return Success;
 		}
 
-		DEBUG_PRINTF("BMC offsets provision failed...");
+		LOG_ERR("BMC offsets provision failed...");
 		erase_provision_flash();
 		return Failure;
 	}
 
-	DEBUG_PRINTF("%s, Provisioned or UFM Locked", __func__);
+	LOG_INF("%s, Provisioned or UFM Locked", __func__);
 	return UnSupported;
 }
 
@@ -1144,7 +1138,7 @@ void process_provision_command(void)
 	if (CheckUfmStatus(UfmFlashStatus, UFM_STATUS_LOCK_BIT_MASK)) {
 		if ((UfmCommandData < READ_ROOT_KEY) || (UfmCommandData > READ_BMC_OFFSET)) {
 			// Ufm locked
-			DEBUG_PRINTF("UFM Locked and Dropped Write Command: 0x%x", UfmCommandData);
+			LOG_INF("UFM Locked and Dropped Write Command: 0x%x", UfmCommandData);
 			return;
 		}
 	}
@@ -1203,7 +1197,7 @@ void process_provision_command(void)
 	}
 
 	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {
-		DEBUG_PRINTF("Calling provisioing process..");
+		LOG_INF("Calling provisioing process..");
 		gProvisionData = 0;
 		gProvisionCount = 0;
 		Status = ProvisionRootKeyHash();
@@ -1220,7 +1214,6 @@ void process_provision_command(void)
 
 		Status = ProvisionBmcOffsets();
 		if (Status != Success) {
-			DEBUG_PRINTF("Status: %x", Status);
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
@@ -1248,10 +1241,10 @@ void UpdateBmcCheckpoint(byte Data)
 		gBMCWatchDogTimer = 0;
 		SetBmcCheckpoint(Data);
 	} else
-		DEBUG_PRINTF("BMC boot completed. Checkpoint update not allowed");
+		LOG_INF("BMC boot completed. Checkpoint update not allowed");
 
 	if (Data == PausingExecutionBlock) {
-		DEBUG_PRINTF("Enter PausingExecution: Block Disable Timer");
+		LOG_INF("Enter PausingExecution: Block Disable Timer");
 		AspeedPFR_DisableTimer(BMC_EVENT);
 	}
 	if (Data == ResumedExecutionBlock)
@@ -1260,7 +1253,7 @@ void UpdateBmcCheckpoint(byte Data)
 	// BMC boot completed
 	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
 		// If execution completed disable timer
-		DEBUG_PRINTF("Enter CompletingExecution: Block Disable Timer");
+		LOG_INF("Enter CompletingExecution: Block Disable Timer");
 		AspeedPFR_DisableTimer(BMC_EVENT);
 		gBmcBootDone = TRUE;
 		gBMCWatchDogTimer = -1;
@@ -1308,7 +1301,7 @@ void UpdateBiosCheckpoint(byte Data)
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
 		reset_recovery_level(PCH_SPI);
 #endif
-		DEBUG_PRINTF("BIOS boot completed. Checkpoint update not allowed");
+		LOG_INF("BIOS boot completed. Checkpoint update not allowed");
 	}
 	if (Data == AUTHENTICATION_FAILED) {
 		gBiosBootDone = FALSE;

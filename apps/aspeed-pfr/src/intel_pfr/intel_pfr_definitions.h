@@ -28,12 +28,6 @@
 #define UPDATE_STATUS_UFM UFM1
 #define UPDATE_STATUS_ADDRESS 0x00
 
-// Debug configuration token
-#define PF_STATUS_DEBUG                 1
-#define PF_UPDATE_DEBUG                 1
-#define SMBUS_MAILBOX_DEBUG             1
-#define INTEL_MANIFEST_DEBUG            1
-
 #define BMC_SUPPORT                     1
 #define EMULATION_SUPPORT               1
 #define LOG_DEBUG                       1

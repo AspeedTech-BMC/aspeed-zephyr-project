@@ -20,12 +20,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
 typedef struct {
 	uint32_t tag;
 	uint32_t version;
@@ -84,7 +78,7 @@ int update_active_pfm(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	DEBUG_PRINTF("Active PFM Updated!!");
+	LOG_INF("Active PFM Updated!!");
 	return Success;
 }
 
@@ -102,7 +96,7 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 
 	if (pfr_spi_read(image_type, active_bitmap, sizeof(active_bitmap_byte),
 				active_bitmap_byte)) {
-		DEBUG_PRINTF("Faild to get bitmap infromation");
+		LOG_ERR("Faild to get bitmap infromation");
 		return Failure;
 	}
 
@@ -151,7 +145,7 @@ int decompression_write(uint32_t image_type,
 	uint16_t bit_mask;
 
 	if (pfr_spi_read(image_type, comp_bitmap, sizeof(comp_bitmap_byte), comp_bitmap_byte)) {
-		DEBUG_PRINTF("Faild to get bitmap infromation");
+		LOG_ERR("Faild to get bitmap infromation");
 		return Failure;
 	}
 
@@ -193,7 +187,7 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 
 	// Supported decompression adrress range is 0 - 256MB
 	if (bitmap_size > (2 * PAGE_SIZE)) {
-		DEBUG_PRINTF("bitmap size is too big");
+		LOG_ERR("bitmap size is too big");
 		return Failure;
 	}
 
@@ -224,22 +218,22 @@ bool is_spi_region_dynamic(PFM_SPI_DEFINITION *spi_region_def)
 bool is_pbc_valid(PBC_HEADER *pbc)
 {
 	if (pbc->tag != PBC_COMPRESSION_TAG) {
-		DEBUG_PRINTF("PBC compression tag is invalid");
+		LOG_ERR("PBC compression tag is invalid");
 		return false;
 	}
 
 	if (pbc->version != PBC_VERSION) {
-		DEBUG_PRINTF("PBC version is invalid");
+		LOG_ERR("PBC version is invalid");
 		return false;
 	}
 
 	if (pbc->page_size != PBC_PAGE_SIZE) {
-		DEBUG_PRINTF("PBC page size is invalid");
+		LOG_ERR("PBC page size is invalid");
 		return false;
 	}
 
 	if (pbc->bitmap_nbit % 8){
-		DEBUG_PRINTF("PBC bitmap size is invalid");
+		LOG_ERR("PBC bitmap size is invalid");
 		return false;
 	}
 
@@ -438,7 +432,7 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	if (!is_pbc_valid(&pbc))
 		return Failure;
 
-	DEBUG_PRINTF("Decompressing capsule from %s region...",
+	LOG_INF("Decompressing capsule from %s region...",
 			(manifest->state == FIRMWARE_RECOVERY) ? "recovery" : "staging");
 
 	while (cap_pfm_body_offset < cap_pfm_body_end_addr) {
