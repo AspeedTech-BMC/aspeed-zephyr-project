@@ -1136,12 +1136,22 @@ void process_provision_command(void)
 	byte Status = 0;
 
 	UfmCommandData = GetUfmCommand();
+
+#if defined(CONFIG_CERBERUS_PFR)
+	if ((UfmCommandData == PROVISION_ROOT_KEY) || (UfmCommandData == PROVISION_PCH_OFFSET) ||
+	    (UfmCommandData == PROVISION_BMC_OFFSET)) {
+		LOG_INF("Unsupported command: 0x%x", UfmCommandData);
+		SetUfmStatusValue(COMMAND_ERROR);
+		return;
+	}
+#endif
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmFlashStatus, sizeof(UfmFlashStatus));
 
 	if (CheckUfmStatus(UfmFlashStatus, UFM_STATUS_LOCK_BIT_MASK)) {
 		if ((UfmCommandData < READ_ROOT_KEY) || (UfmCommandData > READ_BMC_OFFSET)) {
 			// Ufm locked
 			LOG_INF("UFM Locked and Dropped Write Command: 0x%x", UfmCommandData);
+			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
 	}
