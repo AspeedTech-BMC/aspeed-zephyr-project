@@ -27,12 +27,10 @@ int BMCBootHold(void)
 
 	/* Hold BMC Reset */
 	pfr_bmc_extrst_enable_ctrl(true);
-#if !defined(CONFIG_ASPEED_DC_SCM)
 	// Only pull-up/down SRST in first bootup. Pull-up/down this pin in runtime will affect host
 	// VGA function.
 	if (first_time_boot)
 		pfr_bmc_srst_enable_ctrl(true);
-#endif
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
@@ -84,12 +82,10 @@ int BMCBootRelease(void)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 #endif
 
-#if !defined(CONFIG_ASPEED_DC_SCM)
 	if (first_time_boot) {
 		pfr_bmc_srst_enable_ctrl(false);
 		first_time_boot = false;
 	}
-#endif
 
 	pfr_bmc_extrst_enable_ctrl(false);
 	LOG_INF("release BMC");

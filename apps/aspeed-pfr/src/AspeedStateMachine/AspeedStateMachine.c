@@ -93,7 +93,6 @@ void do_init(void *o)
 	spim_irq_init();
 
 	// DEBUG_HALT();
-	pfr_bmc_srst_enable_ctrl(true);
 	BMCBootHold();
 	PCHBootHold();
 
@@ -551,9 +550,6 @@ void enter_tzero(void *o)
 
 	/* Arm reset monitor */
 	platform_monitor_init();
-#if defined(CONFIG_ASPEED_DC_SCM)
-	pfr_bmc_srst_enable_ctrl(false);
-#endif
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 			apply_pfm_protection(BMC_SPI);
@@ -1110,7 +1106,6 @@ void enter_lockdown(void *o)
 {
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
-	pfr_bmc_srst_enable_ctrl(false);
 	BMCBootHold();
 	PCHBootHold();
 	SetPlatformState(LOCKDOWN_ON_AUTH_FAIL);
