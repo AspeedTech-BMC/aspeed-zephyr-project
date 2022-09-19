@@ -25,12 +25,10 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 
 	// Recovery region verification
 	if (manifest->image_type == BMC_TYPE) {
-		LOG_INF("Image Type: BMC");
 		ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 	} else if (manifest->image_type == PCH_TYPE) {
-		LOG_INF("Image Type: PCH");
 		ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
@@ -81,12 +79,10 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	uint32_t read_address;
 
 	if (manifest->image_type == BMC_TYPE) {
-		LOG_INF("Image Type: BMC");
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_BMC_PFM;
 	} else if (manifest->image_type == PCH_TYPE) {
-		LOG_INF("Image Type: PCH");
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_PFM;

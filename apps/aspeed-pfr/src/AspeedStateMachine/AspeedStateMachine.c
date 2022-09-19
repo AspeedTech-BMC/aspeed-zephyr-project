@@ -61,6 +61,8 @@ static uint8_t last_bmc_recovery_verify_status = Failure;
 static uint8_t last_pch_active_verify_status = Failure;
 static uint8_t last_pch_recovery_verify_status = Failure;
 
+static bool reset_from_unprovision_state = false;
+
 size_t event_log_idx = 0;
 
 extern enum boot_indicator get_boot_indicator(void);
@@ -158,7 +160,13 @@ void enter_tmin1(void *o)
 			pch_reset_only = true;
 	} else if (evt_ctx->event == RESET_DETECTED) {
 		LogLastPanic(BMC_RESET_DETECT);
-		bmc_reset_only = true;
+		if (reset_from_unprovision_state ) {
+			reset_from_unprovision_state = false;
+			if (!(GetUfmStatusValue() & UFM_PROVISIONED))
+				bmc_reset_only = true;
+		} else {
+				bmc_reset_only = true;
+		}
 	}
 
 	if (bmc_reset_only) {
@@ -232,6 +240,7 @@ int handle_pit_verification(void *o)
 	if (!(provision_state & UFM_PROVISIONED)) {
 		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
 		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
+		return Failure;
 	} else {
 		if (intel_pfr_pit_level1_verify()) {
 			// lockdown
@@ -258,7 +267,7 @@ void handle_image_verification(void *o)
 
 	if (!(provision_state & UFM_PROVISIONED)) {
 		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
-		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
+		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, evt_ctx->data.ptr);
 	} else {
 		/* Check pending firmware update (update at reset) */
 		CPLD_STATUS cpld_update_status;
@@ -318,21 +327,19 @@ void handle_image_verification(void *o)
 		/* No pending update, verify images */
 		if (update_reset == false) {
 			if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
+				verify_image(BMC_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
 				verify_image(BMC_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
-				state->bmc_active_object.RecoveryImageStatus =
-					last_bmc_recovery_verify_status;
 				state->pch_active_object.ActiveImageStatus =
 					last_pch_active_verify_status;
 				state->pch_active_object.RecoveryImageStatus =
 					last_pch_recovery_verify_status;
 			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+				verify_image(PCH_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
 				verify_image(PCH_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
 				state->bmc_active_object.ActiveImageStatus =
 					last_bmc_active_verify_status;
 				state->bmc_active_object.RecoveryImageStatus =
 					last_bmc_recovery_verify_status;
-				state->pch_active_object.RecoveryImageStatus =
-					last_pch_recovery_verify_status;
 			} else {
 				/* BMC Verification */
 				SetPlatformState(BMC_FLASH_AUTH);
@@ -579,32 +586,48 @@ void enter_tzero(void *o)
 			LOG_ERR("Host firmware is invalid, host won't boot");
 	} else {
 		/* Unprovisioned - Releasing System Reset */
-		if (device_get_binding("spi_m1")!=NULL) {
-			Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spi_m1", false);
-			LOG_INF("Bypass %s", "spi_m1");
-		}
+		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
+			BMCBootRelease();
+			goto enter_tzero_end;
+		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+			PCHBootRelease();
+			goto enter_tzero_end;
+		} else {
+			if (device_get_binding("spi_m1") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m1", false);
+				LOG_INF("Bypass %s", "spi_m1");
+			}
 
-		if (device_get_binding("spi_m2") != NULL) {
-			Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spi_m2", false);
-			LOG_INF("Bypass %s", "spi_m2");
-		}
+			if (device_get_binding("spi_m2") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m2", false);
+				LOG_INF("Bypass %s", "spi_m2");
+			}
 
-		if (device_get_binding("spi_m3") != NULL) {
-			Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spi_m3", false);
-			LOG_INF("Bypass %s", "spi_m3");
-		}
+			if (device_get_binding("spi_m3") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m3", false);
+				LOG_INF("Bypass %s", "spi_m3");
+			}
 
-		if (device_get_binding("spi_m4") != NULL) {
-			Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spi_m4", false);
-			LOG_INF("Bypass %s", "spi_m4");
+			if (device_get_binding("spi_m4") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m4", false);
+				LOG_INF("Bypass %s", "spi_m4");
+			}
 		}
 
 		/* Releasing I2C Filter */
@@ -1322,6 +1345,7 @@ void AspeedStateMachine(void)
 				break;
 #endif
 			case RESET_DETECTED:
+				reset_from_unprovision_state = true;
 #if defined(CONFIG_PIT_PROTECTION)
 			case SEAL_FIRMWARE:
 #endif
