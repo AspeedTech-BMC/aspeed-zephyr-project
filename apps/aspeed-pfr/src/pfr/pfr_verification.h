@@ -9,7 +9,7 @@
 
 int authentication_image(void *AoData, void *EventContext);
 void init_manifest(struct manifest *manifest);
-void init_signature_verifcation(struct signature_verification *signature_verification);
+void init_signature_verification(struct signature_verification *signature_verification);
 
 // -- Active Region
 int ActivePfmVerification(unsigned int ImageType, unsigned int ReadAddress);

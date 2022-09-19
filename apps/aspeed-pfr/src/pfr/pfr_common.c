@@ -32,7 +32,7 @@
 LOG_MODULE_REGISTER(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 struct pfr_manifest pfr_manifest;
 
-// Block0-Block1 verifcation
+// Block0-Block1 verification
 struct active_image pfr_active_image;
 
 // PFR_SIGNATURE
@@ -187,7 +187,7 @@ static int init_pfr_manifest(struct pfr_manifest *pfr_manifest,
 	init_manifest(manifest);
 	init_recovery_manifest(recovery_base);
 	init_update_fw_manifest(update_fw->base);
-	init_signature_verifcation(pfr_manifest->verification->base);
+	init_signature_verification(pfr_manifest->verification->base);
 	init_active_image(pfr_manifest->active_image_base);
 
 	return status;

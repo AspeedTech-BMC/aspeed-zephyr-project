@@ -173,7 +173,7 @@ void init_manifest(struct manifest *manifest)
 }
 
 
-void init_signature_verifcation(struct signature_verification *signature_verification)
+void init_signature_verification(struct signature_verification *signature_verification)
 {
 	signature_verification->verify_signature = verify_signature;
 }

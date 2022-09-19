@@ -169,7 +169,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	LOG_INF("BMC's PCH Staging Area verfication");
 	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
-	// manifest verifcation
+	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
@@ -182,7 +182,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 	manifest->pc_type = PFR_PCH_PFM;
 	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
-	// manifest verifcation
+	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);

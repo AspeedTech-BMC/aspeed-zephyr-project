@@ -37,7 +37,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 
 	LOG_INF("Verifying capsule signature, address=0x%08x", manifest->address);
-	// Block0-Block1 verifcation
+	// Block0-Block1 verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
@@ -55,7 +55,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 
 	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
-	// manifest verifcation
+	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
