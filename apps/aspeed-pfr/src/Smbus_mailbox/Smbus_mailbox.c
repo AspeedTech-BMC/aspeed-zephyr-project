@@ -116,11 +116,16 @@ int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 		return Failure;
 }
 
-unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize)
+unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize)
 {
 	uint8_t status;
 	uint8_t buffer[512];
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+
+	if (addr + DataSize > ARRAY_SIZE(buffer)) {
+		LOG_ERR("offset(0x%x) exceeds UFM max size(0x%x)",  addr + DataSize, ARRAY_SIZE(buffer));
+		status = Failure;
+	}
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
 
@@ -137,10 +142,6 @@ unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uin
 					0, buffer, ARRAY_SIZE(buffer));
 		}
 	}
-
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
-	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, buffer,
-			ARRAY_SIZE(buffer));
 
 	return status;
 }

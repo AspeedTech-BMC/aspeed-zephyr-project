@@ -223,7 +223,7 @@ typedef struct _PFM_STRUCTURE {
 
 #pragma pack()
 
-unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);
+unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize);
 int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
 // void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
 unsigned char erase_provision_data_in_flash(void);
