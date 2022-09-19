@@ -124,7 +124,7 @@ unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, ui
 
 	if (addr + DataSize > ARRAY_SIZE(buffer)) {
 		LOG_ERR("offset(0x%x) exceeds UFM max size(0x%x)",  addr + DataSize, ARRAY_SIZE(buffer));
-		status = Failure;
+		return Failure;
 	}
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;

@@ -51,7 +51,7 @@ int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 	if (status != Success)
 		return Failure;
 
-	LOG_INF("Decommission Success. Erasing the provisioned UFM data.");
+	LOG_INF("Decommission erasing the provisioned UFM data.");
 
 	memset(&cpld_update_status, 0, sizeof(cpld_update_status));
 
@@ -144,7 +144,13 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
-		} else {
+		} else if (image_header.format == UPDATE_FORMAT_TPYE_DCC) {
+			status = cerberus_pfr_decommission(manifest);
+			if (status != Success) {
+				LOG_ERR("HRoT decommission failed.");
+				return Failure;
+			}
+		}else {
 			LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "Incorrect image header:");
 			return Failure;
 		}
@@ -216,9 +222,8 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		} else {
 			status = KEYSTORE_NO_KEY;
 		}
-	} else if (image_format == UPDATE_FORMAT_TPYE_DCC) {
-		status = cerberus_pfr_decommission(manifest);
 	}
+
 	return status;
 }
 
@@ -253,8 +258,15 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 		LOG_ERR("Failed to read image header");
 		return Failure;
 	}
-	if (image_header.format == UPDATE_FORMAT_TPYE_KCC ||
-			image_header.format == UPDATE_FORMAT_TPYE_DCC) {
+
+	if (image_header.format != UPDATE_FORMAT_TPYE_BMC &&
+	    image_header.format != UPDATE_FORMAT_TPYE_PCH &&
+	    image_header.format != UPDATE_FORMAT_TPYE_KCC) {
+		LOG_ERR("Unsupported image format(%d)", image_header.format);
+		return Failure;
+	}
+
+	if (image_header.format == UPDATE_FORMAT_TPYE_KCC) {
 		return cerberus_keystore_update(manifest, image_header.format);
 	}
 

@@ -14,6 +14,8 @@
 #define PCH_TYPE                    2
 
 // Firmware Update Format Type in image header [2:3]
+#define UPDATE_FORMAT_TPYE_BMC      0x0000
+#define UPDATE_FORMAT_TPYE_PCH      0x0001
 #define UPDATE_FORMAT_TPYE_HROT     0x0002
 #define UPDATE_FORMAT_TPYE_KCC      0x0004
 #define UPDATE_FORMAT_TPYE_DCC      0x0005
