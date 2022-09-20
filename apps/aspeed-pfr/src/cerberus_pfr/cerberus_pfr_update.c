@@ -178,50 +178,54 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(header_length),
 			(uint8_t *)&header_length);
 	if (status != Success) {
-		LOG_ERR("HROT update read header length failed");
+		LOG_ERR("%s: read header length failed", __func__);
 		return Failure;
 	}
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + header_length,
 			sizeof(section_header_length), (uint8_t *)&section_header_length);
 	if (status != Success) {
-		LOG_ERR("HROT update read header failed");
+		LOG_ERR("%s: read header failed", __func__);
+		return Failure;
+	}
+	
+	int get_key_id = 0xFF;
+	int last_key_id = 0xFF;
+	uint8_t pub_key[256];
+	struct Keystore_Manager keystore_manager;
+
+	keystoreManager_init(&keystore_manager);
+	status = pfr_spi_read(manifest->image_type,
+			      manifest->address + header_length + section_header_length - 2,
+			      sizeof(capsule_type),
+			      (uint8_t *)&capsule_type);
+	if (status != Success) {
+		LOG_ERR("%s: read capsule type failed", __func__);
 		return Failure;
 	}
 
-	if (image_format == UPDATE_FORMAT_TPYE_KCC) {
-		int get_key_id = 0xFF;
-		int last_key_id = 0xFF;
-		uint8_t pub_key[256];
-		struct Keystore_Manager keystore_manager;
+	if (capsule_type != BMC_PFM_CANCELLATION) {
+		LOG_ERR("%s: unsupported capsule type(0x%x)", __func__, capsule_type);
+		return Failure;
+	}
+		
+	manifest->pc_type = capsule_type;
+	LOG_INF("capsule_type is %x", capsule_type);
+	status = pfr_spi_read(manifest->image_type,
+			      manifest->address + header_length + section_header_length,
+			      256,
+			      (uint8_t *)pub_key);
+	if (status != Success) {
+		LOG_ERR("%s: read cancel key failed", __func__);
+		return Failure;
+	}
 
-		keystoreManager_init(&keystore_manager);
-		status = pfr_spi_read(manifest->image_type,
-				manifest->address + header_length + section_header_length - 2,
-				sizeof(capsule_type), (uint8_t *)&capsule_type);
-		manifest->pc_type = capsule_type;
-		LOG_INF("capsule_type is %x", capsule_type);
-		status = pfr_spi_read(manifest->image_type,
-				manifest->address + header_length + section_header_length,
-				256, (uint8_t *)&pub_key);
-		if (status != Success) {
-			LOG_ERR("HROT update read signature failed");
-			status = Failure;
-		}
-
-		status = keystore_get_key_id(&keystore_manager.base, (uint8_t *)&pub_key, &get_key_id,
-				&last_key_id);
-		if (get_key_id != 0xFF) {
-			if (get_key_id == 0) {
-				LOG_ERR("Root Key could not be Cancelled");
-			} else {
-				status = manifest->keystore->kc_flag->cancel_kc_flag(manifest, get_key_id);
-				if (status == Success)
-					LOG_INF("Key cancellation success. Key Id :%d was cancelled", get_key_id);
-			}
-		} else {
-			status = KEYSTORE_NO_KEY;
-		}
+	status = keystore_get_key_id(&keystore_manager.base, pub_key, &get_key_id, &last_key_id);
+	if (status == Success) {
+		LOG_INF("Key Id %x should be cancelled", get_key_id);
+		status = manifest->keystore->kc_flag->cancel_kc_flag(manifest, get_key_id);
+		if (status == Success)
+			LOG_INF("Key cancellation success. Key Id :%d was cancelled", get_key_id);
 	}
 
 	return status;

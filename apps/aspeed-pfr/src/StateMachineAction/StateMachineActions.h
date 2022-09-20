@@ -25,13 +25,9 @@
 #define ACTIVE_PFM              2
 #define ASPEED_PFR_FIRMWARE       3
 
-extern struct st_pfr_instance pfr_instance;
-extern struct st_manifest_t manifest;
 extern int systemState;
 extern int gEventCount;
 extern int gPublishCount;
-// extern uint8_t gBmcFlag;
-extern uint8_t gDataCount;
 extern uint8_t gProvisionData;
 extern volatile struct st_i2cCtx_t i2c_efb;
 

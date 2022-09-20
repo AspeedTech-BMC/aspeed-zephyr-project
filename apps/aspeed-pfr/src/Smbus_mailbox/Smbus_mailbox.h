@@ -49,24 +49,24 @@ typedef struct _SMBUS_MAIL_BOX_ {
 	byte MinorErrorCode;
 	union {
 		struct {
-			byte CommandBusy : 1;
-			byte CommandDone : 1;
-			byte CommandError : 1;
-			byte UfmStatusReserved : 1;
-			byte UfmLocked : 1;
-			byte Ufmprovisioned : 1;
-			byte PITlevel1enforced : 1;
-			byte PITL2CompleteSuccess : 1;
+			uint8_t CommandBusy : 1;
+			uint8_t CommandDone : 1;
+			uint8_t CommandError : 1;
+			uint8_t UfmStatusReserved : 1;
+			uint8_t UfmLocked : 1;
+			uint8_t Ufmprovisioned : 1;
+			uint8_t PITlevel1enforced : 1;
+			uint8_t PITL2CompleteSuccess : 1;
 		};
 		byte UfmStatusValue;
 	};
 	byte UfmCommand;
 	union {
 		struct {
-			byte ExecuteCmd : 1;
-			byte FlushWriteFIFO : 1;
-			byte FlushReadFIFO : 1;
-			byte UfmCmdTriggerReserved : 4;
+			uint8_t ExecuteCmd : 1;
+			uint8_t FlushWriteFIFO : 1;
+			uint8_t FlushReadFIFO : 1;
+			uint8_t UfmCmdTriggerReserved : 4;
 		};
 		byte UfmCmdTriggerValue;
 	};
@@ -77,27 +77,27 @@ typedef struct _SMBUS_MAIL_BOX_ {
 	byte BiosCheckpoint;
 	union {
 		struct {
-			byte PchUpdateIntentPchActive : 1;
-			byte PchUpdateIntentPchrecovery : 1;
-			byte PchUpdateIntentCpldActive : 1;
-			byte PchUpdateIntentBmcActive : 1;
-			byte PchUpdateIntentBmcRecovery : 1;
-			byte PchUpdateIntentCpldRecovery : 1;
-			byte PchUpdateIntentUpdateDynamic : 1;
-			byte PchUpdateIntentUpdateAtReset : 1;
+			uint8_t PchUpdateIntentPchActive : 1;
+			uint8_t PchUpdateIntentPchrecovery : 1;
+			uint8_t PchUpdateIntentCpldActive : 1;
+			uint8_t PchUpdateIntentBmcActive : 1;
+			uint8_t PchUpdateIntentBmcRecovery : 1;
+			uint8_t PchUpdateIntentCpldRecovery : 1;
+			uint8_t PchUpdateIntentUpdateDynamic : 1;
+			uint8_t PchUpdateIntentUpdateAtReset : 1;
 		};
 		byte PchUpdateIntentValue;
 	};
 	union {
 		struct {
-			byte BmcUpdateIntentPchActive : 1;
-			byte BmcUpdateIntentPchrecovery : 1;
-			byte BmcUpdateIntentCpldActive : 1;
-			byte BmcUpdateIntentBmcActive : 1;
-			byte BmcUpdateIntentBmcRecovery : 1;
-			byte BmcUpdateIntentCpldRecovery : 1;
-			byte BmcUpdateIntentUpdateDynamic : 1;
-			byte BmcUpdateIntentUpdateAtReset : 1;
+			uint8_t BmcUpdateIntentPchActive : 1;
+			uint8_t BmcUpdateIntentPchrecovery : 1;
+			uint8_t BmcUpdateIntentCpldActive : 1;
+			uint8_t BmcUpdateIntentBmcActive : 1;
+			uint8_t BmcUpdateIntentBmcRecovery : 1;
+			uint8_t BmcUpdateIntentCpldRecovery : 1;
+			uint8_t BmcUpdateIntentUpdateDynamic : 1;
+			uint8_t BmcUpdateIntentUpdateAtReset : 1;
 		};
 		byte BmcUpdateIntentValue;
 	};

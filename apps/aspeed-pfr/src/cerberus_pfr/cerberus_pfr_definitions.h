@@ -43,8 +43,10 @@
 
 // Will Remove after test
 #define UFM0                        4
+#define UFM0_SIZE                   1024
 #define UFM1                        3
 #define PROVISION_UFM               UFM0
+#define PROVISION_UFM_SIZE          UFM0_SIZE
 #define UPDATE_STATUS_UFM           UFM1
 #define ROT_TYPE                    3
 #define UPDATE_STATUS_ADDRESS       0x00

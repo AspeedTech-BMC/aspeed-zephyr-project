@@ -29,19 +29,9 @@
 
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define READ_ONLY_RF_COUNT  20
-#define READ_WRITE_RF_COUNT 6
-
-#define PRIMARY_FLASH_REGION    1
-#define SECONDARY_FLASH_REGION  2
-
 static uint32_t gFailedUpdateAttempts = 0;
 static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 const struct device *gSwMbxDev = NULL;
-uint8_t gReadOnlyRfAddress[READ_ONLY_RF_COUNT] = { 0x1, 0x2, 0x3, 0x04, 0x05, 0x06, 0x07, 0x0A, 0x14, 0x15, 0x16, 0x17,
-						   0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F };
-uint8_t gReadAndWriteRfAddress[READ_WRITE_RF_COUNT] = { 0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E };
-extern struct st_pfr_instance pfr_instance;
 
 uint8_t gUfmFifoData[64];
 uint8_t gReadFifoData[64];
@@ -51,31 +41,20 @@ uint8_t gBmcOffsets[12];
 #if defined(CONFIG_PIT_PROTECTION)
 uint8_t gPitPassword[8];
 #endif
-uint8_t gUfmFifoLength;
-uint8_t gbmcactivesvn;
-uint8_t gbmcactiveMajorVersion;
-uint8_t gbmcActiveMinorVersion;
-uint8_t gAcmBootDone = FALSE;
+
 uint8_t gBiosBootDone = FALSE;
 uint8_t gBmcBootDone = FALSE;
 uint8_t gObbBootDone = FALSE;
-uint8_t gWDTUpdate = 0;
-uint8_t gProvisinDoneFlag = FALSE;
-// uint8_t MailboxBuffer[256]={0};
 extern bool gBootCheckpointReceived;
 extern uint32_t gMaxTimeout;
 extern int gBMCWatchDogTimer;
 extern int gPCHWatchDogTimer;
 uint8_t gProvisionCount = 0;
 uint8_t gFifoData = 0;
-uint8_t gBmcFlag;
-uint8_t gDataCount;
 uint8_t gProvisionData = 0;
 CPLD_STATUS cpld_update_status;
-
 EVENT_CONTEXT UpdateEventData;
 AO_DATA UpdateActiveObject;
-
 
 void ResetMailBox(void)
 {
@@ -119,11 +98,11 @@ int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize)
 {
 	uint8_t status;
-	uint8_t buffer[512];
+	uint8_t buffer[PROVISION_UFM_SIZE];
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	if (addr + DataSize > ARRAY_SIZE(buffer)) {
-		LOG_ERR("offset(0x%x) exceeds UFM max size(0x%x)",  addr + DataSize, ARRAY_SIZE(buffer));
+		LOG_ERR("offset(0x%x) exceeds UFM max size(%ld)",  addr + DataSize, ARRAY_SIZE(buffer));
 		return Failure;
 	}
 

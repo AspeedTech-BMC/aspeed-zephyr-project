@@ -14,7 +14,7 @@
 #define PCH_TYPE 2
 
 #define UFM0            4
-#define UFM0_SIZE       256
+#define UFM0_SIZE       512
 
 #define UFM1            3
 
@@ -112,9 +112,6 @@
 #define SMBUS_FILTER_IRQ_DISABLE                0x00
 #define SMBUS_FILTER_ENCRYPTED_DATA_SIZE        64
 #define NOACK_FLAG                              0x3
-#define ACTIVE_UFM PROVISION_UFM
-#define ACTIVE_UFM_SIZE PROVISION_UFM_SIZE
-
 
 #define  BIT0_SET                               0x00000001
 #define  BIT1_SET                               0x00000002
