@@ -32,60 +32,6 @@
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 /**
- * Function to handle Recover Entry
- * Perform any recover library initialization if requred here
- */
-
-int lastRecoveryReason(int ImageType, void* AoData)
-{
-	if (ImageType == BMC_EVENT)
-	{
-		if(((AO_DATA *)AoData)->ActiveImageStatus == Failure){
-			return BMC_ACTIVE_FAIL;
-		}
-		else if (((AO_DATA *)AoData)->RecoveryImageStatus == Failure){
-			return BMC_RECOVERY_FAIL;
-		}
-
-	}
-	else if (ImageType == PCH_EVENT)
-	{
-		if(((AO_DATA *)AoData)->ActiveImageStatus == Failure){
-			return PCH_ACTIVE_FAIL;
-		}
-		else if (((AO_DATA *)AoData)->RecoveryImageStatus == Failure){
-			return PCH_RECOVERY_FAIL;
-		}
-	}
-
-	return 0;
-}
-
-int handle_update_image_action(int image_type, void *AoData, void *EventContext)
-{
-	CPLD_STATUS cpld_update_status;
-	int status;
-
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-	if (status != Success)
-		return status;
-
-	BMCBootHold();
-	PCHBootHold();
-
-
-#if defined(CONFIG_PFR_SW_MAILBOX)
-	SetPlatformState(image_type == BMC_TYPE ? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
-#endif
-
-	status = update_firmware_image(image_type, AoData, EventContext);
-	if (status != Success)
-		return Failure;
-
-	return Success;
-}
-
-/**
  * Update the image referenced by an instance.
  *
  * @param fw The firmware image instance to update.
