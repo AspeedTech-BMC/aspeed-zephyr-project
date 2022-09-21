@@ -421,7 +421,7 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 {
 	int status = 0;
 	PFR_AUTHENTICATION_BLOCK1 *block1_buffer;
-	uint8_t buffer[LENGTH] = { 0 };
+	uint8_t buffer[256] = { 0 };
 
 	status = pfr_spi_read(manifest->image_type, manifest->address +
 			sizeof(PFR_AUTHENTICATION_BLOCK0),

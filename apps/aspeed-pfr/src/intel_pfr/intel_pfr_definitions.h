@@ -7,29 +7,26 @@
 #pragma once
 
 #if defined(CONFIG_INTEL_PFR)
-#define BMC_FLASH_ID                            0
-#define PCH_FLASH_ID                            1
+#define BMC_FLASH_ID                    0
+#define PCH_FLASH_ID                    1
 
-#define BMC_TYPE 0
-#define PCH_TYPE 2
+#define BMC_TYPE                        0
+#define PCH_TYPE                        2
 
-#define UFM0            4
-#define UFM0_SIZE       512
+#define UFM0                            4
+#define UFM0_SIZE                       512
 
-#define UFM1            3
+#define UFM1                            3
 
-#define FALSE                            0
-#define TRUE                             1
-#define START                            2
+#define FALSE                           0
+#define TRUE                            1
+#define START                           2
 
-#define PROVISION_UFM UFM0
-#define PROVISION_UFM_SIZE UFM0_SIZE
+#define PROVISION_UFM                   UFM0
+#define PROVISION_UFM_SIZE              UFM0_SIZE
 
-#define UPDATE_STATUS_UFM UFM1
-#define UPDATE_STATUS_ADDRESS 0x00
-
-#define CPLD_RELEASE_VERSION            1
-#define CPLD_RoT_SVN                    1
+#define UPDATE_STATUS_UFM               UFM1
+#define UPDATE_STATUS_ADDRESS           0x00
 
 // BIOS/BMC SPI Region information
 #define PCH_ACTIVE_FW_UPDATE_ADDRESS    0x00000000
@@ -43,7 +40,6 @@
 #define PBC_PAGE_SIZE                   0x1000
 #define PBC_PATTERN_SIZE                0x0001
 #define PBC_PATTERN                     0xFF
-
 
 #define BLOCK0TAG                       0xB6EAFD19
 #define BLOCK0_RSA_TAG                  0x35C6B783
@@ -79,23 +75,21 @@
 #define UPDATE_CAPSULE                  1
 #define ACTIVE_PFM                      2
 #define ROT_TYPE                        3
-#define LENGTH                          256
 
-#define  SIGN_PCH_PFM_BIT0              0x00000001
-#define  SIGN_PCH_UPDATE_BIT1           0x00000002
-#define  SIGN_BMC_PFM_BIT2              0x00000004
-#define  SIGN_BMC_UPDATE_BIT3           0x00000008
-#define  SIGN_CPLD_UPDATE_BIT4          0x00000010
-#define  SIGN_CPLD_UPDATE_BIT9          0x00000200
+#define SIGN_PCH_PFM_BIT0               0x00000001
+#define SIGN_PCH_UPDATE_BIT1            0x00000002
+#define SIGN_BMC_PFM_BIT2               0x00000004
+#define SIGN_BMC_UPDATE_BIT3            0x00000008
+#define SIGN_CPLD_UPDATE_BIT4           0x00000010
+#define SIGN_CPLD_UPDATE_BIT9           0x00000200
 
-#define SHA384_SIZE 48
-#define SHA256_SIZE 32
+#define SHA384_SIZE                     48
+#define SHA256_SIZE                     32
 
-#define SHA256_DIGEST_LENGTH    32
-#define SHA384_DIGEST_LENGTH    48
-#define SHA512_DIGEST_LENGTH    64
-#define FOUR_BYTE_ADDR_MODE     1
-#define SVN_MAX                 63
+#define SHA256_DIGEST_LENGTH            32
+#define SHA384_DIGEST_LENGTH            48
+#define SHA512_DIGEST_LENGTH            64
+#define SVN_MAX                         63
 #define MAX_READ_SIZE                   0x1000
 #define MAX_WRITE_SIZE                  0x1000
 #define PAGE_SIZE                       0x1000
@@ -105,23 +99,8 @@
 #define ROOT_KEY_X_Y_SIZE_256           32
 #define ROOT_KEY_X_Y_SIZE_384           48
 
-#define BLOCK_SUPPORT_1KB 1
-#define BLOCK_SUPPORT_3KB 0
-
-#define SMBUS_FILTER_IRQ_ENABLE                 0x20
-#define SMBUS_FILTER_IRQ_DISABLE                0x00
-#define SMBUS_FILTER_ENCRYPTED_DATA_SIZE        64
-#define NOACK_FLAG                              0x3
-
-#define  BIT0_SET                               0x00000001
-#define  BIT1_SET                               0x00000002
-#define  BIT2_SET                               0x00000004
-#define  BIT3_SET                               0x00000008
-#define  BIT4_SET                               0x00000010
-#define  BIT5_SET                               0x00000020
-#define  BIT6_SET                               0x00000040
-#define  BIT7_SET                               0x00000080      // Smbus filter disable/enable Reuest key permission
-#define  BIT8_SET                               0x00000100      // Debug Request key permission
+#define BLOCK_SUPPORT_1KB               1
+#define BLOCK_SUPPORT_3KB               0
 
 enum Ecc_Curve {
 	secp384r1 = 1,

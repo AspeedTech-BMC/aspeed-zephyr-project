@@ -12,29 +12,12 @@
 #include "AspeedStateMachine/common_smc.h"
 #include "StateMachineAction/StateMachineActions.h"
 
-extern int systemState;
-extern int gEventCount;
-extern int gPublishCount;
-
-typedef struct {
-	int signal;
-	void *context;
-} TUPLE;
-
 #pragma pack(1)
 
-// enum HRoT_state { IDLE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
-
 typedef char byte;
-#define  BIT2     0x00000004
-#define ACM_MAXTIMEOUT 50000
+
 #define BMC_MAXTIMEOUT CONFIG_BMC_CHECKPOINT_EXPIRE_TIME
 #define BIOS_MAXTIMEOUT CONFIG_PCH_CHECKPOINT_EXPIRE_TIME
-// BMC I2c Commands
-#define  LOGMESSAGE 0x05
-
-#define READ_ONLY 24
-#define WRITE_ONLY 6
 
 typedef struct _SMBUS_MAIL_BOX_ {
 	byte CpldIdentifier;

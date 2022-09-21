@@ -29,12 +29,6 @@
 
 LOG_MODULE_DECLARE(aspeed_state_machine, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define RELEASE_PLATFORM 1
-
-#define MAX_BUFFER_CHECK 79
-#define MAX_LENGTH 32
-#define SMBUS_WRITE 0x45
-
 static void wdt_callback_bmc_timeout(const struct device *dev, int channel_id)
 {
 	ARG_UNUSED(dev);

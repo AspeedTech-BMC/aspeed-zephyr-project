@@ -31,15 +31,8 @@
 
 #define SHA256_SIGNATURE_LENGTH     256
 
-
 // Hard-coded PFM offset
 #define BMC_CPLD_STAGING_ADDRESS    CONFIG_BMC_PFR_STAGING_OFFSET
-#define HROT_ACTIVE_AREA_SIZE   0x60000
-#define PFM_RW_FLASH_REGION_LENGTH  12
-#define TOC_ELEMENT_LENGTH_OFFSET   6
-#define ALLOWABLE_FW_LIST_HEADER_LENGTH 4
-#define ALLOWABLE_FW_LIST_VERSION_ADDR_LENGTH   4
-#define ALLOWABLE_FW_LIST_ALLIGNMENT_LENGTH 2
 
 // Will Remove after test
 #define UFM0                        4
@@ -50,18 +43,15 @@
 #define UPDATE_STATUS_UFM           UFM1
 #define ROT_TYPE                    3
 #define UPDATE_STATUS_ADDRESS       0x00
-#define CPLD_RELEASE_VERSION        1
-#define CPLD_RoT_SVN                1
-#define SHA256_DIGEST_LENGTH    32
-#define SHA384_DIGEST_LENGTH    48
-#define SHA512_DIGEST_LENGTH    64
-#define FOUR_BYTE_ADDR_MODE     1
-#define SVN_MAX                 63
-#define MAX_READ_SIZE           0x1000
-#define MAX_WRITE_SIZE          0x1000
-#define PAGE_SIZE               0x1000
-#define UFM_PAGE_SIZE           16
-#define ROOT_KEY_SIZE           64
+#define SHA256_DIGEST_LENGTH        32
+#define SHA384_DIGEST_LENGTH        48
+#define SHA512_DIGEST_LENGTH        64
+#define SVN_MAX                     63
+#define MAX_READ_SIZE               0x1000
+#define MAX_WRITE_SIZE              0x1000
+#define PAGE_SIZE                   0x1000
+#define UFM_PAGE_SIZE               16
+#define ROOT_KEY_SIZE               64
 #define ROOT_KEY_X_Y_SIZE_256       32
 #define ROOT_KEY_X_Y_SIZE_384       48
 

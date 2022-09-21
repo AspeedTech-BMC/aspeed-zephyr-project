@@ -11,12 +11,6 @@
 #include "pfr/pfr_common.h"
 
 #define DECOMMISSION_CAPSULE             0x200
-#define KEY_CANCELLATION_CAPSULE         0x300
-#define HASH_STORAGE_LENGTH	         256
-#define PLATFORM_ID_HEADER_LENGTH                       0x04
-#define CERBERUS_FLASH_DEVICE_OFFSET_LENGTH             0x04
-#define CERRBERUS_FW_VERSION_ADDR_LENGTH                0x04
-
 
 enum {
 	PFR_CPLD_UPDATE_CAPSULE = 0x00,
@@ -27,36 +21,6 @@ enum {
 	PFR_PCH_CPU_Seamless_Update_Capsule,
 	PFR_AFM,
 	PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON = 0x200
-};
-enum CERBERUS_PFM_MANIFEST_HEADER {
-	PFM_HEADER_TOTAL_LENGTH                 = 0x00,
-	PFM_HEADER_MAGIC_ID                     = 0x02,
-	PFM_HEADER_MANIFEST_ID                  = 0x04,
-	PFM_HEADER_SIG_LENGTH                   = 0x08,
-	PFM_HEADER_SIG_TYPE                     = 0x0A,
-	PFM_HEADER_RESERVED,
-	PFM_TOC_ENTRY_COUNT,
-	PFM_TOC_COUNT,
-	PFM_TOC_HASH_TYPE,
-	PFM_TOC_RESERVED,
-	TOC_ELEMENT_LIST_OFFSET,
-	TOC_ELEMENT_HASH_LIST_OFFSET            = 0x30,
-	TOC_TABLE_HASH_OFFSET                   = 0xB0,
-	CERBERUS_PLATFORM_HEADER_OFFSET         = 0xD0
-};
-
-struct CERBERUS_PFM_RW_REGION {
-	uint8_t flags;
-	uint8_t reserved[3];
-	uint32_t start_address;
-	uint32_t end_address;
-};
-
-struct CERBERUS_SIGN_IMAGE_HEADER {
-	uint8_t hash_type;
-	uint8_t region_count;
-	uint8_t flag;
-	uint8_t reserved;
 };
 
 // Key Cancellation Enum

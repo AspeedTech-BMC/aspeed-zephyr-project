@@ -8,28 +8,8 @@
 
 #include <stdint.h>
 
-#define BMC_RELEASE                             1U
-#define PCH_RELEASE                             1U
-
-#define TOTAL_RETRIES                   3
-
 #define PRIMARY_FLASH_REGION    1
 #define SECONDARY_FLASH_REGION  2
-#define RECOVER_FROM_BACKUP             1
-#define RECOVER_FROM_ACTIVE             1
-#define NUMBER_OF_DATA_ENTRY    4
-
-#define EVENT_STATE_HANDLED             0
-
-#define UPDATE_CAPSULE          1
-#define ACTIVE_PFM              2
-#define ASPEED_PFR_FIRMWARE       3
-
-extern int systemState;
-extern int gEventCount;
-extern int gPublishCount;
-extern uint8_t gProvisionData;
-extern volatile struct st_i2cCtx_t i2c_efb;
 
 #pragma pack(1)
 typedef struct _EVENT_CONTEXT {
@@ -68,13 +48,6 @@ typedef struct _AO_DATA {
 		unsigned int flag;
 	};
 } AO_DATA;
-
-enum SystemState {
-	Initial = 1,
-	Verify,
-	Recovery,
-	Update
-};
 
 enum OPERATIONS {
 	VERIFY_ACTIVE = 1,

@@ -10,9 +10,6 @@
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
-#define SHA384_SIZE 48
-#define SHA256_SIZE 32
-
 #define BIOS1_BIOS2 0x00
 #define ME_SPS          0x01
 #define Microcode1      0x02

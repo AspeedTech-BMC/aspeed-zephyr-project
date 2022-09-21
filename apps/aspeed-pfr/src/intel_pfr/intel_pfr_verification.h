@@ -10,29 +10,25 @@
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
-#define INTEL_PFR_BLOCK_0_TAG 0xB6EAFD19
+#define INTEL_PFR_BLOCK_0_TAG           0xB6EAFD19
 
-#define DECOMMISSION_CAPSULE             0x200
-#define KEY_CANCELLATION_CAPSULE         0x100
+#define DECOMMISSION_CAPSULE            0x200
+#define KEY_CANCELLATION_CAPSULE        0x100
 
-#define FALSE                            0
-#define TRUE                             1
-#define START                            2
-#define BLOCK0_PCTYPE_ADDRESS       8
-#define CSK_KEY_ID_ADDRESS          160
+#define BLOCK0_PCTYPE_ADDRESS           8
+#define CSK_KEY_ID_ADDRESS              160
 #define CSK_KEY_ID_ADDRESS_3K           580
 #define CSK_START_ADDRESS               148
 #define CSK_ENTRY_PC_SIZE               128
-#define KEY_SIZE                                        48
-#define KEY_SIZE_3K                                     512
-#define HROT_UPDATE_RESERVED    32
-#define MAX_BIOS_BOOT_TIME                      300
-#define MAX_ERASE_SIZE                          0x1000
+#define KEY_SIZE                        48
+#define KEY_SIZE_3K                     512
+#define HROT_UPDATE_RESERVED            32
+#define MAX_BIOS_BOOT_TIME              300
+#define MAX_ERASE_SIZE                  0x1000
 
-#define BLOCK0_FRIST_RESERVED_SIZE 4
-#define BLOCK0_SECOND_RESERVED_SIZE 32
-#define BLOCK1_CSK_ENTRY_RESERVED_SIZE 20
-
+#define BLOCK0_FRIST_RESERVED_SIZE      4
+#define BLOCK0_SECOND_RESERVED_SIZE     32
+#define BLOCK1_CSK_ENTRY_RESERVED_SIZE  20
 
 #pragma pack(1)
 
@@ -68,7 +64,6 @@ typedef struct _RootEntry {
 	uint8_t PubKeyY[KEY_SIZE];
 	uint8_t Reserved[20];
 } KEY_ENTRY;
-
 
 typedef struct _RootEntry_3k {
 	uint32_t Tag;
