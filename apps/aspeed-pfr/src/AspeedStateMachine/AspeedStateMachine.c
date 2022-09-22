@@ -160,7 +160,7 @@ void enter_tmin1(void *o)
 			pch_reset_only = true;
 	} else if (evt_ctx->event == RESET_DETECTED) {
 		LogLastPanic(BMC_RESET_DETECT);
-		if (reset_from_unprovision_state ) {
+		if (reset_from_unprovision_state) {
 			reset_from_unprovision_state = false;
 			if (!(GetUfmStatusValue() & UFM_PROVISIONED))
 				bmc_reset_only = true;
@@ -426,6 +426,7 @@ void handle_recovery(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
 	struct event_context *evt_ctx = state->event_ctx;
+	union aspeed_event_data data;
 
 	/* Check Staging Image */
 	bool recovery_done = 0;
@@ -505,8 +506,10 @@ void handle_recovery(void *o)
 		break;
 	}
 
+	data.bit8[2] = evt_ctx->data.bit8[2];
+
 	if (recovery_done)
-		GenerateStateMachineEvent(RECOVERY_DONE, NULL);
+		GenerateStateMachineEvent(RECOVERY_DONE, data.ptr);
 	else
 		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
 }
@@ -632,31 +635,31 @@ void enter_tzero(void *o)
 
 		/* Releasing I2C Filter */
 		const struct device *dev = NULL;
-		if ( (dev = device_get_binding("I2C_FILTER_0")) != NULL) {
+		if ((dev = device_get_binding("I2C_FILTER_0")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
 
-		if ( (dev = device_get_binding("I2C_FILTER_1")) != NULL) {
+		if ((dev = device_get_binding("I2C_FILTER_1")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
 
-		if ( (dev = device_get_binding("I2C_FILTER_2")) != NULL) {
+		if ((dev = device_get_binding("I2C_FILTER_2")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
 
-		if ( (dev = device_get_binding("I2C_FILTER_3")) != NULL) {
+		if ((dev = device_get_binding("I2C_FILTER_3")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
 
-		if ( (dev = device_get_binding("I2C_FILTER_4")) != NULL) {
+		if ((dev = device_get_binding("I2C_FILTER_4")) != NULL) {
 			ast_i2c_filter_init(dev);
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
