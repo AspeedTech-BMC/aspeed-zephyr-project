@@ -569,21 +569,21 @@ uint32_t find_fvm_addr(struct pfr_manifest *manifest, uint16_t fv_type)
 {
 	uint32_t image_type = manifest->image_type;
 	uint32_t act_pfm_offset = manifest->active_pfm_addr + PFM_SIG_BLOCK_SIZE;
-	uint32_t act_pfm_body_offset = act_pfm_offset + sizeof(PFM_STRUCTURE_1);
-	PFM_STRUCTURE_1 act_pfm_header;
+	uint32_t act_pfm_body_offset = act_pfm_offset + sizeof(PFM_STRUCTURE);
+	PFM_STRUCTURE act_pfm_header;
 	uint32_t act_pfm_end_addr;
 
 	PFM_SPI_DEFINITION spi_def;
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
 
 
-	if (pfr_spi_read(image_type, act_pfm_offset, sizeof(PFM_STRUCTURE_1),
+	if (pfr_spi_read(image_type, act_pfm_offset, sizeof(PFM_STRUCTURE),
 				(uint8_t *)&act_pfm_header)) {
 		LOG_ERR("Failed to read active PFM");
 		return Failure;
 	}
 
-	act_pfm_end_addr = act_pfm_body_offset + act_pfm_header.Length - sizeof(PFM_STRUCTURE_1);
+	act_pfm_end_addr = act_pfm_body_offset + act_pfm_header.Length - sizeof(PFM_STRUCTURE);
 
 	while(act_pfm_body_offset < act_pfm_end_addr) {
 		pfr_spi_read(image_type, act_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
@@ -670,23 +670,23 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 	uint32_t state = manifest->state;
 	uint32_t signed_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE;
 	uint32_t cap_pfm_offset = signed_pfm_offset + PFM_SIG_BLOCK_SIZE;
-	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE_1);
+	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE);
 	uint32_t cap_pfm_body_end_addr;
 	uint32_t fvm_addr;
-	PFM_STRUCTURE_1 pfm_header;
+	PFM_STRUCTURE pfm_header;
 	PFM_SPI_DEFINITION spi_def;
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
 
-	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE_1), (uint8_t *)&pfm_header))
+	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
 		return Failure;
 
 	if (pfm_header.PfmTag != PFMTAG) {
 		LOG_ERR("FVM verification failed");
-		LOG_HEXDUMP_INF(&pfm_header, sizeof(PFM_STRUCTURE_1), "PFM Header:");
+		LOG_HEXDUMP_INF(&pfm_header, sizeof(PFM_STRUCTURE), "PFM Header:");
 		return Failure;
 	}
 
-	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE_1);
+	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE);
 
 	while(cap_pfm_body_offset < cap_pfm_body_end_addr) {
 		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),

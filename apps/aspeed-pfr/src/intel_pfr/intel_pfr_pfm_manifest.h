@@ -66,7 +66,7 @@ typedef struct _PFM_SPI_REGION {
 	uint32_t EndOffset;
 } PFM_SPI_REGION;
 
-typedef struct _PFM_STRUCTURE_1 {
+typedef struct _PFM_STRUCTURE {
 	uint32_t PfmTag;
 	uint8_t SVN;
 	uint8_t BkcVersion;
@@ -74,7 +74,7 @@ typedef struct _PFM_STRUCTURE_1 {
 	uint32_t Reserved;
 	uint8_t OemSpecificData[16];
 	uint32_t Length;
-} PFM_STRUCTURE_1;
+} PFM_STRUCTURE;
 
 typedef struct _FVM_STRUCTURE {
 	uint32_t FvmTag;

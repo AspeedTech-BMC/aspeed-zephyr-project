@@ -23,27 +23,23 @@ int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address)
 	uint8_t active_svn;
 	uint16_t active_major_version, active_minor_version;
 	uint8_t ufm_svn = 0;
-	uint8_t buffer[sizeof(PFM_STRUCTURE_1)];
+	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
-	status = pfr_spi_read(manifest->image_type, read_address, sizeof(PFM_STRUCTURE_1), buffer);
+	status = pfr_spi_read(manifest->image_type, read_address, sizeof(PFM_STRUCTURE), buffer);
 	if (status != Success) {
-		LOG_ERR("Pfm Version Set failed...");
+		LOG_ERR("Get Pfm Version Details failed");
 		return Failure;
 	}
 
-	if (((PFM_STRUCTURE_1 *)buffer)->PfmTag == PFMTAG) {
-		LOG_INF("PfmTag verification success...");
-	} else {
-		LOG_ERR("PfmTag verification failed...\n expected: %x\n actual: %x",
-				PFMTAG, ((PFM_STRUCTURE_1 *)buffer)->PfmTag);
+	if (((PFM_STRUCTURE *)buffer)->PfmTag != PFMTAG) {
+		LOG_ERR("PfmTag verification failed, expected: %x, actual: %x",
+			PFMTAG, ((PFM_STRUCTURE *)buffer)->PfmTag);
 		return Failure;
 	}
 
-	active_svn = ((PFM_STRUCTURE_1 *)buffer)->SVN;
-	active_major_version = ((PFM_STRUCTURE_1 *)buffer)->PfmRevision;
-	active_major_version = active_major_version & 0xFF;
-	active_minor_version = ((PFM_STRUCTURE_1 *)buffer)->PfmRevision;
-	active_minor_version = active_minor_version >> 8;
+	active_svn = ((PFM_STRUCTURE *)buffer)->SVN;
+	active_major_version = ((PFM_STRUCTURE *)buffer)->PfmRevision & 0xFF;
+	active_minor_version = ((PFM_STRUCTURE *)buffer)->PfmRevision >> 8;
 
 	if (manifest->image_type == PCH_TYPE) {
 		SetPchPfmActiveSvn(active_svn);
@@ -74,25 +70,30 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 	uint16_t recovery_major_version, recovery_minor_version;
 	uint8_t recovery_svn;
 	uint8_t ufm_svn;
-	PFM_STRUCTURE_1 *pfm_data;
-	uint8_t buffer[sizeof(PFM_STRUCTURE_1)];
+	PFM_STRUCTURE *pfm_data;
+	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
 	// PFM data start address after Recovery block and PFM block
 	pfm_data_address = address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
 
-	status = pfr_spi_read(manifest->image_type, pfm_data_address, sizeof(PFM_STRUCTURE_1),
+	status = pfr_spi_read(manifest->image_type, pfm_data_address, sizeof(PFM_STRUCTURE),
 			buffer);
 	if (status != Success) {
-		LOG_ERR("Get Recover Pfm Version Details failed...");
+		LOG_ERR("Get Recover Pfm Version Details failed");
 		return Failure;
 	}
 
-	pfm_data = (PFM_STRUCTURE_1 *)buffer;
+	pfm_data = (PFM_STRUCTURE *)buffer;
+
+	if (pfm_data->PfmTag != PFMTAG) {
+		LOG_ERR("PfmTag verification failed, expected: %x, actual: %x",
+			PFMTAG, ((PFM_STRUCTURE *)buffer)->PfmTag);
+		return Failure;
+	}
+
 	recovery_svn = pfm_data->SVN;
-	recovery_major_version = pfm_data->PfmRevision;
-	recovery_major_version = recovery_major_version & 0xFF;
-	recovery_minor_version = pfm_data->PfmRevision;
-	recovery_minor_version = recovery_minor_version >> 8;
+	recovery_major_version = pfm_data->PfmRevision & 0xFF;
+	recovery_minor_version = pfm_data->PfmRevision >> 8;
 
 	// MailBox Communication
 	if (manifest->image_type == PCH_TYPE) {
@@ -120,19 +121,19 @@ int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version)
 {
 	int status = 0;
 	uint32_t pfm_start_address = 0;
-	uint8_t buffer[sizeof(PFM_STRUCTURE_1)];
+	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
 	// PFM data start address after Staging block and PFM block
 	pfm_start_address = manifest->address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
 
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE_1),
+	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
 			buffer);
 	if (status != Success) {
 		LOG_ERR("Invalid Staging Area Pfm ");
 		return Failure;
 	}
 
-	*svn_version = ((PFM_STRUCTURE_1 *)buffer)->SVN;
+	*svn_version = ((PFM_STRUCTURE *)buffer)->SVN;
 
 	return Success;
 }
@@ -269,7 +270,7 @@ int fvm_spi_region_verification(struct pfr_manifest *manifest)
 int pfm_spi_region_verification(struct pfr_manifest *manifest)
 {
 	uint32_t read_address = manifest->address;
-	PFM_STRUCTURE_1 pfm_data;
+	PFM_STRUCTURE pfm_data;
 	bool done = false;
 	uint32_t pfm_addr = read_address + PFM_SIG_BLOCK_SIZE;
 	uint32_t pfm_end_addr;
@@ -280,10 +281,10 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 	uint8_t pfm_spi_hash[SHA384_SIZE] = { 0 };
 
 	if (pfr_spi_read(manifest->image_type, pfm_addr,
-			sizeof(PFM_STRUCTURE_1), (uint8_t *)&pfm_data))
+			sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_data))
 		return Failure;
 	pfm_end_addr = pfm_addr + pfm_data.Length;
-	pfm_addr += sizeof(PFM_STRUCTURE_1);
+	pfm_addr += sizeof(PFM_STRUCTURE);
 
 	while (!done) {
 		if (pfr_spi_read(manifest->image_type, pfm_addr,

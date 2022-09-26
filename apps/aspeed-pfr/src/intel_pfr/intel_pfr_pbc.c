@@ -404,19 +404,19 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 		manifest->recovery_address : manifest->staging_address;
 	uint32_t signed_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE;
 	uint32_t cap_pfm_offset = signed_pfm_offset + PFM_SIG_BLOCK_SIZE;
-	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE_1);
+	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE);
 	uint32_t cap_pfm_body_start_addr = cap_pfm_body_offset;
 	uint32_t cap_pfm_body_end_addr;
 	uint32_t pbc_offset;
 	uint32_t pfm_size;
-	PFM_STRUCTURE_1 pfm_header;
+	PFM_STRUCTURE pfm_header;
 	PFM_SPI_DEFINITION spi_def;
 	PBC_HEADER pbc;
 
-	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE_1), (uint8_t *)&pfm_header))
+	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
 		return Failure;
 
-	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE_1);
+	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE);
 
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	pfm_size = get_total_pfm_fvm_size(manifest, signed_pfm_offset,

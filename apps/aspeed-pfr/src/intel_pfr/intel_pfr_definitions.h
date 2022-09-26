@@ -89,7 +89,7 @@
 #define SHA256_DIGEST_LENGTH            32
 #define SHA384_DIGEST_LENGTH            48
 #define SHA512_DIGEST_LENGTH            64
-#define SVN_MAX                         63
+#define SVN_MAX                         64
 #define MAX_READ_SIZE                   0x1000
 #define MAX_WRITE_SIZE                  0x1000
 #define PAGE_SIZE                       0x1000

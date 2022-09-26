@@ -136,8 +136,8 @@ void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *Ma
 			(uint8_t *)&Buffer, sizeof(PFM_STRUCTURE));
 
 	*SVN = Buffer.SVN;
-	*MajorVersion = Buffer.MarjorVersion;
-	*MinorVersion = Buffer.MinorVersion;
+	*MajorVersion = Buffer.PfmRevision & 0xFF;
+	*MinorVersion = Buffer.PfmRevision >> 8;
 }
 
 #define SWMBX_NOTIFYEE_STACK_SIZE 1024
@@ -443,7 +443,6 @@ void InitializeSmbusMailbox(void)
 	uint8_t current_svn;
 
 	current_svn = get_ufm_svn(NULL, SVN_POLICY_FOR_CPLD_UPDATE);
-	// CurrentSvn = Get_Ufm_SVN_Number(SVN_POLICY_FOR_CPLD_UPDATE);
 	SetCpldRotSvn(current_svn);
 }
 

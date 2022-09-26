@@ -23,6 +23,7 @@
 #include "intel_pfr_pbc.h"
 #include "intel_pfr_recovery.h"
 #include "intel_pfr_key_cancellation.h"
+#include "intel_pfr_update.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
@@ -136,48 +137,50 @@ int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash,
 	return pfr_staging_verify(pfr_manifest);
 }
 
-int set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
+int set_ufm_svn(struct pfr_manifest *manifest, uint32_t offset, uint8_t svn_number)
 {
 	ARG_UNUSED(manifest);
 
 	int status = 0;
-	uint8_t svn_buffer[8];
-	uint8_t offset = svn_number / 8;
-	uint8_t remain = svn_number % 8;
-	uint8_t index = 0;
+	uint32_t svn_policy[2];
+	uint32_t new_svn_policy;
 
-	memset(svn_buffer, 0xFF, sizeof(svn_buffer));
-	for (index = 0; index < offset; index++)
-		svn_buffer[index] = 0x00;
+	memset(svn_policy, 0xff, sizeof(svn_policy));
 
-	svn_buffer[index] = svn_buffer[index] << remain;
+	if ((svn_number > get_ufm_svn(manifest, offset)) && (svn_number <= SVN_MAX)) {
+		new_svn_policy = ~((1 << (svn_number % 32)) - 1);
+		if (svn_number < 32)
+			svn_policy[0] = new_svn_policy;
+		else {
+			svn_policy[0] = 0;
+			if (svn_number < 64)
+				svn_policy[1] = new_svn_policy;
+			else if (svn_number == 64)
+				svn_policy[1] = 0;
+		}
+	}
 
-	status = ufm_write(PROVISION_UFM, ufm_location, svn_buffer, sizeof(svn_buffer));
+	status = ufm_write(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
 	if (status != Success)
 		return Failure;
 
 	return Success;
 }
 
-int get_ufm_svn(struct pfr_manifest *manifest, uint8_t offset)
+uint8_t get_ufm_svn(struct pfr_manifest *manifest, uint32_t offset)
 {
 	ARG_UNUSED(manifest);
 
-	uint8_t svn_size = 8; // we have (0- 63) SVN Number in 64 bits
-	uint8_t svn_buffer[8];
-	uint8_t svn_number = 0, index1 = 0, index2 = 0;
-	uint8_t mask = 0x01;
+	uint32_t svn_policy[2];
+	uint8_t index;
 
-	ufm_read(PROVISION_UFM, offset, svn_buffer, sizeof(svn_buffer));
-	for (index1 = 0; index1 < svn_size; index1++) {
-		for (index2 = 0; index2 < svn_size; index2++) {
-			if (/*!*/ ((svn_buffer[index1] >> index2) & mask))
-				return svn_number;
-			svn_number++;
-		}
+	ufm_read(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
+	for (index = 0; index < 64; index++) {
+		if ((svn_policy[(index / 32)] & (1 << (index % 32))) != 0)
+			return index;
 	}
 
-	return svn_number;
+	return 64;
 }
 
 int  check_rot_capsule_type(struct pfr_manifest *manifest)
@@ -399,15 +402,15 @@ int check_svn_number(struct pfr_manifest *manifest, uint32_t read_address,
 {
 	int status = 0;
 	uint32_t pfm_start_address = read_address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
-	uint8_t buffer[sizeof(PFM_STRUCTURE_1)] = { 0 };
+	uint8_t buffer[sizeof(PFM_STRUCTURE)] = { 0 };
 	uint8_t staging_svn_number = 0;
 
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE_1),
+	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
 			(uint8_t *)buffer);
 	if (status != Success)
 		return Failure;
 
-	staging_svn_number = ((PFM_STRUCTURE_1 *)buffer)->SVN;
+	staging_svn_number = ((PFM_STRUCTURE *)buffer)->SVN;
 
 	if (staging_svn_number > SVN_MAX) {
 		LOG_ERR("Invalid Staging area SVN Number");

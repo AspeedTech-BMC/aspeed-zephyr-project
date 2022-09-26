@@ -35,7 +35,7 @@ int cerberus_set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, ui
 	return Success;
 }
 
-int get_ufm_svn(struct pfr_manifest *manifest, uint8_t offset)
+uint8_t get_ufm_svn(struct pfr_manifest *manifest, uint32_t offset)
 {
 	return 0;
 }

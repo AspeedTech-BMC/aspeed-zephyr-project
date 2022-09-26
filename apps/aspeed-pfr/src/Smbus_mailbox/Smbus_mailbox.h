@@ -193,17 +193,6 @@ typedef enum _SEAMLESS_UPDATE_INTENT {
 } SEAMLESS_UPDATE_INTENT;
 #endif
 
-typedef struct _PFM_STRUCTURE {
-	uint32_t PfmTag;
-	uint8_t SVN;
-	uint8_t BkcVersion;
-	uint8_t MarjorVersion;
-	uint8_t MinorVersion;
-	uint32_t Reserved;
-	uint8_t OemSpecificData[16];
-	uint32_t Length;
-} PFM_STRUCTURE;
-
 #pragma pack()
 
 unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize);
