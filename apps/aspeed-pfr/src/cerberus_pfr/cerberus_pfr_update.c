@@ -150,7 +150,7 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 				LOG_ERR("HRoT decommission failed.");
 				return Failure;
 			}
-		}else {
+		} else {
 			LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "Incorrect image header:");
 			return Failure;
 		}
@@ -188,7 +188,7 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		LOG_ERR("%s: read header failed", __func__);
 		return Failure;
 	}
-	
+
 	int get_key_id = 0xFF;
 	int last_key_id = 0xFF;
 	uint8_t pub_key[256];
@@ -208,7 +208,7 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 		LOG_ERR("%s: unsupported capsule type(0x%x)", __func__, capsule_type);
 		return Failure;
 	}
-		
+
 	manifest->pc_type = capsule_type;
 	LOG_INF("capsule_type is %x", capsule_type);
 	status = pfr_spi_read(manifest->image_type,
@@ -431,7 +431,16 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	if (flash_select == PRIMARY_FLASH_REGION) {
 		//Update Active
 		LOG_INF("Update Type: Active Update.");
+		uint32_t time_start, time_end;
+
+		time_start = k_uptime_get_32();
 		status = cerberus_update_active_region(pfr_manifest, erase_rw_regions);
+		if (status != Success)
+			return Failure;
+
+		time_end = k_uptime_get_32();
+		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
+				(time_end - time_start));
 	} else {
 		//Update Recovery
 		LOG_INF("Update Type: Recovery Update.");
@@ -484,6 +493,7 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 	ARG_UNUSED(rsa);
 
 	struct pfr_manifest *manifest = (struct pfr_manifest *) fw;
+
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->staging_address;
 	return cerberus_pfr_verify_image(manifest);

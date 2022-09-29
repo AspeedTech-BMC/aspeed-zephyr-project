@@ -65,7 +65,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		if (status != Success)
 			return Failure;
 
-#if defined (CONFIG_SEAMLESS_UPDATE)
+#if defined(CONFIG_SEAMLESS_UPDATE)
 		if (manifest->state == SEAMLESS_UPDATE) {
 			manifest->pc_type = PFR_PCH_SEAMLESS_UPDATE_CAPSULE;
 		} else
@@ -145,24 +145,28 @@ int set_ufm_svn(struct pfr_manifest *manifest, uint32_t offset, uint8_t svn_numb
 	uint32_t svn_policy[2];
 	uint32_t new_svn_policy;
 
-	memset(svn_policy, 0xff, sizeof(svn_policy));
+	if (svn_number > SVN_MAX) {
+		LOG_ERR("SVN number(%02x) exceed SVN max(%02x)", svn_number, SVN_MAX);
+		return Failure;
+	}
 
-	if ((svn_number > get_ufm_svn(manifest, offset)) && (svn_number <= SVN_MAX)) {
-		new_svn_policy = ~((1 << (svn_number % 32)) - 1);
-		if (svn_number < 32)
-			svn_policy[0] = new_svn_policy;
-		else {
-			svn_policy[0] = 0;
-			if (svn_number < 64)
-				svn_policy[1] = new_svn_policy;
-			else if (svn_number == 64)
-				svn_policy[1] = 0;
-		}
+	memset(svn_policy, 0xff, sizeof(svn_policy));
+	new_svn_policy = ~((1 << (svn_number % 32)) - 1);
+	if (svn_number < 32)
+		svn_policy[0] = new_svn_policy;
+	else {
+		svn_policy[0] = 0;
+		if (svn_number < 64)
+			svn_policy[1] = new_svn_policy;
+		else if (svn_number == 64)
+			svn_policy[1] = 0;
 	}
 
 	status = ufm_write(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
-	if (status != Success)
+	if (status != Success) {
+		LOG_ERR("Set SVN number to UFM failed");
 		return Failure;
+	}
 
 	return Success;
 }

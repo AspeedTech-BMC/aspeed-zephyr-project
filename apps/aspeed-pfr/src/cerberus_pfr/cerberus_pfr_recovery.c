@@ -92,9 +92,13 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 		goto recovery_failed;
 	}
 
+	uint32_t time_start, time_end;
+
+	time_start = k_uptime_get_32();
+
 	// Handle read/write region erasing
 	for (int i = 0; i < fw_ver_element.rw_count; i++) {
-		switch(rw_region[i].flags) {
+		switch (rw_region[i].flags) {
 		case PFM_RW_ERASE:
 			LOG_INF("Eraseing RW region %x - %x", rw_region[i].region.start_addr,
 					rw_region[i].region.end_addr);
@@ -122,12 +126,10 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	bool is_rw_region_handled;
 
 	// Handle recovery sections update
-	while(recovery_offset < sig_address)
-	{
+	while (recovery_offset < sig_address) {
 		status = pfr_spi_read(manifest->image_type, recovery_offset,
 				sizeof(recovery_section), (uint8_t *)&recovery_section);
-		if(recovery_section.magic_number != RECOVERY_SECTION_MAGIC)
-		{
+		if (recovery_section.magic_number != RECOVERY_SECTION_MAGIC) {
 			LOG_ERR("Recovery Section not matched..\n");
 			break;
 		}
@@ -167,6 +169,9 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 		}
 	}
 
+	time_end = k_uptime_get_32();
+	LOG_INF("Firmware recovery completed, elapsed time = %u milliseconds",
+			(time_end - time_start));
 	LOG_INF("Repair success\r\n");
 	status = Success;
 
@@ -190,6 +195,8 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	uint32_t source_address;
 	uint32_t target_address;
+	uint32_t image_type = manifest->image_type;
+	uint32_t flash_id = manifest->flash_id;
 
 	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
 			sizeof(source_address));
@@ -198,17 +205,34 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 
 	status = ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&target_address,
 			sizeof(target_address));
-	if(status != Success)
+	if (status != Success)
 		return Failure;
 
 	source_address += CONFIG_BMC_STAGING_SIZE;
+
+	manifest->image_type = BMC_TYPE;
+	manifest->address = source_address;
+	manifest->flash_id = BMC_FLASH_ID;
+
+	LOG_INF("BMC's PCH Staging Area verfication");
+	status = cerberus_pfr_verify_image(manifest);
+	if (status != Success) {
+		LOG_ERR("verify failed");
+		return Failure;
+	}
+
+	LOG_INF("BMC's PCH Staging verification successful");
+	manifest->address = target_address;
+	manifest->image_type = image_type;
+	manifest->flash_id = flash_id;
+
 	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
 	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
 			source_address, target_address);
 
-	if (pfr_spi_erase_region(PCH_TYPE, support_block_erase, target_address,
+	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
 				CONFIG_PCH_STAGING_SIZE))
 		return Failure;
 
@@ -257,6 +281,7 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 	ARG_UNUSED(hash_length);
 	ARG_UNUSED(pfm);
 	struct pfr_manifest *manifest = (struct pfr_manifest *)image;
+
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->recovery_address;
 	return cerberus_pfr_verify_image(manifest);
