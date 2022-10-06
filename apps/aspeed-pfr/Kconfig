@@ -38,6 +38,12 @@ config ASPEED_STATE_MACHINE_SHELL
 	help
 	  Enable if user need debug shell to interact with state machine
 
+config ASPEED_DICE_SHELL
+	default n
+	bool "Aspeed DICE Shell"
+	help
+	  Enable if user want to test ASPEED DICE core layer implementation.
+
 config BMC_CHECKPOINT_RECOVERY
 	default n
 	bool "BMC Checkpoint timeout recovery function"

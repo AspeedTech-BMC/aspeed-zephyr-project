@@ -27,6 +27,13 @@
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
 
+#include "sys/base64.h"
+#include "net/net_ip.h"
+#include "mbedtls/ecdsa.h"
+#include "mbedtls/hmac_drbg.h"
+#include <crypto/hash.h>
+#include <crypto/hash_aspeed.h>
+
 LOG_MODULE_REGISTER(asm_test, LOG_LEVEL_DBG);
 
 #if defined(CONFIG_ASPEED_STATE_MACHINE_SHELL)
@@ -411,8 +418,6 @@ static int cmd_test_plat_state_led(const struct shell *shell, size_t argc,
 		return 0;
 	}
 
-
-
 	SetPlatformState(pstate);
 	return 0;
 }
@@ -560,6 +565,1028 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 }
 #endif // CONFIG_INTEL_PFR
 
+#if defined(CONFIG_ASPEED_DICE_SHELL)
+
+extern uint8_t buffer[PAGE_SIZE] __aligned(16);
+
+#define CDI_LENGTH                        64
+#define CDI_ADDRESS                       0x79001800
+#define DEVICE_FIRMWARE_START_ADDRESS     0x10000
+#define DEVICE_FIRMWARE_SIZE              0x60000
+#define ECDSA384_PRIVATE_KEY_SIZE         SHA384_HASH_LENGTH + 1
+#define ECDSA384_PUBLIC_KEY_SIZE          SHA384_HASH_LENGTH * 2 + 1
+
+#define X509_SERIAL_NUM_LENGTH            8
+
+
+#define DER_MAX_PEM                       0x500
+#define DER_MAX_TBS                       0x500
+#define DER_MAX_NESTED                    0x10
+
+#define RIOT_X509_KEY_USAGE 0x04    // keyCertSign
+#define RIOT_X509_SNUM_LEN  0x08    // In bytes
+
+#define BASE64_LEN(l) ((l == 0) ? (1) : (((((l - 1) / 3) + 1) * 4) + 1))
+
+typedef struct {
+	uint8_t serial_num[X509_SERIAL_NUM_LENGTH];
+	uint8_t *issuer_common;
+	uint8_t *issuer_org;
+	uint8_t *issuer_country;
+	uint8_t *valid_from;
+	uint8_t *valid_to;
+	uint8_t *subject_common;
+	uint8_t *subject_org;
+	uint8_t *subject_country;
+} PFR_X509_TBS;
+
+typedef struct
+{
+	uint8_t *buffer;
+	uint32_t length;
+	uint32_t position;
+	int collection_start[DER_MAX_NESTED];
+	int collection_position;
+} PFR_DER_CTX;
+
+typedef struct
+{
+	mbedtls_mpi r;
+	mbedtls_mpi s;
+} PFR_ECC_SIG;
+
+// OIDs
+static int oid_ecdsa_with_sha384[] = { 1,2,840,10045,4,3,3,-1 };
+static int oid_common_name[] = { 2,5,4,3,-1 };
+static int oid_country_name[] = { 2,5,4,6,-1 };
+static int oid_org_name[] = { 2,5,4,10,-1 };
+static int oid_ec_pubkey[] = { 1,2,840,10045, 2,1,-1 };
+static int oid_curve_ecdsa384[] = { 1,3,132,0,34,-1 };
+static int oid_key_usage[] = { 2,5,29,15,-1 };
+static int oid_ext_key_usage[] = { 2,5,29,37,-1 };
+static int oid_client_auth[] = { 1,3,6,1,5,5,7,3,2,-1 };
+static int oid_auth_key_identifier[] = { 2,5,29,35,-1 };
+//static int oid_riot[] = { 2,23,133,5,4,1,-1 };
+static int oid_sha384[] = { 2,16,840,1,101,3,4,2,2,-1 };
+static int oid_basic_constraints[] = { 2,5,29,19,-1 };
+
+static mbedtls_hmac_drbg_context hmac_drbg_ctx = {0};
+static uint8_t cdi_digest[SHA384_HASH_LENGTH] = {0};
+static uint8_t dev_fwid[SHA384_HASH_LENGTH] = {0};
+static uint8_t alias_digest[SHA384_HASH_LENGTH] = {0};
+
+uint8_t devid_priv_key_buf[ECDSA384_PRIVATE_KEY_SIZE] = {0};
+uint8_t devid_pub_key_buf[ECDSA384_PUBLIC_KEY_SIZE] = {0};
+uint8_t alias_priv_key_buf[ECDSA384_PRIVATE_KEY_SIZE] = {0};
+uint8_t alias_pub_key_buf[ECDSA384_PUBLIC_KEY_SIZE] = {0};
+uint8_t keybuf[256] = {0};
+uint8_t alias_cert[DER_MAX_PEM] = {0};
+uint8_t devid_cert[DER_MAX_PEM] = {0};
+
+enum cert_type {
+	CERT_TYPE = 0,
+	PUBLICKEY_TYPE,
+	ECC_PRIVATEKEY_TYPE,
+	CERT_REQ_TYPE,
+	LAST_CERT_TYPE
+};
+
+typedef struct
+{
+    uint16_t    hLen;
+    uint16_t    fLen;
+    const char *header;
+    const char *footer;
+} PEM_HDR_FOOTERS;
+
+// We only have a small subset of potential PEM encodings
+const PEM_HDR_FOOTERS pem_hf[LAST_CERT_TYPE] = {
+	{28, 26, "-----BEGIN CERTIFICATE-----\n", "-----END CERTIFICATE-----\n"},
+	{27, 25, "-----BEGIN PUBLIC KEY-----\n", "-----END PUBLIC KEY-----\n\0"},
+	{31, 29, "-----BEGIN EC PRIVATE KEY-----\n", "-----END EC PRIVATE KEY-----\n"},
+	{36, 34, "-----BEGIN CERTIFICATE REQUEST-----\n", "-----END CERTIFICATE REQUEST-----\n"}
+};
+
+void x509_generate_guid(uint8_t *guid, uint32_t *guid_len, uint8_t *seed, uint32_t seed_len)
+{
+	uint8_t digest[SHA384_HASH_LENGTH];
+	uint32_t olen;
+
+	hash_engine_sha_calculate(HASH_SHA384, seed, sizeof(seed_len),
+			digest, sizeof(digest));
+	base64_encode(guid, *guid_len, &olen, digest, 16);
+	*guid_len = olen;
+}
+
+void x509_der_init_context(PFR_DER_CTX *ctx, uint8_t *buffer, uint32_t length)
+{
+	ctx->buffer = buffer;
+	ctx->length = length;
+	ctx->position = 0;
+	memset(buffer, 0, length);
+	for (int i = 0; i < DER_MAX_NESTED; i++) {
+		ctx->collection_start[i] = -1;
+	}
+	ctx->collection_position = 0;
+}
+
+int x509_start_seq_or_set(PFR_DER_CTX *ctx, bool sequence)
+{
+	uint8_t tp = sequence ? 0x30 : 0x31;
+
+	if (ctx->collection_position >= DER_MAX_NESTED)
+		return -1;
+
+	ctx->buffer[ctx->position++] = tp;
+	ctx->collection_start[ctx->collection_position++] = ctx->position;
+	return 0;
+}
+
+int x509_add_int_from_array(PFR_DER_CTX *ctx, uint8_t *val, uint32_t bytes)
+{
+	uint32_t i, num_leading_zeros = 0;
+	bool negative;
+
+	for (i = 0; i < bytes; i++) {
+		if (val[i] != 0)
+			break;
+		num_leading_zeros++;
+	}
+
+	negative = val[num_leading_zeros] >= 128;
+	ctx->buffer[ctx->position++] = 0x02;
+
+	if (bytes == num_leading_zeros) {
+		ctx->buffer[ctx->position++] = 1;
+		ctx->buffer[ctx->position++] = 0;
+	} else {
+		if (negative) {
+			ctx->buffer[ctx->position++] = (uint8_t)(bytes - num_leading_zeros + 1);
+			ctx->buffer[ctx->position++] = 0;
+		} else {
+			ctx->buffer[ctx->position++] = (uint8_t)(bytes - num_leading_zeros);
+		}
+
+		for (i = num_leading_zeros; i < bytes; i++)
+			ctx->buffer[ctx->position++] = val[i];
+	}
+
+	return 0;
+}
+
+int x509_add_short_explicit_int(PFR_DER_CTX *ctx, int val)
+{
+	long valx;
+
+	ctx->buffer[ctx->position++] = 0xA0;
+	ctx->buffer[ctx->position++] = 3;
+
+	valx = htonl(val);
+
+	return (x509_add_int_from_array(ctx, (uint8_t *)&valx, 4));
+}
+
+int x509_add_int(PFR_DER_CTX *ctx, int val)
+{
+	long valx = htonl(val);
+
+	return (x509_add_int_from_array(ctx, (uint8_t *)&valx, 4));
+}
+
+int x509_add_bool(PFR_DER_CTX *ctx, bool val)
+{
+	ctx->buffer[ctx->position++] = 0x01;
+	ctx->buffer[ctx->position++] = 0x01;
+	ctx->buffer[ctx->position++] = (val == true) ? 0xFF : 0x00;
+
+	return 0;
+}
+
+int x509_add_oid(PFR_DER_CTX *ctx, int *values)
+{
+	int     j, k;
+	int     lenPos, digitPos = 0;
+	int     val, digit;
+	int     num_values = 0;
+
+	for (j = 0; j < 16; j++) {
+		if (values[j] < 0)
+			break;
+		num_values++;
+	}
+
+	ctx->buffer[ctx->position++] = 6;
+
+	// Save space for length (only <128 supported)
+	lenPos = ctx->position;
+	ctx->position++;
+
+	// DER-encode the OID, first octet is special
+	val = num_values == 1 ? 0 : values[1];
+	ctx->buffer[ctx->position++] = (uint8_t)(values[0] * 40 + val);
+
+	// Others are base-128 encoded with the most significant bit of each byte,
+	// apart from the least significant byte, set to 1.
+	if (num_values >= 2) {
+		uint8_t digits[5] = { 0 };
+
+		for (j = 2; j < num_values; j++) {
+			digitPos = 0;
+			val = values[j];
+
+			// Convert to B128
+			while (true) {
+				digit = val % 128;
+				digits[digitPos++] = (uint8_t)digit;
+				val = val / 128;
+				if (val == 0) {
+					break;
+				}
+			}
+
+			// Reverse into the buffer, setting the MSB as needed.
+			for (k = digitPos - 1; k >= 0; k--) {
+				val = digits[k];
+				if (k != 0) {
+					val += 128;
+				}
+				ctx->buffer[ctx->position++] = (uint8_t)val;
+			}
+		}
+	}
+
+	ctx->buffer[lenPos] = (uint8_t)(ctx->position - 1 - lenPos);
+	return 0;
+}
+
+int x509_get_int_encoded_num_bytes(int val)
+{
+	if (val < 128) {
+		return 1;
+	}
+	if (val < 256) {
+		return 2;
+	}
+	return 3;
+}
+
+int x509_encode_int(uint8_t *buf, int val)
+{
+	if (val <128) {
+		buf[0] = (uint8_t)val;
+		return 0;
+	}
+	if (val < 256) {
+		buf[0] = 0x81;
+		buf[1] = (uint8_t)val;
+		return 0;
+	}
+	buf[0] = 0x82;
+	buf[1] = (uint8_t)(val / 256);
+	buf[2] = val % 256;
+
+	return 0;
+}
+
+int x509_pop_nesting(PFR_DER_CTX *ctx)
+{
+	int start_pos, num_bytes, encoded_len_size;
+
+	start_pos = ctx->collection_start[--ctx->collection_position];
+	num_bytes = ctx->position - start_pos;
+
+	encoded_len_size = x509_get_int_encoded_num_bytes(num_bytes);
+
+	memmove(ctx->buffer + start_pos + encoded_len_size,
+			ctx->buffer + start_pos,
+			num_bytes);
+
+	x509_encode_int(ctx->buffer + start_pos, num_bytes);
+
+	ctx->position += encoded_len_size;
+
+	return 0;
+}
+
+int x509_add_utf8_str(PFR_DER_CTX *ctx, uint8_t *str)
+{
+	uint32_t i, num_char = (uint32_t)strlen(str);
+
+	ctx->buffer[ctx->position++] = 0x0c;
+	ctx->buffer[ctx->position++] = (uint8_t)num_char;
+
+	for (i = 0; i < num_char; i++) {
+		ctx->buffer[ctx->position++] = str[i];
+	}
+	return 0;
+}
+
+int x509_add_x501_name(PFR_DER_CTX *ctx, uint8_t *common, uint8_t *org, uint8_t *country)
+{
+	x509_start_seq_or_set(ctx, true);
+	x509_start_seq_or_set(ctx, false);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_common_name);
+	x509_add_utf8_str(ctx, common);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	x509_start_seq_or_set(ctx, false);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_country_name);
+	x509_add_utf8_str(ctx, country);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	x509_start_seq_or_set(ctx, false);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_org_name);
+	x509_add_utf8_str(ctx, org);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	return 0;
+}
+
+int x509_add_utc_time(PFR_DER_CTX *ctx, uint8_t *str)
+{
+	uint32_t i, num_char = (uint32_t)strlen(str);
+
+	ctx->buffer[ctx->position++] = 0x17;
+	ctx->buffer[ctx->position++] = (uint8_t)num_char;
+
+	for (i = 0; i < num_char; i++) {
+		ctx->buffer[ctx->position++] = str[i];
+	}
+
+	return 0;
+}
+
+int x509_add_bit_str(PFR_DER_CTX *ctx, uint8_t *bit_str, uint32_t bit_str_num_bytes)
+{
+	int len = bit_str_num_bytes + 1;
+
+	ctx->buffer[ctx->position++] = 0x03;
+	x509_encode_int(ctx->buffer + ctx->position, len);
+	ctx->position += x509_get_int_encoded_num_bytes(len);
+	ctx->buffer[ctx->position++] = 0;
+	memcpy(ctx->buffer + ctx->position, bit_str, bit_str_num_bytes);
+	ctx->position += bit_str_num_bytes;
+
+	return 0;
+}
+
+int x509_add_oct_str(PFR_DER_CTX *ctx, uint8_t *oct_str, uint32_t oct_str_len)
+{
+	ctx->buffer[ctx->position++] = 0x04;
+	x509_encode_int(ctx->buffer + ctx->position, oct_str_len);
+	ctx->position += x509_get_int_encoded_num_bytes(oct_str_len);
+	memcpy(ctx->buffer + ctx->position, oct_str, oct_str_len);
+	ctx->position += oct_str_len;
+
+	return 0;
+}
+
+int x509_start_explicit(PFR_DER_CTX *ctx, uint32_t num)
+{
+    ctx->buffer[ctx->position++] = 0xA0 + (uint8_t)num;
+    ctx->collection_start[ctx->collection_position++] = ctx->position;
+
+    return 0;
+}
+
+int x509_envelop_oct_str(PFR_DER_CTX *ctx)
+{
+	ctx->buffer[ctx->position++] = 0x04;
+	ctx->collection_start[ctx->collection_position++] = ctx->position;
+
+	return 0;
+}
+
+int x509_envelop_bit_str(PFR_DER_CTX *ctx)
+{
+	ctx->buffer[ctx->position++] = 0x03;
+	ctx->collection_start[ctx->collection_position++] = ctx->position;
+	ctx->buffer[ctx->position++] = 0;
+
+	return 0;
+}
+
+int x509_tbs_to_cert(PFR_DER_CTX *ctx)
+{
+	memmove(ctx->buffer + 1, ctx->buffer, ctx->position);
+	ctx->position++;
+
+	// sequence tag
+	ctx->buffer[0] = 0x30;
+	ctx->collection_start[ctx->collection_position++] = 1;
+
+	return 0;
+}
+
+int x509_der_to_pem(PFR_DER_CTX *ctx, uint32_t type, uint8_t *pem, uint32_t *length)
+{
+	uint32_t req_len, olen;
+	uint32_t base64_len = BASE64_LEN(ctx->position);
+
+	req_len = base64_len + pem_hf[type].hLen + pem_hf[type].fLen;
+
+	if (length && (*length < req_len)) {
+		*length = req_len;
+		return -1;
+	}
+
+	memcpy(pem, pem_hf[type].header, pem_hf[type].hLen);
+	pem += pem_hf[type].hLen;
+
+	base64_encode(pem, DER_MAX_PEM, &olen, ctx->buffer, ctx->position);
+	pem += base64_len;
+	memcpy(pem, pem_hf[type].footer, pem_hf[type].fLen);
+	pem += pem_hf[type].fLen;
+
+	if (length)
+		*length = req_len;
+
+	return 0;
+}
+
+int x509_add_extentions(PFR_DER_CTX *ctx, uint8_t *devid_pub_key, uint32_t devid_pub_key_len,
+		uint8_t *dev_fwid, uint32_t fwid_len)
+{
+	uint8_t auth_key_identifier[SHA1_HASH_LENGTH];
+	uint8_t key_usage = RIOT_X509_KEY_USAGE;
+	uint8_t ext_len = 1;
+
+	hash_engine_sha_calculate(HASH_SHA1, devid_pub_key, devid_pub_key_len,
+			auth_key_identifier, sizeof(auth_key_identifier));
+
+	x509_start_explicit(ctx, 3);
+	x509_start_seq_or_set(ctx, true);
+
+	// key usage
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_key_usage);
+	x509_envelop_oct_str(ctx);
+	x509_add_bit_str(ctx, &key_usage, ext_len);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	// extended key usage
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_ext_key_usage);
+	x509_envelop_oct_str(ctx);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_client_auth);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	// authority key identifier
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_auth_key_identifier);
+	x509_envelop_oct_str(ctx);
+	x509_start_seq_or_set(ctx, true);
+	x509_start_explicit(ctx, 0);
+	x509_add_oct_str(ctx, auth_key_identifier, SHA1_HASH_LENGTH);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	// basic constraints
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_basic_constraints);
+	// is critical
+	x509_add_bool(ctx, true);
+	x509_envelop_oct_str(ctx);
+	x509_start_seq_or_set(ctx, true);
+	// cA = false
+	x509_add_bool(ctx, false);
+	x509_add_int(ctx, 1);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	return 0;
+}
+
+int x509_get_alias_cert_tbs(PFR_DER_CTX *ctx, PFR_X509_TBS *tbs_data,
+		uint8_t *alias_pub_key, uint8_t *devid_pub_key,
+		uint8_t *dev_fwid, uint32_t fwid_len)
+{
+	uint8_t guid_buf[64] = {0};
+	uint32_t guid_buf_len = sizeof(guid_buf);
+
+	if (strncmp(tbs_data->subject_common, "*", 1) == 0) {
+		x509_generate_guid(guid_buf, &guid_buf_len, devid_pub_key, ECDSA384_PUBLIC_KEY_SIZE);
+		guid_buf[guid_buf_len - 1] = 0;
+		tbs_data->subject_common = guid_buf;
+	}
+
+	x509_start_seq_or_set(ctx, true);
+	x509_add_short_explicit_int(ctx, 2);
+	x509_add_int_from_array(ctx, tbs_data->serial_num, X509_SERIAL_NUM_LENGTH);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_ecdsa_with_sha384);
+	x509_pop_nesting(ctx);
+
+	x509_add_x501_name(ctx, tbs_data->issuer_common, tbs_data->issuer_org,
+			tbs_data->issuer_country);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_utc_time(ctx, tbs_data->valid_from);
+	x509_add_utc_time(ctx, tbs_data->valid_to);
+	x509_pop_nesting(ctx);
+
+	x509_add_x501_name(ctx, tbs_data->subject_common, tbs_data->subject_org,
+			tbs_data->subject_country);
+	x509_start_seq_or_set(ctx, true);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_ec_pubkey);
+	x509_add_oid(ctx, oid_curve_ecdsa384);
+	x509_pop_nesting(ctx);
+
+	x509_add_bit_str(ctx, alias_pub_key, ECDSA384_PUBLIC_KEY_SIZE);
+	x509_pop_nesting(ctx);
+	x509_add_extentions(ctx, devid_pub_key, ECDSA384_PUBLIC_KEY_SIZE, dev_fwid, fwid_len);
+	x509_pop_nesting(ctx);
+
+	return 0;
+}
+
+int x509_get_device_cert_tbs(PFR_DER_CTX *ctx, PFR_X509_TBS *tbs_data,
+		uint8_t *devid_pub_key)
+{
+	uint8_t key_usage = RIOT_X509_KEY_USAGE;
+	x509_start_seq_or_set(ctx, true);
+	x509_add_short_explicit_int(ctx, 2);
+	x509_add_int_from_array(ctx, tbs_data->serial_num, X509_SERIAL_NUM_LENGTH);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_ecdsa_with_sha384);
+	x509_pop_nesting(ctx);
+
+	x509_add_x501_name(ctx, tbs_data->issuer_common, tbs_data->issuer_org,
+			tbs_data->issuer_country);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_utc_time(ctx, tbs_data->valid_from);
+	x509_add_utc_time(ctx, tbs_data->valid_to);
+	x509_pop_nesting(ctx);
+
+	x509_add_x501_name(ctx, tbs_data->subject_common, tbs_data->subject_org,
+			tbs_data->subject_country);
+	x509_start_seq_or_set(ctx, true);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_ec_pubkey);
+	x509_add_oid(ctx, oid_curve_ecdsa384);
+	x509_pop_nesting(ctx);
+
+	x509_add_bit_str(ctx, devid_pub_key, ECDSA384_PUBLIC_KEY_SIZE);
+	x509_pop_nesting(ctx);
+	x509_start_explicit(ctx, 3);
+	x509_start_seq_or_set(ctx, true);
+
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_key_usage);
+	x509_envelop_oct_str(ctx);
+	x509_add_bit_str(ctx, &key_usage, 1);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_basic_constraints);
+	x509_add_bool(ctx, true);
+	x509_envelop_oct_str(ctx);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_bool(ctx, true);
+	x509_add_int(ctx, 1);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	return 0;
+}
+
+int x509_get_csr_tbs(PFR_DER_CTX *ctx, PFR_X509_TBS *tbs_data, uint8_t *devid_pub_key)
+{
+	x509_start_seq_or_set(ctx, true);
+	x509_add_int(ctx, 0);
+	x509_add_x501_name(ctx, tbs_data->issuer_common, tbs_data->issuer_org,
+			tbs_data->issuer_country);
+
+	x509_start_seq_or_set(ctx, true);
+	x509_start_seq_or_set(ctx, true);
+	x509_add_oid(ctx, oid_ec_pubkey);
+	x509_add_oid(ctx, oid_curve_ecdsa384);
+	x509_pop_nesting(ctx);
+	x509_add_bit_str(ctx, devid_pub_key, ECDSA384_PUBLIC_KEY_SIZE);
+	x509_pop_nesting(ctx);
+	x509_start_explicit(ctx, 0);
+	x509_pop_nesting(ctx);
+	x509_pop_nesting(ctx);
+
+	return 0;
+}
+
+void x509_set_serial_number(PFR_X509_TBS *tbs_data, uint8_t *digest, uint8_t digest_len)
+{
+	uint8_t dice_seed[9] = "DICE_SEED";
+	uint8_t dice_seed_digest[SHA384_HASH_LENGTH];
+	uint8_t final_digest[SHA384_HASH_LENGTH];
+	hash_engine_sha_calculate(HASH_SHA384, dice_seed, sizeof(dice_seed),
+			dice_seed_digest, sizeof(dice_seed_digest));
+	hash_engine_start(HASH_SHA384);
+	hash_engine_update(dice_seed_digest, sizeof(dice_seed_digest));
+	hash_engine_update(digest, digest_len);
+	hash_engine_finish(final_digest, sizeof(final_digest));
+	memcpy(tbs_data->serial_num, final_digest, X509_SERIAL_NUM_LENGTH);
+
+	// DER encoded serial number must be positive and the first byte must not be zero
+	tbs_data->serial_num[0] &= 0x7f;
+	tbs_data->serial_num[0] |= 0x01;
+}
+
+int hash_device_firmware(uint32_t addr, uint32_t fw_size, uint8_t *hash, uint32_t hash_len,
+		enum hash_algo algo)
+{
+	const struct device *flash_dev;
+	uint32_t read_len;
+	flash_dev = device_get_binding("fmc_cs0");
+	hash_engine_start(algo);
+	while (fw_size > 0) {
+		read_len = (fw_size < PAGE_SIZE) ? fw_size : PAGE_SIZE;
+		flash_read(flash_dev, addr, buffer, read_len);
+		hash_engine_update(buffer, read_len);
+		addr += read_len;
+		fw_size -= read_len;
+	}
+
+	hash_engine_finish(hash, hash_len);
+
+	return 0;
+}
+
+// TODO:
+// Since srand() is not supported in current zephyr, we use the hash of cdi digest
+// as the seed of mbedtls random number generator.
+#if 0
+int get_rand_bytes( void *rngState, uint8_t *output, size_t length)
+{
+	ARG_UNUSED(rngState);
+	for (; length; length--)
+		*output++ = (uint8_t)rand();
+
+	return 0;
+}
+
+int seed_drbg(uint8_t *digest, uint32_t digest_len)
+{
+	uint32_t i, seed;
+	mbedtls_md_info_t *md_sha384;
+	int ret = -1;
+
+	for (i = 0; i < digest_len; i++) {
+		seed += ~(digest[i]);
+	}
+	srand(~seed);
+
+	mbedtls_hmac_drbg_init(&hmac_drbg_ctx);
+
+	if (!(md_sha384 = mbedtls_md_info_from_type(MBEDTLS_MD_SHA384)))
+		goto free_drbg;
+
+	if (mbedtls_hmac_drbg_seed(&hmac_drbg_ctx, md_sha384, get_rand_bytes, NULL, NULL, 0))
+		goto free_drbg;
+
+	ret = 0;
+
+free_drbg:
+	if (ret)
+		mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+
+	return ret;
+}
+#else
+
+// Temporary solution
+int get_rand_bytes_by_cdi(void *rngState, uint8_t *output, size_t length)
+{
+	uint8_t cdi_digest_digest[SHA384_HASH_LENGTH];
+	ARG_UNUSED(rngState);
+	hash_engine_sha_calculate(HASH_SHA384, (uint8_t *)cdi_digest, SHA384_HASH_LENGTH,
+			cdi_digest_digest, sizeof(cdi_digest_digest));
+	memset(output, 0, length);
+	memcpy(output, cdi_digest_digest,
+			(length <= SHA384_HASH_LENGTH) ? length : SHA384_HASH_LENGTH);
+
+
+	return 0;
+}
+
+int get_rand_bytes_by_cdi_fwid(void *rngState, uint8_t *output, size_t length)
+{
+	ARG_UNUSED(rngState);
+
+
+	// Combine CDI and FWID for deriving alias key
+	hash_engine_start(HASH_SHA384);
+	hash_engine_update(cdi_digest, SHA384_HASH_LENGTH);
+	hash_engine_update(dev_fwid, SHA384_HASH_LENGTH);
+	hash_engine_finish(alias_digest, sizeof(alias_digest));
+	memset(output, 0, length);
+	memcpy(output, alias_digest,
+			(length <= SHA384_HASH_LENGTH) ? length : SHA384_HASH_LENGTH);
+
+	return 0;
+}
+
+int seed_drbg(int (*f_entropy)(void *, unsigned char *, size_t), void *p_entropy)
+{
+	mbedtls_md_info_t *md_sha384;
+	int ret = -1;
+
+	if (hmac_drbg_ctx.MBEDTLS_PRIVATE(entropy_len))
+		mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+
+	mbedtls_hmac_drbg_init(&hmac_drbg_ctx);
+
+	if (!(md_sha384 = mbedtls_md_info_from_type(MBEDTLS_MD_SHA384)))
+		goto free_drbg;
+
+	if (mbedtls_hmac_drbg_seed(&hmac_drbg_ctx, md_sha384, f_entropy,
+				p_entropy, NULL, 0))
+		goto free_drbg;
+
+	ret = 0;
+
+free_drbg:
+	if (ret)
+		mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+
+	return ret;
+}
+
+#endif
+
+
+void derive_key_pair(mbedtls_ecdsa_context *ctx_sign, uint8_t *privkey_buf, uint8_t *pubkey_buf,
+		int (*f_entropy)(void *, unsigned char *, size_t), void *p_entropy)
+{
+	size_t len;
+	// Seed drbg with cdi digest
+	seed_drbg(f_entropy, p_entropy);
+
+	mbedtls_ecdsa_init(ctx_sign);
+
+	if (mbedtls_ecdsa_genkey(ctx_sign, MBEDTLS_ECP_DP_SECP384R1, mbedtls_hmac_drbg_random,
+				&hmac_drbg_ctx)) {
+		return;
+	}
+
+	if (mbedtls_ecp_point_write_binary(&ctx_sign->MBEDTLS_PRIVATE(grp),
+			&ctx_sign->MBEDTLS_PRIVATE(d),
+			MBEDTLS_ECP_PF_UNCOMPRESSED, &len, privkey_buf, 128)) {
+		LOG_ERR("Failed to get ecdsa privkey");
+		return;
+	}
+
+	if (mbedtls_ecp_point_write_binary(&ctx_sign->MBEDTLS_PRIVATE(grp),
+			&ctx_sign->MBEDTLS_PRIVATE(Q),
+			MBEDTLS_ECP_PF_UNCOMPRESSED, &len, pubkey_buf, 128)) {
+		LOG_ERR("Failed to get ecdsa pubkey");
+		return;
+	}
+}
+
+int x509_digest_sign(PFR_ECC_SIG *sig, uint8_t *digest, uint32_t digest_len,
+		mbedtls_ecdsa_context *ctx)
+{
+
+	return (mbedtls_ecdsa_sign(&ctx->MBEDTLS_PRIVATE(grp), &sig->r, &sig->s,
+				&ctx->MBEDTLS_PRIVATE(d), digest, digest_len,
+				mbedtls_hmac_drbg_random, &hmac_drbg_ctx));
+}
+
+int x509_cert_sign(PFR_ECC_SIG *sig, void *data, uint32_t size, mbedtls_ecdsa_context *ctx)
+{
+	uint8_t digest[SHA384_HASH_LENGTH];
+
+	hash_engine_sha_calculate(HASH_SHA384, data, size, digest, sizeof(digest));
+
+	return (x509_digest_sign(sig, digest, sizeof(digest), ctx));
+}
+
+int x509_mpi_to_int(mbedtls_mpi *mpi, uint8_t *buf, uint32_t buf_len)
+{
+	return (mbedtls_mpi_write_binary(mpi, buf, SHA384_HASH_LENGTH));
+}
+
+int x509_gen_cert(PFR_DER_CTX *cert, PFR_ECC_SIG *tbs_sig)
+{
+	uint8_t enc_buf[SHA384_HASH_LENGTH] = {0};
+	uint32_t enc_buf_len = sizeof(enc_buf);
+
+	x509_tbs_to_cert(cert);
+	x509_start_seq_or_set(cert, true);
+	x509_add_oid(cert, oid_ecdsa_with_sha384);
+	x509_pop_nesting(cert);
+	x509_envelop_bit_str(cert);
+	x509_start_seq_or_set(cert, true);
+	x509_mpi_to_int(&tbs_sig->r, enc_buf, enc_buf_len);
+	x509_add_int_from_array(cert, enc_buf, enc_buf_len);
+	x509_mpi_to_int(&tbs_sig->s, enc_buf, enc_buf_len);
+	x509_add_int_from_array(cert, enc_buf, enc_buf_len);
+	x509_pop_nesting(cert);
+	x509_pop_nesting(cert);
+	x509_pop_nesting(cert);
+
+	return 0;
+}
+
+void dice_start(size_t cert_type)
+{
+	// x509 TBS(to be signed) region
+	PFR_X509_TBS x509_alias_tbs = {{0x55, 0x66, 0x77, 0x88, 0xaa, 0xbb, 0xcc, 0xdd},
+		"Aspeed PFR Core",
+		"AST_TEST",
+		"TW",
+		"221010000000Z",
+		"421010000000Z",
+		"*",
+		"AST_TEST",
+		"TW"};
+
+	PFR_X509_TBS x509_device_tbs = {{0x55, 0x66, 0x77, 0x88, 0xaa, 0xbb, 0xcc, 0xdd},
+		"Aspeed PFR R00t",
+		"AST_TEST",
+		"TW",
+		"221010000000Z",
+		"421010000000Z",
+		"*",
+		"AST_TEST",
+		"TW"};
+
+	mbedtls_ecdsa_context ctx_devid;
+	mbedtls_ecdsa_context ctx_alias;
+	PFR_DER_CTX der_ctx;
+	PFR_ECC_SIG tbs_sig;
+	uint32_t len;
+
+	uint8_t der_buf[DER_MAX_TBS];
+	// Hash CDI
+	hash_engine_sha_calculate(HASH_SHA384, (uint8_t *)CDI_ADDRESS, CDI_LENGTH,
+			cdi_digest, sizeof(cdi_digest));
+	//LOG_HEXDUMP_INF((uint8_t *)CDI_ADDRESS, CDI_LENGTH, "CDI :");
+	//LOG_HEXDUMP_INF(cdi_digest, SHA384_HASH_LENGTH, "CDI digest :");
+
+	// Derive DeviceID key pair from CDI
+	derive_key_pair(&ctx_devid, devid_priv_key_buf, devid_pub_key_buf,
+			get_rand_bytes_by_cdi, NULL);
+	//LOG_HEXDUMP_INF(devid_priv_key_buf, ECDSA384_PRIVATE_KEY_SIZE, "DEVID PRIKEY :");
+	//LOG_HEXDUMP_INF(devid_pub_key_buf, ECDSA384_PUBLIC_KEY_SIZE, "DEVID PUBKEY :");
+
+	// Set serial number of DeviceID certificate
+	x509_set_serial_number(&x509_device_tbs, cdi_digest, sizeof(cdi_digest));
+
+	mbedtls_mpi_write_string(&ctx_devid.MBEDTLS_PRIVATE(d), 16, keybuf, sizeof(keybuf), &len);
+	mbedtls_mpi_write_string(&ctx_devid.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(X), 16, keybuf,
+			sizeof(keybuf), &len);
+	mbedtls_mpi_write_string(&ctx_devid.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Y), 16, keybuf,
+			sizeof(keybuf), &len);
+
+	// Hash device firmware as FWID
+	hash_device_firmware(DEVICE_FIRMWARE_START_ADDRESS, DEVICE_FIRMWARE_SIZE, dev_fwid,
+			SHA384_HASH_LENGTH, HASH_SHA384);
+
+	// Derive Alias key pair from CDI and FWID
+	derive_key_pair(&ctx_alias, alias_priv_key_buf, alias_pub_key_buf,
+			get_rand_bytes_by_cdi_fwid, NULL);
+	//LOG_HEXDUMP_INF(alias_priv_key_buf, ECDSA384_PRIVATE_KEY_SIZE, "Alias PRIKEY :");
+	//LOG_HEXDUMP_INF(alias_pub_key_buf, ECDSA384_PUBLIC_KEY_SIZE, "Alias PUBKEY :");
+
+	// Set serial number of Alias certificate
+	x509_set_serial_number(&x509_alias_tbs, alias_digest, sizeof(alias_digest));
+
+	mbedtls_mpi_write_string(&ctx_alias.MBEDTLS_PRIVATE(d), 16, keybuf, sizeof(keybuf), &len);
+	mbedtls_mpi_write_string(&ctx_alias.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(X), 16, keybuf,
+			sizeof(keybuf), &len);
+	mbedtls_mpi_write_string(&ctx_alias.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Y), 16, keybuf,
+			sizeof(keybuf), &len);
+
+	x509_der_init_context(&der_ctx, der_buf, DER_MAX_TBS);
+	x509_get_alias_cert_tbs(&der_ctx, &x509_alias_tbs, alias_pub_key_buf,
+			devid_pub_key_buf, dev_fwid, SHA384_HASH_LENGTH);
+
+	mbedtls_mpi_init(&tbs_sig.r);
+	mbedtls_mpi_init(&tbs_sig.s);
+	x509_cert_sign(&tbs_sig, der_ctx.buffer, der_ctx.position, &ctx_devid);
+
+	x509_gen_cert(&der_ctx, &tbs_sig);
+	len = sizeof(alias_cert);
+	//LOG_HEXDUMP_INF(der_ctx.buffer, der_ctx.position, "Alias Cert DER :");
+	x509_der_to_pem(&der_ctx, CERT_TYPE, alias_cert, &len);
+	alias_cert[len] = 0;
+
+	//LOG_HEXDUMP_INF(alias_cert, sizeof(alias_cert), "Alias Cert PEM :");
+
+	if(cert_type) {
+		// Self-Signed
+		x509_device_tbs.issuer_common = x509_device_tbs.subject_common;
+		x509_device_tbs.issuer_org = x509_device_tbs.subject_org;
+		x509_device_tbs.issuer_country = x509_device_tbs.subject_country;
+		x509_der_init_context(&der_ctx, der_buf, DER_MAX_TBS);
+		x509_get_device_cert_tbs(&der_ctx, &x509_device_tbs, devid_pub_key_buf);
+		x509_cert_sign(&tbs_sig, der_ctx.buffer, der_ctx.position, &ctx_devid);
+		x509_gen_cert(&der_ctx, &tbs_sig);
+		x509_der_to_pem(&der_ctx, CERT_TYPE, devid_cert, &len);
+		devid_cert[len] = 0;
+		//LOG_HEXDUMP_INF(der_ctx.buffer, der_ctx.position, "DevID Cert DER :");
+		//LOG_HEXDUMP_INF(devid_cert, sizeof(devid_cert), "DevID Cert PEM :");
+	} else {
+		// CSR
+		x509_der_init_context(&der_ctx, der_buf, DER_MAX_TBS);
+		x509_get_csr_tbs(&der_ctx, &x509_alias_tbs, devid_pub_key_buf);
+		x509_cert_sign(&tbs_sig, der_ctx.buffer, der_ctx.position, &ctx_devid);
+		x509_gen_cert(&der_ctx, &tbs_sig);
+		x509_der_to_pem(&der_ctx, CERT_REQ_TYPE, devid_cert, &len);
+		devid_cert[len] = 0;
+		//LOG_HEXDUMP_INF(der_ctx.buffer, der_ctx.position, "DevID CSR DER :");
+		//LOG_HEXDUMP_INF(devid_cert, sizeof(devid_cert), "DevID CSR PEM :");
+	}
+
+	mbedtls_ecdsa_free(&ctx_devid);
+	mbedtls_ecdsa_free(&ctx_alias);
+}
+
+void dump_cert(const struct shell *shell, uint8_t *cert, uint32_t cert_size)
+{
+	uint32_t remaining = cert_size;
+	int i = 0, len, start = 0;
+	uint8_t buf[65] = {0};
+
+	while(remaining) {
+		if (i - start == 63 || cert[i] == 0x0a) {
+			len = (cert[i] == 0x0a) ? i - start : i - start + 1;
+			memcpy(buf, &cert[start], len);
+			shell_print(shell, "%s", buf);
+			remaining -= (i - start) + 1;
+			start = ++i;
+		} else if (cert[i] == 0) {
+			if (i > start) {
+				memcpy(buf, &cert[start], i - start + 1);
+				shell_print(shell, "%s", buf);
+			}
+
+			// print footer
+			shell_print(shell, "%s", &cert[i + 1]);
+
+			break;
+		} else {
+			++i;
+		}
+	}
+}
+
+static int cmd_dice(const struct shell *shell, size_t argc, char **argv)
+{
+	int i;
+	uint8_t buf[65] = {0};
+
+	if (argc != 2) {
+		shell_print(shell, "asm dice <0/1> for generating device id CSR(0) or CERT(1)");
+		return 0;
+	}
+
+	size_t cert_type = strtol(argv[1], NULL, 16);
+	memset(devid_cert, 0, sizeof(devid_cert));
+	memset(alias_cert, 0, sizeof(alias_cert));
+
+	dice_start(cert_type);
+
+	shell_print(shell, "DeviceID PRIV KEY :");
+	shell_hexdump(shell, devid_priv_key_buf, ECDSA384_PRIVATE_KEY_SIZE);
+	shell_print(shell, "DeviceID PUB KEY :");
+	shell_hexdump(shell, devid_pub_key_buf, ECDSA384_PUBLIC_KEY_SIZE);
+	shell_print(shell, "Alias PRIV KEY :");
+	shell_hexdump(shell, alias_priv_key_buf, ECDSA384_PUBLIC_KEY_SIZE);
+	shell_print(shell, "Alias PUB KEY :");
+	shell_hexdump(shell, alias_pub_key_buf, ECDSA384_PUBLIC_KEY_SIZE);
+	shell_print(shell, "DevID %s PEM :", (cert_type) ? "CERT" : "CSR");
+	dump_cert(shell, devid_cert, sizeof(devid_cert));
+
+	shell_print(shell, "Alias CERT PEM :");
+	dump_cert(shell, alias_cert, sizeof(alias_cert));
+
+	return 0;
+}
+#endif // CONFIG_ASPEED_DICE_SHELL
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
 	SHELL_CMD(event, &sub_event, "State Machine Event", NULL),
@@ -573,6 +1600,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(pstate, NULL, "Test Platform State LED", cmd_test_plat_state_led),
 #if defined(CONFIG_INTEL_PFR)
 	SHELL_CMD(afm, NULL, "Dump AFM Structure: DEVICE OFFSET", cmd_afm),
+#endif
+#if defined(CONFIG_ASPEED_DICE_SHELL)
+	SHELL_CMD(dice, NULL, "Generate Cert Chain", cmd_dice),
 #endif
 	SHELL_SUBCMD_SET_END
 );

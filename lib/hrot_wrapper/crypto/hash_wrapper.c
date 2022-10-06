@@ -30,7 +30,7 @@ static int hash_wrapper_calculate_sha384(struct hash_engine *engine, const uint8
 {
 	enum hash_algo shaAlgo = HASH_SHA384;
 
-	return hash_engine_sha_calculate(shaAlgo, data, length, hash, hash_length);;
+	return hash_engine_sha_calculate(shaAlgo, data, length, hash, hash_length);
 }
 
 static int hash_wrapper_start_sha384(struct hash_engine *engine)
