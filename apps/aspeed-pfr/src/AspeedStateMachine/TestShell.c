@@ -1000,6 +1000,20 @@ static int cmd_dice(const struct shell *shell, size_t argc, char **argv)
 }
 #endif // CONFIG_ASPEED_DICE_SHELL
 
+#include <sys/sys_heap.h>
+#if 0
+extern struct sys_heap z_malloc_heap;
+#endif
+extern struct sys_heap _system_heap;
+static int cmd_heap(const struct shell *shell, size_t argc, char **argv)
+{
+#if 0
+	sys_heap_print_info(&z_malloc_heap, true);
+#endif
+	sys_heap_print_info(&_system_heap, true);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
 	SHELL_CMD(event, &sub_event, "State Machine Event", NULL),
@@ -1017,6 +1031,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 #if defined(CONFIG_ASPEED_DICE_SHELL)
 	SHELL_CMD(dice, NULL, "Generate Cert Chain", cmd_dice),
 #endif
+	SHELL_CMD(heap, NULL, "Show system heap statistic", cmd_heap),
 	SHELL_SUBCMD_SET_END
 );
 

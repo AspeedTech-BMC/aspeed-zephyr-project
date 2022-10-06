@@ -131,6 +131,7 @@ void do_init(void *o)
 #endif
 #if defined(CONFIG_PFR_MCTP)
 		init_pfr_mctp();
+		spdm_main();
 #endif
 		SetPlatformState(CPLD_NIOS_II_PROCESSOR_WAITING_TO_START);
 #if defined(CONFIG_INIT_POWER_SEQUENCE)
