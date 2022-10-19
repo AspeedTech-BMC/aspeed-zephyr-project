@@ -52,7 +52,7 @@ static int initialize_flash(void)
 	if (status)
 		return status;
 
-	status = flash_wrapper_init(getSpiEngineWrapper(), getFlashEngineWrapper());
+	status = flash_wrapper_init(getSpiEngineWrapper(), getFlashEngineWrapper(), getSpiEngineStateWrapper());
 
 	return status;
 }
@@ -78,7 +78,7 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 	PFM_SPI_DEFINITION spi_def;
 	uint32_t fvm_body_end_addr;
 
-	spi_flash->spi.device_id[0] = PCH_SPI;
+	spi_flash->spi.state->device_id[0] = PCH_SPI;
 	spi_flash->spi.base.read(&spi_flash->spi, fvm_offset, &fvm, sizeof(FVM_STRUCTURE));
 	fvm_body_end_addr = fvm_offset + fvm.Length;
 

@@ -62,7 +62,7 @@ void apply_pfm_protection(int spi_device_id)
 #endif
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	spi_flash->spi.device_id[0] = spi_device_id;
+	spi_flash->spi.state->device_id[0] = spi_device_id;
 	spi_flash->spi.base.read(&spi_flash->spi, addr_size_of_pfm, pfm_length, 4);
 
 	int pfm_record_length = (pfm_length[0] & 0xff) | (pfm_length[1] << 8 & 0xff00) | (pfm_length[2] << 16 & 0xff0000) | (pfm_length[3] << 24 & 0xff000000);

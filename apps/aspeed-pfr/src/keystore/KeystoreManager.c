@@ -52,7 +52,7 @@ int keystore_save_key(struct keystore *store, int id, const uint8_t *key, size_t
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 
 	LOG_INF("%s: write addr = 0x%x, length = 0x%0x", __func__, base_addr, KeyStoreKeyMaxLen);
 	LOG_HEXDUMP_DBG(storebuf, KeyStoreKeyMaxLen, "keystore buffer:");
@@ -76,7 +76,7 @@ int keystore_load_key(struct keystore *store, int id, uint8_t **key, size_t *len
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 	BaseAddr = id * KeyStoreKeyMaxLen;
 
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeyStoreHdrLen);
@@ -114,7 +114,7 @@ int keystore_erase_key(struct keystore *store, int id)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 	BaseAddr = KeyStoreOffset_0;
 
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&StoreBuf, KeySectionSize);
@@ -152,7 +152,7 @@ int keystore_erase_all_keys(struct keystore *store)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 	BaseAddr = KeyStoreOffset_0;
 	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, BaseAddr);
 
@@ -186,7 +186,7 @@ int keystore_get_key_id(struct keystore *store, uint8_t *key, int *key_id, int *
 	int id = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_KEY; // Internal UFM SPI
 
 	while (id < KEY_MAX_NUMBER) {
 		base_addr = id * KeyStoreKeyMaxLen;
@@ -274,7 +274,7 @@ int keystore_save_root_key(struct rsa_public_key *pub_key)
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Root Key save to Intel State
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE; // Root Key save to Intel State
 
 	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)StoreBuf, rootkey_contain_size);
 
@@ -299,7 +299,7 @@ int keystore_get_root_key(struct rsa_public_key *pub_key)
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Root Key save to Intel State
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE; // Root Key save to Intel State
 
 	//Key Length
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, BaseAddr, (uint8_t *)&key_length, sizeof(key_length));

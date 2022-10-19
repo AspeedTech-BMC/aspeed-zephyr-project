@@ -104,7 +104,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	}
 
 	// verify
-	manifest->flash->device_id[0] = manifest->flash_id;
+	manifest->flash->state->device_id[0] = manifest->flash_id;
 	status = flash_verify_contents((struct flash *)manifest->flash,
 			verify_addr,
 			(image_header.image_length - image_header.sign_length),
@@ -223,7 +223,7 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 
-	spi_flash->spi.device_id[0] = pfr_manifest->image_type;
+	spi_flash->spi.state->device_id[0] = pfr_manifest->image_type;
 	status = manifest_flash_init(manifest_flash, getFlashDeviceInstance(), read_address,
 			PFM_V2_MAGIC_NUM);
 	if (status) {

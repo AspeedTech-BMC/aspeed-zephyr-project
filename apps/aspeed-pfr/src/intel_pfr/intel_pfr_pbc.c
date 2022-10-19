@@ -71,7 +71,7 @@ int update_active_pfm(struct pfr_manifest *manifest)
 
 	// Adjusting capsule offset size to PFM Signing chain
 	capsule_offset += PFM_SIG_BLOCK_SIZE;
-	spi_flash->spi.device_id[0] = manifest->image_type;
+	spi_flash->spi.state->device_id[0] = manifest->image_type;
 	// Updating PFM from capsule to active region
 	status = flash_copy_and_verify((struct spi_flash *)&spi_flash->spi, manifest->active_pfm_addr,
 			capsule_offset, BLOCK_SIZE);

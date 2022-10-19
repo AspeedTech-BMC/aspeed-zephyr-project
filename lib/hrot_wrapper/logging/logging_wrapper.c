@@ -24,6 +24,7 @@
 
 static struct spi_engine_wrapper logFlash;      // logging flash implementations info
 struct flash_master_wrapper spi;                // interface to the SPI master connected to a flash device.
+static struct spi_engine_state_wrapper logFlashState;      // logging flash implementations info
 
 /**
  * @brief Initializes logging features.
@@ -49,13 +50,13 @@ int logging_flash_wrapper_init(struct logging_flash *logging)
 	}
 	/* Initializes SPI flash access functions and corresponding commands.
 	 * spi variable is unused argument in flash_wrapper_init function. */
-	status = flash_wrapper_init(&logFlash, &spi);
+	status = flash_wrapper_init(&logFlash, &spi, &logFlashState);
 
 	if (status != 0) {
 		return status;  // failed to flash wrapper initialization
 	}
 
-	logFlash.spi.device_id[0] = ROT_INTERNAL_LOG;// Access fmc_cs0 ROT_INTERNAL_LOG
+	logFlash.spi.state->device_id[0] = ROT_INTERNAL_LOG;// Access fmc_cs0 ROT_INTERNAL_LOG
 	/* retrieves flash device size. */
 #if 0
 	status = logFlash.spi.base.get_device_size((struct flash *)&logFlash.spi, &logFlash.spi.device_size);
@@ -66,7 +67,8 @@ int logging_flash_wrapper_init(struct logging_flash *logging)
 	if (status != 0) {
 		return status;  // failed to retrieves flash device size
 	}
-	status = logging_flash_init(logging, &logFlash.spi, LOGGING_FLASH_BASE_ADDRESS);
+	struct logging_flash_state state;
+	status = logging_flash_init(logging, &state, &logFlash.spi, LOGGING_FLASH_BASE_ADDRESS);
 
 	if (status != 0) {
 		return status;  // failed to initializes logging flash
@@ -77,7 +79,8 @@ int logging_flash_wrapper_init(struct logging_flash *logging)
 
 int logging_memory_wrapper_init(struct logging_memory *logging)
 {
-	return (logging_memory_init(logging, LOG_ENTRY_COUNT, LOG_ENTRY_SIZE));
+	struct logging_flash_state state;
+	return (logging_memory_init(logging, &state, LOG_ENTRY_COUNT, LOG_ENTRY_SIZE));
 }
 
 /**

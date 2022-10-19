@@ -50,7 +50,7 @@ static void Data_dump_buf(uint8_t *buf, uint32_t len)
 int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
 	const struct device *flash_device;
-	uint8_t DeviceId = flash->device_id[0];
+	uint8_t DeviceId = flash->state->device_id[0];
 	int AdrOffset = xfer->address;
 	int Datalen = xfer->length;
 	uint32_t buf_addr = xfer->data;
@@ -155,7 +155,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	int err, ret = 0;
 
 	flash_device = device_get_binding(Flash_Devices_List[ROT_SPI]);
-	uint8_t DeviceId = flash->device_id[0];
+	uint8_t DeviceId = flash->state->device_id[0];
 
 	AdrOffset = xfer->address;
 	Datalen = xfer->length;
@@ -232,7 +232,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 
 int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
-	uint8_t DeviceId = flash->device_id[0];
+	uint8_t DeviceId = flash->state->device_id[0];
 	int ret  = 0;
 
 	if (DeviceId <= PCH_SPI)

@@ -18,6 +18,7 @@ struct rsa_engine_wrapper rsaEngineWrapper;
 
 // Zephyr Ported structures
 struct spi_engine_wrapper spiEngineWrapper;
+struct spi_engine_state_wrapper spiEngineStateWrapper;
 struct flash_master_wrapper flashEngineWrapper;
 struct spi_filter_engine_wrapper spiFilterEngineWrapper;
 
@@ -81,6 +82,11 @@ struct rsa_engine_wrapper *getRsaEngineInstance(void)
 struct spi_engine_wrapper *getSpiEngineWrapper(void)
 {
 	return &spiEngineWrapper;
+}
+
+struct spi_engine_state_wrapper *getSpiEngineStateWrapper(void)
+{
+	return &spiEngineStateWrapper;
 }
 
 struct flash_master_wrapper *getFlashEngineWrapper(void)

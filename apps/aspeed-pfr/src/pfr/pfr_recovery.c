@@ -153,7 +153,7 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 		area_size = CONFIG_BMC_STAGING_SIZE;
 	else /* if (image_type == PCH_TYPE) */
 		area_size = CONFIG_PCH_STAGING_SIZE;
-	spi_flash->spi.device_id[0] = image_type;
+	spi_flash->spi.state->device_id[0] = image_type;
 	LOG_INF("Recovering...");
 	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
 		LOG_ERR("Recovery region erase failed");

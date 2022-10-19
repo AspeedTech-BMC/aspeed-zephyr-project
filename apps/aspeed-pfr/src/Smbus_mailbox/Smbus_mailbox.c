@@ -72,7 +72,7 @@ unsigned char erase_provision_flash(void)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE;
 	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, 0);
 	return status;
 }
@@ -86,7 +86,7 @@ int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, addr, DataBuffer, length);
 
 	if (status == 0)
@@ -106,7 +106,7 @@ unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, ui
 		return Failure;
 	}
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE;
 
 	// Read Intel State
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, buffer,
@@ -131,7 +131,7 @@ void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *Ma
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = image_id; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = image_id; // Internal UFM SPI
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, address,
 			(uint8_t *)&Buffer, sizeof(PFM_STRUCTURE));
 

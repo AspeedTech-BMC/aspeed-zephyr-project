@@ -48,6 +48,7 @@ struct spi_flash *getSpiFlashInstance(void);
 struct rsa_engine_wrapper *getRsaEngineInstance(void);
 struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper(void);
 struct spi_engine_wrapper *getSpiEngineWrapper(void);
+struct spi_engine_state_wrapper *getSpiEngineStateWrapper(void);
 uint8_t *getNewHashStorage(void);
 struct flash_master_wrapper *getFlashEngineWrapper(void);
 struct manifest_flash *getManifestFlashInstance(void);

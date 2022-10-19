@@ -312,7 +312,7 @@ int Wrapper_spi_flash_chip_erase(struct spi_flash *flash)
 
 }
 
-int  flash_wrapper_init(struct spi_engine_wrapper *flash, struct flash_master_wrapper *spi)
+int  flash_wrapper_init(struct spi_engine_wrapper *flash, struct flash_master_wrapper *spi, struct spi_engine_state_wrapper *flash_state)
 {
 	int status;
 
@@ -321,24 +321,25 @@ int  flash_wrapper_init(struct spi_engine_wrapper *flash, struct flash_master_wr
 	}
 
 	memset(flash, 0, sizeof(struct spi_engine_wrapper));
+	memset(flash_state, 0, sizeof(struct spi_engine_state_wrapper));
+	flash->spi.state = &flash_state->state;
 
-	status = platform_mutex_init(&flash->spi.lock);
+	status = platform_mutex_init(&flash->spi.state->lock);
 	if (status != 0) {
 		return status;
 	}
 
-
-	flash->spi.command.read = FLASH_CMD_READ;
-	flash->spi.command.write = FLASH_CMD_PP;
-	flash->spi.command.erase_sector = FLASH_CMD_4K_ERASE;
-	flash->spi.command.erase_block = FLASH_CMD_64K_ERASE;
-	flash->spi.command.enter_pwrdown = FLASH_CMD_DP;
-	flash->spi.command.release_pwrdown = FLASH_CMD_RDP;
+	flash->spi.state->command.read = FLASH_CMD_READ;
+	flash->spi.state->command.write = FLASH_CMD_PP;
+	flash->spi.state->command.erase_sector = FLASH_CMD_4K_ERASE;
+	flash->spi.state->command.erase_block = FLASH_CMD_64K_ERASE;
+	flash->spi.state->command.enter_pwrdown = FLASH_CMD_DP;
+	flash->spi.state->command.release_pwrdown = FLASH_CMD_RDP;
 
 	flash->spi.spi->xfer =  spi->base.xfer;
 	flash->spi.spi->capabilities = spi->base.capabilities;
-	flash->spi.device_id[0] = 0xff;
-	flash->spi.capabilities = (FLASH_CAP_3BYTE_ADDR | FLASH_CAP_4BYTE_ADDR);
+	flash->spi.state->device_id[0] = 0xff;
+	flash->spi.state->capabilities = (FLASH_CAP_3BYTE_ADDR | FLASH_CAP_4BYTE_ADDR);
 
 	flash->spi.base.get_device_size = (int (*)(struct flash *, uint32_t *))Wrapper_spi_flash_get_device_size;
 	flash->spi.base.read = (int (*)(struct flash *, uint32_t, uint8_t *, size_t))Wrapper_spi_flash_read;

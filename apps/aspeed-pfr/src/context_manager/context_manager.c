@@ -30,7 +30,7 @@ unsigned char erase_context_data_flash(void)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE;
 	status = spi_flash->spi.base.sector_erase(&spi_flash->spi, 0);
 	return status;
 }
@@ -40,7 +40,7 @@ void get_context_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t leng
 	uint8_t status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read(&spi_flash->spi, addr, DataBuffer, length);
 }
 
@@ -50,7 +50,7 @@ unsigned char set_context_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8
 	uint8_t buffer[256];
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE;
 
 	// Read Intel State
 	status = spi_flash->spi.base.read(&spi_flash->spi, 0, buffer, sizeof(buffer) / sizeof(buffer[0]));
@@ -68,7 +68,7 @@ unsigned char set_context_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8
 		}
 	}
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE;
 	status = spi_flash->spi.base.read(&spi_flash->spi, 0, buffer, sizeof(buffer) / sizeof(buffer[0]));
 
 	return status;
