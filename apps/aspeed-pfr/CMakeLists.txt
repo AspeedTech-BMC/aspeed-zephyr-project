@@ -26,6 +26,7 @@ zephyr_link_libraries(smf)
 zephyr_link_libraries(cerberus)
 zephyr_link_libraries(mbedTLS)
 zephyr_include_directories(mbedTLS)
+zephyr_include_directories(.)
 target_include_directories(
 	app
 	PRIVATE

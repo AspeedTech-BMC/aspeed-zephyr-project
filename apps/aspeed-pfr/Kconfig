@@ -44,6 +44,41 @@ config ASPEED_DICE_SHELL
 	help
 	  Enable if user want to test ASPEED DICE core layer implementation.
 
+config ASPEED_DICE_CERT_VALID_FROM
+	depends on ASPEED_DICE_SHELL
+	default "20221010000000"
+	string "Aspeed DICE certificate validity, format : YYYYMMDDhhmmss"
+	help
+	  Certificate not valid before this date.
+
+config ASPEED_DICE_CERT_VALID_TO
+	depends on ASPEED_DICE_SHELL
+	default "20421010000000"
+	string "Aspeed DICE certificate validity, format : YYYYMMDDhhmmss"
+	help
+	  Certificate not valid after this date.
+
+config ASPEED_DICE_CERT_DEVID_ISSUER_NAME
+	depends on ASPEED_DICE_SHELL
+	default "CN=Aspeed PFR R00t,O=AST_TW,C=TW"
+	string "Aspeed DICE devid certificate issuer name"
+	help
+	  Name of the certification authority which issued the device id certificate.
+
+config ASPEED_DICE_CERT_ALIAS_ISSUER_NAME
+	depends on ASPEED_DICE_SHELL
+	default "CN=Aspeed PFR Core,O=AST_TW,C=TW"
+	string "Aspeed DICE alias certificate issuer name"
+	help
+	  Name of the certification authority which issued the alias certificate.
+
+config ASPEED_DICE_CERT_ALIAS_SUBJECT_NAME
+	depends on ASPEED_DICE_SHELL
+	default "CN=Aspeed PFR Core,O=AST_TW,C=TW"
+	string "Aspeed DICE alias certificate subject name"
+	help
+	  Name of the person or entity to whom the certificate is being issued.
+
 config BMC_CHECKPOINT_RECOVERY
 	default n
 	bool "BMC Checkpoint timeout recovery function"
