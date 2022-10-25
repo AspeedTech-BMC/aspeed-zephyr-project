@@ -15,7 +15,6 @@ struct pfm_manager_flash pfmManagerFlash;
 struct signature_verification signatureVerification;	/**< PFM signature verification. */
 struct spi_flash spiFlash;					/**< Flash where the PFM is stored. */
 struct rsa_engine_wrapper rsaEngineWrapper;
-struct I2CSlave_engine_wrapper I2cSlaveEnginWrapper;
 
 // Zephyr Ported structures
 struct spi_engine_wrapper spiEngineWrapper;
@@ -87,11 +86,6 @@ struct spi_engine_wrapper *getSpiEngineWrapper(void)
 struct flash_master_wrapper *getFlashEngineWrapper(void)
 {
 	return &flashEngineWrapper;
-}
-
-struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void)
-{
-	return &I2cSlaveEnginWrapper.base;
 }
 
 uint8_t *getNewHashStorage(void)

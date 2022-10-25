@@ -33,12 +33,6 @@
 
 LOG_MODULE_REGISTER(engine, CONFIG_LOG_DEFAULT_LEVEL);
 
-static int initialize_I2cSlave(/*struct engine_instances *engineInstances*/)
-{
-	int status = I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
-	return status;
-}
-
 static int initialize_crypto(/*struct engine_instances *engineInstances*/)
 {
 	int status = 0;
@@ -70,8 +64,6 @@ int initializeEngines(void)
 	status = initialize_flash();
 	assert(status == 0);
 	status = initialize_crypto();
-	assert(status == 0);
-	status = initialize_I2cSlave();
 	assert(status == 0);
 
 	return status;
