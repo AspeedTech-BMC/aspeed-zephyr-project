@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
+#include <drivers/flash.h>
 #include "pfr/pfr_update.h"
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "include/SmbusMailBoxCom.h"
@@ -20,14 +23,14 @@
 #include "intel_pfr_pbc.h"
 #include "intel_pfr_recovery.h"
 #include "intel_pfr_key_cancellation.h"
+#include "intel_pfr_update.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "gpio/gpio_aspeed.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-
-extern EVENT_CONTEXT DataContext;
 
 int pfr_staging_verify(struct pfr_manifest *manifest)
 {
@@ -62,7 +65,14 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		if (status != Success)
 			return Failure;
 
-		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		if (manifest->state == SEAMLESS_UPDATE) {
+			manifest->pc_type = PFR_PCH_SEAMLESS_UPDATE_CAPSULE;
+		} else
+#endif
+		{
+			manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
+		}
 	} else  {
 		return Failure;
 	}
@@ -103,9 +113,17 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 	manifest->staging_address = read_address;
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	if (manifest->image_type == PCH_TYPE &&
+			manifest->state == SEAMLESS_UPDATE) {
+		status = manifest->pfr_authentication->fvm_verify(manifest);
+	} else if (manifest->image_type == PCH_TYPE) {
+		status = manifest->pfr_authentication->fvms_verify(manifest);
+	}
+#endif
 	LOG_INF("Staging area verification successful");
 
-	return Success;
+	return status;
 }
 
 int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
@@ -119,48 +137,54 @@ int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash,
 	return pfr_staging_verify(pfr_manifest);
 }
 
-int set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
+int set_ufm_svn(struct pfr_manifest *manifest, uint32_t offset, uint8_t svn_number)
 {
 	ARG_UNUSED(manifest);
 
 	int status = 0;
-	uint8_t svn_buffer[8];
-	uint8_t offset = svn_number / 8;
-	uint8_t remain = svn_number % 8;
-	uint8_t index = 0;
+	uint32_t svn_policy[2];
+	uint32_t new_svn_policy;
 
-	memset(svn_buffer, 0xFF, sizeof(svn_buffer));
-	for (index = 0; index < offset; index++)
-		svn_buffer[index] = 0x00;
-
-	svn_buffer[index] = svn_buffer[index] << remain;
-
-	status = ufm_write(PROVISION_UFM, ufm_location, svn_buffer, sizeof(svn_buffer));
-	if (status != Success)
+	if (svn_number > SVN_MAX) {
+		LOG_ERR("SVN number(%02x) exceed SVN max(%02x)", svn_number, SVN_MAX);
 		return Failure;
+	}
+
+	memset(svn_policy, 0xff, sizeof(svn_policy));
+	new_svn_policy = ~((1 << (svn_number % 32)) - 1);
+	if (svn_number < 32)
+		svn_policy[0] = new_svn_policy;
+	else {
+		svn_policy[0] = 0;
+		if (svn_number < 64)
+			svn_policy[1] = new_svn_policy;
+		else if (svn_number == 64)
+			svn_policy[1] = 0;
+	}
+
+	status = ufm_write(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
+	if (status != Success) {
+		LOG_ERR("Set SVN number to UFM failed");
+		return Failure;
+	}
 
 	return Success;
 }
 
-int get_ufm_svn(struct pfr_manifest *manifest, uint8_t offset)
+uint8_t get_ufm_svn(struct pfr_manifest *manifest, uint32_t offset)
 {
 	ARG_UNUSED(manifest);
 
-	uint8_t svn_size = 8; // we have (0- 63) SVN Number in 64 bits
-	uint8_t svn_buffer[8];
-	uint8_t svn_number = 0, index1 = 0, index2 = 0;
-	uint8_t mask = 0x01;
+	uint32_t svn_policy[2];
+	uint8_t index;
 
-	ufm_read(PROVISION_UFM, offset, svn_buffer, sizeof(svn_buffer));
-	for (index1 = 0; index1 < svn_size; index1++) {
-		for (index2 = 0; index2 < svn_size; index2++) {
-			if (/*!*/ ((svn_buffer[index1] >> index2) & mask))
-				return svn_number;
-			svn_number++;
-		}
+	ufm_read(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
+	for (index = 0; index < 64; index++) {
+		if ((svn_policy[(index / 32)] & (1 << (index % 32))) != 0)
+			return index;
 	}
 
-	return svn_number;
+	return 64;
 }
 
 int  check_rot_capsule_type(struct pfr_manifest *manifest)
@@ -179,8 +203,10 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 		return KEY_CANCELLATION_CAPSULE;
 	} else if (pc_type == PFR_CPLD_UPDATE_CAPSULE) {
 		return PFR_CPLD_UPDATE_CAPSULE;
-	} else if (pc_type == PFR_PCH_CPU_Seamless_Update_Capsule) {
-		return PFR_PCH_CPU_Seamless_Update_Capsule;
+	} else if (pc_type == PFR_PCH_SEAMLESS_UPDATE_CAPSULE) {
+		return PFR_PCH_SEAMLESS_UPDATE_CAPSULE;
+	} else if (pc_type == PFR_AFM) {
+		return PFR_AFM;
 	} else {
 		return 7;
 	}
@@ -320,7 +346,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("ROT update capsule verification failed");
-		SetMinorErrorCode(CPLD_UPD_CAPSULE_AUTH_FAIL);
+		LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 		return Failure;
 	}
 
@@ -358,7 +384,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 		status = rot_svn_policy_verify(manifest, hrot_svn);
 		if (status != Success) {
 			LOG_ERR("ROT verify svn failed");
-			SetMinorErrorCode(CPLD_INVALID_SVN);
+			LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
 			return Failure;
 		}
 		pc_length = manifest->pc_length - sizeof(uint32_t);
@@ -380,15 +406,15 @@ int check_svn_number(struct pfr_manifest *manifest, uint32_t read_address,
 {
 	int status = 0;
 	uint32_t pfm_start_address = read_address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
-	uint8_t buffer[sizeof(PFM_STRUCTURE_1)] = { 0 };
+	uint8_t buffer[sizeof(PFM_STRUCTURE)] = { 0 };
 	uint8_t staging_svn_number = 0;
 
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE_1),
+	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
 			(uint8_t *)buffer);
 	if (status != Success)
 		return Failure;
 
-	staging_svn_number = ((PFM_STRUCTURE_1 *)buffer)->SVN;
+	staging_svn_number = ((PFM_STRUCTURE *)buffer)->SVN;
 
 	if (staging_svn_number > SVN_MAX) {
 		LOG_ERR("Invalid Staging area SVN Number");
@@ -421,15 +447,18 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	uint32_t pc_type_status = 0;
 	uint8_t active_svn_number = 0;
 	CPLD_STATUS cpld_update_status;
-
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
-	DECOMPRESSION_TYPE_MASK_ENUM decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
-
+	DECOMPRESSION_TYPE_MASK_ENUM decomp_event;
 	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
-
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 
-	pfr_manifest->state = UPDATE;
+	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC) {
+		decomp_event = DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK;
+	} else {
+		decomp_event = DECOMPRESSION_STATIC_REGIONS_MASK;
+	}
+
+	pfr_manifest->state = FIRMWARE_UPDATE;
 	pfr_manifest->image_type = image_type;
 	pfr_manifest->flash_id = flash_select;
 
@@ -513,7 +542,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			NULL, NULL);
 	if (status != Success) {
 		LOG_ERR("Staging Area verfication failed");
-		SetMinorErrorCode(FW_UPD_CAPSULE_AUTH_FAIL);
+		if (flash_select == PRIMARY_FLASH_REGION) {
+			// Log failure for the case of active region update.
+			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+		} else {
+			// Log failure for the case of recovery region update.
+			LogUpdateFailure(UPD_CAPSULE_TO_RECOVERY_AUTH_FAIL, 1);
+		}
+
 		return Failure;
 	}
 
@@ -529,7 +565,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	status = check_svn_number(pfr_manifest, source_address, active_svn_number);
 	if (status != Success) {
-		SetMinorErrorCode(PCH_BMC_FW_INVALID_SVN);
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
 		LOG_ERR("Anti rollback");
 		return Failure;
 	}
@@ -540,15 +576,17 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		if (ActiveObjectData->RestrictActiveUpdate == 1) {
 			LOG_ERR("Restrict Active Update");
-			SetMinorErrorCode(UPD_NOT_ALLOWED);
+			LogUpdateFailure(UPD_NOT_ALLOWED, 0);
 			return Failure;
 		}
 
 		uint32_t time_start, time_end;
 		time_start = k_uptime_get_32();
 
-		if (decompress_capsule(pfr_manifest, decomp_event))
+		if (decompress_capsule(pfr_manifest, decomp_event)) {
+			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
 			return Failure;
+		}
 
 		time_end = k_uptime_get_32();
 		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
@@ -578,137 +616,147 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	return Success;
 }
 
-void get_region_type(CPLD_STATUS region, void *AoData)
-{
-
-	if (region.CpldStatus == 1) {
-		if (region.Region[0].ActiveRegion == 1)
-			DataContext.flash = PRIMARY_FLASH_REGION;
-
-		if (region.Region[0].Recoveryregion == 1 && region.Region[0].ActiveRegion == 0)
-			DataContext.flash = SECONDARY_FLASH_REGION;
-	}
-	if (region.BmcStatus == 1) {
-		if (region.Region[1].ActiveRegion == 1 || (region.Region[1].Recoveryregion == 1 &&
-					region.Region[1].ActiveRegion == 1)) {
-			((AO_DATA *)AoData)->RestrictActiveUpdate = 0;
-			DataContext.flash = PRIMARY_FLASH_REGION;
-		}
-
-		if (region.Region[1].Recoveryregion == 1 && region.Region[1].ActiveRegion == 0)
-			DataContext.flash = SECONDARY_FLASH_REGION;
-	}
-	if (region.PchStatus == 1) {
-		if ((region.Region[2].ActiveRegion == 1) || (region.Region[2].Recoveryregion == 1 &&
-					region.Region[2].ActiveRegion == 1)) {
-			((AO_DATA *)AoData)->RestrictActiveUpdate = 0;
-			DataContext.flash = PRIMARY_FLASH_REGION;
-		}
-
-		if (region.Region[2].Recoveryregion == 1 && region.Region[2].ActiveRegion == 0)
-			DataContext.flash = SECONDARY_FLASH_REGION;
-	}
-}
-
-void watchdog_timer(uint32_t image_type)
-{
-	ARG_UNUSED(image_type);
-#if 0
-	if (image_type == BMC_TYPE) {
-		LOG_INF("Watchdog timer BMC TYPE");
-	} else {
-		LOG_INF("Watchdog timer PCH TYPE");
-	}
-#endif
-}
-
-int check_staging_area(void)
+#if defined(CONFIG_SEAMLESS_UPDATE)
+int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContext)
 {
 	int status = 0;
-	int flash_id;
-	void *AoData = NULL;
-
-	LOG_INF("Check Staging Area");
+	uint32_t source_address;
+	uint32_t act_pfm_offset;
+	uint32_t address = 0;
+	uint32_t pc_type_status = 0;
 	CPLD_STATUS cpld_update_status;
+	const struct device *dev_m = NULL;
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	uint32_t flash_size = flash_get_flash_size("spi1_cs0");
+	uint32_t staging_start_addr;
+#endif
+
+	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
+
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+
+	// Currently, only support pch seamless update.
+	if (image_type != PCH_TYPE) {
+		return Failure;
+	}
+
+	LOG_INF("PCH Seamless Update in Progress");
+	if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
+				sizeof(source_address)))
+		return Failure;
+	if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+				sizeof(act_pfm_offset)))
+		return Failure;
+
+	pfr_manifest->state = SEAMLESS_UPDATE;
+	pfr_manifest->image_type = image_type;
+	pfr_manifest->flash_id = flash_select;
+	pfr_manifest->staging_address = source_address;
+	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
 	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status,
 			sizeof(CPLD_STATUS));
+	LOG_HEXDUMP_INF(&cpld_update_status, sizeof(cpld_update_status), "CPLD Status");
 	if (status != Success)
 		return Failure;
 
-	if (cpld_update_status.CpldStatus == 1) {
-		LOG_INF("CPLD Check");
-		get_region_type(cpld_update_status, AoData);
-		DataContext.image = ROT_TYPE;
-		flash_id = BMC_TYPE;
+	LOG_INF("Switch PCH SPI MUX to ROT");
+	dev_m = device_get_binding(PCH_SPI_MONITOR);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
 
-		// Checking CPLD staging area
-		status = handle_update_image_action(ROT_TYPE, NULL, &DataContext);
-		if (status == Success) {
-			LOG_INF("SuccessFully updated cpld");
-			cpld_update_status.CpldStatus = 0;
-			cpld_update_status.Region[0].ActiveRegion = 0;
-			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-					(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		}
+	if (cpld_update_status.BmcToPchStatus == 1) {
+
+		cpld_update_status.BmcToPchStatus = 0;
+		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+		if (status != Success)
+			goto release_pch_mux;
+
+		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&address, sizeof(address));
+		if (status != Success)
+			goto release_pch_mux;
+
+		LOG_INF("Switch BMC SPI MUX to ROT");
+#if defined(CONFIG_BMC_DUAL_FLASH)
+		staging_start_addr = address;
+		if (staging_start_addr >= flash_size)
+			dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+		else
+			dev_m = device_get_binding(BMC_SPI_MONITOR);
+#else
+		dev_m = device_get_binding(BMC_SPI_MONITOR);
+#endif
+		spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+
+		// PFR Staging - PCH Staging offset after BMC staging offset
+		address += CONFIG_BMC_STAGING_SIZE;
+		pfr_manifest->address = address;
+
+		// Checking for key cancellation
+		pfr_manifest->image_type = BMC_TYPE;
+		pc_type_status = check_rot_capsule_type(pfr_manifest);
+		pfr_manifest->image_type = image_type;
+
+		status = pfr_staging_pch_staging(pfr_manifest);
+		if (status != Success)
+			goto release_both_muxes;
+
+		// Release BMC SPI after copying capsule to PCH's flash.
+		// PCH SPI will be release after firmware update completed.
+		LOG_INF("Switch BMC SPI MUX to BMC");
+		spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 	}
 
-	if (cpld_update_status.BmcStatus == 1) {
-		LOG_INF("BMC check");
-		get_region_type(cpld_update_status, AoData);
-		flash_id = BMC_TYPE;
-		DataContext.image = flash_id;
-		// Checking BMC staging area
-		status = handle_update_image_action(flash_id, NULL, &DataContext);
-		if (status == Success) {
-			if (cpld_update_status.Region[1].ActiveRegion == 1 &&
-					cpld_update_status.Region[1].Recoveryregion == 1) {
-				watchdog_timer(BMC_TYPE);
-			} else if ((cpld_update_status.Region[1].ActiveRegion == 1)
-				   || (cpld_update_status.Region[1].Recoveryregion == 1)) {
-				cpld_update_status.BmcStatus = 0;
-				cpld_update_status.Region[1].ActiveRegion = 0;
-				cpld_update_status.Region[1].Recoveryregion = 0;
-				status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-						(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-			}
-		} else {
-			cpld_update_status.BmcStatus = 0;
-			cpld_update_status.Region[1].ActiveRegion = 0;
-			cpld_update_status.Region[1].Recoveryregion = 0;
-			status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-					(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		}
+
+	pfr_manifest->address = source_address;
+	// Staging area verification
+	LOG_INF("Staging Area verfication");
+	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
+			NULL, NULL);
+	if (status != Success) {
+		LOG_ERR("Staging Area verfication failed");
+		goto release_pch_mux;
 	}
 
-	if (cpld_update_status.PchStatus == 1) {
-		LOG_INF("PCH check");
-		// Checking PCH staging area
-		flash_id = PCH_TYPE;
+	status = decompress_fv_capsule(pfr_manifest);
+	if (status != Success)
+		LOG_ERR("Failed to decompress seamless capsule");
 
-		get_region_type(cpld_update_status, AoData);
-		DataContext.image = flash_id;
-		status = handle_update_image_action(flash_id, NULL, &DataContext);
-		if (status == Success) {
-			if (cpld_update_status.Region[2].ActiveRegion == 1 &&
-					cpld_update_status.Region[2].Recoveryregion == 1) {
-				watchdog_timer(PCH_TYPE);
-			} else if ((cpld_update_status.Region[2].ActiveRegion == 1) ||
-					(cpld_update_status.Region[2].Recoveryregion == 1)) {
-				cpld_update_status.PchStatus = 0;
-				cpld_update_status.Region[2].ActiveRegion = 0;
-				cpld_update_status.Region[2].Recoveryregion = 0;
-				status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-						(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-			}
-		} else {
-			cpld_update_status.PchStatus = 0;
-			cpld_update_status.Region[2].ActiveRegion = 0;
-			cpld_update_status.Region[2].Recoveryregion = 0;
-			status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-					(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		}
-	}
+	goto release_pch_mux;
+
+release_both_muxes:
+	LOG_INF("Switch BMC SPI MUX to BMC");
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	if (staging_start_addr >= flash_size)
+		dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+	else
+		dev_m = device_get_binding(BMC_SPI_MONITOR);
+#else
+	dev_m = device_get_binding(BMC_SPI_MONITOR);
+#endif
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+release_pch_mux:
+	LOG_INF("Switch PCH SPI MUX to PCH");
+	dev_m = device_get_binding(PCH_SPI_MONITOR);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 
 	return status;
 }
+#endif // CONFIG_SEAMLESS_UPDATE
+
+/**
+ * Verify the complete firmware image.  All components in the image will be fully validated.
+ * This includes checking image signatures and key revocation.
+ *
+ * @param fw The firmware image to validate.
+ * @param hash The hash engine to use for validation.
+ * @param rsa The RSA engine to use for signature checking.
+ *
+ * @return 0 if the firmware image is valid or an error code.
+ */
+int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
+{
+	return intel_pfr_update_verify(fw, hash, rsa);
+}
+#endif // CONFIG_INTEL_PFR

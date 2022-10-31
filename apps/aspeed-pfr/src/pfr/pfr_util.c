@@ -24,7 +24,12 @@
 #include "flash/flash_util.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "pfr_common.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#endif
 #include "crypto/ecdsa_aspeed.h"
 #include <sys/reboot.h>
 #include <stdio.h>
@@ -220,21 +225,21 @@ static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
 	mbedtls_ecdsa_init(&ctx_verify);
 	mbedtls_mpi_init(&r);
 	mbedtls_mpi_init(&s);
-	mbedtls_mpi_read_binary(&ctx_verify.Q.X, pubkey->x, length);
-	mbedtls_mpi_read_binary(&ctx_verify.Q.Y, pubkey->y, length);
-	mbedtls_mpi_read_binary(&ctx_verify.Q.Z, &z, 1);
+	mbedtls_mpi_read_binary(&ctx_verify.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(X), pubkey->x, length);
+	mbedtls_mpi_read_binary(&ctx_verify.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Y), pubkey->y, length);
+	mbedtls_mpi_read_binary(&ctx_verify.MBEDTLS_PRIVATE(Q).MBEDTLS_PRIVATE(Z), &z, 1);
 	mbedtls_mpi_read_binary(&r, signature_r, length);
 	mbedtls_mpi_read_binary(&s, signature_s, length);
 
 	if (length == SHA256_HASH_LENGTH)
-		mbedtls_ecp_group_load(&ctx_verify.grp, MBEDTLS_ECP_DP_SECP256R1);
+		mbedtls_ecp_group_load(&ctx_verify.MBEDTLS_PRIVATE(grp), MBEDTLS_ECP_DP_SECP256R1);
 	else if (length == SHA384_HASH_LENGTH)
-		mbedtls_ecp_group_load(&ctx_verify.grp, MBEDTLS_ECP_DP_SECP384R1);
+		mbedtls_ecp_group_load(&ctx_verify.MBEDTLS_PRIVATE(grp), MBEDTLS_ECP_DP_SECP384R1);
 	else
 		LOG_ERR("Unsupported ECDSA curve length, %d", length);
 
-	ret = mbedtls_ecdsa_verify(&ctx_verify.grp, digest, length,
-				   &ctx_verify.Q, &r, &s);
+	ret = mbedtls_ecdsa_verify(&ctx_verify.MBEDTLS_PRIVATE(grp), digest, length,
+				   &ctx_verify.MBEDTLS_PRIVATE(Q), &r, &s);
 	mbedtls_ecdsa_free(&ctx_verify);
 	mbedtls_mpi_free(&r);
 	mbedtls_mpi_free(&s);

@@ -6,7 +6,6 @@
 #include <string.h>
 #include "common.h"
 
-struct flash flashDevice;
 struct flash_master flashMaster;			/**< Flash master for the PFM flash. */
 struct hash_engine hashEngine;				/**< Hashing engine for validation. */
 struct host_state_manager hostStateManager;
@@ -23,7 +22,7 @@ struct spi_engine_wrapper spiEngineWrapper;
 struct flash_master_wrapper flashEngineWrapper;
 struct spi_filter_engine_wrapper spiFilterEngineWrapper;
 
-uint8_t hashStorage[hashStorageLength];
+static uint8_t hashStorage[RSA_MAX_KEY_LENGTH] __aligned(16);
 
 bool gBootCheckpointReceived;
 int gBMCWatchDogTimer = -1;
@@ -32,9 +31,7 @@ uint32_t gMaxTimeout = MAX_BIOS_BOOT_TIME;
 
 struct flash *getFlashDeviceInstance(void)
 {
-	flashDevice = spiEngineWrapper.spi.base;
-
-	return &flashDevice;
+	return &spiEngineWrapper.spi.base;
 }
 
 struct flash_master *getFlashMasterInstance(void)
@@ -54,7 +51,7 @@ struct host_state_manager *getHostStateManagerInstance(void)
 
 struct manifest_flash *getManifestFlashInstance(void)
 {
-	return &manifestFlash;
+        return &manifestFlash;
 }
 
 struct pfm_flash *getPfmFlashInstance(void)
@@ -99,7 +96,7 @@ struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void)
 
 uint8_t *getNewHashStorage(void)
 {
-	memset(hashStorage, 0, hashStorageLength);
+	memset(hashStorage, 0, RSA_MAX_KEY_LENGTH);
 
 	return hashStorage;
 }

@@ -3,15 +3,15 @@
  *
  * SPDX-License-Identifier: MIT
  */
-#include <stdlib.h>
+
 #include <string.h>
-#include "platform.h"
+#include <crypto/rsa_structs.h>
+#include <crypto/rsa_aspeed.h>
 #include <crypto/rsa.h>
 #include "rsa_wrapper.h"
-#include <crypto/rsa_aspeed.h>
+
 int rsa_wrapper_generate_key(struct rsa_engine *engine, struct rsa_private_key *key, int bits)
 {
-
 	return 0;
 }
 
@@ -51,20 +51,21 @@ int rsa_wrapper_decrypt(struct rsa_engine *engine, const struct rsa_private_key 
 	return decrypt_aspeed(key, encrypted, in_length, decrypted, out_length);
 }
 
-
 int rsa_wrapper_sig_verify(struct rsa_engine *engine, const struct rsa_public_key *key,
 			   const uint8_t *signature, size_t sig_length, const uint8_t *match, size_t match_length)
 {
 	struct rsa_key driver_key;
 
-	driver_key.m = key->modulus;// &test;
-	driver_key.m_bits = key->mod_length * 8;
-	driver_key.e = &key->exponent;
+	driver_key.m = (char *)key->modulus;
+	driver_key.m_bits = (uint32_t)(key->mod_length * 8);
+	driver_key.e = (char *)&key->exponent;
 	driver_key.e_bits = 24;
 	driver_key.d = NULL;
 	driver_key.d_bits =  0;
+
 	return sig_verify_aspeed(&driver_key, signature, sig_length, match, match_length);
 }
+
 /**
  * Initialize an aspeed RSA engine.
  *
@@ -74,9 +75,8 @@ int rsa_wrapper_sig_verify(struct rsa_engine *engine, const struct rsa_public_ke
  */
 int rsa_wrapper_init(struct rsa_engine_wrapper *engine)
 {
-	if (engine == NULL) {
+	if (engine == NULL)
 		return RSA_ENGINE_INVALID_ARGUMENT;
-	}
 
 	memset(engine, 0, sizeof(struct rsa_engine_wrapper));
 
@@ -90,9 +90,4 @@ int rsa_wrapper_init(struct rsa_engine_wrapper *engine)
 	engine->base.sig_verify = rsa_wrapper_sig_verify;
 
 	return 0;
-
-// exit:
-//      mbedtls_entropy_free (&engine->entropy);
-//      mbedtls_ctr_drbg_free (&engine->ctr_drbg);
-//      return status;
 }

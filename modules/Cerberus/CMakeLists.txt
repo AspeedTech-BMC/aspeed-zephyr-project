@@ -301,10 +301,10 @@ if (CONFIG_CERBERUS)
 		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_manager.c
 		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_manager_flash.c
 		# ${CERBERUS_CORE_DIR}/manifest/pcd/pcd_observer_pcr.c
-		# ${CERBERUS_CORE_DIR}/manifest/manifest_flash.c
+		${CERBERUS_CORE_DIR}/manifest/manifest_flash.c
 		# ${CERBERUS_CORE_DIR}/manifest/manifest_manager_flash.c
 		# ${CERBERUS_CORE_DIR}/manifest/manifest_manager.c
-		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_flash.c
+		${CERBERUS_CORE_DIR}/manifest/pfm/pfm_flash.c
 		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_observer_pcr.c
 		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_observer_pending_reset.c
 		# ${CERBERUS_CORE_DIR}/manifest/pfm/pfm_manager.c
@@ -354,7 +354,7 @@ if (CONFIG_CERBERUS)
 		# ${CERBERUS_CORE_DIR}/common/observable.c
 		# ${CERBERUS_CORE_DIR}/common/authorization_allowed.c
 		# ${CERBERUS_CORE_DIR}/common/authorization_disallowed.c
-		# ${CERBERUS_CORE_DIR}/common/buffer_util.c
+		${CERBERUS_CORE_DIR}/common/buffer_util.c
 		# ${CERBERUS_CORE_DIR}/common/authorization_challenge.c
 		# ${CERBERUS_CORE_DIR}/common/image_header.c
 

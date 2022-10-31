@@ -11,10 +11,18 @@
 
 #include "pfr_ufm.h"
 #include "AspeedStateMachine/common_smc.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_update.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#include "cerberus_pfr/cerberus_pfr_verification.h"
+#include "cerberus_pfr/cerberus_pfr_update.h"
+#endif
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "include/SmbusMailBoxCom.h"
@@ -22,83 +30,6 @@
 #include "pfr_common.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-
-#undef DEBUG_PRINTF
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
-/**
- * Function to handle Recover Entry
- * Perform any recover library initialization if requred here
- */
-
-int lastRecoveryReason(int ImageType, void* AoData)
-{
-	if (ImageType == BMC_EVENT)
-	{
-		if(((AO_DATA *)AoData)->ActiveImageStatus == Failure){
-			return BMC_ACTIVE_FAIL;
-		}
-		else if (((AO_DATA *)AoData)->RecoveryImageStatus == Failure){
-			return BMC_RECOVERY_FAIL;
-		}
-
-	}
-	else if (ImageType == PCH_EVENT)
-	{
-		if(((AO_DATA *)AoData)->ActiveImageStatus == Failure){
-			return PCH_ACTIVE_FAIL;
-		}
-		else if (((AO_DATA *)AoData)->RecoveryImageStatus == Failure){
-			return PCH_RECOVERY_FAIL;
-		}
-	}
-
-	return 0;
-}
-
-int lastPanicReason(int ImageType)
-{
-	if (ImageType == BMC_EVENT){
-		return BMC_UPDATE_INTENT;
-	}
-	else if (ImageType == PCH_EVENT){
-		return PCH_UPDATE_INTENT;
-	}
-	return 0;
-}
-
-int handle_update_image_action(int image_type, void *AoData, void *EventContext)
-{
-	CPLD_STATUS cpld_update_status;
-	int status;
-
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-	if (status != Success)
-		return status;
-
-	BMCBootHold();
-	PCHBootHold();
-
-
-#if SMBUS_MAILBOX_SUPPORT
-	SetPlatformState(image_type == BMC_TYPE ? BMC_FW_UPDATE : (PCH_TYPE ? PCH_FW_UPDATE : CPLD_FW_UPDATE));
-	if (image_type != CPLD_FW_UPDATE) {
-		SetLastPanicReason(lastPanicReason(image_type));
-		IncPanicEventCount();
-	}
-#endif
-
-	status = update_firmware_image(image_type, AoData, EventContext);
-	if (status != Success)
-		return Failure;
-
-	return Success;
-}
-
 
 /**
  * Update the image referenced by an instance.
@@ -117,21 +48,6 @@ int handle_update_image_action(int image_type, void *AoData, void *EventContext)
 int firmware_image_load(struct firmware_image *fw, struct flash *flash, uint32_t base_addr)
 {
 	return Success;
-}
-
-/**
- * Verify the complete firmware image.  All components in the image will be fully validated.
- * This includes checking image signatures and key revocation.
- *
- * @param fw The firmware image to validate.
- * @param hash The hash engine to use for validation.
- * @param rsa The RSA engine to use for signature checking.
- *
- * @return 0 if the firmware image is valid or an error code.
- */
-int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa)
-{
-	return intel_pfr_update_verify(fw, hash, rsa);
 }
 
 /**

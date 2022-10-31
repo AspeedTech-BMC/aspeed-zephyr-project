@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <shell/shell.h>
 
@@ -80,20 +81,22 @@ int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
+int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 {
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
 	uint32_t policy_data;
 	uint32_t bit_offset;
 	int status = 0;
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	if (manifest->pc_type == PFR_PCH_SEAMLESS_UPDATE_CAPSULE)
+		return Success;
+#endif
+
 	if (!ufm_offset) {
 		LOG_ERR("%s: Invalid provisioned UFM offset for key cancellation", __func__);
 		return Failure;
 	}
-
-	if (manifest->pc_type == PFR_PCH_CPU_Seamless_Update_Capsule)
-		return Success;
 
 	// key id must be within 0-127
 	if (key_id > KEY_CANCELLATION_MAX_KEY_ID) {
@@ -119,7 +122,7 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 	return Success;
 }
 
-int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
+int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 {
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
 	uint32_t policy_data;
@@ -163,7 +166,7 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint32_t key_id)
 static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **argv)
 {
 	struct pfr_manifest test_manifest;
-	uint32_t key_id;
+	uint8_t key_id;
 
 	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
 	key_id = strtoul(argv[2], NULL, 10);
@@ -178,7 +181,7 @@ static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **
 static int cmd_verify_csk_key_id(const struct shell *shell, size_t argc, char **argv)
 {
 	struct pfr_manifest test_manifest;
-	uint32_t key_id;
+	uint8_t key_id;
 
 	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
 	key_id = strtoul(argv[2], NULL, 10);
@@ -224,3 +227,5 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
 SHELL_CMD_REGISTER(kc, &sub_kc_cmds, "Key Cancellation Commands", NULL);
 
 #endif
+
+#endif // CONFIG_INTEL_PFR

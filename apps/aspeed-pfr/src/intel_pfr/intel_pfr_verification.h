@@ -6,36 +6,29 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
-#define INTEL_PFR_BLOCK_0_TAG 0xB6EAFD19
+#define INTEL_PFR_BLOCK_0_TAG           0xB6EAFD19
 
-#define DECOMMISSION_CAPSULE             0x200
-#define KEY_CANCELLATION_CAPSULE         0x100
+#define DECOMMISSION_CAPSULE            0x200
+#define KEY_CANCELLATION_CAPSULE        0x100
 
-#define FALSE                            0
-#define TRUE                             1
-#define START                            2
-#define BLOCK0_PCTYPE_ADDRESS       8
-#define CSK_KEY_ID_ADDRESS          160
+#define BLOCK0_PCTYPE_ADDRESS           8
+#define CSK_KEY_ID_ADDRESS              160
 #define CSK_KEY_ID_ADDRESS_3K           580
 #define CSK_START_ADDRESS               148
 #define CSK_ENTRY_PC_SIZE               128
-#define KEY_SIZE                                        48
-#define KEY_SIZE_3K                                     512
-#define HROT_UPDATE_RESERVED    32
-#define MAX_BIOS_BOOT_TIME                      300
-#define MAX_ERASE_SIZE                          0x1000
+#define KEY_SIZE                        48
+#define KEY_SIZE_3K                     512
+#define HROT_UPDATE_RESERVED            32
+#define MAX_BIOS_BOOT_TIME              300
+#define MAX_ERASE_SIZE                  0x1000
 
-#define RANDOM_KEY_MAGIC_TAG                                    0x52414E44
-#define RANDOM_KEY_ADDRESS_IN_UFM                               ((PROVISION_UFM_SIZE * 16) - (2 * SHA384_SIZE))
-#define ROOT_PUB_KEY_LOC_IN_UFM                                 (RANDOM_KEY_ADDRESS_IN_UFM - (2 * SHA384_SIZE))
-#define MAGIC_TAG_SIZE                                                  4
-#define BLOCK0_FRIST_RESERVED_SIZE 4
-#define BLOCK0_SECOND_RESERVED_SIZE 32
-#define BLOCK1_CSK_ENTRY_RESERVED_SIZE 20
-
+#define BLOCK0_FRIST_RESERVED_SIZE      4
+#define BLOCK0_SECOND_RESERVED_SIZE     32
+#define BLOCK1_CSK_ENTRY_RESERVED_SIZE  20
 
 #pragma pack(1)
 
@@ -71,7 +64,6 @@ typedef struct _RootEntry {
 	uint8_t PubKeyY[KEY_SIZE];
 	uint8_t Reserved[20];
 } KEY_ENTRY;
-
 
 typedef struct _RootEntry_3k {
 	uint32_t Tag;
@@ -186,7 +178,7 @@ enum {
 	PFR_PCH_UPDATE_CAPSULE,
 	PFR_BMC_PFM,
 	PFR_BMC_UPDATE_CAPSULE,
-	PFR_PCH_CPU_Seamless_Update_Capsule,
+	PFR_PCH_SEAMLESS_UPDATE_CAPSULE,
 	PFR_AFM,
 	PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON = 0x200
 };
@@ -216,6 +208,10 @@ struct pfr_authentication {
 	int (*block1_csk_block0_entry_verify)(struct pfr_manifest *manifest);
 	int (*block1_verify)(struct pfr_manifest *manifest);
 	int (*block0_verify)(struct pfr_manifest *manifest);
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	int (*fvm_verify)(struct pfr_manifest *manifest);
+	int (*fvms_verify)(struct pfr_manifest *manifest);
+#endif
 };
 
 #pragma pack()
@@ -224,3 +220,13 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
 void init_pfr_authentication(struct pfr_authentication *pfr_authentication);
+
+int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
+		    struct signature_verification *verification, uint8_t *hash_out,
+		    size_t hash_length);
+#if defined(CONFIG_SEAMLESS_UPDATE)
+int intel_fvms_verify(struct pfr_manifest *manifest);
+int intel_fvm_verify(struct pfr_manifest *manifest);
+#endif
+
+#endif // CONFIG_INTEL_PFR

@@ -12,29 +12,12 @@
 #include "AspeedStateMachine/common_smc.h"
 #include "StateMachineAction/StateMachineActions.h"
 
-extern int systemState;
-extern int gEventCount;
-extern int gPublishCount;
-
-typedef struct {
-	int signal;
-	void *context;
-} TUPLE;
-
 #pragma pack(1)
 
-// enum HRoT_state { IDLE, I2C, VERIFY, RECOVERY, UPDATE, LOCKDOWN };
-
 typedef char byte;
-#define  BIT2     0x00000004
-#define ACM_MAXTIMEOUT 50000
-#define BMC_MAXTIMEOUT 175000
-#define BIOS_MAXTIMEOUT 900000
-// BMC I2c Commands
-#define  LOGMESSAGE 0x05
 
-#define READ_ONLY 24
-#define WRITE_ONLY 6
+#define BMC_MAXTIMEOUT CONFIG_BMC_CHECKPOINT_EXPIRE_TIME
+#define BIOS_MAXTIMEOUT CONFIG_PCH_CHECKPOINT_EXPIRE_TIME
 
 typedef struct _SMBUS_MAIL_BOX_ {
 	byte CpldIdentifier;
@@ -49,24 +32,24 @@ typedef struct _SMBUS_MAIL_BOX_ {
 	byte MinorErrorCode;
 	union {
 		struct {
-			byte CommandBusy : 1;
-			byte CommandDone : 1;
-			byte CommandError : 1;
-			byte UfmStatusReserved : 1;
-			byte UfmLocked : 1;
-			byte Ufmprovisioned : 1;
-			byte PITlevel1enforced : 1;
-			byte PITL2CompleteSuccess : 1;
+			uint8_t CommandBusy : 1;
+			uint8_t CommandDone : 1;
+			uint8_t CommandError : 1;
+			uint8_t UfmStatusReserved : 1;
+			uint8_t UfmLocked : 1;
+			uint8_t Ufmprovisioned : 1;
+			uint8_t PITlevel1enforced : 1;
+			uint8_t PITL2CompleteSuccess : 1;
 		};
 		byte UfmStatusValue;
 	};
 	byte UfmCommand;
 	union {
 		struct {
-			byte ExecuteCmd : 1;
-			byte FlushWriteFIFO : 1;
-			byte FlushReadFIFO : 1;
-			byte UfmCmdTriggerReserved : 4;
+			uint8_t ExecuteCmd : 1;
+			uint8_t FlushWriteFIFO : 1;
+			uint8_t FlushReadFIFO : 1;
+			uint8_t UfmCmdTriggerReserved : 4;
 		};
 		byte UfmCmdTriggerValue;
 	};
@@ -77,27 +60,27 @@ typedef struct _SMBUS_MAIL_BOX_ {
 	byte BiosCheckpoint;
 	union {
 		struct {
-			byte PchUpdateIntentPchActive : 1;
-			byte PchUpdateIntentPchrecovery : 1;
-			byte PchUpdateIntentCpldActive : 1;
-			byte PchUpdateIntentBmcActive : 1;
-			byte PchUpdateIntentBmcRecovery : 1;
-			byte PchUpdateIntentCpldRecovery : 1;
-			byte PchUpdateIntentUpdateDynamic : 1;
-			byte PchUpdateIntentUpdateAtReset : 1;
+			uint8_t PchUpdateIntentPchActive : 1;
+			uint8_t PchUpdateIntentPchrecovery : 1;
+			uint8_t PchUpdateIntentCpldActive : 1;
+			uint8_t PchUpdateIntentBmcActive : 1;
+			uint8_t PchUpdateIntentBmcRecovery : 1;
+			uint8_t PchUpdateIntentCpldRecovery : 1;
+			uint8_t PchUpdateIntentUpdateDynamic : 1;
+			uint8_t PchUpdateIntentUpdateAtReset : 1;
 		};
 		byte PchUpdateIntentValue;
 	};
 	union {
 		struct {
-			byte BmcUpdateIntentPchActive : 1;
-			byte BmcUpdateIntentPchrecovery : 1;
-			byte BmcUpdateIntentCpldActive : 1;
-			byte BmcUpdateIntentBmcActive : 1;
-			byte BmcUpdateIntentBmcRecovery : 1;
-			byte BmcUpdateIntentCpldRecovery : 1;
-			byte BmcUpdateIntentUpdateDynamic : 1;
-			byte BmcUpdateIntentUpdateAtReset : 1;
+			uint8_t BmcUpdateIntentPchActive : 1;
+			uint8_t BmcUpdateIntentPchrecovery : 1;
+			uint8_t BmcUpdateIntentCpldActive : 1;
+			uint8_t BmcUpdateIntentBmcActive : 1;
+			uint8_t BmcUpdateIntentBmcRecovery : 1;
+			uint8_t BmcUpdateIntentCpldRecovery : 1;
+			uint8_t BmcUpdateIntentUpdateDynamic : 1;
+			uint8_t BmcUpdateIntentUpdateAtReset : 1;
 		};
 		byte BmcUpdateIntentValue;
 	};
@@ -153,6 +136,10 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	BmcPfmRecoverMajorVersion = 0x1e,
 	BmcPfmRecoverMinorVersion = 0x1f,
 	CpldFPGARoTHash = 0x20, /* 0x20 - 0x5f */
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	PchSeamlessUpdateIntent = 0x61,
+	BmcSeamlessUpdateIntent = 0x62,
+#endif
 	Reserved                = 0x63,
 	AcmBiosScratchPad       = 0x80,
 	BmcScratchPad           = 0xc0,
@@ -193,23 +180,22 @@ typedef enum _UPDATE_INTENT {
 	PchFwAndBmcFwUpdate                     = 0x1B,
 	PchBmcHROTActiveAndRecoveryUpdate       = 0x3f,
 	BmcActiveAndDynamicUpdate               = 0x48,
-	ExceptBmcActiveUpdate                   = 0x37
+	ExceptBmcActiveUpdate                   = 0x37,
+	ExceptPchActiveUpdate                   = 0x3E,
 } UPDATE_INTENT;
 
-typedef struct _PFM_STRUCTURE {
-	uint32_t PfmTag;
-	uint8_t SVN;
-	uint8_t BkcVersion;
-	uint8_t MarjorVersion;
-	uint8_t MinorVersion;
-	uint32_t Reserved;
-	uint8_t OemSpecificData[16];
-	uint32_t Length;
-} PFM_STRUCTURE;
+#if defined(CONFIG_SEAMLESS_UPDATE)
+typedef enum _SEAMLESS_UPDATE_INTENT {
+	PchFvSeamlessUpdate                     = 0x01,
+	AfmActiveUpdate                         = 0x02,
+	AfmRecoveryUpdate                       = 0x04,
+	AfmActiveAndRecoveryUpdate              = 0x06,
+} SEAMLESS_UPDATE_INTENT;
+#endif
 
 #pragma pack()
 
-unsigned char set_provision_data_in_flash(uint8_t addr, uint8_t *DataBuffer, uint8_t DataSize);
+unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize);
 int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
 // void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
 unsigned char erase_provision_data_in_flash(void);
@@ -229,6 +215,14 @@ void SetPlatformState(byte PlatformStateData);
 byte GetRecoveryCount(void);
 void IncRecoveryCount(void);
 byte GetLastRecoveryReason(void);
+
+int getFailedUpdateAttemptsCount(void);
+void LogErrorCodes(uint8_t major_err, uint8_t minor_err);
+void LogUpdateFailure(uint8_t minor_err, uint32_t failed_count);
+void ClearUpdateFailure(void);
+void LogLastPanic(uint8_t panic);
+void LogRecovery(uint8_t reason);
+void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason);
 
 // void SetLastRecoveryReason(LAST_RECOVERY_REASON_VALUE LastRecoveryReasonValue);
 void SetLastRecoveryReason(byte LastRecoveryReasonValue);
@@ -251,7 +245,7 @@ bool IsUfmStatusLocked(void);
 bool IsUfmStatusUfmProvisioned(void);
 bool IsUfmStatusPitLevel1Enforced(void);
 bool IsUfmStatusPITL2CompleteSuccess(void);
-byte GetUfmStatusValue(void);
+uint8_t GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
 void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
@@ -323,6 +317,8 @@ bool WatchDogTimer(int ImageType);
 uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag);
 void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion);
 void initializeFPLEDs(void);
+unsigned char erase_provision_flash(void);
+void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
 
 #define UFM_STATUS_LOCK_BIT_MASK                      0b1
 #define UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK 0b10

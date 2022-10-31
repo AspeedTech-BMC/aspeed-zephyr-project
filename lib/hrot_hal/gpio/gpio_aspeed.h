@@ -16,8 +16,9 @@
 #endif
 
 
-#define BMC_SPI_MONITOR "spi_m1"
-#define PCH_SPI_MONITOR "spi_m3"
+#define BMC_SPI_MONITOR   "spi_m1"
+#define BMC_SPI_MONITOR_2 "spi_m2"
+#define PCH_SPI_MONITOR   "spi_m3"
 #define CPU0_RST 1  //refer to ASPEED Datasheet V0.8 p.41
 #define BMC_SRST 5
 

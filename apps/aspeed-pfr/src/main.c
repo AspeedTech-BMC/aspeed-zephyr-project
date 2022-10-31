@@ -6,15 +6,23 @@
 
 #include <logging/log.h>
 #include <zephyr.h>
+#include <build_config.h>
 
 #include "common/common.h"
 #include "include/SmbusMailBoxCom.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_provision.h"
-#include "pfr/pfr_common.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_verification.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#endif
+#include "pfr/pfr_common.h"
 #include <logging/logging_wrapper.h>
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
@@ -31,7 +39,7 @@ extern void aspeed_print_sysrst_info(void);
 
 void main(void)
 {
-	LOG_INF("*** ASPEED_PFR version 01.02 Board:%s ***", CONFIG_BOARD);
+	LOG_INF("*** ASPEED_PFR version v%02d.%02d Board:%s ***", PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, CONFIG_BOARD);
 
 	aspeed_print_sysrst_info();
 

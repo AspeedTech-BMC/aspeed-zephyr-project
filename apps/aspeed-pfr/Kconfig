@@ -13,6 +13,19 @@ config BMC_DUAL_FLASH
 	help
 	  Enable if BMC has dual flash
 
+config INTEL_PFR
+	default y
+	bool "intel pfr solution"
+	help
+	  Intel PFR support
+
+config CERBERUS_PFR
+	depends on !INTEL_PFR
+	default n
+	bool "cerberus pfr solution"
+	help
+	  Cerberus PFR support
+
 config SPI_MUX_INVERSE
 	default n
 	bool "Invert SPI MUX"
@@ -31,11 +44,25 @@ config BMC_CHECKPOINT_RECOVERY
 	help
 	  Enable if BMC supports mailbox checkpoint
 
+config BMC_CHECKPOINT_EXPIRE_TIME
+	default 175000
+	int "Maximum timeout value for BMC checkpoint in mS"
+	help
+	  After system is provisioned, the watchdog will be armed during BMC
+	  booting. The expire time will be set to this number in milliseconds.
+
 config PCH_CHECKPOINT_RECOVERY
 	default n
 	bool "PCH Checkpoint timeout recovery function"
 	help
 	  Enable if PCH supports mailbox checkpoint
+
+config PCH_CHECKPOINT_EXPIRE_TIME
+	default 900000
+	int "Maximum timeout value for PCH checkpoint in mS"
+	help
+	  After system is provisioned, the watchdog will be armed during BIOS
+	  booting. The expire time will be set to this number in milliseconds.
 
 config PLATFORM_STATE_LED
 	default n
@@ -73,11 +100,41 @@ config PCH_STAGING_SIZE
 	help
 	  The max size of PCH staging area for putting signed PCH capsule.
 
+config BMC_PFR_STAGING_OFFSET
+	depends on CERBERUS_PFR
+	hex "PFR staging region offset in BMC flash"
+	help
+	  The starting offset of PFR staging region, and this is for Cerberus PFR provisioning.
+
 config INIT_POWER_SEQUENCE
 	default n
 	bool "Wait for CPLD power sequence to start PFR functionality"
 	help
 	  PFR state machine will stay in INIT state until CPLD power sequence releases
 	  RST_SRST_BMC_N and RST_RSMRST_N.
+
+config SEAMLESS_UPDATE
+	depends on INTEL_PFR
+	depends on !CERBERUS_PFR
+	default n
+	bool "Seamless update support"
+	help
+	  Support FVM verification and host firmware update by seamless capsule.
+	  PFR will update host firmware without going to t-1 state and rebooting host.
+
+config PIT_PROTECTION
+	depends on INTEL_PFR
+	depends on !CERBERUS_PFR
+	default n
+	bool "PIT protection support"
+	help
+	  Enable PIT protection functions and PIT mailbox commands.
+	  ROT will perform PIT check if PIT protection is enabled via mailbox command.
+
+config PFR_SW_MAILBOX
+	default n
+        bool "SW mailbox solution"
+        help
+          Enable SW mailbox support.
 
 source "Kconfig.zephyr"

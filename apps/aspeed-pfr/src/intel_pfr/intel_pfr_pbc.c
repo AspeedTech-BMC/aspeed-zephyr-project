@@ -4,27 +4,23 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include <posix/time.h>
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
 #include "flash/flash_wrapper.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_pfm_manifest.h"
+#include "intel_pfr_verification.h"
 #include "common/common.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if PF_UPDATE_DEBUG
-#define DEBUG_PRINTF LOG_INF
-#else
-#define DEBUG_PRINTF(...)
-#endif
-
-typedef struct
-{
+typedef struct {
 	uint32_t tag;
 	uint32_t version;
 	uint32_t page_size;
@@ -35,30 +31,54 @@ typedef struct
 	uint32_t _reserved[25];
 } PBC_HEADER;
 
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#define RECOVER_ON_FIRST_RECOVERY   0b100
+static uint8_t g_bmc_recovery_level = RECOVER_ON_FIRST_RECOVERY;
+static uint8_t g_pch_recovery_level = RECOVER_ON_FIRST_RECOVERY;
+
+uint8_t get_recovery_level(uint32_t image_type)
+{
+	return (image_type == PCH_SPI) ? g_pch_recovery_level : g_bmc_recovery_level;
+}
+
+void inc_recovery_level(uint32_t image_type)
+{
+	if (image_type == PCH_SPI)
+		g_pch_recovery_level <<= 1;
+	else
+		g_bmc_recovery_level <<= 1;
+}
+
+void reset_recovery_level(uint32_t image_type)
+{
+	if (image_type == PCH_SPI)
+		g_pch_recovery_level = RECOVER_ON_FIRST_RECOVERY;
+	else
+		g_bmc_recovery_level = RECOVER_ON_FIRST_RECOVERY;
+}
+#endif
+
 int update_active_pfm(struct pfr_manifest *manifest)
 {
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int status = 0;
 	uint32_t capsule_offset;
 
-	if (manifest->state == RECOVERY)
+	if (manifest->state == FIRMWARE_RECOVERY)
 		capsule_offset = manifest->recovery_address;
 	else
 		capsule_offset = manifest->staging_address;
 
 	// Adjusting capsule offset size to PFM Signing chain
 	capsule_offset += PFM_SIG_BLOCK_SIZE;
-
 	spi_flash->spi.device_id[0] = manifest->image_type;
-
 	// Updating PFM from capsule to active region
-	status = flash_copy_and_verify(&spi_flash->spi, manifest->active_pfm_addr,
-			capsule_offset, PAGE_SIZE);
+	status = flash_copy_and_verify((struct spi_flash *)&spi_flash->spi, manifest->active_pfm_addr,
+			capsule_offset, BLOCK_SIZE);
 	if (status != Success)
 		return Failure;
 
-	DEBUG_PRINTF("Active PFM Updated!!");
-
+	LOG_INF("Active PFM Updated!!");
 	return Success;
 }
 
@@ -76,7 +96,7 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 
 	if (pfr_spi_read(image_type, active_bitmap, sizeof(active_bitmap_byte),
 				active_bitmap_byte)) {
-		DEBUG_PRINTF("Faild to get bitmap infromation");
+		LOG_ERR("Faild to get bitmap infromation");
 		return Failure;
 	}
 
@@ -125,7 +145,7 @@ int decompression_write(uint32_t image_type,
 	uint16_t bit_mask;
 
 	if (pfr_spi_read(image_type, comp_bitmap, sizeof(comp_bitmap_byte), comp_bitmap_byte)) {
-		DEBUG_PRINTF("Faild to get bitmap infromation");
+		LOG_ERR("Faild to get bitmap infromation");
 		return Failure;
 	}
 
@@ -154,13 +174,9 @@ int decompression_write(uint32_t image_type,
 }
 
 int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
-		uint32_t start_addr, uint32_t end_addr)
+		uint32_t pbc_offset, uint32_t start_addr, uint32_t end_addr)
 {
 	uint32_t image_type = manifest->image_type;
-	uint32_t read_address = (manifest->state == UPDATE) ?
-		manifest->staging_address : manifest->recovery_address;
-	uint32_t cap_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE * 2;
-	uint32_t pbc_offset = cap_pfm_offset + manifest->pc_length;
 	uint32_t decomp_src_addr;
 	uint32_t active_bitmap;
 	uint32_t comp_bitmap;
@@ -171,7 +187,7 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 
 	// Supported decompression adrress range is 0 - 256MB
 	if (bitmap_size > (2 * PAGE_SIZE)) {
-		DEBUG_PRINTF("bitmap size is too big");
+		LOG_ERR("bitmap size is too big");
 		return Failure;
 	}
 
@@ -202,38 +218,213 @@ bool is_spi_region_dynamic(PFM_SPI_DEFINITION *spi_region_def)
 bool is_pbc_valid(PBC_HEADER *pbc)
 {
 	if (pbc->tag != PBC_COMPRESSION_TAG) {
-		DEBUG_PRINTF("PBC compression tag is invalid");
+		LOG_ERR("PBC compression tag is invalid");
 		return false;
 	}
 
 	if (pbc->version != PBC_VERSION) {
-		DEBUG_PRINTF("PBC version is invalid");
+		LOG_ERR("PBC version is invalid");
 		return false;
 	}
 
 	if (pbc->page_size != PBC_PAGE_SIZE) {
-		DEBUG_PRINTF("PBC page size is invalid");
+		LOG_ERR("PBC page size is invalid");
 		return false;
 	}
 
 	if (pbc->bitmap_nbit % 8){
-		DEBUG_PRINTF("PBC bitmap size is invalid");
+		LOG_ERR("PBC bitmap size is invalid");
 		return false;
 	}
 
 	return true;
 }
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+int get_total_pfm_fvm_size(struct pfr_manifest *manifest, uint32_t signed_pfm_offset,
+		uint32_t cap_pfm_body_start_addr, uint32_t cap_pfm_body_end_addr)
+{
+	PFM_SPI_DEFINITION spi_def;
+	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
+	uint32_t last_fvm_start_addr = 0;
+	uint32_t image_type = manifest->image_type;
+	uint32_t cap_pfm_body_offset = cap_pfm_body_start_addr;
+
+	while (cap_pfm_body_offset < cap_pfm_body_end_addr) {
+		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
+				(uint8_t *)&spi_def);
+		if (spi_def.PFMDefinitionType == SMBUS_RULE) {
+			cap_pfm_body_offset += sizeof(PFM_SMBUS_RULE);
+		} else if (spi_def.PFMDefinitionType == SPI_REGION) {
+			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
+			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
+				cap_pfm_body_offset += sizeof(PFM_SPI_DEFINITION);
+				cap_pfm_body_offset += (manifest->hash_curve == secp384r1) ?
+					SHA384_SIZE : SHA256_SIZE;
+			} else {
+				cap_pfm_body_offset += SPI_REGION_DEF_MIN_SIZE;
+			}
+		} else if (spi_def.PFMDefinitionType == FVM_ADDR_DEF) {
+			fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)&spi_def;
+			if (fvm_def->FVMAddress > last_fvm_start_addr)
+				last_fvm_start_addr = fvm_def->FVMAddress;
+
+			cap_pfm_body_offset += sizeof(PFM_FVM_ADDRESS_DEFINITION);
+		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
+			cap_pfm_body_offset += sizeof(FVM_CAPABLITIES);
+		} else {
+			break;
+		}
+	}
+
+	uint32_t total_pfm_fvm_size;
+	// Get length from the header of the last fvm.
+	if (last_fvm_start_addr) {
+		PFR_AUTHENTICATION_BLOCK0 signed_fvm;
+		uint32_t last_fvm_start_addr_in_pfm =
+			last_fvm_start_addr - manifest->active_pfm_addr;
+		uint32_t last_signed_fvm_offset = signed_pfm_offset + last_fvm_start_addr_in_pfm;
+
+		pfr_spi_read(image_type, last_signed_fvm_offset, sizeof(PFR_AUTHENTICATION_BLOCK0),
+				(uint8_t *)&signed_fvm);
+		total_pfm_fvm_size = last_fvm_start_addr_in_pfm + signed_fvm.PcLength;
+	} else {
+		total_pfm_fvm_size = manifest->pc_length;
+	}
+
+	return total_pfm_fvm_size;
+}
+
+int decompress_fvm_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
+		uint32_t pbc_offset, uint32_t cap_fvm_offset,
+		DECOMPRESSION_TYPE_MASK_ENUM decomp_type)
+{
+	FVM_STRUCTURE fvm;
+	PFM_SPI_DEFINITION spi_def;
+	uint32_t fvm_body_offset;
+	uint32_t image_type = manifest->image_type;
+	uint32_t fvm_body_end_addr;
+
+	if (pfr_spi_read(image_type, cap_fvm_offset, sizeof(FVM_STRUCTURE),
+			(uint8_t *)&fvm))
+		return Failure;
+	fvm_body_offset = cap_fvm_offset + sizeof(FVM_STRUCTURE);
+	fvm_body_end_addr = fvm_body_offset + fvm.Length - sizeof(FVM_ADDR_DEF);
+
+	while (fvm_body_offset < fvm_body_end_addr) {
+		pfr_spi_read(image_type, fvm_body_offset, sizeof(PFM_SPI_DEFINITION),
+				(uint8_t *)&spi_def);
+
+		if (spi_def.PFMDefinitionType == SPI_REGION) {
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+			uint8_t recovery_level = get_recovery_level(image_type);
+			bool region_require_update = false;
+			PFM_SPI_REGION *spi_reg = (PFM_SPI_REGION *)&spi_def;
+			if (manifest->state != FIRMWARE_RECOVERY)
+				region_require_update = true;
+			else if (manifest->state == FIRMWARE_RECOVERY &&
+					(recovery_level & spi_reg->ProtectLevelMask ))
+				region_require_update = true;
+#else
+			bool region_require_update = true;
+#endif
+			if (is_spi_region_static(&spi_def)) {
+				if ((decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK) &&
+						region_require_update) {
+					if (decompress_spi_region(manifest, pbc,
+								pbc_offset,
+								spi_def.RegionStartAddress,
+								spi_def.RegionEndAddress))
+						return Failure;
+				}
+			} else if (is_spi_region_dynamic(&spi_def) &&
+				   spi_def.RegionStartAddress != manifest->staging_address) {
+				if ((decomp_type & DECOMPRESSION_DYNAMIC_REGIONS_MASK) &&
+						region_require_update) {
+					if (decompress_spi_region(manifest, pbc,
+								pbc_offset,
+								spi_def.RegionStartAddress,
+								spi_def.RegionEndAddress))
+						return Failure;
+				}
+			}
+
+			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
+			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
+				fvm_body_offset += sizeof(PFM_SPI_DEFINITION);
+				fvm_body_offset += (manifest->hash_curve == secp384r1) ?
+					SHA384_SIZE : SHA256_SIZE;
+			} else {
+				fvm_body_offset += SPI_REGION_DEF_MIN_SIZE;
+			}
+		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
+			fvm_body_offset += sizeof(FVM_CAPABLITIES);
+		} else {
+			break;
+		}
+	}
+
+	return Success;
+}
+
+int decompress_fv_capsule(struct pfr_manifest *manifest)
+{
+	uint32_t image_type = manifest->image_type;
+	int sector_sz = pfr_spi_get_block_size(image_type);
+	bool support_block_erase = (sector_sz == BLOCK_SIZE) ? true : false;
+	uint32_t read_address = manifest->staging_address;
+	uint32_t signed_fvm_offset = read_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t cap_fvm_offset = signed_fvm_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t pbc_offset = cap_fvm_offset + manifest->pc_length;
+	PBC_HEADER pbc;
+
+	if (manifest->target_fvm_addr == 0)
+		return Failure;
+
+	// Erase and update active FVM region.
+	pfr_spi_erase_region(image_type, support_block_erase, manifest->target_fvm_addr,
+			manifest->pc_length);
+	pfr_spi_page_read_write(image_type, signed_fvm_offset , manifest->target_fvm_addr);
+
+	if(pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
+		return Failure;
+
+	if (decompress_fvm_spi_region(manifest, &pbc, pbc_offset, cap_fvm_offset,
+				DECOMPRESSION_STATIC_REGIONS_MASK))
+		return Failure;
+
+	return Success;
+}
+#endif
+
 int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_ENUM decomp_type)
 {
 	uint32_t image_type = manifest->image_type;
-	uint32_t read_address = (manifest->state == UPDATE) ?
-		manifest->staging_address : manifest->recovery_address;
-	uint32_t cap_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE * 2;
-	uint32_t pbc_offset = cap_pfm_offset + manifest->pc_length;
-	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE_1);
+	uint32_t read_address = (manifest->state == FIRMWARE_RECOVERY) ?
+		manifest->recovery_address : manifest->staging_address;
+	uint32_t signed_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t cap_pfm_offset = signed_pfm_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE);
+	uint32_t cap_pfm_body_start_addr = cap_pfm_body_offset;
+	uint32_t cap_pfm_body_end_addr;
+	uint32_t pbc_offset;
+	uint32_t pfm_size;
+	PFM_STRUCTURE pfm_header;
 	PFM_SPI_DEFINITION spi_def;
 	PBC_HEADER pbc;
+
+	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
+		return Failure;
+
+	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE);
+
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	pfm_size = get_total_pfm_fvm_size(manifest, signed_pfm_offset,
+			cap_pfm_body_start_addr, cap_pfm_body_end_addr);
+#else
+	pfm_size = manifest->pc_length;
+#endif
+	pbc_offset = cap_pfm_offset + pfm_size;
 
 	if(pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
 		return Failure;
@@ -241,26 +432,44 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	if (!is_pbc_valid(&pbc))
 		return Failure;
 
-	DEBUG_PRINTF("Decompressing %s capsule...", (manifest->state == UPDATE) ?
-			"staging" : "recovery");
+	LOG_INF("Decompressing capsule from %s region...",
+			(manifest->state == FIRMWARE_RECOVERY) ? "recovery" : "staging");
 
-	while (1) {
-		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION), (uint8_t *)&spi_def);
+	while (cap_pfm_body_offset < cap_pfm_body_end_addr) {
+		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
+				(uint8_t *)&spi_def);
 		if (spi_def.PFMDefinitionType == SMBUS_RULE) {
 			cap_pfm_body_offset += sizeof(PFM_SMBUS_RULE);
 		} else if (spi_def.PFMDefinitionType == SPI_REGION) {
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+				uint8_t recovery_level = get_recovery_level(image_type);
+				bool region_require_update = false;
+				PFM_SPI_REGION *spi_reg = (PFM_SPI_REGION *)&spi_def;
+				if (manifest->state != FIRMWARE_RECOVERY)
+					region_require_update = true;
+				else if (manifest->state == FIRMWARE_RECOVERY &&
+						(recovery_level & spi_reg->ProtectLevelMask ))
+					region_require_update = true;
+#else
+				bool region_require_update = true;
+#endif
 			if (is_spi_region_static(&spi_def)) {
-				if (decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK)
-					decompress_spi_region(manifest, &pbc,
-							spi_def.RegionStartAddress,
-							spi_def.RegionEndAddress);
+				if ((decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK) &&
+						region_require_update)
+					if (decompress_spi_region(manifest, &pbc,
+								pbc_offset,
+								spi_def.RegionStartAddress,
+								spi_def.RegionEndAddress))
+						return Failure;
 			} else if (is_spi_region_dynamic(&spi_def) &&
 				   spi_def.RegionStartAddress != manifest->staging_address) {
-				if (decomp_type & DECOMPRESSION_DYNAMIC_REGIONS_MASK)
-					decompress_spi_region(manifest, &pbc,
-							spi_def.RegionStartAddress,
-							spi_def.RegionEndAddress);
-
+				if ((decomp_type & DECOMPRESSION_DYNAMIC_REGIONS_MASK) &&
+						region_require_update)
+					if (decompress_spi_region(manifest, &pbc,
+								pbc_offset,
+								spi_def.RegionStartAddress,
+								spi_def.RegionEndAddress))
+						return Failure;
 			}
 
 			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
@@ -271,7 +480,25 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 			} else {
 				cap_pfm_body_offset += SPI_REGION_DEF_MIN_SIZE;
 			}
-		} else {
+		}
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		else if (spi_def.PFMDefinitionType == FVM_ADDR_DEF) {
+			PFM_FVM_ADDRESS_DEFINITION *fvm_def =
+				(PFM_FVM_ADDRESS_DEFINITION *)&spi_def;
+			uint32_t fvm_offset_in_pfm;
+			uint32_t cap_fvm_offset;
+
+			fvm_offset_in_pfm = fvm_def->FVMAddress - manifest->active_pfm_addr;
+			cap_fvm_offset = cap_pfm_offset + fvm_offset_in_pfm;
+			if (decompress_fvm_spi_region(manifest, &pbc, pbc_offset, cap_fvm_offset,
+					decomp_type))
+				return Failure;
+			cap_pfm_body_offset += sizeof(PFM_FVM_ADDRESS_DEFINITION);
+		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
+			cap_pfm_body_offset += sizeof(FVM_CAPABLITIES);
+		}
+#endif
+		else {
 			break;
 		}
 	}
@@ -281,4 +508,4 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 
 	return Success;
 }
-
+#endif // CONFIG_INTEL_PFR

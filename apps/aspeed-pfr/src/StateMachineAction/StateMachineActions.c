@@ -8,26 +8,26 @@
 #include "StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "include/SmbusMailBoxCom.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_authentication.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_provision.h"
+#include "cerberus_pfr/cerberus_pfr_authentication.h"
+#endif
 #include "pfr/pfr_verification.h"
 #include "pfr/pfr_update.h"
 #include "flash/flash_aspeed.h"
 #include <watchdog/watchdog_aspeed.h>
 #include "Smbus_mailbox/Smbus_mailbox.h"
-#include "intel_pfr/intel_pfr_definitions.h"
 #include "spi_filter/spi_filter_wrapper.h"
 #include "logging/debug_log.h"// State Machine log saving
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
 LOG_MODULE_DECLARE(aspeed_state_machine, CONFIG_LOG_DEFAULT_LEVEL);
-
-#define RELEASE_PLATFORM 1
-
-#define MAX_BUFFER_CHECK 79
-#define MAX_LENGTH 32
-#define SMBUS_WRITE 0x45
 
 static void wdt_callback_bmc_timeout(const struct device *dev, int channel_id)
 {
@@ -36,8 +36,8 @@ static void wdt_callback_bmc_timeout(const struct device *dev, int channel_id)
 	LOG_ERR("BMC Boot WDT Timeout");
 	union aspeed_event_data data = {0};
 	data.bit8[0] = BMC_EVENT;
+	LogWatchdogRecovery(BMC_LAUNCH_FAIL, BMC_WDT_EXPIRE);
 	GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
-	SetLastPanicReason(BMC_WDT_EXPIRE);
 }
 
 static void wdt_callback_pch_timeout(const struct device *dev, int channel_id)
@@ -47,8 +47,8 @@ static void wdt_callback_pch_timeout(const struct device *dev, int channel_id)
 	LOG_ERR("PCH Boot WDT Timeout");
 	union aspeed_event_data data = {0};
 	data.bit8[0] = PCH_EVENT;
+	LogWatchdogRecovery(ACM_LAUNCH_FAIL, ACM_WDT_EXPIRE);
 	GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
-	SetLastPanicReason(ACM_WDT_EXPIRE);
 }
 
 void AspeedPFR_EnableTimer(int type)

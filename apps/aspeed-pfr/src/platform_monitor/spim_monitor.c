@@ -111,7 +111,7 @@ void spim_irq_init(void)
 	for (i = 0; i < 3; i++) {
 		spim_devs[i] = device_get_binding(spim_dev_names[i]);
 		if (!spim_devs[i]) {
-			LOG_ERR("demo_err: cannot get device, %s.\n", spim_dev_names[i]);
+			LOG_ERR("Cannot get device, %s, skipped.", spim_dev_names[i]);
 			continue;
 		}
 		log_ctrls[i].dev = spim_devs[i];

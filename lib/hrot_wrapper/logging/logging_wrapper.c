@@ -189,10 +189,15 @@ int debug_log_test(void)
 	}
 
 	if (logging_flash_wrapper_init((struct logging_flash *)debug_log)) {
+		free(flash_read_contents);
+		free(log_read_contents);
+		free(debug_log);
 		return __LINE__;
 	}
 
 	if (debug_log_clear()) {
+		free(flash_read_contents);
+		free(log_read_contents);
 		return __LINE__;
 	}
 
@@ -201,6 +206,8 @@ int debug_log_test(void)
 	debug_msg_clear((((struct logging_flash *)debug_log)->entry_buffer), DBG_LOG_TST_RD_SIZE);
 	for (size_t i = 0; i < 54; i++) // 1.5KB
 		if (debug_log_create_entry(1 % DEBUG_LOG_NUM_SEVERITY, (uint8_t)i, (uint8_t)i + 1, i, i + 1)) {
+			free(flash_read_contents);
+			free(log_read_contents);
 			return (i << 16) | __LINE__;
 		}
 	printk("Log size=%d\n", debug_log_get_size());// 1512 bytes = 54 logs, pass

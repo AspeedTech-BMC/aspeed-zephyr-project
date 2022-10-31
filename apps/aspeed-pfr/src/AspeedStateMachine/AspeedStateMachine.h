@@ -21,6 +21,10 @@ enum aspeed_pfr_state {
 	RUNTIME,
 	SYSTEM_LOCKDOWN,
 	SYSTEM_REBOOT,
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	SEAMLESS_UPDATE,
+	SEAMLESS_VERIFY,
+#endif
 };
 
 enum aspeed_pfr_event {
@@ -39,6 +43,16 @@ enum aspeed_pfr_event {
 	UPDATE_DONE,
 	UPDATE_FAILED,
 	PROVISION_CMD,
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	SEAMLESS_UPDATE_REQUESTED,
+	SEAMLESS_UPDATE_DONE,
+	SEAMLESS_UPDATE_FAILED,
+	SEAMLESS_VERIFY_DONE,
+	SEAMLESS_VERIFY_FAILED,
+#endif
+#if defined(CONFIG_PIT_PROTECTION)
+	SEAL_FIRMWARE,
+#endif
 };
 
 union aspeed_event_data {

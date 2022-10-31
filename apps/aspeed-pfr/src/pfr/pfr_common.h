@@ -41,6 +41,9 @@ struct pfr_manifest {
 	uint32_t pc_type;                                       // manifest protected content type
 	uint32_t kc_flag;                                       // Key Cancellation flag
 	uint32_t hash_curve;                                    // Hash Curve
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	uint32_t target_fvm_addr;                               // fvm region for seamless update
+#endif
 
 };
 
@@ -87,6 +90,6 @@ struct pfr_keystore {
 	struct key_cancellation_flag *kc_flag;
 };
 
-void init_pfr_manifest(void);
+void init_pfr_bases(void);
 struct pfr_manifest *get_pfr_manifest(void);
 

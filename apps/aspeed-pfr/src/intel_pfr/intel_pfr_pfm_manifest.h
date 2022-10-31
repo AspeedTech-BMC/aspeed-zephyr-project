@@ -6,12 +6,27 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
+
+#define BIOS1_BIOS2 0x00
+#define ME_SPS          0x01
+#define Microcode1      0x02
+#define Microcode2      0x03
+
+#define SPI_REGION     0x1
+#define SMBUS_RULE     0x2
+#define FVM_ADDR_DEF   0x3
+#define FVM_CAP        0x4
+
+#define SIZE_OF_PCH_SMBUS_RULE 40
+#define SPI_REGION_DEF_MIN_SIZE 16
+
+#define PCH_FVM_SPI_REGION 0x01
+#define PCH_FVM_CAP        0x04
+
 #pragma pack(1)
-
-#define NUM_WHITESPACE 8
-
 typedef struct PFMSPIDEFINITION {
 	uint8_t PFMDefinitionType;
 	struct {
@@ -51,9 +66,7 @@ typedef struct _PFM_SPI_REGION {
 	uint32_t EndOffset;
 } PFM_SPI_REGION;
 
-
-
-typedef struct _PFM_STRUCTURE_1 {
+typedef struct _PFM_STRUCTURE {
 	uint32_t PfmTag;
 	uint8_t SVN;
 	uint8_t BkcVersion;
@@ -61,7 +74,7 @@ typedef struct _PFM_STRUCTURE_1 {
 	uint32_t Reserved;
 	uint8_t OemSpecificData[16];
 	uint32_t Length;
-} PFM_STRUCTURE_1;
+} PFM_STRUCTURE;
 
 typedef struct _FVM_STRUCTURE {
 	uint32_t FvmTag;
@@ -105,24 +118,51 @@ typedef struct _FVM_CAPABILITIES {
 	uint8_t Description[20];
 } FVM_CAPABLITIES;
 
-#define SHA384_SIZE 48
-#define SHA256_SIZE 32
+typedef struct _AFM_STRUCTURE {
+	uint32_t AfmTag; /* Should be 0x8883CE1D */
+	uint8_t SVN;
+	uint8_t Reserved;
+	uint16_t AfmRevision; /* Major:Minor */
+	uint8_t OemSpecificData[16];
+	uint32_t Length;
+	uint8_t AfmBody[];
+	/* Padding to nearest 128B bondary with 0xFF */
+} AFM_STRUCTURE;
 
-#define BIOS1_BIOS2 0x00
-#define ME_SPS          0x01
-#define Microcode1      0x02
-#define Microcode2      0x03
+typedef struct _AFM_ADDRESS_DEFINITION {
+	uint8_t AfmDefinitionType; /* 0x03 AFM SPI region address definitions */
+	uint8_t DeviceAddress; /* 7-bit SMBus address of the device to be measured */
+	uint16_t UUID; /* Universal Unique ID of the device */
+	uint32_t Length; /* Length of the AFM in bytes */
+	uint32_t AfmAddress; /* Address of AFM must be at least 4k aligned */
+} AFM_ADDRESS_DEFINITION;
 
-#define SPI_REGION 0x1
-#define SMBUS_RULE 0x2
-#define SIZE_OF_PCH_SMBUS_RULE 40
-#define PCH_PFM_SPI_REGION 0x01
-#define ACTIVE_PFM_SMBUS_RULE 0x02
-#define PCH_PFM_FVM_ADDRESS_DEFINITION 0x03
-#define SPI_REGION_DEF_MIN_SIZE 16
+typedef struct _AFM_DEVICE_MEASUREMENT_VALUE {
+	uint8_t PossibleMeasurements;
+	uint8_t ValueType; /* Defined in DSP0274 1.0.0 spec section 4.10 */
+	uint16_t ValueSize; /* Size of measurement value */
+	uint8_t Values[];
+} AFM_DEVICE_MEASUREMENT_VALUE;
 
-#define PCH_FVM_SPI_REGION 0x01
-#define PCH_FVM_Capabilities 0x04
+typedef struct _AFM_DEVICE_STRUCTURE {
+	uint16_t UUID;
+	uint8_t BusID;
+	uint8_t DeviceAddress; /* 7-bit SMBus address of the device to be measured */
+	uint8_t BindingSpec; /* MCTP physical trasport binding (SMBus or I3C) */
+	uint16_t BindingSpecVersion; /* Major:Minor */
+	uint8_t Policy;
+	uint8_t SVN;
+	uint8_t Reserved1;
+	uint16_t AfmVersion; /* Major:Minor */
+	uint32_t CurveMagic; /* AFM_PUBLIC_SECP256_TAG, AFM_PUBLIC_SECP384_TAG, AFM_PUBLIC_RSA2K_TAG ... */
+	uint16_t PlatformManufacturerStr;
+	uint16_t PlatformManufacturerIDModel;
+	uint8_t Reserved2[20];
+	uint8_t PublicKeyModuleXY[512];
+	uint32_t PublicKeyExponent;
+	uint32_t TotalMeasurements;
+	AFM_DEVICE_MEASUREMENT_VALUE Measurements[];
+} AFM_DEVICE_STRUCTURE;
 
 typedef struct {
 	uint8_t Calculated : 1;
@@ -131,17 +171,10 @@ typedef struct {
 	uint8_t DynamicEraseTriggered : 1;
 	uint8_t Reserved : 2;
 } ProtectLevelMask;
-
-extern uint32_t g_manifest_length;
-extern uint32_t g_fvm_manifest_length;
-
-extern ProtectLevelMask pch_protect_level_mask_count;
-extern ProtectLevelMask bmc_protect_level_mask_count;
-
 #pragma pack()
 
 int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version);
 int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
 int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address);
 int pfm_spi_region_verification(struct pfr_manifest *manifest);
-
+#endif // CONFIG_INTEL_PFR

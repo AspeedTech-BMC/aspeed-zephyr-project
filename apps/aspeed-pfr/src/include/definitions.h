@@ -11,19 +11,11 @@
 #define SPI_FLASH_SIZE 0x1000000
 #define PFM_FLASH_MANIFEST_ADDRESS 0x7c00000
 #define RECOVERY_IMAGE_BASE_ADDRESS 0x03E00000
-#define CPLD_RELEASE_VERSION 1
 #define HASH_ENGINE_NAME        wrapper
-#define SMBUS_MAILBOX_SUPPORT       1
 
 #define HASH_ENGINE_INIT_FUNC_DEF(name) hash_ ## name ## _init
 #define HASH_ENGINE_INIT_FUNC(name)             HASH_ENGINE_INIT_FUNC_DEF(name)
 #define HASH_ENGINE_INIT                                HASH_ENGINE_INIT_FUNC(HASH_ENGINE_NAME)
-
-#ifdef CONFIG_DEBUG
-#define DEBUG_PRINTF(val) printk(val)
-#else
-#define DEBUG_PRINTF(val)
-#endif
 
 enum {
 	DEBUG_LOG_ASPEED_PFR_MAIN = 0x20,

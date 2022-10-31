@@ -35,8 +35,6 @@ int Wrapper_spi_filter_rw_region(struct spi_filter_interface *spi_filter, uint8_
 
 	ret = Set_SPI_Filter_RW_Region(spim_devs[spi_filter_wrapper->dev_id], SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, start_addr, length);
 
-
-
 	return ret;
 }
 

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
@@ -24,12 +25,10 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 
 	// Recovery region verification
 	if (manifest->image_type == BMC_TYPE) {
-		LOG_INF("Image Type: BMC");
 		ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 	} else if (manifest->image_type == PCH_TYPE) {
-		LOG_INF("Image Type: PCH");
 		ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
@@ -38,7 +37,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	manifest->address = read_address;
 
 	LOG_INF("Verifying capsule signature, address=0x%08x", manifest->address);
-	// Block0-Block1 verifcation
+	// Block0-Block1 verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
@@ -56,7 +55,7 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	manifest->address += PFM_SIG_BLOCK_SIZE;
 
 	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
-	// manifest verifcation
+	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
 			manifest->pfr_hash->length);
@@ -80,12 +79,10 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	uint32_t read_address;
 
 	if (manifest->image_type == BMC_TYPE) {
-		LOG_INF("Image Type: BMC");
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_BMC_PFM;
 	} else if (manifest->image_type == PCH_TYPE) {
-		LOG_INF("Image Type: PCH");
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
 				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_PFM;
@@ -100,7 +97,6 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 			manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("Verify active PFM failed");
-		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 		return Failure;
 	}
 
@@ -113,7 +109,6 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	status = pfm_spi_region_verification(manifest);
 	if (status != Success) {
-		SetMajorErrorCode(manifest->image_type == BMC_TYPE ? BMC_AUTH_FAIL : PCH_AUTH_FAIL);
 		LOG_ERR("Verify active SPI region failed");
 		return Failure;
 	}
@@ -122,5 +117,4 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	return Success;
 }
 
-
-
+#endif // CONFIG_INTEL_PFR

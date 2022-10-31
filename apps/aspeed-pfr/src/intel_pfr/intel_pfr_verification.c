@@ -4,18 +4,161 @@
  * SPDX-License-Identifier: MIT
  */
 
+#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
+#include <drivers/flash.h>
+#include "common/common.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
+#include "flash/flash_aspeed.h"
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "pfr/pfr_util.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_key_cancellation.h"
+#include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_verification.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+
+#if defined(CONFIG_PIT_PROTECTION)
+int intel_pfr_pit_level1_verify(void)
+{
+	// PIT level 1 verification should be customized.
+	// This is the sample code that use ast1060 internal flash offset 0xdf000 - dffff to
+	// simulate RF NVRAM.
+#define RF_NVRAM_OFFSET 0xf000
+	uint32_t ufm_status;
+	uint8_t pit_password[8];
+	uint8_t rf_pit_password[8];
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&ufm_status, sizeof(ufm_status));
+	if (!CheckUfmStatus(ufm_status, UFM_STATUS_PIT_L1_ENABLE_BIT_MASK))
+		return Success;
+
+	ufm_read(PROVISION_UFM, PIT_PASSWORD,
+			(uint8_t *)pit_password, sizeof(pit_password));
+	pfr_spi_read(ROT_INTERNAL_INTEL_STATE, RF_NVRAM_OFFSET, sizeof(rf_pit_password),
+			rf_pit_password);
+	if (compare_buffer(pit_password, rf_pit_password, sizeof(pit_password))) {
+		SetPlatformState(LOCKDOWN_DUE_TO_PIT_L1);
+		LOG_ERR("PIT Level 1 verify failed, lockdown");
+		return Lockdown;
+	}
+
+	LOG_INF("PIT L1 verify successful");
+	return Success;
+}
+
+int intel_pfr_pit_level2_verify(void)
+{
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
+	const struct device *flash_dev;
+	PFR_AUTHENTICATION_BLOCK1 block1;
+	KEY_ENTRY *root_entry;
+	uint32_t ufm_status;
+	uint32_t act_pfm_offset;
+	uint32_t flash_size;
+	uint32_t hash_length;
+	uint8_t sha_buffer[SHA384_DIGEST_LENGTH] = { 0 };
+	uint8_t pit_hash_buffer[SHA384_DIGEST_LENGTH] = { 0 };
+	static char *flash_devices[4] = {
+		"spi1_cs0",
+		"spi1_cs1",
+		"spi2_cs0",
+		"spi2_cs1",
+	};
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&ufm_status, sizeof(ufm_status));
+	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_L2_PASSED_BIT_MASK) ||
+			!CheckUfmStatus(ufm_status, UFM_STATUS_PIT_L2_ENABLE_BIT_MASK))
+		return Success;
+
+	if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+				sizeof(act_pfm_offset))) {
+		LOG_ERR("Failed to get active PFM address");
+		return Failure;
+	}
+
+	if (pfr_spi_read(BMC_TYPE, act_pfm_offset + sizeof(PFR_AUTHENTICATION_BLOCK0),
+				sizeof(PFR_AUTHENTICATION_BLOCK1), &block1)) {
+		LOG_ERR("Failed to get block1");
+		return Failure;
+	}
+
+	root_entry = &block1.RootEntry;
+	if (root_entry->PubCurveMagic == PUBLIC_SECP384_TAG) {
+		pfr_manifest->pfr_hash->type = HASH_TYPE_SHA384;
+		hash_length = SHA384_DIGEST_LENGTH;
+	} else {
+		pfr_manifest->pfr_hash->type = HASH_TYPE_SHA256;
+		hash_length = SHA256_DIGEST_LENGTH;
+	}
+
+	pfr_manifest->pfr_hash->start_address = 0;
+	flash_dev = device_get_binding(flash_devices[BMC_TYPE]);
+	flash_size = flash_get_flash_size(flash_dev);
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
+	flash_size += flash_get_flash_size(flash_dev);
+#endif
+	spi_flash->spi.device_id[0] = BMC_TYPE;
+	pfr_manifest->image_type = BMC_TYPE;
+	pfr_manifest->pfr_hash->length = flash_size;
+	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
+			sha_buffer, hash_length);
+
+	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK)) {
+		ufm_read(PROVISION_UFM, PIT_BMC_FW_HASH,
+				(uint8_t *)pit_hash_buffer, sizeof(pit_hash_buffer));
+		if (compare_buffer(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
+			LOG_ERR("PIT L2 BMC hash mismatch");
+			LOG_HEXDUMP_ERR(sha_buffer, hash_length, "bmc pit hash :");
+			LOG_HEXDUMP_ERR(pit_hash_buffer, hash_length, "ufm pit hash :");
+			SetPlatformState(LOCKDOWN_ON_PIT_L2_BMC_HASH_MISMATCH);
+			return Lockdown;
+		}
+		LOG_INF("PIT L2 BMC hash verify successful");
+	} else {
+		ufm_write(PROVISION_UFM, PIT_BMC_FW_HASH, sha_buffer, SHA384_DIGEST_LENGTH);
+		LOG_INF("BMC firmware sealed");
+	}
+
+
+	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
+	flash_size = flash_get_flash_size(flash_dev);
+	spi_flash->spi.device_id[0] = PCH_TYPE;
+	pfr_manifest->image_type = PCH_TYPE;
+	pfr_manifest->pfr_hash->length = flash_size;
+	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
+			sha_buffer, hash_length);
+
+	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK)) {
+		ufm_read(PROVISION_UFM, PIT_PCH_FW_HASH,
+				(uint8_t *)pit_hash_buffer, sizeof(pit_hash_buffer));
+		if (compare_buffer(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
+			LOG_ERR("PIT L2 PCH hash mismatch");
+			LOG_HEXDUMP_ERR(sha_buffer, hash_length, "pch pit hash :");
+			LOG_HEXDUMP_ERR(pit_hash_buffer, hash_length, "ufm pit hash :");
+			SetPlatformState(LOCKDOWN_ON_PIT_L2_PCH_HASH_MISMATCH);
+			return Lockdown;
+		}
+		SetUfmFlashStatus(ufm_status, UFM_STATUS_PIT_L2_PASSED_BIT_MASK);
+		LOG_INF("PIT L2 PCH hash verify successful");
+	} else {
+		ufm_write(PROVISION_UFM, PIT_PCH_FW_HASH, sha_buffer, SHA384_DIGEST_LENGTH);
+		SetUfmFlashStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK);
+		SetPlatformState(PIT_L2_FW_SEALED);
+		LOG_INF("PCH firmware sealed");
+		// All firmware sealed, lockdown
+		return Lockdown;
+	}
+	return Success;
+}
+#endif
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
@@ -28,7 +171,6 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 	ARG_UNUSED(verification);
 	ARG_UNUSED(hash_out);
 	ARG_UNUSED(hash_length);
-	ARG_UNUSED(verification);
 
 	init_pfr_authentication(pfr_manifest->pfr_authentication);
 
@@ -63,7 +205,7 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 
 int validate_pc_type(struct pfr_manifest *manifest, uint32_t pc_type)
 {
-	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_CPU_Seamless_Update_Capsule) {
+	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_SEAMLESS_UPDATE_CAPSULE) {
 		LOG_ERR("Validation PC Type failed, block0_read_pc_type = %x, manifest_pc_type = %x", pc_type, manifest->pc_type);
 		return Failure;
 	}
@@ -223,6 +365,11 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		// ROT update
 		sign_bit_verify = SIGN_CPLD_UPDATE_BIT4;
 	}
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	else if (manifest->pc_type == PFR_PCH_SEAMLESS_UPDATE_CAPSULE) {
+		sign_bit_verify = SIGN_PCH_UPDATE_BIT1;
+	}
+#endif
 
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
 		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x", block1_buffer->CskEntryInitial.KeyPermission);
@@ -274,9 +421,13 @@ int intel_block1_verify(struct pfr_manifest *manifest)
 {
 	int status = 0;
 	PFR_AUTHENTICATION_BLOCK1 *block1_buffer;
-	uint8_t buffer[LENGTH] = { 0 };
+	uint8_t buffer[256] = { 0 };
 
-	status = pfr_spi_read(manifest->image_type, manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0), sizeof(block1_buffer->TagBlock1) + sizeof(block1_buffer->ReservedBlock1) + sizeof(block1_buffer->RootEntry), buffer);
+	status = pfr_spi_read(manifest->image_type, manifest->address +
+			sizeof(PFR_AUTHENTICATION_BLOCK0),
+			sizeof(block1_buffer->TagBlock1) + sizeof(block1_buffer->ReservedBlock1) +
+			sizeof(block1_buffer->RootEntry), buffer);
+
 	if (status != Success) {
 		LOG_ERR("Block1: Flash read data failed");
 		return Failure;
@@ -413,6 +564,174 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	return Success;
 }
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+uint32_t find_fvm_addr(struct pfr_manifest *manifest, uint16_t fv_type)
+{
+	uint32_t image_type = manifest->image_type;
+	uint32_t act_pfm_offset = manifest->active_pfm_addr + PFM_SIG_BLOCK_SIZE;
+	uint32_t act_pfm_body_offset = act_pfm_offset + sizeof(PFM_STRUCTURE);
+	PFM_STRUCTURE act_pfm_header;
+	uint32_t act_pfm_end_addr;
+
+	PFM_SPI_DEFINITION spi_def;
+	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
+
+
+	if (pfr_spi_read(image_type, act_pfm_offset, sizeof(PFM_STRUCTURE),
+				(uint8_t *)&act_pfm_header)) {
+		LOG_ERR("Failed to read active PFM");
+		return Failure;
+	}
+
+	act_pfm_end_addr = act_pfm_body_offset + act_pfm_header.Length - sizeof(PFM_STRUCTURE);
+
+	while(act_pfm_body_offset < act_pfm_end_addr) {
+		pfr_spi_read(image_type, act_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
+				(uint8_t *)&spi_def);
+		if (spi_def.PFMDefinitionType == SMBUS_RULE) {
+			act_pfm_body_offset += sizeof(PFM_SMBUS_RULE);
+		} else if (spi_def.PFMDefinitionType == SPI_REGION) {
+			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
+			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
+				act_pfm_body_offset += sizeof(PFM_SPI_DEFINITION);
+				act_pfm_body_offset += (manifest->hash_curve == secp384r1) ?
+					SHA384_SIZE : SHA256_SIZE;
+			} else {
+				act_pfm_body_offset += SPI_REGION_DEF_MIN_SIZE;
+			}
+		} else if (spi_def.PFMDefinitionType == FVM_ADDR_DEF) {
+			fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)&spi_def;
+			if (fvm_def->FVType == fv_type) {
+				manifest->target_fvm_addr = fvm_def->FVMAddress;
+				return fvm_def->FVMAddress;
+			}
+			act_pfm_body_offset += sizeof(PFM_FVM_ADDRESS_DEFINITION);
+		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
+			act_pfm_body_offset += sizeof(FVM_CAPABLITIES);
+		} else {
+			break;
+		}
+	}
+
+	return 0;
+}
+
+int intel_fvm_verify(struct pfr_manifest *manifest)
+{
+	uint32_t image_type = manifest->image_type;
+	uint32_t read_address = manifest->address;
+	uint32_t signed_fvm_offset = read_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t cap_fvm_offset = signed_fvm_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t act_fvm_offset;
+	uint32_t target_fvm_addr;
+
+	FVM_STRUCTURE cap_fvm_header;
+	FVM_STRUCTURE act_fvm_header;
+
+	if (pfr_spi_read(image_type, cap_fvm_offset, sizeof(FVM_STRUCTURE),
+				(uint8_t *)&cap_fvm_header)) {
+		LOG_ERR("Failed to read capsule FVM");
+		return Failure;
+	}
+
+
+	target_fvm_addr = find_fvm_addr(manifest, cap_fvm_header.FvType);
+
+	if (target_fvm_addr == 0) {
+		LogUpdateFailure(SEAMLESS_UNKNOWN_FV_TYPE, 1);
+		LOG_ERR("Failed to find FVM address in active PFM");
+		return Failure;
+	}
+
+	act_fvm_offset = target_fvm_addr + PFM_SIG_BLOCK_SIZE;
+
+
+	if (pfr_spi_read(image_type, act_fvm_offset, sizeof(FVM_STRUCTURE),
+				(uint8_t *)&act_fvm_header)) {
+		LOG_ERR("Failed to read active FVM");
+		return Failure;
+	}
+
+	if (act_fvm_header.SVN != cap_fvm_header.SVN) {
+		LOG_ERR("Capsule FVM SVN doesn't match the active FVM SVN");
+		return Failure;
+	} else if (act_fvm_header.Length != cap_fvm_header.Length){
+		LOG_ERR("Capsule FVM length doesn't match the active FVM length");
+		return Failure;
+	}
+
+	return Success;
+}
+
+int intel_fvms_verify(struct pfr_manifest *manifest)
+{
+	uint32_t image_type = manifest->image_type;
+	uint32_t read_address = manifest->address;
+	uint32_t state = manifest->state;
+	uint32_t signed_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t cap_pfm_offset = signed_pfm_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE);
+	uint32_t cap_pfm_body_end_addr;
+	uint32_t fvm_addr;
+	PFM_STRUCTURE pfm_header;
+	PFM_SPI_DEFINITION spi_def;
+	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
+
+	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
+		return Failure;
+
+	if (pfm_header.PfmTag != PFMTAG) {
+		LOG_ERR("FVM verification failed");
+		LOG_HEXDUMP_INF(&pfm_header, sizeof(PFM_STRUCTURE), "PFM Header:");
+		return Failure;
+	}
+
+	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE);
+
+	while(cap_pfm_body_offset < cap_pfm_body_end_addr) {
+		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
+				(uint8_t *)&spi_def);
+		if (spi_def.PFMDefinitionType == SMBUS_RULE) {
+			cap_pfm_body_offset += sizeof(PFM_SMBUS_RULE);
+		} else if (spi_def.PFMDefinitionType == SPI_REGION) {
+			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
+			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
+				cap_pfm_body_offset += sizeof(PFM_SPI_DEFINITION);
+				cap_pfm_body_offset += (manifest->hash_curve == secp384r1) ?
+					SHA384_SIZE : SHA256_SIZE;
+			} else {
+				cap_pfm_body_offset += SPI_REGION_DEF_MIN_SIZE;
+			}
+		} else if (spi_def.PFMDefinitionType == FVM_ADDR_DEF) {
+			// Verify FVMs signature.
+			LOG_INF("Verifying Capsule FVMs... ");
+			manifest->state = FIRMWARE_UPDATE;
+			fvm_def = (PFM_FVM_ADDRESS_DEFINITION *)&spi_def;
+			fvm_addr = fvm_def->FVMAddress - manifest->active_pfm_addr +
+				+ read_address + PFM_SIG_BLOCK_SIZE;
+
+			manifest->address = fvm_addr;
+			if (manifest->base->verify((struct signature_verification *)manifest,
+						NULL, NULL, NULL, 0)) {
+				LOG_ERR("Verify FVM failed");
+			}
+			LOG_INF("FVM region verify successful");
+			cap_pfm_body_offset += sizeof(PFM_FVM_ADDRESS_DEFINITION);
+		} else if (spi_def.PFMDefinitionType == FVM_CAP) {
+			cap_pfm_body_offset += sizeof(FVM_CAPABLITIES);
+		} else {
+			break;
+		}
+	}
+
+	// Restore manifest settings.
+	manifest->state = state;
+	manifest->address = read_address;
+
+	return Success;
+}
+#endif
+
 void init_pfr_authentication(struct pfr_authentication *pfr_authentication)
 {
 	pfr_authentication->validate_pctye = validate_pc_type;
@@ -421,4 +740,30 @@ void init_pfr_authentication(struct pfr_authentication *pfr_authentication)
 	pfr_authentication->block1_csk_block0_entry_verify = intel_block1_csk_block0_entry_verify;
 	pfr_authentication->block1_block0_entry_verify = intel_block1_block0_entry_verify;
 	pfr_authentication->block0_verify = intel_block0_verify;
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	pfr_authentication->fvms_verify = intel_fvms_verify;
+	pfr_authentication->fvm_verify = intel_fvm_verify;
+#endif
 }
+
+/**
+ * Verify if the manifest is valid.
+ *
+ * @param manifest The manifest to validate.
+ * @param hash The hash engine to use for validation.
+ * @param verification Verification instance to use to verify the manifest signature.
+ * @param hash_out Optional output buffer for manifest hash calculated during verification.  A
+ * validation error does not necessarily mean the hash output is not valid.  If the manifest
+ * hash was not calculated, this buffer will be cleared.  Set this to null to not return the
+ * manifest hash.
+ * @param hash_length Length of the hash output buffer.
+ *
+ * @return 0 if the manifest is valid or an error code.
+ */
+int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
+		    struct signature_verification *verification, uint8_t *hash_out,
+		    size_t hash_length)
+{
+	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
+}
+#endif // CONFIG_INTEL_PFR

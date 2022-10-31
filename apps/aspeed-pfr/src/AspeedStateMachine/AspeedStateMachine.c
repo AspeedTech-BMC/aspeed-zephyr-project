@@ -9,14 +9,23 @@
 #include <logging/log.h>
 #include <logging/log_ctrl.h>
 #include <drivers/i2c/pfr/swmbx.h>
+#include <drivers/i2c/pfr/i2c_filter.h>
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include <drivers/flash.h>
 
 #include "AspeedStateMachine.h"
 #include "include/SmbusMailBoxCom.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
+#include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_update.h"
-#include "imageRecovery/image_recovery.h"
+#include "intel_pfr/intel_pfr_verification.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "cerberus_pfr/cerberus_pfr_update.h"
+#include "cerberus_pfr/cerberus_pfr_spi_filtering.h"
+#endif
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "pfr/pfr_util.h"
@@ -33,12 +42,27 @@
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 
+#define MAX_UPD_FAILED_ALLOWED 10
+
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
 K_FIFO_DEFINE(aspeed_sm_fifo);
 struct smf_context s_obj;
 static const struct smf_state state_table[];
 
 enum aspeed_pfr_event event_log[128] = {START_STATE_MACHINE};
+
+enum {
+		BmcOnlyReset = 1,
+		PchOnlyReset,
+};
+
+static uint8_t last_bmc_active_verify_status = Failure;
+static uint8_t last_bmc_recovery_verify_status = Failure;
+static uint8_t last_pch_active_verify_status = Failure;
+static uint8_t last_pch_recovery_verify_status = Failure;
+
+static bool reset_from_unprovision_state = false;
+
 size_t event_log_idx = 0;
 
 extern enum boot_indicator get_boot_indicator(void);
@@ -71,7 +95,6 @@ void do_init(void *o)
 	spim_irq_init();
 
 	// DEBUG_HALT();
-	pfr_bmc_srst_enable_ctrl(true);
 	BMCBootHold();
 	PCHBootHold();
 
@@ -101,7 +124,7 @@ void do_init(void *o)
 		GenerateStateMachineEvent(INIT_ROT_SECONDARY_BOOTED, NULL);
 	} else {
 		/* ABR primary booted */
-#if SMBUS_MAILBOX_SUPPORT
+#if defined(CONFIG_PFR_SW_MAILBOX)
 		InitializeSmbusMailbox();
 #endif
 
@@ -119,27 +142,132 @@ void do_init(void *o)
 
 void enter_tmin1(void *o)
 {
-	ARG_UNUSED(o);
+	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
+	bool bmc_reset_only = false;
+	bool pch_reset_only = false;
+
 	LOG_DBG("Start");
+	if (evt_ctx->data.bit8[0] == BmcUpdateIntent) {
+		LogLastPanic(BMC_UPDATE_INTENT);
+		if (!(update_region & ExceptBmcActiveUpdate) &&
+				update_region & BmcActiveUpdate)
+			bmc_reset_only = true;
+	} else if (evt_ctx->data.bit8[0] == PchUpdateIntent) {
+		LogLastPanic(PCH_UPDATE_INTENT);
+		if (!(update_region & ExceptPchActiveUpdate) &&
+				update_region & PchActiveUpdate)
+			pch_reset_only = true;
+	} else if (evt_ctx->event == RESET_DETECTED) {
+		LogLastPanic(BMC_RESET_DETECT);
+		if (reset_from_unprovision_state) {
+			reset_from_unprovision_state = false;
+			if (!(GetUfmStatusValue() & UFM_PROVISIONED))
+				bmc_reset_only = true;
+		} else {
+				bmc_reset_only = true;
+		}
+	}
+
+	if (bmc_reset_only) {
+		BMCBootHold();
+		evt_ctx->data.bit8[2] = BmcOnlyReset;
+	} else if (pch_reset_only) {
+		PCHBootHold();
+		evt_ctx->data.bit8[2] = PchOnlyReset;
+	} else {
+		evt_ctx->data.bit8[2] = 0;
+		BMCBootHold();
+		PCHBootHold();
+	}
+
 	SetPlatformState(ENTER_T_MINUS_1);
-	/* TODO: BMC only reset */
-	BMCBootHold();
-	PCHBootHold();
 	LOG_DBG("End");
 }
 
-void handle_image_verification(void *o)
+void verify_image(uint32_t image, uint32_t operation, uint32_t flash, struct smf_context *state)
 {
-	struct smf_context *state = (struct smf_context *)o;
-	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+	EVENT_CONTEXT evt_wrap;
 	int ret;
 
+	evt_wrap.image = image;
+	evt_wrap.operation = operation;
+	evt_wrap.flash = flash;
 
+	ret = authentication_image(NULL, &evt_wrap);
+	if (image == BMC_EVENT) {
+		if (operation == VERIFY_ACTIVE) {
+			LOG_INF("authentication_image bmc active return %d", ret);
+			state->bmc_active_object.ActiveImageStatus = ret ? Failure : Success;
+		} else if (operation == VERIFY_BACKUP) {
+			LOG_INF("authentication_image bmc backup return %d", ret);
+			state->bmc_active_object.RecoveryImageStatus = ret ? Failure : Success;
+		}
+	} else if (image == PCH_EVENT) {
+		if (operation == VERIFY_ACTIVE) {
+			LOG_INF("authentication_image host active return %d", ret);
+			state->pch_active_object.ActiveImageStatus = ret ? Failure : Success;
+		} else if (operation == VERIFY_BACKUP) {
+			LOG_INF("authentication_image host backup return %d", ret);
+			state->pch_active_object.RecoveryImageStatus = ret ? Failure : Success;
+		}
+	}
+}
+
+#if defined(CONFIG_PIT_PROTECTION)
+void handle_pit_event(void *o)
+{
+	uint8_t provision_state = GetUfmStatusValue();
+	uint32_t UfmStatus;
+
+	if (!(provision_state & UFM_PROVISIONED))
+		return;
+
+	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_HASH_STORED_BIT_MASK) ||
+			CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_PASSED_BIT_MASK))
+		return;
+
+	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PIT_L2_ENABLE_BIT_MASK))
+		GenerateStateMachineEvent(SEAL_FIRMWARE, NULL);
+}
+
+int handle_pit_verification(void *o)
+{
 	byte provision_state = GetUfmStatusValue();
 
 	if (!(provision_state & UFM_PROVISIONED)) {
 		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
 		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
+		return Failure;
+	} else {
+		if (intel_pfr_pit_level1_verify()) {
+			// lockdown
+			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+			return Failure;
+		}
+		if (intel_pfr_pit_level2_verify()) {
+			// lockdown
+			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+			return Failure;
+		}
+	}
+
+	return Success;
+}
+#endif
+
+void handle_image_verification(void *o)
+{
+	struct smf_context *state = (struct smf_context *)o;
+	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+
+	byte provision_state = GetUfmStatusValue();
+
+	if (!(provision_state & UFM_PROVISIONED)) {
+		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
+		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, evt_ctx->data.ptr);
 	} else {
 		/* Check pending firmware update (update at reset) */
 		CPLD_STATUS cpld_update_status;
@@ -190,72 +318,60 @@ void handle_image_verification(void *o)
 				update_reset = true;
 				data.bit8[0] = BmcUpdateIntent;
 				data.bit8[1] = intent;
+				data.bit8[2] = evt_ctx->data.bit8[2];
+				data.bit8[3] = evt_ctx->data.bit8[3];
 				GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 			}
 		}
 
 		/* No pending update, verify images */
 		if (update_reset == false) {
-			/* BMC Verification */
-			SetPlatformState(BMC_FLASH_AUTH);
-			{
-				EVENT_CONTEXT evt_wrap;
+			if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
+				verify_image(BMC_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
+				verify_image(BMC_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+				state->pch_active_object.ActiveImageStatus =
+					last_pch_active_verify_status;
+				state->pch_active_object.RecoveryImageStatus =
+					last_pch_recovery_verify_status;
+			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+				verify_image(PCH_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
+				verify_image(PCH_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+				state->bmc_active_object.ActiveImageStatus =
+					last_bmc_active_verify_status;
+				state->bmc_active_object.RecoveryImageStatus =
+					last_bmc_recovery_verify_status;
+			} else {
+				/* BMC Verification */
+				SetPlatformState(BMC_FLASH_AUTH);
+				verify_image(BMC_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
+				verify_image(BMC_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
 
-				evt_wrap.image = BMC_EVENT;
-				evt_wrap.operation = VERIFY_BACKUP;
-				evt_wrap.flash = SECONDARY_FLASH_REGION;
-				ret = authentication_image(NULL, &evt_wrap);
-				LOG_INF("authentication_image bmc backup return %d", ret);
-				if (ret == 0)
-					state->bmc_active_object.RecoveryImageStatus = Success;
-				else
-					state->bmc_active_object.RecoveryImageStatus = Failure;
+				/* PCH Verification */
+				SetPlatformState(PCH_FLASH_AUTH);
+				verify_image(PCH_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
+				verify_image(PCH_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
 			}
 
-			{
-				EVENT_CONTEXT evt_wrap;
 
-				evt_wrap.image = BMC_EVENT;
-				evt_wrap.operation = VERIFY_ACTIVE;
-				evt_wrap.flash = PRIMARY_FLASH_REGION;
-				ret = authentication_image(NULL, &evt_wrap);
-				LOG_INF("authentication_image bmc active return %d", ret);
-				if (ret == 0)
-					state->bmc_active_object.ActiveImageStatus = Success;
-				else
-					state->bmc_active_object.ActiveImageStatus = Failure;
-			}
-
-			/* PCH Verification */
-			SetPlatformState(PCH_FLASH_AUTH);
-			{
-				EVENT_CONTEXT evt_wrap;
-
-				evt_wrap.image = PCH_EVENT;
-				evt_wrap.operation = VERIFY_BACKUP;
-				evt_wrap.flash = SECONDARY_FLASH_REGION;
-				ret = authentication_image(NULL, &evt_wrap);
-				LOG_INF("authentication_image host backup return %d", ret);
-				if (ret == 0)
-					state->pch_active_object.RecoveryImageStatus = Success;
-				else
-					state->pch_active_object.RecoveryImageStatus = Failure;
-			}
-
-			{
-				EVENT_CONTEXT evt_wrap;
-
-				evt_wrap.image = PCH_EVENT;
-				evt_wrap.operation = VERIFY_ACTIVE;
-				evt_wrap.flash = PRIMARY_FLASH_REGION;
-				ret = authentication_image(NULL, &evt_wrap);
-				LOG_INF("authentication_image host active return %d", ret);
-				if (ret == 0)
-					state->pch_active_object.ActiveImageStatus = Success;
-				else
-					state->pch_active_object.ActiveImageStatus = Failure;
-			}
 			/* Success = 0, Failure = 1 */
+			if (state->bmc_active_object.ActiveImageStatus) {
+				if (state->bmc_active_object.RecoveryImageStatus)
+					LogErrorCodes(BMC_AUTH_FAIL, ACTIVE_RECOVERY_AUTH_FAIL);
+				else
+					LogErrorCodes(BMC_AUTH_FAIL, ACTIVE_AUTH_FAIL);
+			} else if (state->bmc_active_object.RecoveryImageStatus) {
+				LogErrorCodes(BMC_AUTH_FAIL, RECOVERY_AUTH_FAIL);
+			}
+
+			if (state->pch_active_object.ActiveImageStatus) {
+				if (state->pch_active_object.RecoveryImageStatus)
+					LogErrorCodes(PCH_AUTH_FAIL, ACTIVE_RECOVERY_AUTH_FAIL);
+				else
+					LogErrorCodes(PCH_AUTH_FAIL, ACTIVE_AUTH_FAIL);
+			} else if (state->pch_active_object.RecoveryImageStatus) {
+				LogErrorCodes(PCH_AUTH_FAIL, RECOVERY_AUTH_FAIL);
+			}
+
 			LOG_INF("BMC image verification recovery=%s active=%s",
 					state->bmc_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->bmc_active_object.ActiveImageStatus ? "Bad" : "Good");
@@ -263,25 +379,30 @@ void handle_image_verification(void *o)
 					state->pch_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->pch_active_object.ActiveImageStatus ? "Bad" : "Good");
 
+			last_bmc_recovery_verify_status = state->bmc_active_object.RecoveryImageStatus;
+			last_bmc_active_verify_status = state->bmc_active_object.ActiveImageStatus;
+			last_pch_recovery_verify_status = state->pch_active_object.RecoveryImageStatus;
+			last_pch_active_verify_status = state->pch_active_object.ActiveImageStatus;
+
 			if (evt_ctx->event != RECOVERY_DONE) {
 				if (state->pch_active_object.ActiveImageStatus == Failure
 						|| state->bmc_active_object.ActiveImageStatus == Failure
 						|| state->pch_active_object.RecoveryImageStatus == Failure
 						|| state->bmc_active_object.RecoveryImageStatus == Failure) {
 					/* ACT/RCV region went wrong, go recovery */
-					GenerateStateMachineEvent(VERIFY_FAILED, NULL);
+					GenerateStateMachineEvent(VERIFY_FAILED, evt_ctx->data.ptr);
 				} else {
 					/* Everything good, done */
-					GenerateStateMachineEvent(VERIFY_DONE, NULL);
+					GenerateStateMachineEvent(VERIFY_DONE, evt_ctx->data.ptr);
 				}
 			} else {
 				/* Coming back from RECOVERY, relax some condition */
 				if (state->bmc_active_object.ActiveImageStatus == Success) {
 					/* If BMC is good to go, just boot the BMC. It wiil be checked by Tzero */
-					GenerateStateMachineEvent(VERIFY_DONE, NULL);
+					GenerateStateMachineEvent(VERIFY_DONE, evt_ctx->data.ptr);
 				} else {
 					/* SYSTEM LOCKDOWN */
-					GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+					GenerateStateMachineEvent(RECOVERY_FAILED, evt_ctx->data.ptr);
 				}
 			}
 		}
@@ -290,8 +411,14 @@ void handle_image_verification(void *o)
 
 void do_verify(void *o)
 {
+	int status = Success;
 	LOG_DBG("Start");
-	handle_image_verification(o);
+#if defined(CONFIG_PIT_PROTECTION)
+	status = handle_pit_verification(o);
+#endif
+	if (status == Success)
+		handle_image_verification(o);
+
 	LOG_DBG("End");
 }
 
@@ -299,13 +426,16 @@ void handle_recovery(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
 	struct event_context *evt_ctx = state->event_ctx;
+	union aspeed_event_data data;
 
 	/* Check Staging Image */
 	bool recovery_done = 0;
 	int ret;
 	EVENT_CONTEXT evt_wrap;
 
-	recovery_initialize();
+	initializeEngines();
+	initializeManifestProcessor();
+	//recovery_initialize();
 
 	/* TODO: Verify Staging? */
 	SetPlatformState(T_MINUS_1_FW_RECOVERY);
@@ -327,6 +457,7 @@ void handle_recovery(void *o)
 	case VERIFY_FAILED:
 		// Recovery matrix can be handled in recover_image
 		if (state->bmc_active_object.RecoveryImageStatus == Failure) {
+			LogRecovery(BMC_RECOVERY_FAIL);
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 
@@ -336,15 +467,22 @@ void handle_recovery(void *o)
 		}
 
 		if (state->bmc_active_object.ActiveImageStatus == Failure) {
+			if (evt_ctx->event != WDT_TIMEOUT)
+				LogRecovery(BMC_ACTIVE_FAIL);
 			evt_wrap.image = BMC_EVENT;
 			ret = recover_image(&state->bmc_active_object, &evt_wrap);
 			LOG_INF("BMC recover active region return=%d", ret);
 			if (ret == Success || ret == VerifyActive || ret == VerifyRecovery)
 				recovery_done = 1;
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
+			if (evt_ctx->event == WDT_TIMEOUT)
+				inc_recovery_level(BMC_SPI);
+#endif
 
 		}
 
 		if (state->pch_active_object.RecoveryImageStatus == Failure) {
+			LogRecovery(PCH_RECOVERY_FAIL);
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
@@ -352,18 +490,26 @@ void handle_recovery(void *o)
 		}
 
 		if (state->pch_active_object.ActiveImageStatus == Failure) {
+			if (evt_ctx->event != WDT_TIMEOUT)
+				LogRecovery(PCH_ACTIVE_FAIL);
 			evt_wrap.image = PCH_EVENT;
 			ret = recover_image(&state->pch_active_object, &evt_wrap);
 			LOG_INF("PCH Recovery return=%d", ret);
 			recovery_done = 1;
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
+			if (evt_ctx->event == WDT_TIMEOUT)
+				inc_recovery_level(PCH_SPI);
+#endif
 		}
 		break;
 	default:
 		break;
 	}
 
+	data.bit8[2] = evt_ctx->data.bit8[2];
+
 	if (recovery_done)
-		GenerateStateMachineEvent(RECOVERY_DONE, NULL);
+		GenerateStateMachineEvent(RECOVERY_DONE, data.ptr);
 	else
 		GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
 }
@@ -410,12 +556,20 @@ void enter_tzero(void *o)
 	SetPlatformState(ENTER_T0);
 
 	struct smf_context *state = (struct smf_context *)o;
+	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+
 	/* Arm reset monitor */
 	platform_monitor_init();
-#if defined(CONFIG_ASPEED_DC_SCM)
-	pfr_bmc_srst_enable_ctrl(false);
-#endif
 	if (state->ctx.current == &state_table[RUNTIME]) {
+		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
+			apply_pfm_protection(BMC_SPI);
+			BMCBootRelease();
+			goto enter_tzero_end;
+		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+			apply_pfm_protection(PCH_SPI);
+			PCHBootRelease();
+			goto enter_tzero_end;
+		}
 		/* Provisioned */
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
@@ -431,28 +585,91 @@ void enter_tzero(void *o)
 			/* Arm SPI/I2C Filter */
 			apply_pfm_protection(PCH_SPI);
 			PCHBootRelease();
-		}
-		else
+		} else
 			LOG_ERR("Host firmware is invalid, host won't boot");
 	} else {
 		/* Unprovisioned - Releasing System Reset */
-		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m1", false);
-		Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m2", false);
-		Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m3", false);
-		Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-		SPI_Monitor_Enable("spi_m4", false);
+		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
+			BMCBootRelease();
+			goto enter_tzero_end;
+		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+			PCHBootRelease();
+			goto enter_tzero_end;
+		} else {
+			if (device_get_binding("spi_m1") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m1", false);
+				LOG_INF("Bypass %s", "spi_m1");
+			}
+
+			if (device_get_binding("spi_m2") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m2", false);
+				LOG_INF("Bypass %s", "spi_m2");
+			}
+
+			if (device_get_binding("spi_m3") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m3", false);
+				LOG_INF("Bypass %s", "spi_m3");
+			}
+
+			if (device_get_binding("spi_m4") != NULL) {
+				Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+				SPI_Monitor_Enable("spi_m4", false);
+				LOG_INF("Bypass %s", "spi_m4");
+			}
+		}
+
+		/* Releasing I2C Filter */
+		const struct device *dev = NULL;
+		if ((dev = device_get_binding("I2C_FILTER_0")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+
+		if ((dev = device_get_binding("I2C_FILTER_1")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+
+		if ((dev = device_get_binding("I2C_FILTER_2")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+
+		if ((dev = device_get_binding("I2C_FILTER_3")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
+
+		if ((dev = device_get_binding("I2C_FILTER_4")) != NULL) {
+			ast_i2c_filter_init(dev);
+			ast_i2c_filter_en(dev, true, false, false, false);
+			LOG_INF("Bypass %s", dev->name);
+		}
 
 		BMCBootRelease();
 		PCHBootRelease();
 	}
 
+enter_tzero_end:
 	LOG_DBG("End");
 }
 
@@ -500,6 +717,24 @@ void handle_provision_event(void *o)
 	}
 }
 
+#if defined(CONFIG_CERBERUS_PFR)
+void handle_provision_image(void *o)
+{
+	LOG_INF("Handle Provision Image");
+	AO_DATA *ao_data_wrap = NULL;
+	EVENT_CONTEXT evt_ctx_wrap;
+	uint32_t image_type = ROT_TYPE;
+	int ret;
+
+	const struct device *dev_m = device_get_binding(BMC_SPI_MONITOR);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+
+	LOG_INF("Provision result = %d", ret);
+}
+#endif
+
 void handle_checkpoint(void *o)
 {
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
@@ -532,8 +767,9 @@ void handle_update_requested(void *o)
 	AO_DATA *ao_data_wrap = NULL;
 	EVENT_CONTEXT evt_ctx_wrap;
 	int ret;
-	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
+	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	CPLD_STATUS cpld_update_status;
+
 
 	LOG_DBG("FIRMWARE_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
@@ -541,6 +777,8 @@ void handle_update_requested(void *o)
 	case PchUpdateIntent:
 		/* CPU/PCH only has access to bit[7:6] and bit[1:0] */
 		update_region &= UpdateAtReset | DymanicUpdate | PchRecoveryUpdate | PchActiveUpdate;
+		if (!update_region)
+			LogUpdateFailure(INVALID_UPD_INTENT, 0);
 		break;
 	case BmcUpdateIntent:
 		/* BMC has full access */
@@ -555,7 +793,7 @@ void handle_update_requested(void *o)
 	}
 
 	/* Immediate Update */
-	uint32_t handled_region = 0;
+	uint8_t handled_region = 0;
 
 	while (update_region) {
 		uint32_t image_type = 0xFFFFFFFF;
@@ -566,6 +804,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(BMC_FW_UPDATE);
 				LOG_INF("BMC Active Firmware Update");
 				image_type = BMC_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 				update_region &= ~BmcActiveUpdate;
 				handled_region |= BmcActiveUpdate;
@@ -578,6 +817,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(BMC_FW_UPDATE);
 				LOG_INF("BMC Recovery Firmware Update");
 				image_type = BMC_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
 				update_region &= ~BmcRecoveryUpdate;
 				handled_region |= BmcRecoveryUpdate;
@@ -590,6 +830,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(PCH_FW_UPDATE);
 				LOG_INF("PCH Active Firmware Update");
 				image_type = PCH_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 				update_region &= ~PchActiveUpdate;
 				handled_region |= PchActiveUpdate;
@@ -602,6 +843,7 @@ void handle_update_requested(void *o)
 				SetPlatformState(PCH_FW_UPDATE);
 				LOG_INF("PCH Recovery Firmware Update");
 				image_type = PCH_TYPE;
+				evt_ctx_wrap.flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 				evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
 				update_region &= ~PchRecoveryUpdate;
 				handled_region |= PchRecoveryUpdate;
@@ -634,18 +876,114 @@ void handle_update_requested(void *o)
 		if (image_type != 0xFFFFFFFF)
 			ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
 
+		evt_ctx->data.bit8[3] = handled_region;
+
 		if (ret != Success) {
 			/* TODO: Log failed reason and handle it properly */
-			GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
+			GenerateStateMachineEvent(UPDATE_FAILED, evt_ctx->data.ptr);
 			break;
 		}
 	}
 
 	if (update_region == 0 && ret == Success)
-		GenerateStateMachineEvent(UPDATE_DONE, (void *)handled_region);
+		GenerateStateMachineEvent(UPDATE_DONE, evt_ctx->data.ptr);
 	else
-		GenerateStateMachineEvent(UPDATE_FAILED, (void *)handled_region);
+		GenerateStateMachineEvent(UPDATE_FAILED, evt_ctx->data.ptr);
 }
+
+#if defined(CONFIG_SEAMLESS_UPDATE)
+void handle_seamless_update_requested(void *o)
+{
+	struct smf_context *state = (struct smf_context *)o;
+	struct event_context *evt_ctx = state->event_ctx;
+	AO_DATA *ao_data_wrap = NULL;
+	EVENT_CONTEXT evt_ctx_wrap;
+	int ret;
+	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
+	CPLD_STATUS cpld_update_status;
+
+	LOG_DBG("SEAMLESS_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
+
+	switch (evt_ctx->data.bit8[0]) {
+		case PchSeamlessUpdateIntent:
+			update_region &= PchFvSeamlessUpdate;
+			break;
+		case BmcSeamlessUpdateIntent:
+			update_region &= PchFvSeamlessUpdate;
+			ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			cpld_update_status.BmcToPchStatus = 1;
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+			/* TODO: AFM update */
+			//update_region &= PchFvSeamlessUpdate | AfmActiveAndRecoveryUpdate;
+			break;
+		default:
+			break;
+	}
+
+	/* Immediate Update */
+	uint32_t handled_region = 0;
+
+	while (update_region) {
+		uint32_t image_type = 0xFFFFFFFF;
+		do {
+			/* PCH Seamless */
+			if (update_region & PchFvSeamlessUpdate) {
+				LOG_INF("PCH Seamless Update");
+				evt_ctx_wrap.operation = SEAMLESS_UPDATE_OP;
+				SetPlatformState(PCH_SEAMLESS_UPDATE);
+				image_type = PCH_TYPE;
+				update_region &= ~PchFvSeamlessUpdate;
+				handled_region |= PchFvSeamlessUpdate;
+				break;
+			}
+			/*TODO : AFM update */
+		} while (0);
+
+		if (evt_ctx_wrap.operation == SEAMLESS_UPDATE_OP) {
+			ret = perform_seamless_update(image_type, ao_data_wrap, &evt_ctx_wrap);
+			SetPlatformState(PCH_SEAMLESS_UPDATE_DONE);
+			if (ret != Success)
+				GenerateStateMachineEvent(SEAMLESS_UPDATE_FAILED, (void *)handled_region);
+			else
+				GenerateStateMachineEvent(SEAMLESS_UPDATE_DONE, (void *)handled_region);
+		}
+	}
+}
+
+void handle_seamless_update_verification(void *o)
+{
+	const struct device *dev_m = NULL;
+	int ret;
+
+	EVENT_CONTEXT evt_wrap;
+
+	evt_wrap.image = PCH_EVENT;
+	evt_wrap.operation = VERIFY_ACTIVE;
+	evt_wrap.flash = PRIMARY_FLASH_REGION;
+
+	LOG_INF("Switch PCH SPI MUX to ROT");
+	dev_m = device_get_binding(PCH_SPI_MONITOR);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+
+	ret = authentication_image(NULL, &evt_wrap);
+
+
+	LOG_INF("authentication_image host active return %d", ret);
+
+	if (ret == 0) {
+		LOG_INF("Applying PCH SPI Region protection");
+		apply_pfm_protection(PCH_SPI);
+		GenerateStateMachineEvent(SEAMLESS_VERIFY_DONE, NULL);
+	}
+	else {
+		LogUpdateFailure(SEAMLESS_AUTH_FAILED_AFTER_UPDATE, 0);
+		GenerateStateMachineEvent(SEAMLESS_VERIFY_FAILED, NULL);
+	}
+
+	LOG_INF("Switch PCH SPI MUX to PCH");
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+}
+#endif
 
 void do_unprovisioned(void *o)
 {
@@ -653,8 +991,16 @@ void do_unprovisioned(void *o)
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 
 	switch (evt_ctx->event) {
+#if defined(CONFIG_CERBERUS_PFR)
+	case UPDATE_REQUESTED:
+		handle_provision_image(o);
+		break;
+#endif
 	case PROVISION_CMD:
 		handle_provision_event(o);
+#if defined(CONFIG_PIT_PROTECTION)
+		handle_pit_event(o);
+#endif
 		break;
 	default:
 		break;
@@ -665,14 +1011,35 @@ void do_unprovisioned(void *o)
 
 void enter_runtime(void *o)
 {
-	ARG_UNUSED(o);
 	LOG_DBG("Start");
+	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
+	switch (evt_ctx->event) {
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		case SEAMLESS_UPDATE_DONE:
+		case SEAMLESS_UPDATE_FAILED:
+		case SEAMLESS_VERIFY_DONE:
+		case SEAMLESS_VERIFY_FAILED:
+			break;
+#endif
+		default:
+			if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
-	AspeedPFR_EnableTimer(BMC_EVENT);
+				AspeedPFR_EnableTimer(BMC_EVENT);
+#endif
+			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+				AspeedPFR_EnableTimer(PCH_EVENT);
+#endif
+			} else {
+#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
+				AspeedPFR_EnableTimer(BMC_EVENT);
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
-	AspeedPFR_EnableTimer(PCH_EVENT);
+				AspeedPFR_EnableTimer(PCH_EVENT);
 #endif
+			}
+			break;
+	}
 	LOG_DBG("End");
 }
 
@@ -722,6 +1089,9 @@ void do_runtime(void *o)
 	switch (evt_ctx->event) {
 	case PROVISION_CMD:
 		handle_provision_event(o);
+#if defined(CONFIG_PIT_PROTECTION)
+		handle_pit_event(o);
+#endif
 		break;
 	case WDT_CHECKPOINT:
 		handle_checkpoint(o);
@@ -742,11 +1112,26 @@ void do_update(void *o)
 	LOG_DBG("End");
 }
 
+#if defined(CONFIG_SEAMLESS_UPDATE)
+void do_seamless_update(void *o)
+{
+	LOG_DBG("Start");
+	handle_seamless_update_requested(o);
+	LOG_DBG("End");
+}
+
+void do_seamless_verify(void *o)
+{
+	LOG_DBG("Start");
+	handle_seamless_update_verification(o);
+	LOG_DBG("End");
+}
+#endif
+
 void enter_lockdown(void *o)
 {
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
-	pfr_bmc_srst_enable_ctrl(false);
 	BMCBootHold();
 	PCHBootHold();
 	SetPlatformState(LOCKDOWN_ON_AUTH_FAIL);
@@ -781,7 +1166,10 @@ static const struct smf_state state_table[] = {
 	[TZERO] = SMF_CREATE_STATE(enter_tzero, NULL, exit_tzero, NULL),
 	[UNPROVISIONED] = SMF_CREATE_STATE(NULL, do_unprovisioned, NULL, &state_table[TZERO]),
 	[RUNTIME] = SMF_CREATE_STATE(enter_runtime, do_runtime, NULL, &state_table[TZERO]),
-	// [SEAMLESS_UPDATE] = SMF_CREATE_STATE(NULL, do_seamless, NULL, NULL, &state_table[TZERO]),
+#if defined(CONFIG_SEAMLESS_UPDATE)
+	[SEAMLESS_UPDATE] = SMF_CREATE_STATE(NULL, do_seamless_update, NULL, &state_table[TZERO]),
+	[SEAMLESS_VERIFY] = SMF_CREATE_STATE(NULL, do_seamless_verify, NULL, &state_table[TZERO]),
+#endif
 	[SYSTEM_LOCKDOWN] = SMF_CREATE_STATE(NULL, do_lockdown, NULL, NULL),
 	[SYSTEM_REBOOT] = SMF_CREATE_STATE(NULL, do_reboot, NULL, NULL),
 };
@@ -873,7 +1261,9 @@ void AspeedStateMachine(void)
 		} else if (current_state == &state_table[FIRMWARE_UPDATE]) {
 			switch (fifo_in->event) {
 			case UPDATE_DONE:
-				if (fifo_in->data.bit32 & HROTActiveUpdate) {
+				ClearUpdateFailure();
+
+				if (fifo_in->data.bit8[3] & HROTActiveUpdate) {
 					/* Update PFR requires reboot platform */
 					next_state = &state_table[SYSTEM_REBOOT];
 				} else {
@@ -890,16 +1280,29 @@ void AspeedStateMachine(void)
 		} else if (current_state == &state_table[RUNTIME]) {
 			switch (fifo_in->event) {
 			case RESET_DETECTED:
+#if defined(CONFIG_PIT_PROTECTION)
+			case SEAL_FIRMWARE:
+#endif
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;
 			case UPDATE_REQUESTED:
+				if (getFailedUpdateAttemptsCount() >= MAX_UPD_FAILED_ALLOWED) {
+					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
+					break;
+				}
 				/* Check update intent, seamless or tmin1 update */
-				if (fifo_in->data.bit8[1] & UpdateAtReset) {
-					/* Update at reset, just set the status and don't go Tmin1 */
-					run_state = true;
+				if (fifo_in->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate) {
+					if (fifo_in->data.bit8[1] & UpdateAtReset) {
+						/* Update at reset, just set the status and don't go Tmin1 */
+						run_state = true;
+					} else {
+						/* Immediate update */
+						next_state = &state_table[FIRMWARE_UPDATE];
+					}
 				} else {
-					/* Immediate update */
-					next_state = &state_table[FIRMWARE_UPDATE];
+					/* Discard the request */
+					LOG_ERR("UPDATE_INTENT %02x without any target (PCH/BMC/PFR), skipped",
+							fifo_in->data.bit8[1]);
 				}
 				break;
 			case PROVISION_CMD:
@@ -917,6 +1320,15 @@ void AspeedStateMachine(void)
 					next_state = &state_table[FIRMWARE_RECOVERY];
 #endif
 				break;
+#if defined(CONFIG_SEAMLESS_UPDATE)
+			case SEAMLESS_UPDATE_REQUESTED:
+				if (getFailedUpdateAttemptsCount() >= MAX_UPD_FAILED_ALLOWED) {
+					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
+					break;
+				}
+				next_state = &state_table[SEAMLESS_UPDATE];
+				break;
+#endif
 			default:
 				break;
 			}
@@ -926,14 +1338,55 @@ void AspeedStateMachine(void)
 				// Just run provision handling
 				run_state = true;
 				break;
+#if defined(CONFIG_CERBERUS_PFR)
+			case UPDATE_REQUESTED:
+				// Only accept for provisioning capsule
+				if (fifo_in->data.bit8[1] & HROTActiveUpdate) {
+					run_state = true;
+					// next_state = &state_table[FIRMWARE_UPDATE];
+				}
+				break;
+#endif
 			case RESET_DETECTED:
+				reset_from_unprovision_state = true;
+#if defined(CONFIG_PIT_PROTECTION)
+			case SEAL_FIRMWARE:
+#endif
 				next_state = &state_table[FIRMWARE_VERIFY];
 				break;
 			default:
 				break;
 			}
 		}
+#if defined(CONFIG_SEAMLESS_UPDATE)
+		else if (current_state == &state_table[SEAMLESS_UPDATE]) {
+			switch (fifo_in->event) {
+				case SEAMLESS_UPDATE_DONE:
+					ClearUpdateFailure();
+					next_state = &state_table[SEAMLESS_VERIFY];
+					break;
+				case SEAMLESS_UPDATE_FAILED:
+					// Skip verification, firmware will be recovered in
+					// the next bootup.
+					LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+					next_state = &state_table[RUNTIME];
+					break;
+				default:
+					break;
+			}
 
+		} else if (current_state == &state_table[SEAMLESS_VERIFY]) {
+			next_state = &state_table[RUNTIME];
+			switch (fifo_in->event) {
+				case SEAMLESS_VERIFY_DONE:
+				case SEAMLESS_VERIFY_FAILED:
+					next_state = &state_table[RUNTIME];
+					break;
+				default:
+					break;
+			}
+		}
+#endif
 		if (next_state)
 			smf_set_state(SMF_CTX(&s_obj), next_state);
 

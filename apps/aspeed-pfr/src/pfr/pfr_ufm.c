@@ -7,7 +7,12 @@
 #include "common/common.h"
 #include "flash/flash_wrapper.h"
 #include "AspeedStateMachine/common_smc.h"
+#if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#endif
 #include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
@@ -18,7 +23,7 @@ int get_cpld_status(uint8_t *data, uint32_t data_length)
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
-	status = spi_flash->spi.base.read(&spi_flash->spi, 0, data, data_length);
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, data, data_length);
 
 	return Success;
 }
@@ -31,7 +36,7 @@ int set_cpld_status(uint8_t *data, uint32_t data_length)
 
 	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
 	status = pfr_spi_erase_4k(ROT_INTERNAL_STATE, 0);
-	status = spi_flash->spi.base.write(&spi_flash->spi, 0, data, data_length);
+	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, 0, data, data_length);
 
 	return Success;
 }

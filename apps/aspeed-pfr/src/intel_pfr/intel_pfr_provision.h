@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "intel_pfr_verification.h"
 
@@ -26,16 +27,16 @@ enum {
 	BMC_STAGING_REGION_OFFSET                               = 0x048,
 	PIT_PASSWORD                                            = 0x04c,
 	PIT_PCH_FW_HASH                                         = 0x054,
-	PIT_BMC_FW_HASH                                         = 0x074,
-	SVN_POLICY_FOR_CPLD_UPDATE                              = 0x094,
-	SVN_POLICY_FOR_PCH_FW_UPDATE                            = 0x09c,
-	SVN_POLICY_FOR_BMC_FW_UPDATE                            = 0x0a4,
-	KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_PFM             = 0x0ac,
-	KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_UPDATE_CAPSULE  = 0x0bc,
-	KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_PFM             = 0x0cc,
-	KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_UPDATE_CAPSULE  = 0x0dc,
-	KEY_CANCELLATION_POLICY_FOR_SIGNING_CPLD_UPDATE_CAPSULE = 0x0ec
+	PIT_BMC_FW_HASH                                         = 0x094,
+	SVN_POLICY_FOR_CPLD_UPDATE                              = 0x0d4,
+	SVN_POLICY_FOR_PCH_FW_UPDATE                            = 0x0dc,
+	SVN_POLICY_FOR_BMC_FW_UPDATE                            = 0x0e4,
+	KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_PFM             = 0x0ec,
+	KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_UPDATE_CAPSULE  = 0x0fc,
+	KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_PFM             = 0x10c,
+	KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_UPDATE_CAPSULE  = 0x11c,
+	KEY_CANCELLATION_POLICY_FOR_SIGNING_CPLD_UPDATE_CAPSULE = 0x12c
 };
 
 int verify_root_key_entry(struct pfr_manifest *manifest, PFR_AUTHENTICATION_BLOCK1 *block1_buffer);
-
+#endif
