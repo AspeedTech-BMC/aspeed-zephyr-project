@@ -19,6 +19,7 @@ if (CONFIG_HROT_HAL)
 	    ${HROT_MIDDLEWARE_ROOT}/crypto/hash_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/crypto/rsa_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/crypto/ecdsa_aspeed.c
+	    ${HROT_MIDDLEWARE_ROOT}/i2c/hal_i2c.c
 	    ${HROT_MIDDLEWARE_ROOT}/i2c/i2c_filter_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/watchdog/watchdog_aspeed.c
 	    # ${HROT_MIDDLEWARE_ROOT}/otp/otp_aspeed.c
