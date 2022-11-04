@@ -190,12 +190,12 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 	if (status != Success)
 		return Failure;
 
-	// Block1verifcation
+	// Block1 Verification
 	status = pfr_manifest->pfr_authentication->block1_verify(pfr_manifest);
 	if (status != Success)
 		return status;
 
-	// Block0Verification
+	// Block0 Verification
 	status = pfr_manifest->pfr_authentication->block0_verify(pfr_manifest);
 	if (status != Success)
 		return Failure;

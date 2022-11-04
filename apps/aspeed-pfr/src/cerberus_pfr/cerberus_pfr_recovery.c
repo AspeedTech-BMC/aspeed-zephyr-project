@@ -214,7 +214,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address = source_address;
 	manifest->flash_id = BMC_FLASH_ID;
 
-	LOG_INF("BMC's PCH Staging Area verfication");
+	LOG_INF("BMC's PCH Staging Area verification");
 	status = cerberus_pfr_verify_image(manifest);
 	if (status != Success) {
 		LOG_ERR("verify failed");

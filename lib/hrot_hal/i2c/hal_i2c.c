@@ -192,7 +192,7 @@ void i2c_scan(uint8_t bus, uint8_t *target_addr, uint8_t *target_addr_len)
 		return;
 	}
 
-	if (target_addr == NULL) {
+	if (target_addr_len == NULL) {
 		LOG_DBG("Parameter \"target_addr_len\" passed in as NULL");
 		return;
 	}

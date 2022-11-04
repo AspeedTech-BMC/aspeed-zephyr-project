@@ -167,7 +167,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
 
-	LOG_INF("BMC's PCH Staging Area verfication");
+	LOG_INF("BMC's PCH Staging Area verification");
 	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,

@@ -537,11 +537,11 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return ast1060_update(pfr_manifest);
 
 	// Staging area verification
-	LOG_INF("Staging Area verfication");
+	LOG_INF("Staging Area verification");
 	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
 			NULL, NULL);
 	if (status != Success) {
-		LOG_ERR("Staging Area verfication failed");
+		LOG_ERR("Staging Area verification failed");
 		if (flash_select == PRIMARY_FLASH_REGION) {
 			// Log failure for the case of active region update.
 			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
@@ -711,11 +711,11 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 
 	pfr_manifest->address = source_address;
 	// Staging area verification
-	LOG_INF("Staging Area verfication");
+	LOG_INF("Staging Area verification");
 	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
 			NULL, NULL);
 	if (status != Success) {
-		LOG_ERR("Staging Area verfication failed");
+		LOG_ERR("Staging Area verification failed");
 		goto release_pch_mux;
 	}
 
