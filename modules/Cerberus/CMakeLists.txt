@@ -190,7 +190,22 @@ if (CONFIG_CERBERUS)
 		# ${CERBERUS_CORE_DIR}/tpm/tpm.c
 	)
 
+	if (CONFIG_CERBERUS_MCTP)
+		zephyr_library_sources(
+			${CERBERUS_CORE_DIR}/cmd_interface/cmd_channel.c
+			${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface.c
+			${CERBERUS_CORE_DIR}/cmd_interface/device_manager.c
+			${CERBERUS_CORE_DIR}/common/observable.c
+			${CERBERUS_CORE_DIR}/crypto/checksum.c
+			${CERBERUS_CORE_DIR}/mctp/cmd_interface_mctp_control.c
+			${CERBERUS_CORE_DIR}/mctp/mctp_base_protocol.c
+			${CERBERUS_CORE_DIR}/mctp/mctp_control_protocol_commands.c
+			${CERBERUS_CORE_DIR}/mctp/mctp_interface.c
+		)
+	endif ()
+
 	zephyr_compile_definitions(
+		CMD_ENABLE_ISSUE_REQUEST
 		ENABLE_DEBUG_COMMANDS
 		ECC_ENABLE_GENERATE_KEY_PAIR
 		ECC_ENABLE_ECDH

@@ -5,6 +5,9 @@ config CERBERUS
 	bool "Cerberus support"
 
 if CERBERUS
-
-
+	config CERBERUS_MCTP
+	default n
+	bool "Cerberus MCTP support"
+	help
+	Enable Cerberus MCTP protocol support.
 endif
