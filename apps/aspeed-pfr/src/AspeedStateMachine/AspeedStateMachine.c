@@ -42,6 +42,10 @@
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
 
+#if defined(CONFIG_PFR_MCTP)
+#include "mctp/mctp.h"
+#endif
+
 #define MAX_UPD_FAILED_ALLOWED 10
 
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
@@ -127,7 +131,9 @@ void do_init(void *o)
 #if defined(CONFIG_PFR_SW_MAILBOX)
 		InitializeSmbusMailbox();
 #endif
-
+#if defined(CONFIG_PFR_MCTP)
+		init_pfr_mctp();
+#endif
 		SetPlatformState(CPLD_NIOS_II_PROCESSOR_WAITING_TO_START);
 #if defined(CONFIG_INIT_POWER_SEQUENCE)
 		LOG_INF("Wait for power sequence");

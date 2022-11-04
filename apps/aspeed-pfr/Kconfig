@@ -178,4 +178,12 @@ config PFR_SW_MAILBOX
         help
           Enable SW mailbox support.
 
+config PFR_MCTP
+	depends on CERBERUS
+	depends on CERBERUS_MCTP
+	default n
+	bool "PFR MCTP support"
+	help
+	  Enable PFR MCTP support.
+
 source "Kconfig.zephyr"
