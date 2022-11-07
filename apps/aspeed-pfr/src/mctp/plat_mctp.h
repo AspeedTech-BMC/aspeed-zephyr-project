@@ -7,6 +7,7 @@
 #pragma once
 
 #if defined(CONFIG_PFR_MCTP)
+#include "mctp_utils.h"
 
 typedef struct _mctp_smbus_port {
 	mctp *mctp_inst;

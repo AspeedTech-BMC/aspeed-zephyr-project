@@ -9,6 +9,7 @@
 #if defined(CONFIG_PFR_MCTP)
 #include <stdint.h>
 #include <zephyr.h>
+#include <device.h>
 #include "mctp/mctp_interface_wrapper.h"
 #include "cmd_interface/cmd_channel.h"
 

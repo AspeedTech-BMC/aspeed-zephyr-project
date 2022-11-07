@@ -6,7 +6,9 @@
 
 #if defined(CONFIG_PFR_MCTP)
 #include <zephyr.h>
+#include <device.h>
 #include <logging/log.h>
+#include <drivers/i2c/pfr/swmbx.h>
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "cmd_interface/cmd_channel.h"
 #include "i2c/hal_i2c.h"
