@@ -46,7 +46,7 @@ int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uin
 			0x1414, 0x04);
 	if (status != 0) {
 		LOG_ERR("mctp control command interface init failed");
-		return status;
+		goto error_device_mgr;
 	}
 
 	// TODO: if wants to fully support cerberus system commands,
@@ -60,10 +60,17 @@ int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uin
 			&mctp_wrapper->cmd_mctp_control.base, &mctp_wrapper->device_mgr);
 	if (status != 0) {
 		LOG_ERR("mctp interface init failed");
-		return status;
+		goto error_cmd_interface;
 	}
 
 	return 0;
+
+error_cmd_interface:
+	cmd_interface_mctp_control_deinit(&mctp_wrapper->cmd_mctp_control);
+error_device_mgr:
+	device_manager_release(&mctp_wrapper->device_mgr);
+
+	return status;
 }
 
 void mctp_interface_wrapper_deinit(struct mctp_interface_wrapper *mctp_wrapper)

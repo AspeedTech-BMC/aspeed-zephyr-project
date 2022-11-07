@@ -16,9 +16,8 @@
 #define MCTP_ERROR 1
 
 #define MCTP_TX_QUEUE_SIZE 16
-#define MCTP_RX_QUEUE_SIZE 16
-#define MCTP_RX_TASK_STACK_SIZE 4096
-#define MCTP_TX_TASK_STACK_SIZE 1024
+#define MCTP_RX_TASK_STACK_SIZE 2048
+#define MCTP_TX_TASK_STACK_SIZE 2048
 #define MCTP_TASK_NAME_LEN 32
 
 typedef enum {
@@ -49,6 +48,7 @@ typedef uint16_t (*medium_rx)(void *mctp_p, void *msg_p);
 typedef struct _mctp_smbus_conf {
 	uint8_t bus;
 	uint8_t rot_addr;
+	uint8_t mbx_port;
 } mctp_smbus_conf;
 
 /* mctp medium conf */
@@ -86,13 +86,18 @@ typedef struct _mctp {
 
 	/* queue */
 	struct k_msgq mctp_tx_queue;
-	struct k_msgq mctp_rx_queue;
 
 	/* interface */
 	struct mctp_interface_wrapper mctp_wrapper;
 
 	/* command channel */
 	struct cmd_channel mctp_cmd_channel;
+
+	/* semaphore */
+	struct k_sem rx_fifo_in_data_sem;
+
+	/* sw mailbox device */
+	const struct device *sw_mbx_dev;
 } mctp;
 
 /* public function */
@@ -110,8 +115,9 @@ uint8_t mctp_start(mctp *mctp_inst);
 /* mctp service stop */
 uint8_t mctp_stop(mctp *mctp_inst);
 
-/* send message to destination endpoint */
+/* send/receive message to destination endpoint */
 uint8_t mctp_send_msg(mctp *mctp_inst, struct cmd_packet *packet);
+uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet);
 
 /* medium init/deinit */
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);

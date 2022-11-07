@@ -23,21 +23,24 @@ static uint8_t set_thread_name(mctp *mctp_inst)
 	    mctp_inst->medium_type >= MCTP_MEDIUM_TYPE_MAX)
 		return MCTP_ERROR;
 
+	uint8_t ret = MCTP_ERROR;
+
 	switch (mctp_inst->medium_type) {
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		LOG_INF("medium_type: smbus");
 		mctp_smbus_conf *smbus_conf = (mctp_smbus_conf *)&mctp_inst->medium_conf;
 
 		snprintf(mctp_inst->mctp_rx_task_name, sizeof(mctp_inst->mctp_rx_task_name),
-			 "mctprx_%02x_%02x", mctp_inst->medium_type, smbus_conf->bus);
+			 "mctprx_%02x_%02x_%02x", mctp_inst->medium_type, smbus_conf->bus, smbus_conf->rot_addr);
 		snprintf(mctp_inst->mctp_tx_task_name, sizeof(mctp_inst->mctp_tx_task_name),
 			 "mctptx_%02x_%02x", mctp_inst->medium_type, smbus_conf->bus);
+		ret = MCTP_SUCCESS;
 		break;
 	default:
-		return MCTP_ERROR;
+		break;
 	}
 
-	return MCTP_SUCCESS;
+	return ret;
 }
 
 /* init the medium related resources */
@@ -85,6 +88,23 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 		LOG_WRN("%s without mctp_inst!", __func__);
 		return;
 	}
+
+	mctp *mctp_inst = (mctp *)arg;
+
+	if (!mctp_inst->read_data) {
+		LOG_WRN("%s without medium read function!", __func__);
+		return;
+	}
+
+	if (!mctp_inst->mctp_cmd_channel.receive_packet) {
+		LOG_WRN("%s without channel receive function!", __func__);
+		return;
+	}
+
+	LOG_INF("%s start %p", __func__, mctp_inst);
+
+	while (1)
+		cmd_channel_receive_and_process(&mctp_inst->mctp_cmd_channel, &mctp_inst->mctp_wrapper.mctp_interface, -1);
 }
 
 /* mctp tx task */
@@ -205,11 +225,6 @@ uint8_t mctp_stop(mctp *mctp_inst)
 		mctp_inst->mctp_rx_task_tid = NULL;
 	}
 
-	if (mctp_inst->mctp_rx_queue.buffer_start) {
-		free(mctp_inst->mctp_rx_queue.buffer_start);
-		mctp_inst->mctp_rx_queue.buffer_start = NULL;
-	}
-
 	if (mctp_inst->mctp_tx_task_tid) {
 		k_thread_abort(mctp_inst->mctp_tx_task_tid);
 		mctp_inst->mctp_tx_task_tid = NULL;
@@ -245,8 +260,6 @@ uint8_t mctp_start(mctp *mctp_inst)
 
 	k_msgq_init(&mctp_inst->mctp_tx_queue, tx_msgq_buf, sizeof(mctp_tx_msg), MCTP_TX_QUEUE_SIZE);
 
-#if 0
-	k_msgq_init(&mctp_inst->mctp_rx_queue, msgq_buf, sizeof(struct cmd_packet), MCTP_RX_QUEUE_SIZE);
 	/* create rx service */
 	mctp_inst->mctp_rx_task_tid =
 		k_thread_create(&mctp_inst->rx_task_thread_data, mctp_inst->rx_task_stack_area,
@@ -254,9 +267,8 @@ uint8_t mctp_start(mctp *mctp_inst)
 				mctp_inst, NULL, NULL, K_PRIO_PREEMPT(10), 0, K_MSEC(1));
 	if (!mctp_inst->mctp_rx_task_tid)
 		goto error;
-
 	k_thread_name_set(mctp_inst->mctp_rx_task_tid, mctp_inst->mctp_rx_task_name);
-#endif
+
 	/* create tx service */
 	mctp_inst->mctp_tx_task_tid =
 		k_thread_create(&mctp_inst->tx_task_thread_data, mctp_inst->tx_task_stack_area,
@@ -311,6 +323,19 @@ error:
 		free(mctp_msg.buf);
 
 	return MCTP_ERROR;
+}
+
+uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet)
+{
+	if (!mctp_inst || !packet)
+		return MCTP_ERROR;
+
+	if (!mctp_inst->is_servcie_start) {
+		LOG_WRN("The mctp_inst isn't start service!");
+		return MCTP_ERROR;
+	}
+
+	return mctp_inst->read_data(mctp_inst, packet);
 }
 
 #endif // CONFIG_PFR_MCTP

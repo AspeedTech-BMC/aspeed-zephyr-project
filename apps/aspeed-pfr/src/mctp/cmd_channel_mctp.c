@@ -33,7 +33,25 @@ int cmd_channel_mctp_receive_packet(struct cmd_channel *channel, struct cmd_pack
 	if (packet == NULL)
 		return CMD_CHANNEL_INVALID_ARGUMENT;
 
-	LOG_INF("[%d]: received packet", channel->id);
+	mctp *mctp_inst = CONTAINER_OF(channel, mctp, mctp_cmd_channel);
+	int status;
+
+	status = mctp_recv_msg(mctp_inst, packet);
+	LOG_HEXDUMP_DBG(packet->data, packet->pkt_size, "rx packet:");
+	LOG_DBG("pkt_size = %d", packet->pkt_size);
+	LOG_DBG("dest_addr = %x", packet->dest_addr);
+	LOG_DBG("state = %d", packet->state);
+	LOG_DBG("pkt_timeout = %lld", packet->pkt_timeout.ticks);
+	LOG_DBG("timeout_valid = %d", packet->timeout_valid);
+
+	if (packet->state == CMD_OVERFLOW_PACKET)
+		return CMD_CHANNEL_PKT_OVERFLOW;
+	if (packet->state != CMD_VALID_PACKET)
+		return CMD_CHANNEL_INVALID_PKT_STATE;
+
+	if (status != MCTP_SUCCESS)
+		return CMD_CHANNEL_RX_FAILED;
+
 	return 0;
 }
 
