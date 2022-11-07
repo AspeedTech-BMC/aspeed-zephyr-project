@@ -118,7 +118,11 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	UfmCmdTriggerValue = 0x0c,
 	UfmWriteFIFO = 0x0d,
 	UfmReadFIFO = 0x0e,
+#if defined(CONFIG_PFR_MCTP)
+	MCTPWriteFIFO = 0x0f,
+#else
 	BmcCheckpoint = 0x0f,
+#endif
 	AcmCheckpoint = 0x10,
 	BiosCheckpoint = 0x11,
 	PchUpdateIntent = 0x12,
@@ -136,6 +140,9 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	BmcPfmRecoverMajorVersion = 0x1e,
 	BmcPfmRecoverMinorVersion = 0x1f,
 	CpldFPGARoTHash = 0x20, /* 0x20 - 0x5f */
+#if defined(CONFIG_PFR_MCTP)
+	BmcCheckpoint = 0x60,
+#endif
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	PchSeamlessUpdateIntent = 0x61,
 	BmcSeamlessUpdateIntent = 0x62,
@@ -249,7 +256,7 @@ uint8_t GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
 void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
-void SetUfmCmdTriggerValue(byte);
+void SetUfmCmdTriggerValue(byte UfmCommandTriggerValue);
 byte get_provision_command(void);
 void set_provision_command(byte UfmCommandValue);
 void set_provision_commandTrigger(byte UfmCommandTrigger);
