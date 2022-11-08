@@ -12,7 +12,7 @@
 #include "mctp_utils.h"
 #include "plat_mctp.h"
 
-#define MCTP_TEST_DEBUG 0
+// #define MCTP_TEST_DEBUG
 static uint8_t request_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_BODY] = {0};
 static uint8_t message_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN] = {0};
 
@@ -49,8 +49,7 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 	for (i = 0; i < req_len; i++)
 		request_buf[i] = strtol(argv[argc_req_idx++], NULL, 16);
 
-#if MCTP_TEST_DEBUG
-	shell_print(shell, "req_len = %d", req_len);
+#ifdef MCTP_TEST_DEBUG
 	shell_print(shell, "request:");
 	shell_hexdump(shell, request_buf, req_len);
 #endif
@@ -67,35 +66,47 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 	return 0;
 }
 
-static int cmd_mctp_send_large_msg(const struct shell *shell, size_t argc, char **argv)
+static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **argv)
 {
 	ARG_UNUSED(shell);
 
 	struct mctp_interface *mctp_interface = NULL;
+	uint8_t resp_header[4] = { 0 };
+	uint32_t payload_length;
+	uint32_t test_time = 1;
 	mctp *mctp_inst = NULL;
 	int argc_req_idx = 3;
+	uint32_t time_start;
+	uint32_t time_end;
+	uint32_t req_len;
 	uint8_t dst_addr;
 	uint8_t dst_eid;
 	uint8_t bus_num;
-	uint32_t count;
-	uint32_t req_len;
 	int status;
 	int i;
+
+	if (argc == 6) {
+		test_time = strtol(argv[5], NULL, 10);
+		if (test_time < 1) {
+			shell_print(shell, "test_time(%d) is invalid", test_time);
+			goto exit;
+		}
+	}
 
 	bus_num = strtol(argv[1], NULL, 16);
 	dst_addr = strtol(argv[2], NULL, 16);
 	dst_eid = strtol(argv[3], NULL, 16);
-	count = strtol(argv[7], NULL, 10);
+	payload_length = strtol(argv[4], NULL, 10);
 
-	if ((count + 3) > sizeof(request_buf)) {
-		shell_print(shell, "count(%d) is too big", count);
-		return 0;
+	if ((payload_length + 3) > sizeof(request_buf)) {
+		shell_print(shell, "payload count(%d) is too big", payload_length);
+		goto exit;
 	}
 
 	mctp_inst = find_mctp_by_smbus(bus_num);
 	if (mctp_inst == NULL) {
 		shell_error(shell, "mctp instance not fould");
-		return 0;
+		goto exit;
 	}
 
 	mctp_interface = &mctp_inst->mctp_wrapper.mctp_interface;
@@ -104,35 +115,64 @@ static int cmd_mctp_send_large_msg(const struct shell *shell, size_t argc, char 
 	// request_buf[1] = rq
 	// requaet_buf[2] = command code
 	memset(request_buf, 0, sizeof(request_buf));
-	request_buf[0] = strtol(argv[4], NULL, 16);
-	request_buf[1] = strtol(argv[5], NULL, 16);
-	request_buf[2] = strtol(argv[6], NULL, 16);
+	request_buf[0] = 0x85;
+	request_buf[1] = 0x80;
+	request_buf[2] = 0x01;
 
-	for (i = 0; i < count; i++)
+	for (i = 0; i < payload_length; i++)
 		request_buf[argc_req_idx++] = i % 0x100;
 
-	req_len = 3 + count;
-#if MCTP_TEST_DEBUG
-	shell_print(shell, "req_len = %d", req_len);
-	shell_print(shell, "request:");
-	shell_hexdump(shell, request_buf, req_len);
-#endif
-	status = mctp_interface_issue_request(mctp_interface, &mctp_inst->mctp_cmd_channel,
-		dst_addr, dst_eid, request_buf, req_len, message_buf, sizeof(message_buf), 1000);
+	req_len = 3 + payload_length;
 
-	if (status != 0)
-		shell_error(shell, "mctp issue request failed(%x)", status);
-	else {
-		shell_print(shell, "response:");
-		shell_hexdump(shell, mctp_interface->req_buffer.data, mctp_interface->req_buffer.length);
+	// resp
+	resp_header[0] = request_buf[0]; //message type
+	resp_header[1] = request_buf[1] & 0x7f; // rq
+	resp_header[2] = request_buf[2]; // command code
+	resp_header[3] = 0; // completion code
+
+	for (i = 1; i <= test_time; i++) {
+		shell_print(shell, "test time(%d)...", i);
+		time_start = k_uptime_get_32();
+		status = mctp_interface_issue_request(mctp_interface, &mctp_inst->mctp_cmd_channel,
+			dst_addr, dst_eid, request_buf, req_len, message_buf, sizeof(message_buf), 1000);
+		time_end = k_uptime_get_32();
+		shell_print(shell, "elapsed time = %u milliseconds", (time_end - time_start));
+		if (status != 0) {
+			shell_error(shell, "mctp issue request failed(%x)", status);
+			goto exit;
+		} else {
+			if (mctp_interface->req_buffer.length != (req_len + 1)) {
+				shell_error(shell, "failed: response length(%d)", mctp_interface->req_buffer.length);
+					goto dump_msg;
+			}
+			if (memcmp(mctp_interface->req_buffer.data, resp_header, sizeof(resp_header))) {
+				shell_error(shell, "failed: response headr");
+					goto dump_msg;
+			}
+			if (memcmp(&mctp_interface->req_buffer.data[4], &request_buf[3], (mctp_interface->req_buffer.length - 4))) {
+				shell_error(shell, "failed: response payload");
+					goto dump_msg;
+			}
+			shell_print(shell, "pass");
+		}
 	}
 
+#ifndef MCTP_TEST_DEBUG
+	return 0;
+#endif
+
+dump_msg:
+	shell_print(shell, "request:");
+	shell_hexdump(shell, request_buf, req_len);
+	shell_print(shell, "response:");
+	shell_hexdump(shell, mctp_interface->req_buffer.data, mctp_interface->req_buffer.length);
+exit:
 	return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 	SHELL_CMD_ARG(send, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <option:payload>", cmd_mctp_send_msg, 7, 255),
-	SHELL_CMD_ARG(send_large, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <msg_count>", cmd_mctp_send_large_msg, 8, 0),
+	SHELL_CMD_ARG(echo, NULL, "<bus> <dest_addr> <dest_eid> <payload_length> <option:default 1 time>", cmd_mctp_echo_test, 5, 1),
 	SHELL_SUBCMD_SET_END
 );
 
