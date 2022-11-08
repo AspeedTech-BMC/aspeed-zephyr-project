@@ -6,8 +6,16 @@ config CERBERUS
 
 if CERBERUS
 	config CERBERUS_MCTP
+	depends on CERBERUS
 	default n
 	bool "Cerberus MCTP support"
 	help
-	Enable Cerberus MCTP protocol support.
+	  Enable Cerberus MCTP protocol support.
+
+	config CERBERUS_MCTP_TEST_ECHO
+	depends on CERBERUS_MCTP
+        default n
+        bool "Cerberus MCTP echo command"
+        help
+          Cerberus MCTP echo command support for large message test.
 endif
