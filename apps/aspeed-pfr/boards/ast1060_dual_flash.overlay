@@ -194,9 +194,9 @@
 			reg = <0xE0000 0x10000>;
 		};
 
-		log_partition: partition@5 {
-			label = "log";
-			reg = <0xF0000 0x20000>;
+		afm_partition: partition@5 {
+			label = "afm";
+			reg = <0xF0000 0x10000>;
 		};
 	};
 };
