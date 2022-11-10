@@ -28,7 +28,7 @@ int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uin
 
 	int status;
 
-	status = device_manager_init(&mctp_wrapper->device_mgr, 1, DEVICE_MANAGER_PA_ROT_MODE,
+	status = device_manager_init(&mctp_wrapper->device_mgr, 2, DEVICE_MANAGER_PA_ROT_MODE,
 			DEVICE_MANAGER_MASTER_AND_SLAVE_BUS_ROLE);
 	if (status != 0) {
 		LOG_ERR("device manager init failed");
@@ -39,6 +39,13 @@ int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uin
 			DEVICE_MANAGER_SELF_DEVICE_NUM, MCTP_BASE_PROTOCOL_PA_ROT_CTRL_EID, rot_addr);
 	if (status != 0) {
 		LOG_ERR("update self device failed");
+		return status;
+	}
+
+	status = device_manager_update_device_entry(&mctp_wrapper->device_mgr,
+			DEVICE_MANAGER_MCTP_BRIDGE_DEVICE_NUM, MCTP_BASE_PROTOCOL_BMC_EID, 0x10);
+	if (status != 0) {
+		LOG_ERR("update bridge device failed");
 		return status;
 	}
 
