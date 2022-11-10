@@ -315,8 +315,12 @@ uint8_t mctp_send_msg(mctp *mctp_inst, struct cmd_packet *packet)
 
 	int ret = k_msgq_put(&mctp_inst->mctp_tx_queue, &mctp_msg, K_NO_WAIT);
 
-	if (!ret)
-		return MCTP_SUCCESS;
+	if (ret) {
+		LOG_ERR("can't put msgq(%d)", ret);
+		goto error;
+	}
+
+	return MCTP_SUCCESS;
 
 error:
 	if (mctp_msg.buf)

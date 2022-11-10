@@ -98,14 +98,18 @@ static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **arg
 	dst_eid = strtol(argv[3], NULL, 16);
 	payload_length = strtol(argv[4], NULL, 10);
 
-	if ((payload_length + 3) > sizeof(request_buf)) {
+	// message type
+	// rq
+	// command code
+	// completion code
+	if ((payload_length + 4) > sizeof(request_buf)) {
 		shell_print(shell, "payload count(%d) is too big", payload_length);
 		goto exit;
 	}
 
 	mctp_inst = find_mctp_by_smbus(bus_num);
 	if (mctp_inst == NULL) {
-		shell_error(shell, "mctp instance not fould");
+		shell_error(shell, "mctp instance not found");
 		goto exit;
 	}
 
@@ -134,12 +138,12 @@ static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **arg
 		shell_print(shell, "test time(%d)...", i);
 		time_start = k_uptime_get_32();
 		status = mctp_interface_issue_request(mctp_interface, &mctp_inst->mctp_cmd_channel,
-			dst_addr, dst_eid, request_buf, req_len, message_buf, sizeof(message_buf), 1000);
+			dst_addr, dst_eid, request_buf, req_len, message_buf, sizeof(message_buf), 3000);
 		time_end = k_uptime_get_32();
 		shell_print(shell, "elapsed time = %u milliseconds", (time_end - time_start));
 		if (status != 0) {
 			shell_error(shell, "mctp issue request failed(%x)", status);
-			goto exit;
+			goto dump_req_msg;
 		} else {
 			if (mctp_interface->req_buffer.length != (req_len + 1)) {
 				shell_error(shell, "failed: response length(%d)", mctp_interface->req_buffer.length);
@@ -162,10 +166,11 @@ static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **arg
 #endif
 
 dump_msg:
-	shell_print(shell, "request:");
-	shell_hexdump(shell, request_buf, req_len);
 	shell_print(shell, "response:");
 	shell_hexdump(shell, mctp_interface->req_buffer.data, mctp_interface->req_buffer.length);
+dump_req_msg:
+	shell_print(shell, "request:");
+	shell_hexdump(shell, request_buf, req_len);
 exit:
 	return 0;
 }
