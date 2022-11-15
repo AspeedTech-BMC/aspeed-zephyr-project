@@ -119,7 +119,7 @@ static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **arg
 	// request_buf[1] = rq
 	// requaet_buf[2] = command code
 	memset(request_buf, 0, sizeof(request_buf));
-	request_buf[0] = 0x85;
+	request_buf[0] = 0x7c;
 	request_buf[1] = 0x80;
 	request_buf[2] = 0x01;
 
