@@ -204,7 +204,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 				if (!ret) {
 					gUfmFifoData[gFifoData++] = c;
 				}
-			} while (!ret);
+			} while (!ret && (gFifoData < sizeof(gUfmFifoData)));
 		} else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Read FIFO empty prepare next data */
 			k_sem_take(events[1].sem, K_NO_WAIT);
@@ -1074,7 +1074,13 @@ void lock_provision_flash(void)
 	uint32_t UfmStatus;
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-	SetUfmFlashStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK);
+
+	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BIT_MASK)) {
+		LOG_ERR("Cannot lock UFM unless root key hash and offsets are provisioned");
+		SetUfmStatusValue(COMMAND_ERROR);
+	}
+	else
+		SetUfmFlashStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK);
 }
 
 void ReadRootKey(void)

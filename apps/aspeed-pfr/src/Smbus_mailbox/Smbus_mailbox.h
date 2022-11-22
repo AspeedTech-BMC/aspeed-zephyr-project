@@ -337,6 +337,9 @@ void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
 #define UFM_STATUS_PIT_HASH_STORED_BIT_MASK           0b10000000
 #define UFM_STATUS_PIT_L2_PASSED_BIT_MASK             0b100000000
 
+// If root key hash, pch and bmc offsets are provisioned, we say CPLD has been provisioned
+#define UFM_STATUS_PROVISIONED_BIT_MASK               0b000001110
+
 extern uint8_t gBiosBootDone;
 extern uint8_t gBmcBootDone;
 
