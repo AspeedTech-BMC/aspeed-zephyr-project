@@ -45,14 +45,22 @@ void spdm_requester_main(void *a, void *b, void *c)
 			case SPDM_REQ_ADD:
 				for (size_t i = 0; i<8; ++i) {
 					if (target_list[i] == NULL) {
+#if 1
+						target_list[i] = spdm_context_create();
+						init_requester_context(target_list[i]);
+#else
 						target_list[i] = attest_task->spdm_ctx;
+#endif
 						break;
 					}
 				}
 				break;
 			case SPDM_REQ_REMOVE:
 				for (size_t i = 0; i<8; ++i) {
-					if (target_list[i] == attest_task->spdm_ctx) {
+					if (target_list[i] != NULL) {
+#if 1
+						spdm_context_release(target_list[i]);
+#endif
 						target_list[i] = NULL;
 						break;
 					}
@@ -66,36 +74,83 @@ void spdm_requester_main(void *a, void *b, void *c)
 			k_free(attest_task);
 		} else {
 			for (size_t i=0; i<8; ++i) {
+				int ret;
 				struct spdm_context *context = target_list[i];
 				if (context == NULL)
 					continue;
 
-				spdm_get_version(context);
-				spdm_get_capabilities(context);
-				spdm_negotiate_algorithms(context);
+				// TODO: Get from context->connetion_data
+				uint8_t bus=0, eid=0;
+
+				/* VCA: Initiate Connection */
+				ret = spdm_get_version(context);
+				if (ret < 0) {
+					LOG_ERR("SPDM[%d,%02x] GET_VERSION Failed", bus, eid);
+					continue;
+				}
+				ret = spdm_get_capabilities(context);
+				if (ret < 0) {
+					LOG_ERR("SPDM[%d,%02x] GET_CAPABILITIES Failed", bus, eid);
+					continue;
+				}
+				ret = spdm_negotiate_algorithms(context);
+				if (ret < 0) {
+					LOG_ERR("SPDM[%d,%02x] NEGOTIATE_ALGORITHMS Failed", bus, eid);
+					continue;
+				}
+
+				/* Device identities */
 				if (context->remote.capabilities.flags & SPDM_CERT_CAP) {
-					spdm_get_digests(context);
+					ret = spdm_get_digests(context);
 
 					for (uint8_t slot_id = 0; slot_id < 8; ++slot_id) {
 						if (context->remote.certificate.slot_mask & (1 << slot_id)) {
-							LOG_ERR("Getting Certificate Slot[%d]", slot_id);
-							spdm_get_certificate(context, slot_id);
-							k_msleep(1000);
+							LOG_INF("Getting Certificate Slot[%d]", slot_id);
+							ret = spdm_get_certificate(context, slot_id);
+							if (ret != 0) {
+								LOG_ERR("SPDM[%d,%02x] GET_CERTIFICATE Failed", bus, eid);
+								break;
+							}
+						}
+					}
+					if (ret != 0) {
+						continue;
+					}
+				} else {
+					LOG_ERR("SPDM[%d,%02x] Device doesn't support GET_CERTIFICATE", bus, eid);
+					continue;
+				}
+
+				/* Device Authentication */
+				ret = spdm_challenge(context, 0x01, 0x00);
+				if (ret < 0) {
+					LOG_ERR("SPDM[%d,%02x] CHALLENGE Failed", bus, eid);
+					continue;
+				}
+
+				/* Device Attestation */
+				uint8_t number_of_blocks = 0, measurement_block, received_blocks = 0;
+				bool signature_verified = false;
+				ret = spdm_get_measurements(context, 0, SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER, &number_of_blocks);
+				/* Get 0x01 - 0xFE block */
+				/* TODO: The block_id and measurement should comparing from AFM. Now we just scan it */
+				for (uint8_t block_id = 1; block_id <= 0xfe; ++block_id) {
+					if (received_blocks != number_of_blocks-1) {
+						ret = spdm_get_measurements(context, 0, block_id, &measurement_block);
+						if (ret == 0) {
+							++received_blocks;
+						}
+					} else {
+						ret = spdm_get_measurements(context, SPDM_MEASUREMENT_REQ_ATTR_GEN_SIGNATURE, block_id, &measurement_block);
+						if (ret == 0) {
+							signature_verified = true;
+							break;
 						}
 					}
 				}
-
-				spdm_challenge(context, 0x01, 0x00);
-
-				uint8_t number_of_blocks = 0, measurement_block;
-				spdm_get_measurements(context, 0, SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER, &number_of_blocks);
-				for (uint8_t block_id = 1; block_id <= number_of_blocks; ++block_id) {
-					spdm_get_measurements(context, 0, block_id, &measurement_block);
+				if (signature_verified == false) {
+					/* Recovery the firmware ?? */
 				}
-				spdm_get_measurements(context,
-						SPDM_MEASUREMENT_REQ_ATTR_GEN_SIGNATURE,
-						SPDM_MEASUREMENT_OPERATION_ALL_MEASUREMENTS,
-						&measurement_block);
 			}
 		}
 #if 0

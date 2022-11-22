@@ -92,6 +92,7 @@ static void handler(void *ctx, void *req, void *rsp)
 	struct spdm_context *context = (struct spdm_context *)ctx;
 	struct spdm_message *req_msg = (struct spdm_message *)req;
 	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
+	int ret;
 
 	if (req_msg->header.spdm_version != SPDM_VERSION) {
 		return;
@@ -106,82 +107,96 @@ static void handler(void *ctx, void *req, void *rsp)
 	case SPDM_STATE_NOT_READY:
 		/* Only accept GET_VERSION command*/
 		if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		}
 		break;
 	case SPDM_STATE_GOT_VERSION:
 		if (req_msg->header.request_response_code == SPDM_REQ_GET_CAPABILITIES) {
-			spdm_handle_get_capabilities(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_CAPABILITIES;
+			ret = spdm_handle_get_capabilities(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_CAPABILITIES;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
 			// Reset the protocol
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		}
 		break;
 	case SPDM_STATE_GOT_CAPABILITIES:
 		if (req_msg->header.request_response_code == SPDM_REQ_NEGOTIATE_ALGORITHMS) {
-			spdm_handle_negotiate_algorithms(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_NEGOTIATED_ALGORITHMS;
+			ret = spdm_handle_negotiate_algorithms(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_NEGOTIATED_ALGORITHMS;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
 			// Reset the protocol
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		}
 		break;
 	case SPDM_STATE_NEGOTIATED_ALGORITHMS:
 		/* Expecting GET_DIGEST (if supported) or GET_MEASUREMENT message */
 		if (req_msg->header.request_response_code == SPDM_REQ_GET_DIGESTS) {
-			spdm_handle_get_digests(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_DIGESTS;
+			ret = spdm_handle_get_digests(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_DIGESTS;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_MEASUREMENTS) {
-			spdm_handle_get_measurements(context, req_msg, rsp_msg);
+			ret = spdm_handle_get_measurements(context, req_msg, rsp_msg);
 			// context->connection_state = SPDM_STATE_SESSION_ESTABLISHED;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
 			// Reset the protocol
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		}
 		break;
 	case SPDM_STATE_GOT_DIGESTS:
 		if (req_msg->header.request_response_code == SPDM_REQ_GET_CERTIFICATE) {
-			spdm_handle_get_certificate(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_CERTIFICATE;
+			ret = spdm_handle_get_certificate(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_CERTIFICATE;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_CHALLENGE) {
-			spdm_handle_challenge(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_CHANLLENGED;
+			ret = spdm_handle_challenge(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_CHANLLENGED;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
 			// Reset the protocol
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		}
 		break;
 	case SPDM_STATE_GOT_CERTIFICATE:
 		if (req_msg->header.request_response_code == SPDM_REQ_GET_CERTIFICATE) {
-			spdm_handle_get_certificate(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_CERTIFICATE;
+			ret = spdm_handle_get_certificate(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_CERTIFICATE;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_CHALLENGE) {
-			spdm_handle_challenge(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_CHANLLENGED;
+			ret = spdm_handle_challenge(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_CHANLLENGED;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
 			// Reset the protocol
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		}
 		break;
 	case SPDM_STATE_CHANLLENGED:
 		if (req_msg->header.request_response_code == SPDM_REQ_GET_MEASUREMENTS) {
-			spdm_handle_get_measurements(context, req_msg, rsp_msg);
+			ret = spdm_handle_get_measurements(context, req_msg, rsp_msg);
 			// context->connection_state = SPDM_STATE_SESSION_ESTABLISHED;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_VERSION) {
 			// Reset the protocol
-			spdm_handle_get_version(context, req_msg, rsp_msg);
-			context->connection_state = SPDM_STATE_GOT_VERSION;
+			ret = spdm_handle_get_version(context, req_msg, rsp_msg);
+			if (ret == 0)
+				context->connection_state = SPDM_STATE_GOT_VERSION;
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_DIGESTS) {
-			spdm_handle_get_digests(context, req_msg, rsp_msg);
+			ret = spdm_handle_get_digests(context, req_msg, rsp_msg);
 		} else if (req_msg->header.request_response_code == SPDM_REQ_GET_CERTIFICATE) {
-			spdm_handle_get_certificate(context, req_msg, rsp_msg);
+			ret = spdm_handle_get_certificate(context, req_msg, rsp_msg);
 		}
 		break;
 	default:

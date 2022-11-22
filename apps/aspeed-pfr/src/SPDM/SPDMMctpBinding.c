@@ -38,7 +38,8 @@ int spdm_mctp_send_recv(void *ctx, void *request_buf, void *response_buf)
 			);
 	if (ret == 0) {
 		// SPDM Header
-		memcpy(&rsp_msg->header, conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.data + 1, sizeof(rsp_msg->header));
+		memcpy(&rsp_msg->header, conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.data + 1,
+				sizeof(rsp_msg->header));
 
 		// SPDM Payload
 		spdm_buffer_init(&rsp_msg->buffer,
@@ -46,12 +47,10 @@ int spdm_mctp_send_recv(void *ctx, void *request_buf, void *response_buf)
 		spdm_buffer_append_array(&rsp_msg->buffer,
 				conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.data + 1 + 4,
 				conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.length - 1 - 4);
-		/*
-		LOG_HEXDUMP_INF(rsp_msg->buffer.data, rsp_msg->buffer.write_ptr, "MCTP BUF SEND_RECV:");
-		LOG_HEXDUMP_INF(conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.data,
+		LOG_HEXDUMP_DBG(rsp_msg->buffer.data, rsp_msg->buffer.write_ptr, "MCTP BUF SEND_RECV:");
+		LOG_HEXDUMP_DBG(conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.data,
 				conn->mctp_inst->mctp_wrapper.mctp_interface.req_buffer.length,
 				"MCTP RAW SEND_RECV:");
-				*/
 	} else {
 		LOG_ERR("mctp_interface_issue_request ret=%x", ret);
 	}
@@ -69,7 +68,7 @@ void spdm_mctp_init_req(void *ctx)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;
 	struct spdm_mctp_connection_data *conn = k_malloc(sizeof(struct spdm_mctp_connection_data));
-	
+
 	conn->mctp_inst = find_mctp_by_smbus(0);
 	conn->dst_addr = 0x10;
 	conn->dst_eid = 0x0a;

@@ -13,6 +13,8 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;
 	struct spdm_message *req_msg = (struct spdm_message *)req;
+	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
+	int ret;
 	/* Deserialize */
 	/* Measurement operation:
 	 * - A value of 0x0 shall query the Responder for the total number of measurements available.
@@ -27,7 +29,6 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 	// uint8_t req_nonce[32];
 	// spdm_buffer_get_array(&req_msg->buffer, req_nonce, 32);
 
-	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
 	rsp_msg->header.request_response_code = SPDM_RSP_MEASUREMENTS;
 	rsp_msg->header.param2 = 0;
 	if (req_measurement == 0) {
@@ -100,7 +101,6 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 	// - L1/L2: Concatenate(GET_MEASUREMENTS_REQUEST1, MEASUREMENTS_RESPONSE1, ...,
 	//          GET_MEASUREMENTS_REQUESTn-1, MEASUREMENTS_RESPONSEn-1,
 	//          GET_MEASUREMENTS_REQUESTn, MEASUREMENTS_RESPONSEn)
-	int ret;
 
 	/* Append Req/Rsp to L1L2 hash */
 	spdm_context_update_l1l2_hash(context, req_msg, rsp_msg);
@@ -111,18 +111,9 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 		 * requested a signature on that specific GET_MEASUREMENTS request.
 		 */
 		uint8_t hash[48];
-#if 1
+
 		mbedtls_sha512_finish(&context->l1l2_context, hash);
 		spdm_context_reset_l1l2_hash(context);
-		
-#else
-		/* Clone the context and calculate the hash with the cloned one */
-		mbedtls_sha512_context hash_ctx;
-		mbedtls_sha512_init(&hash_ctx);
-		mbedtls_sha512_clone(&hash_ctx, &context->l1l2_context);
-		mbedtls_sha512_finish(&hash_ctx, hash);
-		mbedtls_sha512_free(&hash_ctx);
-#endif
 
 		/* Sign the message */
 		uint8_t sig[MBEDTLS_ECDSA_MAX_LEN];
@@ -146,10 +137,20 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 		mbedtls_mpi_free(&s);
 		mbedtls_mpi_free(&r);
 		spdm_buffer_resize(&rsp_msg->buffer, rsp_msg->buffer.write_ptr + sig_len);
-		ret = spdm_buffer_append_array(&rsp_msg->buffer, sig, sig_len);
+		spdm_buffer_append_array(&rsp_msg->buffer, sig, sig_len);
 		if (ret) {
-			LOG_ERR("Buffer is not enough for signature");
+			LOG_ERR("GET_MEASUREMENTS Failed to sign message");
+			rsp_msg->header.request_response_code = SPDM_RSP_ERROR;
+			rsp_msg->header.param1 = SPDM_ERROR_CODE_UNSPECIFIED;
+			rsp_msg->header.param2 = 0;
+			spdm_buffer_release(&rsp_msg->buffer);
+			ret = -1;
+			goto cleanup;
 		}
 	}
-	return 0;
+
+	ret = 0;
+
+cleanup:
+	return ret;
 }

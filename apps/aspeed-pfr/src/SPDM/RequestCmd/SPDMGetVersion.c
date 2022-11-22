@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <stdlib.h>
 #include "SPDM/SPDMCommon.h"
 
 LOG_MODULE_DECLARE(spdm_req, CONFIG_LOG_DEFAULT_LEVEL);
@@ -19,30 +20,58 @@ int spdm_get_version(void *ctx)
 	req_msg.header.param2 = 0;
 
 	spdm_buffer_init(&req_msg.buffer, 0);
+	spdm_buffer_init(&rsp_msg.buffer, 0);
 
 	ret = spdm_send_request(context, &req_msg, &rsp_msg);
 	if (ret != 0) {
 		LOG_ERR("GET_VERSION failed %x", ret);
-		return -1;
+		ret = -1;
+		goto cleanup;
+	} else if (rsp_msg.header.spdm_version != SPDM_VERSION) {
+		LOG_ERR("Unsupported header SPDM_VERSION %x", rsp_msg.header.spdm_version);
+		ret = -1;
+		goto cleanup;
+	} else if (rsp_msg.header.request_response_code != SPDM_RSP_VERSION) {
+		LOG_ERR("Expecting VERSION message but got %02x Param[%02x,%02x]",
+				rsp_msg.header.request_response_code,
+				rsp_msg.header.param1,
+				rsp_msg.header.param2);
+		ret = -1;
+		goto cleanup;
+	} else if (rsp_msg.buffer.write_ptr < 4 || (rsp_msg.buffer.write_ptr % 2 != 0)) {
+		LOG_ERR("VERSION message length incorrect");
+		ret = -1;
+		goto cleanup;
 	}
 
-	spdm_buffer_get_reserved(&req_msg.buffer, 1);
-	spdm_buffer_get_u8(&req_msg.buffer, &context->remote.version.version_number_entry_count);
+	spdm_buffer_get_reserved(&rsp_msg.buffer, 1);
+	uint8_t count = 0;
+	spdm_buffer_get_u8(&rsp_msg.buffer, &count);
 
-	if (context->remote.version.version_number_entry_count > 0) {
-		if (context->remote.version.version_number_entry != NULL) {
-			free(context->remote.version.version_number_entry);
-			context->remote.version.version_number_entry = NULL;
+	if (count > 0) {
+		context->remote.version.version_number_entry_count = 0;
+		for (size_t i = 0; i < count; ++i) {
+			uint16_t version = 0;
+			//spdm_buffer_get_u16(&rsp_msg.buffer, &context->remote.version.version_number_entry[i]);
+			spdm_buffer_get_u16(&rsp_msg.buffer, &version);
+			// TODO: Prepare for SPDM 1.1 1.2
+			if (((version >> 8) & 0xff) == SPDM_VERSION) {
+				context->remote.version.version_number_entry[0] = version;
+				context->remote.version.version_number_entry_count = 1;
+				break;
+			}
 		}
-		context->remote.version.version_number_entry =
-			malloc(context->remote.version.version_number_entry_count * sizeof(uint16_t));
-		for (size_t i = 0; i < context->remote.version.version_number_entry_count; ++i) {
-			spdm_buffer_get_u16(&req_msg.buffer, &context->remote.version.version_number_entry[i]);
+		if (context->remote.version.version_number_entry_count == 0) {
+			LOG_ERR("No supported version found");
+			ret = -1;
+			goto cleanup;
 		}
+	} else {
+		LOG_ERR("Version Number Entry Count is 0");
+		ret = -1;
+		goto cleanup;
 	}
 
-	LOG_HEXDUMP_INF(&rsp_msg.header, sizeof(rsp_msg.header), "VERSION HEADER:");
-	LOG_HEXDUMP_INF(rsp_msg.buffer.data, rsp_msg.buffer.size, "VERSION DATA:");
 
 #if defined(SPDM_TRANSCRIPT)
 	/* Reset the buffer */
@@ -68,10 +97,16 @@ int spdm_get_version(void *ctx)
 	spdm_context_reset_m1m2_hash(context);
 	spdm_context_update_m1m2_hash(context, &req_msg, &rsp_msg);
 #endif
+	ret = 0;
 
+cleanup:
+	if (ret < 0) {
+		LOG_HEXDUMP_ERR(&rsp_msg.header, sizeof(rsp_msg.header), "VERSION HEADER:");
+		LOG_HEXDUMP_ERR(rsp_msg.buffer.data, rsp_msg.buffer.size, "VERSION DATA:");
+	}
 
 	spdm_buffer_release(&req_msg.buffer);
 	spdm_buffer_release(&rsp_msg.buffer);
-	return 0;
+	return ret;
 }
 

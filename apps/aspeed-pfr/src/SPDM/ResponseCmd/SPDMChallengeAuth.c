@@ -14,13 +14,33 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;
 	struct spdm_message *req_msg = (struct spdm_message *)req;
+	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
+	int ret;
 	/* Deserialize */
 
 	// TODO: Check if slot exists
 	uint8_t slot_id = req_msg->header.param1;
 	uint8_t measurmenent_summary_hash = req_msg->header.param2;
 
-	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
+	if (req_msg->header.spdm_version != SPDM_VERSION) {
+		LOG_ERR("Unsupported header SPDM_VERSION %x", req_msg->header.spdm_version);
+		rsp_msg->header.param1 = SPDM_ERROR_CODE_MAJOR_VERSION_MISMATCH;
+		ret = -1;
+		goto cleanup;
+	} else if (slot_id > 7 || !(context->local.certificate.slot_mask & (1<<slot_id))) {
+		LOG_ERR("CHALLENGE Slot[%d] not exist. Slot_mask=%02x",
+				slot_id, context->local.certificate.slot_mask);
+		rsp_msg->header.param1 = SPDM_ERROR_CODE_INVALID_REQUEST;
+		ret = -1;
+		goto cleanup;
+	} else if (req_msg->buffer.write_ptr != 32) {
+		LOG_ERR("CHALLENGE message length incorrect %d",
+				req_msg->buffer.write_ptr + 4);
+		rsp_msg->header.param1 = SPDM_ERROR_CODE_INVALID_REQUEST;
+		ret = -1;
+		goto cleanup;
+	}
+
 	/* Serialize the result */
 	// H + 32 + H + 2 + OpaqueLen + S
 	// H:  Cert Chain Has
@@ -60,7 +80,6 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	spdm_buffer_append_u16(&rsp_msg->buffer, opaque_length);
 
 	// Opaque Data: Reserved for now.
-	
 	// Signature by selected ALGORITHMS by alias id private key
 	// Alias ID Key is in context->key_pair
 	// Signature = Sign(SK, Hash(M1))
@@ -74,7 +93,6 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	// - B: Concatenate(GET_DIGEST, DIGEST, GET_CERTIFICATE, CERTIFICATE)
 	// - C: Concatenate(CHALLENGE, CHALLENGE_AUTH\Signature)
 	uint8_t sig[MBEDTLS_ECDSA_MAX_LEN];
-	int ret;
 
 	// Calculate HASH(M1)
 	spdm_context_update_m1m2_hash(context, req_msg, rsp_msg);
@@ -91,14 +109,25 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	LOG_HEXDUMP_INF(hash, 48, "Responder M1 hash:");
 	LOG_INF("mbedtls_ecdsa_sign ret=%x", -ret);
 
-	size_t r_size = mbedtls_mpi_size(&r), s_size = mbedtls_mpi_size(&s);
-	mbedtls_mpi_write_binary(&r, sig, r_size);
-	mbedtls_mpi_write_binary(&s, sig + r_size, s_size);
+	if (ret == 0) {
+		size_t r_size = mbedtls_mpi_size(&r), s_size = mbedtls_mpi_size(&s);
+		mbedtls_mpi_write_binary(&r, sig, r_size);
+		mbedtls_mpi_write_binary(&s, sig + r_size, s_size);
 
-	LOG_HEXDUMP_INF(sig, r_size + s_size, "Signature:");
+		LOG_HEXDUMP_INF(sig, r_size + s_size, "Signature:");
+
+		spdm_buffer_append_array(&rsp_msg->buffer, sig, r_size + s_size);
+	} else {
+		LOG_ERR("CHALLENGE Failed to sign message");
+		rsp_msg->header.request_response_code = SPDM_RSP_ERROR;
+		rsp_msg->header.param1 = SPDM_ERROR_CODE_UNSPECIFIED;
+		rsp_msg->header.param2 = 0;
+		spdm_buffer_release(&rsp_msg->buffer);
+		ret = -1;
+	}
 	mbedtls_mpi_free(&s);
 	mbedtls_mpi_free(&r);
 
-	spdm_buffer_append_array(&rsp_msg->buffer, sig, r_size + s_size);
-	return 0;
+cleanup:
+	return ret;
 }

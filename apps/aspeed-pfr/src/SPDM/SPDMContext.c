@@ -10,6 +10,8 @@
 
 LOG_MODULE_DECLARE(spdm, CONFIG_LOG_DEFAULT_LEVEL);
 
+static mbedtls_x509_crt system_root_ca;
+
 int random_callback(void *context, unsigned char *output, size_t output_len)
 {
 	sys_rand_get(output, output_len);
@@ -23,8 +25,12 @@ void *spdm_context_create()
 	context->connection_state = SPDM_STATE_NOT_READY;
 
 	context->local.version.version_number_entry_count = 1;
-	context->local.version.version_number_entry = (uint16_t*)malloc(context->local.version.version_number_entry_count);
 	context->local.version.version_number_entry[0] = SPDM_VERSION << SPDM_VERSION_NUMBER_ENTRY_SHIFT_BIT;
+
+	context->remote.version.version_number_entry_count = 0;
+	context->remote.version.version_number_entry[0] = 0;
+	context->remote.version.version_number_entry[1] = 0;
+	context->remote.version.version_number_entry[2] = 0;
 
 	/* Set CT to 32768us due to mbedtls ecdsa */
 	context->local.capabilities.ct_exponent = 15;
@@ -38,21 +44,24 @@ void *spdm_context_create()
 	context->local.algorithms.measurement_hash_algo = SPDM_ALGORITHMS_MEAS_HASH_TPM_ALG_SHA_384;
 	context->local.algorithms.base_asym_sel =SPDM_ALGORITHMS_BASE_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384;
 	context->local.algorithms.base_hash_sel = SPDM_ALGORITHMS_BASE_HASH_TPM_ALG_SHA_384;
+#if 0
 	context->local.algorithms.ext_asym_sel_count = 0;
 	context->local.algorithms.ext_hash_sel_count = 0;
 	context->local.algorithms.ext_asym_sel[0] = 0;
 	context->local.algorithms.ext_hash_sel[0] = 0;
+#endif
 
 	context->local.certificate.slot_mask = 0;
 	context->remote.certificate.slot_mask = 0;
 	for (size_t i = 0; i < 8; ++i) {
 		context->local.certificate.certs[i].size = 0;
 		context->local.certificate.certs[i].data = NULL;
+		mbedtls_x509_crt_init(&context->local.certificate.certs[i].chain);
+
 		context->remote.certificate.certs[i].size = 0;
 		context->remote.certificate.certs[i].data = NULL;
+		mbedtls_x509_crt_init(&context->remote.certificate.certs[i].chain);
 	}
-	mbedtls_x509_crt_init(&context->local.certificate.root_ca);
-	mbedtls_x509_crt_init(&context->remote.certificate.root_ca);
 
 	context->get_measurement = NULL;
 
@@ -78,24 +87,22 @@ void spdm_context_release(void *ctx)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;
 
-	free(context->remote.version.version_number_entry);
-
-	mbedtls_x509_crt_free(&context->local.certificate.root_ca);
-	mbedtls_x509_crt_free(&context->remote.certificate.root_ca);
-
 	for (size_t slot_id=0; slot_id<8; ++slot_id) {
-		if (context->remote.certificate.certs[slot_id].data) {
-			free(context->remote.certificate.certs[slot_id].data);
-			context->remote.certificate.certs[slot_id].data = NULL;
-			context->remote.certificate.certs[slot_id].size = 0;
-		}
 		if (context->local.certificate.certs[slot_id].data) {
 			free(context->local.certificate.certs[slot_id].data);
 			context->local.certificate.certs[slot_id].data = NULL;
 			context->local.certificate.certs[slot_id].size = 0;
 		}
+		if (context->remote.certificate.certs[slot_id].data) {
+			free(context->remote.certificate.certs[slot_id].data);
+			context->remote.certificate.certs[slot_id].data = NULL;
+			context->remote.certificate.certs[slot_id].size = 0;
+		}
+		mbedtls_x509_crt_free(&context->local.certificate.certs[slot_id].chain);
+		mbedtls_x509_crt_free(&context->remote.certificate.certs[slot_id].chain);
 	}
 
+	mbedtls_ecp_keypair_free(&context->key_pair);
 #if defined(SPDM_TRANSCRIPT)
 	spdm_buffer_release(&context->message_a);
 	spdm_buffer_release(&context->message_b);
@@ -106,6 +113,8 @@ void spdm_context_release(void *ctx)
 #endif
 	/* TODO: Assuming the hash algorithm is SHA384 */
 	mbedtls_sha512_free(&context->l1l2_context);
+
+	free(context);
 }
 
 int spdm_load_certificate(void *ctx, bool remote, uint8_t slot_id, void *cert_data, uint16_t cert_len)
@@ -137,24 +146,21 @@ int spdm_load_certificate(void *ctx, bool remote, uint8_t slot_id, void *cert_da
 	cert_info->certs[slot_id].data[1] = ((cert_len + 4 + 48) >> 8) & 0xff;
 
 	/* Hash the  Root Cert */
+	// TODO: Find the root cert length
 	mbedtls_sha512(cert_data, 468, cert_info->certs[slot_id].data + 4, 1);
 
 	return 0;
 }
 
-int spdm_load_root_certificate(void *ctx, bool remote, void *cert_data, uint16_t cert_len)
+int spdm_load_root_certificate(void *cert_data, uint16_t cert_len)
 {
-	struct spdm_context *context = (struct spdm_context*)ctx;
-	struct spdm_certificate_info *cert_info = &context->local.certificate;
+	/* Root Certificate */
+	return mbedtls_x509_crt_parse_der_nocopy(&system_root_ca, cert_data, cert_len);
+}
 
-	if (remote) {
-		cert_info = &context->remote.certificate;
-	}
-
-	/* TODO: Copy certificate or just assign the pointer? */
-	mbedtls_x509_crt_parse_der_nocopy(&cert_info->root_ca, cert_data, cert_len);
-
-	return 0;
+mbedtls_x509_crt* spdm_get_root_certificate()
+{
+	return &system_root_ca;
 }
 
 size_t spdm_context_base_hash_size(void *ctx)
@@ -270,4 +276,5 @@ void spdm_context_update_l1l2_hash(void *ctx, void *req, void *rsp)
 			(const unsigned char *)rsp_msg->buffer.data,
 			rsp_msg->buffer.write_ptr);
 }
+
 

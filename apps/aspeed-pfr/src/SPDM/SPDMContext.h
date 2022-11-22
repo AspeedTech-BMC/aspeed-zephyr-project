@@ -25,7 +25,7 @@ enum SPDM_CONNECTION_STATE {
 
 struct spdm_version_info {
 	uint8_t version_number_entry_count;
-	uint16_t *version_number_entry;
+	uint16_t version_number_entry[3]; // Placeholder for SPDM 1.0 1.1 1.2
 };
 
 struct spdm_capabilities_info {
@@ -42,10 +42,12 @@ struct spdm_algorithms_info {
 	uint32_t measurement_hash_algo;
 	uint32_t base_asym_sel;
 	uint32_t base_hash_sel;
+#if 0
 	uint8_t ext_asym_sel_count; // A'
 	uint8_t ext_hash_sel_count; // E'
 	uint32_t ext_asym_sel[SPDM_EXT_ASYM_SEL_COUNT];
 	uint32_t ext_hash_sel[SPDM_EXT_HASH_SEL_COUNT];
+#endif
 };
 
 struct spdm_certificate_info {
@@ -53,8 +55,9 @@ struct spdm_certificate_info {
 	struct {
 		uint16_t size;
 		uint8_t *data;
+		mbedtls_x509_crt chain;
+		uint8_t digest[48];
 	} certs[8]; // Slot ID 0~7 and root
-	mbedtls_x509_crt root_ca;
 };
 
 struct spdm_context_info {
@@ -118,7 +121,8 @@ struct spdm_req_fifo_data {
 void *spdm_context_create();
 void spdm_context_release(void *ctx);
 int spdm_load_certificate(void *ctx, bool remote, uint8_t slot_id, void *cert_data, uint16_t cert_len);
-int spdm_load_root_certificate(void *ctx, bool remote, void *cert_data, uint16_t cert_len);
+int spdm_load_root_certificate(void *cert_data, uint16_t cert_len);
+mbedtls_x509_crt* spdm_get_root_certificate();
 size_t spdm_context_base_hash_size(void *context);
 size_t spdm_context_base_algo_size(void *context);
 size_t spdm_context_measurement_hash_size(void *context);

@@ -141,11 +141,11 @@ int get_measurement(void *context,
 		get_measurement_by_index(1, measurement + offset, measurement_size);
 		offset += *measurement_size;
 		remain_size -= *measurement_size;
-		*measurement_size = remain_size; 
+		*measurement_size = remain_size;
 		get_measurement_by_index(2, measurement + offset, measurement_size);
 		offset += *measurement_size;
 		remain_size -= *measurement_size;
-		*measurement_size = remain_size; 
+		*measurement_size = remain_size;
 		get_measurement_by_index(3, measurement + offset, measurement_size);
 		offset += *measurement_size;
 		*measurement_count = 3;
@@ -161,9 +161,6 @@ void init_requester_context(struct spdm_context *context)
 {
 	spdm_mctp_init_req(context);
 
-	spdm_load_root_certificate(context, true, ca_cert_der, ca_cert_der_len);
-	spdm_load_root_certificate(context, true, inter_cert_der, inter_cert_der_len);
-
 	// Set private/public key pair for signing
 	int ret;
 	ret = mbedtls_ecp_group_load(&context->key_pair.MBEDTLS_PRIVATE(grp),
@@ -178,7 +175,7 @@ void init_requester_context(struct spdm_context *context)
 	LOG_INF("mbedtls_ecp_point_read_binary ret=%x", -ret);
 
 	ret = mbedtls_ecp_check_pub_priv(&context->key_pair, &context->key_pair, context->random_callback, context);
-	LOG_ERR("mbedtls_ecp_check_pub_priv ret=%x", -ret);
+	LOG_INF("mbedtls_ecp_check_pub_priv ret=%x", -ret);
 }
 
 void init_responder_context(struct spdm_context *context)
@@ -192,11 +189,6 @@ void init_responder_context(struct spdm_context *context)
 	spdm_load_certificate(context, false, 0, devid_cert_der, devid_cert_der_len);
 	spdm_load_certificate(context, false, 1, alias_cert_der, alias_cert_der_len);
 #endif
-	spdm_load_root_certificate(context, true, ca_cert_der, ca_cert_der_len);
-	spdm_load_root_certificate(context, true, inter_cert_der, inter_cert_der_len);
-	spdm_load_root_certificate(context, true, ca1_cert_der, ca1_cert_der_len);
-	spdm_load_root_certificate(context, true, inter1_cert_der, inter1_cert_der_len);
-
 	context->get_measurement = get_measurement;
 
 	int ret;
@@ -212,7 +204,7 @@ void init_responder_context(struct spdm_context *context)
 	LOG_INF("mbedtls_ecp_point_read_binary ret=%x", -ret);
 
 	ret = mbedtls_ecp_check_pub_priv(&context->key_pair, &context->key_pair, context->random_callback, context);
-	LOG_ERR("mbedtls_ecp_check_pub_priv ret=%x", -ret);
+	LOG_INF("mbedtls_ecp_check_pub_priv ret=%x", -ret);
 }
 
 
@@ -221,7 +213,7 @@ void init_responder_context(struct spdm_context *context)
 extern void spdm_requester_main(void *ctx, void *b, void *c);
 K_THREAD_STACK_DEFINE(spdm_requester_stack, SPDM_REQUESTER_STACK_SIZE);
 struct k_thread spdm_requester_thread_data;
-k_tid_t spdm_requester_tid; 
+k_tid_t spdm_requester_tid;
 
 struct spdm_context *context_rsp_oo;
 
@@ -229,18 +221,21 @@ void spdm_main()
 {
 	struct spdm_context *context_rsp = spdm_context_create();
 
+	mbedtls_x509_crt_init(spdm_get_root_certificate());
+	spdm_load_root_certificate(ca_cert_der, ca_cert_der_len);
+	spdm_load_root_certificate(inter_cert_der, inter_cert_der_len);
+	spdm_load_root_certificate(ca1_cert_der, ca1_cert_der_len);
+	spdm_load_root_certificate(inter1_cert_der, inter1_cert_der_len);
+
 	init_responder_context(context_rsp);
 	context_rsp_oo = context_rsp;
-
-	struct spdm_context *context = spdm_context_create();
-	init_requester_context(context);
 
 	spdm_requester_tid = k_thread_create(
 			&spdm_requester_thread_data,
 			spdm_requester_stack,
 			K_THREAD_STACK_SIZEOF(spdm_requester_stack),
 			spdm_requester_main,
-			context, NULL, NULL,
+			NULL, NULL, NULL,
 			SPDM_REQUESTER_PRIO, 0, K_NO_WAIT);
 	k_thread_name_set(spdm_requester_tid, "SPDM REQ");
 }
@@ -256,8 +251,8 @@ static int cmd_spdm_req(const struct shell *shell, size_t argc, char **argv)
 	struct spdm_req_fifo_data *fifo_data = NULL;
 
 	if (context == NULL) {
-		context = spdm_context_create();
-		init_requester_context(context);
+		// context = spdm_context_create();
+		// init_requester_context(context);
 	}
 
 	fifo_data = k_malloc(sizeof(struct spdm_req_fifo_data));

@@ -13,6 +13,14 @@ int spdm_handle_get_version(void *ctx, void *req, void *rsp)
 	struct spdm_context *context = (struct spdm_context *)ctx;
 	struct spdm_message *req_msg = (struct spdm_message *)req;
 	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
+	int ret;
+
+	if (req_msg->header.spdm_version != SPDM_VERSION) {
+		LOG_ERR("Unsupported header SPDM_VERSION %x", req_msg->header.spdm_version);
+		rsp_msg->header.param1 = SPDM_ERROR_CODE_MAJOR_VERSION_MISMATCH;
+		ret = -1;
+		goto cleanup;
+	}
 
 	rsp_msg->header.request_response_code = SPDM_RSP_VERSION;
 	rsp_msg->header.param1 = 0;
@@ -27,6 +35,10 @@ int spdm_handle_get_version(void *ctx, void *req, void *rsp)
 
 	spdm_context_reset_m1m2_hash(context);
 	spdm_context_update_m1m2_hash(context, req_msg, rsp_msg);
+	
+	ret = 0;
 
-	return 0;
+cleanup:
+
+	return ret;
 }
