@@ -100,6 +100,7 @@ int i2c_master_read(I2C_MSG *msg, uint8_t retry)
 			LOG_HEXDUMP_DBG(msg->data, msg->rx_len, "rxbuf");
 			break;
 		}
+		k_msleep(10);
 	}
 
 	if (i > retry)
@@ -167,6 +168,7 @@ int i2c_master_write(I2C_MSG *msg, uint8_t retry)
 		ret = i2c_write(dev_i2c[msg->bus], txbuf, msg->tx_len, msg->target_addr);
 		if (ret == 0) // i2c write success
 			break;
+		k_msleep(10);
 	}
 
 	if (i > retry)

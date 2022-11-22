@@ -33,6 +33,11 @@ static mctp_smbus_port smbus_port[] = {
 	 .conf.smbus_conf.rot_addr = I2C_ADDR_ROT_FOR_BMC,
 	 .conf.smbus_conf.mbx_port = 0
 	},
+	{
+	 .conf.smbus_conf.bus = I2C_BUS_PCH,
+	 .conf.smbus_conf.rot_addr = I2C_ADDR_ROT_FOR_PCH,
+	 .conf.smbus_conf.mbx_port = 1
+	},
 };
 
 K_SEM_DEFINE(mctp_fifo_state_sem, 0, 1);
