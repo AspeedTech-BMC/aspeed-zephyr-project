@@ -103,6 +103,14 @@ static void handler(void *ctx, void *req, void *rsp)
 	rsp_msg->header.param1 = SPDM_ERROR_CODE_UNSUPPORTED_REQUEST;
 	rsp_msg->header.param2 = 0;
 
+	if (req_msg->header.request_response_code != SPDM_REQ_GET_MEASUREMENTS) {
+		/* 294: Any communication between Requester and Responder other than
+		 *      a GET_MEASUREMENTS request or response resets L1/L2 computation 
+		 *      to null.
+		 */
+		spdm_context_reset_l1l2_hash(context);
+	}
+
 	switch (context->connection_state) {
 	case SPDM_STATE_NOT_READY:
 		/* Only accept GET_VERSION command*/

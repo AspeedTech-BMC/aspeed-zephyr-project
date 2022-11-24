@@ -10,6 +10,7 @@
 #include <logging/log.h>
 
 #include "SPDM/SPDMContext.h"
+#include "SPDM/SPDMCrypto.h"
 #include "SPDM/SPDMBuffer.h"
 #include "SPDM/SPDMDefinitions.h"
 #include "SPDM/SPDMRequester.h"

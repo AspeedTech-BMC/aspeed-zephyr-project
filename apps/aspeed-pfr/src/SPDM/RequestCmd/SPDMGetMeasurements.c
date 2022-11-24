@@ -66,6 +66,13 @@ int spdm_get_measurements(void *ctx, uint8_t request_attribute, uint8_t measurem
 	if (request_attribute == 0x00) {
 		spdm_context_update_l1l2_hash(context, &req_msg, &rsp_msg);
 	} else if (request_attribute == 0x01) {
+		if (rsp_msg.buffer.write_ptr < 96) {
+			LOG_ERR("MEASUREMENTS message length incorrect %d", rsp_msg.buffer.write_ptr);
+			ret = -1;
+			goto cleanup;
+		}
+
+		/* Signature is excluded from L1/L2 Hash */
 		rsp_msg.buffer.write_ptr -= 96;
 		spdm_context_update_l1l2_hash(context, &req_msg, &rsp_msg);
 		rsp_msg.buffer.write_ptr += 96;
@@ -76,36 +83,16 @@ int spdm_get_measurements(void *ctx, uint8_t request_attribute, uint8_t measurem
 		mbedtls_sha512_finish(&context->l1l2_context, hash);
 		spdm_context_reset_l1l2_hash(context);
 
-		mbedtls_mpi r, s;
-		mbedtls_mpi_init(&r);
-		mbedtls_mpi_init(&s);
-
-		mbedtls_mpi_read_binary(&r,
-				(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 48);
-		mbedtls_mpi_read_binary(&s,
-				(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 48, 48);
-
-		mbedtls_x509_crt *cur = &context->remote.certificate.certs[0].chain;
-		while (cur) {
-			if (cur->next != NULL)
-				cur = cur->next;
-			else
-				break;
-		}
-
-		// TODO: Verify the signature with selected leaf certificate
-		ret = mbedtls_ecdsa_verify(
-				&mbedtls_pk_ec(cur->pk)->MBEDTLS_PRIVATE(grp),
-				hash, spdm_context_base_hash_size(context),
-				&mbedtls_pk_ec(cur->pk)->MBEDTLS_PRIVATE(Q),
-				&r, &s);
+		/* DSP0274_1.0.1: 
+		 * 310: Public key associated with the slot 0 certificate of the Responder.
+		 */
+		ret = spdm_crypto_verify(context, 0, hash, 48,
+				(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 96);
 		LOG_INF("GET_MEASUREMENT SIGNATURE VERIFY ret=%x", -ret);
 		if (ret < 0) {
 			LOG_HEXDUMP_ERR(hash, 48, "Requester L2 hash:");
 			ret = -1;
 		}
-		mbedtls_mpi_free(&s);
-		mbedtls_mpi_free(&r);
 	}
 
 cleanup:

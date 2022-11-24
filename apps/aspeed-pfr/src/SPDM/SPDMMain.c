@@ -130,6 +130,7 @@ int get_measurement(void *context,
 		uint8_t measurement_index, uint8_t* measurement_count,
 		uint8_t* measurement, size_t* measurement_size)
 {
+	int ret = 0;
 
 	if (measurement_index == SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER) {
 		/* Return the number of measurements in count */
@@ -151,10 +152,13 @@ int get_measurement(void *context,
 		*measurement_count = 3;
 		*measurement_size = offset;
 	} else {
-		get_measurement_by_index(measurement_index, measurement, measurement_size);
-		*measurement_count = 1;
+		ret = get_measurement_by_index(measurement_index, measurement, measurement_size);
+		if (ret == 0)
+			*measurement_count = 1;
+		else
+			*measurement_count = 0;
 	}
-	return 0;
+	return ret;
 }
 
 void init_requester_context(struct spdm_context *context)

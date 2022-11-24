@@ -131,22 +131,22 @@ void spdm_requester_main(void *a, void *b, void *c)
 				/* Device Attestation */
 				uint8_t number_of_blocks = 0, measurement_block, received_blocks = 0;
 				bool signature_verified = false;
-				ret = spdm_get_measurements(context, 0, SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER, &number_of_blocks);
+
+				spdm_context_reset_l1l2_hash(context);
+				ret = spdm_get_measurements(context, 0,
+						SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER, &number_of_blocks);
 				/* Get 0x01 - 0xFE block */
 				/* TODO: The block_id and measurement should comparing from AFM. Now we just scan it */
-				for (uint8_t block_id = 1; block_id <= 0xfe; ++block_id) {
-					if (received_blocks != number_of_blocks-1) {
-						ret = spdm_get_measurements(context, 0, block_id, &measurement_block);
-						if (ret == 0) {
-							++received_blocks;
-						}
-					} else {
-						ret = spdm_get_measurements(context, SPDM_MEASUREMENT_REQ_ATTR_GEN_SIGNATURE, block_id, &measurement_block);
-						if (ret == 0) {
-							signature_verified = true;
-							break;
-						}
-					}
+				ret = spdm_get_measurements(context, 0, 0x01, &measurement_block);
+				ret = spdm_get_measurements(context, 0, 0x02, &measurement_block);
+				ret = spdm_get_measurements(context, 0, 0x03, &measurement_block);
+				ret = spdm_get_measurements(context, 0, 0x04, &measurement_block);
+				ret = spdm_get_measurements(context, 0, 0x05, &measurement_block);
+				ret = spdm_get_measurements(context, 0, 0xfd, &measurement_block);
+				ret = spdm_get_measurements(context, SPDM_MEASUREMENT_REQ_ATTR_GEN_SIGNATURE,
+						0xfe, &measurement_block);
+				if (ret == 0) {
+					signature_verified = true;
 				}
 				if (signature_verified == false) {
 					/* Recovery the firmware ?? */

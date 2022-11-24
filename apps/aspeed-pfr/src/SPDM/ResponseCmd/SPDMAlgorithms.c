@@ -70,8 +70,10 @@ int spdm_handle_negotiate_algorithms(void *ctx, void *req, void *rsp)
 
 	context->remote.algorithms.length = length;
 	context->remote.algorithms.measurement_spec_sel = measurement_spec_sel;
-	context->remote.algorithms.base_asym_sel = base_asym_sel;
-	context->remote.algorithms.base_hash_sel = base_hash_sel;
+	context->remote.algorithms.base_asym_sel =
+		base_asym_sel & SPDM_ALGORITHMS_BASE_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384;
+	context->remote.algorithms.base_hash_sel =
+		base_hash_sel & SPDM_ALGORITHMS_BASE_HASH_TPM_ALG_SHA_384;
 
 #if 0
 	/* AlgStruct not supported */

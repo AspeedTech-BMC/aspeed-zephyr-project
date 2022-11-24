@@ -25,7 +25,7 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 	uint8_t req_signature = req_msg->header.param1 & 0x01;
 	uint8_t req_measurement = req_msg->header.param2;
 
-	LOG_ERR("GET_MEASUREMENTS[%02x,%02x]", req_msg->header.param1, req_msg->header.param2);
+	LOG_INF("GET_MEASUREMENTS[%02x,%02x]", req_msg->header.param1, req_msg->header.param2);
 	// uint8_t req_nonce[32];
 	// spdm_buffer_get_array(&req_msg->buffer, req_nonce, 32);
 
@@ -57,10 +57,6 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 		spdm_buffer_append_u16(&rsp_msg->buffer, 0);
 
 	} else {
-		/* TODO: Calculate the requested measurements,
-		 *       perhaps a call back for context? 
-		 */
-
 		/* Serialize the result */
 		uint8_t measurement[(48 + 4 + 3) * 3];
 		uint8_t measurement_count;
@@ -69,14 +65,24 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 
 		spdm_buffer_init(&rsp_msg->buffer, 1 + 3 + L + SPDM_NONCE_SIZE + 2 + OL);
 
+		ret = context->get_measurement(context, req_measurement, &measurement_count, measurement, &measurement_size);
+		if (ret < 0) {
+			// Measurement not existed
+			LOG_ERR("GET_MEASUREMENTS[%d] doesn't exist", req_measurement);
+			rsp_msg->header.request_response_code = SPDM_RSP_ERROR;
+			rsp_msg->header.param1 = SPDM_ERROR_CODE_INVALID_REQUEST;
+			rsp_msg->header.param2 = 0;
+			spdm_buffer_release(&rsp_msg->buffer);
 
-		context->get_measurement(context, req_measurement, &measurement_count, measurement, &measurement_size);
+			ret = -1;
+			goto cleanup;
+		}
 		rsp_msg->header.param1 = measurement_count; // Total number of measurements
 
 		/* Number of Blocks (1) */
 		spdm_buffer_append_u8(&rsp_msg->buffer, measurement_count);
 
-		/* MeasurementRecordLength (3): TODO: Support u24? */
+		/* MeasurementRecordLength (3) */
 		spdm_buffer_append_u8(&rsp_msg->buffer, (measurement_size >>  0) & 0xFF);
 		spdm_buffer_append_u8(&rsp_msg->buffer, (measurement_size >>  8) & 0xFF);
 		spdm_buffer_append_u8(&rsp_msg->buffer, (measurement_size >> 16) & 0xFF);
@@ -118,27 +124,13 @@ int spdm_handle_get_measurements(void *ctx, void *req, void *rsp)
 		/* Sign the message */
 		uint8_t sig[MBEDTLS_ECDSA_MAX_LEN];
 		size_t sig_len = 0;
+		ret = spdm_crypto_sign(context, hash, sizeof(hash), sig, &sig_len);
 
-		mbedtls_mpi r, s;
-		mbedtls_mpi_init(&r);
-		mbedtls_mpi_init(&s);
-
-		ret = mbedtls_ecdsa_sign(&context->key_pair.MBEDTLS_PRIVATE(grp),
-				&r, &s, &context->key_pair.MBEDTLS_PRIVATE(d),
-				hash, sizeof(hash), context->random_callback, context);
-		LOG_INF("mbedtls_ecdsa_sign ret=%x", -ret);
-		LOG_HEXDUMP_INF(hash, sizeof(hash), "Responder L1 HASH");
-
-		size_t r_size = mbedtls_mpi_size(&r), s_size = mbedtls_mpi_size(&s);
-		mbedtls_mpi_write_binary(&r, sig, r_size);
-		mbedtls_mpi_write_binary(&s, sig + r_size, s_size);
-		sig_len = r_size + s_size;
-
-		mbedtls_mpi_free(&s);
-		mbedtls_mpi_free(&r);
-		spdm_buffer_resize(&rsp_msg->buffer, rsp_msg->buffer.write_ptr + sig_len);
-		spdm_buffer_append_array(&rsp_msg->buffer, sig, sig_len);
-		if (ret) {
+		if (ret == 0) {
+			spdm_buffer_resize(&rsp_msg->buffer, rsp_msg->buffer.write_ptr + sig_len);
+			spdm_buffer_append_array(&rsp_msg->buffer, sig, sig_len);
+			LOG_HEXDUMP_INF(sig, sig_len, "Signature");
+		} else {
 			LOG_ERR("GET_MEASUREMENTS Failed to sign message");
 			rsp_msg->header.request_response_code = SPDM_RSP_ERROR;
 			rsp_msg->header.param1 = SPDM_ERROR_CODE_UNSPECIFIED;

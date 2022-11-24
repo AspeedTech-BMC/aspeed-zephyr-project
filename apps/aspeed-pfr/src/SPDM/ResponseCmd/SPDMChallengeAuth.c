@@ -93,30 +93,17 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	// - B: Concatenate(GET_DIGEST, DIGEST, GET_CERTIFICATE, CERTIFICATE)
 	// - C: Concatenate(CHALLENGE, CHALLENGE_AUTH\Signature)
 	uint8_t sig[MBEDTLS_ECDSA_MAX_LEN];
+	size_t sig_len;
 
 	// Calculate HASH(M1)
 	spdm_context_update_m1m2_hash(context, req_msg, rsp_msg);
 	mbedtls_sha512_finish(&context->m1m2_context, hash);
 	spdm_context_reset_m1m2_hash(context);
 
-	mbedtls_mpi r, s;
-	mbedtls_mpi_init(&r);
-	mbedtls_mpi_init(&s);
-
-	ret = mbedtls_ecdsa_sign(&context->key_pair.MBEDTLS_PRIVATE(grp),
-			&r, &s, &context->key_pair.MBEDTLS_PRIVATE(d),
-			hash, hash_length, context->random_callback, context);
-	LOG_HEXDUMP_INF(hash, 48, "Responder M1 hash:");
-	LOG_INF("mbedtls_ecdsa_sign ret=%x", -ret);
-
+	ret = spdm_crypto_sign(context, hash, hash_length, sig, &sig_len);
 	if (ret == 0) {
-		size_t r_size = mbedtls_mpi_size(&r), s_size = mbedtls_mpi_size(&s);
-		mbedtls_mpi_write_binary(&r, sig, r_size);
-		mbedtls_mpi_write_binary(&s, sig + r_size, s_size);
-
-		LOG_HEXDUMP_INF(sig, r_size + s_size, "Signature:");
-
-		spdm_buffer_append_array(&rsp_msg->buffer, sig, r_size + s_size);
+		LOG_HEXDUMP_INF(sig, sig_len, "Signature:");
+		spdm_buffer_append_array(&rsp_msg->buffer, sig, sig_len);
 	} else {
 		LOG_ERR("CHALLENGE Failed to sign message");
 		rsp_msg->header.request_response_code = SPDM_RSP_ERROR;
@@ -125,8 +112,6 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 		spdm_buffer_release(&rsp_msg->buffer);
 		ret = -1;
 	}
-	mbedtls_mpi_free(&s);
-	mbedtls_mpi_free(&r);
 
 cleanup:
 	return ret;

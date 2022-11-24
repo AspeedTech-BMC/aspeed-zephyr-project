@@ -60,54 +60,24 @@ int spdm_challenge(void *ctx, uint8_t slot_id, uint8_t measurements)
 	LOG_HEXDUMP_INF(&rsp_msg.header, 4, "CHALLENGE_AUTH HEADER:");
 	LOG_HEXDUMP_DBG(rsp_msg.buffer.data, rsp_msg.buffer.write_ptr, "CHALLENGE_AUTH:");
 
-	// Verify the CHALLENGE_AUTH signature
-	mbedtls_mpi r, s;
-	mbedtls_mpi_init(&r);
-	mbedtls_mpi_init(&s);
+	/* Verify the CHALLENGE_AUTH signature */
 	uint8_t hash[48];
 
-	mbedtls_mpi_read_binary(&r, (uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 48);
-	mbedtls_mpi_read_binary(&s, (uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 48, 48);
-
+	/* Signature is excluded from M1/M2 hash */
 	rsp_msg.buffer.write_ptr -= 96;
 	spdm_context_update_m1m2_hash(context, &req_msg, &rsp_msg);
 	rsp_msg.buffer.write_ptr += 96;
 	mbedtls_sha512_finish(&context->m1m2_context, hash);
 	spdm_context_reset_m1m2_hash(context);
 
-	mbedtls_x509_crt *cur = &context->remote.certificate.certs[slot_id].chain;
-	size_t cert_index = 0;
-	while (cur) {
-		++cert_index;
-		if (cur->next != NULL)
-			cur = cur->next;
-		else {
-#if 0
-			LOG_INF("Found LEAF_CERT[%d]", cert_index);
-			char *buf = malloc(CONFIG_LOG_STRDUP_MAX_STRING);
-			ret = mbedtls_x509_crt_info(buf, CONFIG_LOG_STRDUP_MAX_STRING-1, "\r", cur);
-			if (ret > 0) {
-				buf[ret] = '\0';
-				LOG_INF("Certificate[%d][%d] info:\n%s", slot_id, cert_index, log_strdup(buf));
-			}
-			free(buf);
-#endif
-			break;
-		}
-	}
-
-	ret = mbedtls_ecdsa_verify(
-			&mbedtls_pk_ec(cur->pk)->MBEDTLS_PRIVATE(grp),
-			hash, spdm_context_base_hash_size(context),
-			&mbedtls_pk_ec(cur->pk)->MBEDTLS_PRIVATE(Q),
-			&r, &s);
+	ret = spdm_crypto_verify(context, slot_id,
+			hash, 48,
+			(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 96);
 	LOG_INF("CHALLENG_AUTH SIGNATURE VERIFY ret=%x", -ret);
 	if (ret < 0) {
 		LOG_HEXDUMP_ERR(hash, 48, "Requester M2 hash:");
 		ret = -1;
 	} 
-	mbedtls_mpi_free(&s);
-	mbedtls_mpi_free(&r);
 
 cleanup:
 	spdm_buffer_release(&req_msg.buffer);
