@@ -77,7 +77,7 @@ int spdm_challenge(void *ctx, uint8_t slot_id, uint8_t measurements)
 	if (ret < 0) {
 		LOG_HEXDUMP_ERR(hash, 48, "Requester M2 hash:");
 		ret = -1;
-	} 
+	}
 
 cleanup:
 	spdm_buffer_release(&req_msg.buffer);

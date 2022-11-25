@@ -186,4 +186,9 @@ config PFR_MCTP
 	help
 	  Enable PFR MCTP support.
 
+config PFR_SPDM_ATTESTATION
+	depends on PFR_MCTP
+	default n
+	bool "SPDM attestation support"
+
 source "Kconfig.zephyr"

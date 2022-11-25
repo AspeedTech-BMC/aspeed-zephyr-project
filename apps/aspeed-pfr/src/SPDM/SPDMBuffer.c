@@ -14,6 +14,8 @@
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
+LOG_MODULE_REGISTER(spdm_buffer, CONFIG_LOG_DEFAULT_LEVEL);
+
 int spdm_buffer_init(struct spdm_buffer *buffer, size_t size)
 {
 	if (buffer == NULL) {
@@ -89,6 +91,11 @@ int spdm_buffer_append_u16(struct spdm_buffer *buffer, uint16_t data)
 	return spdm_buffer_append_array(buffer, &data, 2);
 }
 
+int spdm_buffer_append_u24(struct spdm_buffer *buffer, uint32_t data)
+{
+	return spdm_buffer_append_array(buffer, &data, 3);
+}
+
 int spdm_buffer_append_u32(struct spdm_buffer *buffer, uint32_t data)
 {
 	return spdm_buffer_append_array(buffer, &data, 4);
@@ -113,6 +120,8 @@ int spdm_buffer_append_reserved(struct spdm_buffer *buffer, size_t size)
 int spdm_buffer_get_array(struct spdm_buffer *buffer, void *data, size_t size)
 {
 	if (buffer == NULL || buffer->read_ptr + size > buffer->size) {
+		LOG_ERR("spdm_buffer_get_array buffer=%p data=%p read_ptr=%d size=%d buf->size=%d",
+				buffer, data, buffer->read_ptr, size, buffer->size);
 		return -1;
 	}
 
@@ -130,6 +139,11 @@ int spdm_buffer_get_u8(struct spdm_buffer *buffer, uint8_t *data)
 int spdm_buffer_get_u16(struct spdm_buffer *buffer, uint16_t *data)
 {
 	return spdm_buffer_get_array(buffer, data, 2);
+}
+
+int spdm_buffer_get_u24(struct spdm_buffer *buffer, uint32_t *data)
+{
+	return spdm_buffer_get_array(buffer, data, 3);
 }
 
 int spdm_buffer_get_u32(struct spdm_buffer *buffer, uint32_t *data)

@@ -22,6 +22,7 @@ void *spdm_context_create()
 {
 	struct spdm_context *context = (struct spdm_context *)malloc(sizeof(struct spdm_context));
 
+	context->release_connection_data = NULL;
 	context->connection_state = SPDM_STATE_NOT_READY;
 
 	context->local.version.version_number_entry_count = 1;
@@ -113,7 +114,8 @@ void spdm_context_release(void *ctx)
 #endif
 	/* TODO: Assuming the hash algorithm is SHA384 */
 	mbedtls_sha512_free(&context->l1l2_context);
-
+	if (context->release_connection_data)
+		context->release_connection_data(context);
 	free(context);
 }
 

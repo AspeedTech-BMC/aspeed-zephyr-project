@@ -64,15 +64,22 @@ int spdm_mctp_recv(void *ctx, void *buffer, size_t *buffer_size)
 	return 0;
 }
 
-void spdm_mctp_init_req(void *ctx)
+void spdm_mctp_init_req(void *ctx, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;
-	struct spdm_mctp_connection_data *conn = k_malloc(sizeof(struct spdm_mctp_connection_data));
+	struct spdm_mctp_connection_data *conn = malloc(sizeof(struct spdm_mctp_connection_data));
 
-	conn->mctp_inst = find_mctp_by_smbus(0);
-	conn->dst_addr = 0x10;
-	conn->dst_eid = 0x0a;
+	conn->mctp_inst = find_mctp_by_smbus(bus);
+	conn->dst_addr = dst_sa;
+	conn->dst_eid = dst_eid;
 
 	context->connection_data = conn;
 	context->send_recv = spdm_mctp_send_recv;
+}
+
+void spdm_mctp_release_req(void *ctx)
+{
+	struct spdm_context *context = (struct spdm_context *)ctx;
+	struct spdm_mctp_connection_data *conn = context->connection_data;
+	free(conn);
 }

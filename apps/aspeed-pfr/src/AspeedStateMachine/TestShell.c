@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include <zephyr.h>
+#include <sys/sys_heap.h>
 #include <smf.h>
 #include <shell/shell.h>
 #include <logging/log.h>
@@ -243,6 +244,8 @@ static int cmd_asm_ufm_status(const struct shell *shell, size_t argc,
 	shell_print(shell, "Region[1].ActiveRegion = %02x", cpld_update_status.Region[2].ActiveRegion);
 	shell_print(shell, "Region[2].Recoveryregion = %02x", cpld_update_status.Region[2].Recoveryregion);
 
+	shell_print(shell, "Attestation = %02x", cpld_update_status.AttestationFlag);
+
 
 	return 0;
 }
@@ -384,7 +387,8 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 
 	/* PCH Update Intent */
 	(UPDATE_REQUESTED_PCH_PCH_ACT, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchActiveUpdate << 16)))),
-	(UPDATE_REQUESTED_PCH_PCH_RCV, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchRecoveryUpdate << 16))))
+	(UPDATE_REQUESTED_PCH_PCH_RCV, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchRecoveryUpdate << 16)))),
+	(ATTESTATION_FAILED, ATTESTATION_FAILED)
 
 );
 
@@ -491,7 +495,7 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 
 	for (size_t i=0; i < afm.Length/sizeof(AFM_ADDRESS_DEFINITION); ++i) {
 		AFM_ADDRESS_DEFINITION addr;
-		const size_t partition_offset = 0x07e00000; /* Test image coming from Archer City */
+		const size_t partition_offset = 0x80000000;
 		flash_read(dev, offset + 1024 + sizeof(AFM_STRUCTURE) + i*sizeof(AFM_ADDRESS_DEFINITION), &addr, sizeof(AFM_ADDRESS_DEFINITION));
 		shell_print(shell, "+++ AFM ADDR DEFINITION[%d] +++", i);
 		shell_print(shell, "-> Type:0x%02x DevAddr:0x%02x UUID:0x%04x Length:0x%08x AfmAdd:0x%08x",
@@ -1000,16 +1004,9 @@ static int cmd_dice(const struct shell *shell, size_t argc, char **argv)
 }
 #endif // CONFIG_ASPEED_DICE_SHELL
 
-#include <sys/sys_heap.h>
-#if 0
-extern struct sys_heap z_malloc_heap;
-#endif
 extern struct sys_heap _system_heap;
 static int cmd_heap(const struct shell *shell, size_t argc, char **argv)
 {
-#if 0
-	sys_heap_print_info(&z_malloc_heap, true);
-#endif
 	sys_heap_print_info(&_system_heap, true);
 	return 0;
 }

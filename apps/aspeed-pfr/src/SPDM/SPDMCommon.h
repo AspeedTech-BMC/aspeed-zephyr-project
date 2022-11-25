@@ -67,4 +67,4 @@ typedef struct {
 	struct spdm_message *message;
 } spdm_request_data;
 
-
+void init_spdm();

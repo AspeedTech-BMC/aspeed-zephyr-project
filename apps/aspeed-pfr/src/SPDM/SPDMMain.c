@@ -161,9 +161,10 @@ int get_measurement(void *context,
 	return ret;
 }
 
-void init_requester_context(struct spdm_context *context)
+void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid)
 {
-	spdm_mctp_init_req(context);
+	spdm_mctp_init_req(context, bus, dst_sa, dst_eid);
+	context->release_connection_data = spdm_mctp_release_req;
 
 	// Set private/public key pair for signing
 	int ret;
@@ -215,13 +216,14 @@ void init_responder_context(struct spdm_context *context)
 #define SPDM_REQUESTER_PRIO 4
 #define SPDM_REQUESTER_STACK_SIZE 8192
 extern void spdm_requester_main(void *ctx, void *b, void *c);
+extern void spdm_attester_main(void *ctx, void *b, void *c);
 K_THREAD_STACK_DEFINE(spdm_requester_stack, SPDM_REQUESTER_STACK_SIZE);
 struct k_thread spdm_requester_thread_data;
 k_tid_t spdm_requester_tid;
 
 struct spdm_context *context_rsp_oo;
 
-void spdm_main()
+void init_spdm()
 {
 	struct spdm_context *context_rsp = spdm_context_create();
 
@@ -238,7 +240,8 @@ void spdm_main()
 			&spdm_requester_thread_data,
 			spdm_requester_stack,
 			K_THREAD_STACK_SIZEOF(spdm_requester_stack),
-			spdm_requester_main,
+			//spdm_requester_main,
+			spdm_attester_main,
 			NULL, NULL, NULL,
 			SPDM_REQUESTER_PRIO, 0, K_NO_WAIT);
 	k_thread_name_set(spdm_requester_tid, "SPDM REQ");
@@ -249,26 +252,12 @@ void spdm_main()
 
 static int cmd_spdm_req(const struct shell *shell, size_t argc, char **argv)
 {
-	static struct spdm_context *context = NULL;
-	extern struct k_fifo spdm_req_fifo;
-
-	struct spdm_req_fifo_data *fifo_data = NULL;
-
-	if (context == NULL) {
-		// context = spdm_context_create();
-		// init_requester_context(context);
-	}
-
-	fifo_data = k_malloc(sizeof(struct spdm_req_fifo_data));
-	fifo_data->spdm_ctx = context;
-
+	uint16_t uuid = strtol(argv[2], NULL, 16);
 	if (strcmp(argv[1], "remove") == 0) {
-		fifo_data->command = SPDM_REQ_REMOVE;
+		spdm_remove_device(uuid);
 	} else {
-		fifo_data->command = SPDM_REQ_ADD;
+		spdm_add_device(uuid);
 	}
-
-	k_fifo_put(&spdm_req_fifo, fifo_data);
 	return 0;
 }
 
@@ -282,9 +271,38 @@ static int cmd_spdm_rsp(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
+#include <portability/cmsis_os2.h>
+static int cmd_spdm_run(const struct shell *shell, size_t argc, char **argv)
+{
+	spdm_run_attester();
+	return 0;
+}
+
+static int cmd_spdm_stop(const struct shell *shell, size_t argc, char **argv)
+{
+	spdm_stop_attester();
+	return 0;
+}
+
+static int cmd_spdm_enable(const struct shell *shell, size_t argc, char **argv)
+{
+	spdm_enable_attester();
+	return 0;
+}
+
+static int cmd_spdm_get(const struct shell *shell, size_t argc, char **argv)
+{
+	spdm_get_attester();
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_spdm_cmds,
-	SHELL_CMD_ARG(req, NULL, "SPDM Requester: spdm req [add|remove]", cmd_spdm_req, 2, 5),
+	SHELL_CMD_ARG(req, NULL, "SPDM Requester: spdm req add|remove afm_offset", cmd_spdm_req, 3, 5),
 	SHELL_CMD(rsp, NULL, "Run SPDM Responder Thread", cmd_spdm_rsp),
+	SHELL_CMD(enable, NULL, "Stop attestation", cmd_spdm_enable),
+	SHELL_CMD(run, NULL, "Run attestation", cmd_spdm_run),
+	SHELL_CMD(stop, NULL, "Stop attestation", cmd_spdm_stop),
+	SHELL_CMD(get, NULL, "Stop attestation", cmd_spdm_get),
 	SHELL_SUBCMD_SET_END
 );
 

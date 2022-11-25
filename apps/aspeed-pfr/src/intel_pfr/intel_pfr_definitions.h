@@ -126,7 +126,8 @@ typedef struct {
 	uint8_t DecommissionFlag;
 	uint8_t CpldRecovery;
 	uint8_t BmcToPchStatus;
-	uint8_t Reserved[4];
+	uint8_t AttestationFlag;
+	uint8_t Reserved[3];
 } CPLD_STATUS;
 
 #endif // CONFIG_INTEL_PFR

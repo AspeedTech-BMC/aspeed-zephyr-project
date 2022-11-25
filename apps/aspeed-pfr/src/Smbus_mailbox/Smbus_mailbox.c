@@ -1069,6 +1069,37 @@ void EnablePitLevel2(void)
 }
 #endif
 
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+bool IsSpdmAttestationEnabled()
+{
+	// This setting will active/deactive SPDM attestation on next boot.
+	CPLD_STATUS cpld_status;
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+	return cpld_status.AttestationFlag == 0x00 ? true : false;
+}
+
+void EnableSpdmAttestation(bool enable)
+{
+	// This setting will active/deactive SPDM attestation on next boot.
+	CPLD_STATUS cpld_status;
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+	if (enable) {
+		cpld_status.AttestationFlag = 0x00;
+	} else {
+		cpld_status.AttestationFlag = 0xFF;
+	}
+	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+}
+
+void ReadDeviceIdPublicKey(void)
+{
+
+}
+#endif
+
 void lock_provision_flash(void)
 {
 	uint32_t UfmStatus;
@@ -1190,6 +1221,22 @@ void process_provision_command(void)
 		EnablePitLevel2();
 		break;
 #endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	case ENABLE_DEVICE_ATTESTATION_REQUESTS:
+		LOG_INF("Enable SPDM Attestation");
+		EnableSpdmAttestation(true);
+		break;
+	case READ_DEVICE_ID_PUBLIC_KEY:
+		ReadDeviceIdPublicKey();
+		break;
+	case DISABLE_DEVICE_ATTESTATION_REQUESTS:
+		LOG_INF("Disable SPDM Attestation");
+		EnableSpdmAttestation(false);
+		break;
+#endif
+	default:
+		LOG_ERR("Unsupported provision command 0x%02x", UfmCommandData);
+		break;
 	}
 
 	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {

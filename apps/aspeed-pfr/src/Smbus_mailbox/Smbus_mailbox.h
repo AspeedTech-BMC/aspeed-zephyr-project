@@ -327,6 +327,8 @@ void initializeFPLEDs(void);
 unsigned char erase_provision_flash(void);
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
 
+bool IsSpdmAttestationEnabled();
+
 #define UFM_STATUS_LOCK_BIT_MASK                      0b1
 #define UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK 0b10
 #define UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK   0b100

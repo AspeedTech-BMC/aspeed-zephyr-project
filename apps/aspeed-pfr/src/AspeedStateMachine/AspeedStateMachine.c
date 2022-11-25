@@ -45,6 +45,10 @@
 #include "mctp/mctp.h"
 #endif
 
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+#include "SPDM/SPDMCommon.h"
+#endif
+
 #define MAX_UPD_FAILED_ALLOWED 10
 
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
@@ -131,7 +135,13 @@ void do_init(void *o)
 #endif
 #if defined(CONFIG_PFR_MCTP)
 		init_pfr_mctp();
-		spdm_main();
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+		init_spdm();
+		/* Read UFM Setting */
+		if (IsSpdmAttestationEnabled()) {
+			spdm_enable_attester();
+		}
+#endif
 #endif
 		SetPlatformState(CPLD_NIOS_II_PROCESSOR_WAITING_TO_START);
 #if defined(CONFIG_INIT_POWER_SEQUENCE)
@@ -151,6 +161,10 @@ void enter_tmin1(void *o)
 	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	bool bmc_reset_only = false;
 	bool pch_reset_only = false;
+
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	spdm_stop_attester();
+#endif
 
 	LOG_DBG("Start");
 	if (evt_ctx->data.bit8[0] == BmcUpdateIntent) {
@@ -673,6 +687,10 @@ void enter_tzero(void *o)
 	}
 
 enter_tzero_end:
+
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	spdm_run_attester();
+#endif
 	LOG_DBG("End");
 }
 
@@ -1043,6 +1061,16 @@ void enter_runtime(void *o)
 			}
 			break;
 	}
+	spdm_run_attester();
+	LOG_DBG("End");
+}
+
+void exit_runtime(void *o)
+{
+	LOG_DBG("Start");
+
+	spdm_stop_attester();
+
 	LOG_DBG("End");
 }
 
@@ -1168,12 +1196,12 @@ static const struct smf_state state_table[] = {
 	[FIRMWARE_UPDATE] = SMF_CREATE_STATE(NULL, do_update, NULL, &state_table[TMIN1]),
 	[TZERO] = SMF_CREATE_STATE(enter_tzero, NULL, exit_tzero, NULL),
 	[UNPROVISIONED] = SMF_CREATE_STATE(NULL, do_unprovisioned, NULL, &state_table[TZERO]),
-	[RUNTIME] = SMF_CREATE_STATE(enter_runtime, do_runtime, NULL, &state_table[TZERO]),
+	[RUNTIME] = SMF_CREATE_STATE(enter_runtime, do_runtime, exit_runtime, &state_table[TZERO]),
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	[SEAMLESS_UPDATE] = SMF_CREATE_STATE(NULL, do_seamless_update, NULL, &state_table[TZERO]),
 	[SEAMLESS_VERIFY] = SMF_CREATE_STATE(NULL, do_seamless_verify, NULL, &state_table[TZERO]),
 #endif
-	[SYSTEM_LOCKDOWN] = SMF_CREATE_STATE(NULL, do_lockdown, NULL, NULL),
+	[SYSTEM_LOCKDOWN] = SMF_CREATE_STATE(NULL, do_lockdown, NULL, &state_table[TMIN1]),
 	[SYSTEM_REBOOT] = SMF_CREATE_STATE(NULL, do_reboot, NULL, NULL),
 };
 
@@ -1330,6 +1358,11 @@ void AspeedStateMachine(void)
 					break;
 				}
 				next_state = &state_table[SEAMLESS_UPDATE];
+				break;
+#endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+			case ATTESTATION_FAILED:
+				next_state = &state_table[SYSTEM_LOCKDOWN];
 				break;
 #endif
 			default:

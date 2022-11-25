@@ -137,6 +137,7 @@ typedef struct _AFM_ADDRESS_DEFINITION {
 	uint32_t AfmAddress; /* Address of AFM must be at least 4k aligned */
 } AFM_ADDRESS_DEFINITION;
 
+/* TODO: This structure is changed after intel 60686 rev 2.3 to include measurement block index */
 typedef struct _AFM_DEVICE_MEASUREMENT_VALUE {
 	uint8_t PossibleMeasurements;
 	uint8_t ValueType; /* Defined in DSP0274 1.0.0 spec section 4.10 */
@@ -160,7 +161,8 @@ typedef struct _AFM_DEVICE_STRUCTURE {
 	uint8_t Reserved2[20];
 	uint8_t PublicKeyModuleXY[512];
 	uint32_t PublicKeyExponent;
-	uint32_t TotalMeasurements;
+	uint8_t TotalMeasurements;
+	uint8_t Reserved3[3];
 	AFM_DEVICE_MEASUREMENT_VALUE Measurements[];
 } AFM_DEVICE_STRUCTURE;
 

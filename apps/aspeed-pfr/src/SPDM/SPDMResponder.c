@@ -59,7 +59,6 @@ int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t 
 	/* Lookup Context by bus/src_eid */
 	context = find_spdm_context(bus, src_eid);
 
-	k_msleep(10);
 	if (context) {
 		/* Execute the message */
 		memcpy(&req_msg.header, (uint8_t *)buffer+1, sizeof(req_msg.header));
@@ -82,6 +81,13 @@ int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t 
 		spdm_buffer_release(&req_msg.buffer);
 
 		return 0;
+	} else {
+		((uint8_t *)buffer)[0] = 0x05;
+		((uint8_t *)buffer)[1] = SPDM_VERSION;
+		((uint8_t *)buffer)[2] = SPDM_RSP_ERROR;
+		((uint8_t *)buffer)[3] = SPDM_ERROR_CODE_BUSY;
+		((uint8_t *)buffer)[4] = SPDM_ERROR_DATA_BUSY;
+		*length = 5;
 	}
 
 	return -1;

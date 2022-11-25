@@ -73,6 +73,7 @@ struct spdm_context {
 	int (*send)(void *context, void *buffer, size_t buffer_size);
 	int (*recv)(void *context, void *buffer, size_t *buffer_size);
 	int (*send_recv)(void *context, void *request_buffer, void *response_buffer);
+	void (*release_connection_data)(void *context);
 	void *connection_data;
 
 	/* request responsed callback */

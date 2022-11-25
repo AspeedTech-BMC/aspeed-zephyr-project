@@ -53,6 +53,9 @@ enum aspeed_pfr_event {
 #if defined(CONFIG_PIT_PROTECTION)
 	SEAL_FIRMWARE,
 #endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	ATTESTATION_FAILED,
+#endif
 };
 
 union aspeed_event_data {
