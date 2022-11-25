@@ -18,14 +18,7 @@ LOG_MODULE_REGISTER(fwupdate);
 //#define ROT_FWWUP_DEBUG
 #define ROT_FW_SIZE 0x60000
 
-enum {
-	BMC_FLASH_ID = 0,
-	PCH_FLASH_ID = 2,
-	ROT_FLASH_ID = 4,
-	ROT_FMC_CS1  = 5,
-};
-
-static char *flash_devices[6] = {
+char *flash_devices[6] = {
 	"spi1_cs0",
 	"spi1_cs1",
 	"spi2_cs0",
@@ -47,7 +40,7 @@ static uint32_t rot_fw_size = 0;
 static uint8_t staging_src_flash_id = BMC_FLASH_ID;
 static uint8_t ext_mux_level = 0;
 
-static uint8_t flash_buf[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+uint8_t flash_buf[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
 
 void configure_staging_source(union aspeed_event_data *data)
 {

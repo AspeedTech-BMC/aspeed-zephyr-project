@@ -11,6 +11,7 @@
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include "gpio/gpio_ctrl.h"
 #include "sw_mailbox/sw_mailbox.h"
+#include "certificate/cert_verify.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -33,6 +34,10 @@ uint8_t vault_key_buf[64];
 void main(void)
 {
 	uint32_t secure_boot_reg;
+	PFR_DEVID_CERT_INFO *devid_cert_info;
+	uint8_t *cert_chain;
+	uint32_t cert_chain_len;
+
 	BMCBootHold();
 	PCHBootHold();
 
@@ -46,36 +51,84 @@ void main(void)
 	if (secure_boot_reg & SCU_LOW_SECURITY_EN) {
 #endif
 		// Secure boot is enabled
-		// TODO: Check devid certificate type
+		// Get device id certificate from internal flash
+		devid_cert_info = get_certificate_info();
+		if (devid_cert_info == NULL) {
+			DEBUG_HALT();
+		}
 
+		// If certificate type is CSR, it means device id is not provisioned.
+		// Preload firmware should send CSR to HSM for provisioning.
+		// Once preload firmware received signed certificate chain from HSM,
+		// it should verify certificate chain and replace CSR by certificate
+		// chain to complete device id provisioning.
+		// If certificate type is certificate, verify the certificate chain.
+		// Enable firmware update mailbox commands if certificate chain is
+		// verified successfully.
+		if (IS_CSR(devid_cert_info)) {
+			LOG_INF("Sending DeviceID certificate request to HSM...");
+			// TODO:
+			// 1. handshake with HSM
+			// 2. send CSR to HSM
+			// 3. receive certificate chain from HSM
+			//
+			// DONE:
+			// 4. verify certificate chain
+			// 5. replace CSR by singed certificate chain
+			cert_chain = get_certificate_chain(&cert_chain_len);
+			if (verify_certificate(cert_chain, cert_chain_len)) {
+				LOG_ERR("Invalid certificate chain");
+				cleanup_cert_info();
+				DEBUG_HALT();
+			}
+			LOG_INF("Replace CSR by certificate chain");
+			if (write_cert_chain(cert_chain, cert_chain_len)) {
+				LOG_ERR("Certificate chain replacement failed");
+				cleanup_cert_info();
+				DEBUG_HALT();
+			}
+		} else {
+			LOG_INF("Verify certificate chain...");
+			cert_chain = devid_cert_info->cert.data;
+			cert_chain_len = devid_cert_info->cert.length;
+			if (verify_certificate(cert_chain, cert_chain_len)) {
+				LOG_ERR("Invalid certificate chain");
+				cleanup_cert_info();
+				DEBUG_HALT();
+			}
+
+			cleanup_cert_info();
 #if defined(CONFIG_PFR_SW_MAILBOX)
-		init_sw_mailbox();
+			init_sw_mailbox();
 #endif
-
-		BMCBootRelease();
-		PCHBootRelease();
+			BMCBootRelease();
+			PCHBootRelease();
+			LOG_INF("Ready for ROT firmware replacement");
+		}
 	} else {
 		// Secure Boot is not enabled
 		// Perform the following process
+		// TODO:
 		// 1. Update OTP image
 		// 2. Generate vault key
 		// 3. Enable secure boot
 		// 4. Enable CDI
 		// 5. Erase OTP image
-	}
-
 #if 0
-	dev_entropy = device_get_binding(DT_LABEL(DT_NODELABEL(rng)));
-	if (!dev_entropy) {
-		return;
-	}
+		dev_entropy = device_get_binding(DT_LABEL(DT_NODELABEL(rng)));
+		if (!dev_entropy) {
+			LOG_ERR("Hardware random number generator not found");
+			DEBUG_HALT();
+		}
 
-	entropy_get_entropy(dev_entropy, vault_key_buf, sizeof(vault_key_buf));
-	LOG_HEXDUMP_INF(vault_key_buf, sizeof(vault_key_buf), "vault key:");
+		entropy_get_entropy(dev_entropy, vault_key_buf, sizeof(vault_key_buf));
+		LOG_HEXDUMP_INF(vault_key_buf, sizeof(vault_key_buf), "vault key:");
 #endif
+	}
 
 #if defined(CONFIG_ABR_FLOW_CTRL_ASPEED)
 	// Remove this if abr is not enabled.
 	disable_abr_wdt();
 #endif
+
 }

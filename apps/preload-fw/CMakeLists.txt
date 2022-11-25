@@ -19,6 +19,7 @@ target_sources(app PRIVATE ${app_sources})
 
 #message(STATUS "Printing app_sources - ${app_sources}")
 zephyr_link_libraries(mbedTLS)
+zephyr_include_directories(.)
 target_include_directories(
 	app
 	PRIVATE
