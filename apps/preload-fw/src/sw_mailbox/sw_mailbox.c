@@ -73,7 +73,6 @@ K_SEM_DEFINE(rot_checksum1_sem, 0, 1);
 K_SEM_DEFINE(rot_checksum2_sem, 0, 1);
 K_SEM_DEFINE(rot_checksum3_sem, 0, 1);
 
-
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
 	int ret;

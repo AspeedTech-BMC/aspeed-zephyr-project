@@ -15,9 +15,6 @@
 
 LOG_MODULE_REGISTER(fwupdate);
 
-//#define ROT_FWWUP_DEBUG
-#define ROT_FW_SIZE 0x60000
-
 char *flash_devices[6] = {
 	"spi1_cs0",
 	"spi1_cs1",
@@ -27,15 +24,9 @@ char *flash_devices[6] = {
 	"fmc_cs1"
 };
 
-#ifdef ROT_FWWUP_DEBUG
-static uint32_t rot_fw_staging_addr = 0xcde0000;
-static uint32_t rot_fw_checksum = 0xa13f747c;
-static uint32_t rot_fw_size = 0x3c418;
-#else
 static uint32_t rot_fw_staging_addr = 0;
 static uint32_t rot_fw_checksum = 0;
 static uint32_t rot_fw_size = 0;
-#endif
 
 static uint8_t staging_src_flash_id = BMC_FLASH_ID;
 static uint8_t ext_mux_level = 0;
@@ -75,7 +66,7 @@ void set_fw_staging_source(union aspeed_event_data *data)
 		rot_fw_staging_addr |= (data->bit8[1] << 24);
 		break;
 	}
-	LOG_INF("rot_fw_staging_addr : %x\n", rot_fw_staging_addr);
+	LOG_INF("rot_fw_staging_addr : %x", rot_fw_staging_addr);
 }
 
 void set_fw_image_size(union aspeed_event_data *data)
@@ -98,7 +89,7 @@ void set_fw_image_size(union aspeed_event_data *data)
 		rot_fw_size |= (data->bit8[1] << 24);
 		break;
 	}
-	LOG_INF("rot_fw_size : %x\n", rot_fw_size);
+	LOG_INF("rot_fw_size : %x", rot_fw_size);
 }
 
 void set_fw_image_checksum(union aspeed_event_data *data)
@@ -121,7 +112,7 @@ void set_fw_image_checksum(union aspeed_event_data *data)
 		rot_fw_checksum |= (data->bit8[1] << 24);
 		break;
 	}
-	LOG_INF("rot_fw_checksum : %x\n", rot_fw_checksum);
+	LOG_INF("rot_fw_checksum : %x", rot_fw_checksum);
 }
 
 uint32_t cal_checksum(const struct device *dev, uint32_t addr, uint32_t size)
@@ -140,6 +131,14 @@ uint32_t cal_checksum(const struct device *dev, uint32_t addr, uint32_t size)
 	}
 
 	return crc;
+}
+
+const struct device *get_flash_dev(uint8_t flash_id)
+{
+	const struct device *flash_dev;
+	flash_dev = device_get_binding(flash_devices[flash_id]);
+
+	return flash_dev;
 }
 
 int rot_fw_update(void)
@@ -166,7 +165,13 @@ int rot_fw_update(void)
 	}
 
 	BMCSPIHold(ext_mux_level);
+	LOG_INF("flash dev : %s", flash_devices[staging_src_flash_id]);
 	stg_flash_dev = device_get_binding(flash_devices[staging_src_flash_id]);
+	if (stg_flash_dev == NULL) {
+		LOG_ERR("Failed to get BMC flash device");
+		goto fwu_error;
+	}
+
 	flash_sz = flash_get_flash_size(stg_flash_dev);
 
 	if (rot_fw_size > fa->fa_size) {

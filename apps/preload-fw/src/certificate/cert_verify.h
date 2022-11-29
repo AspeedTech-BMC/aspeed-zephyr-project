@@ -13,7 +13,7 @@
 #define SHA256_HASH_LENGTH		  32
 #define SHA384_HASH_LENGTH		  48
 
-#define IS_CSR(info) (info->cert_type == CERT_REQ_TYPE)
+#define IS_CSR(info) (info.cert_type == CERT_REQ_TYPE)
 
 enum cert_type {
 	CERT_TYPE = 0,
@@ -36,9 +36,8 @@ typedef struct {
 	uint8_t cert_type;
 } PFR_DEVID_CERT_INFO;
 
-PFR_DEVID_CERT_INFO *get_certificate_info(void);
-
-uint8_t *get_certificate_chain(uint32_t *cert_chain_len);
+int get_certificate_info(PFR_DEVID_CERT_INFO *devid_cert_info, uint32_t cert_size);
+uint8_t get_certificate_chain(uint8_t *cert_chain, uint32_t *cert_chain_len);
 int verify_certificate(uint8_t *cert_chain, uint32_t cert_chain_len);
 int write_cert_chain(uint8_t *cert_chain, uint32_t cert_chain_len);
 void cleanup_cert_info(void);

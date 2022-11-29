@@ -7,11 +7,11 @@
 #include <logging/log.h>
 #include <zephyr.h>
 #include <build_config.h>
-#include <drivers/entropy.h>
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include "gpio/gpio_ctrl.h"
 #include "sw_mailbox/sw_mailbox.h"
 #include "certificate/cert_verify.h"
+#include "otp/otp_utils.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -29,32 +29,34 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 #define SEC_BASE                     0x7e6f2000
 
 extern void aspeed_print_sysrst_info(void);
+PFR_DEVID_CERT_INFO devid_cert_info;
+uint8_t cert_chain[CERT_CHAIN_SIZE];
 
-uint8_t vault_key_buf[64];
 void main(void)
 {
-	uint32_t secure_boot_reg;
-	PFR_DEVID_CERT_INFO *devid_cert_info;
-	uint8_t *cert_chain;
 	uint32_t cert_chain_len;
+	enum otp_status otp_rc;
+	bool is_secureboot_en;
 
 	BMCBootHold();
 	PCHBootHold();
+	is_secureboot_en = is_otp_secureboot_en(&otp_rc);
+	if (otp_rc) {
+		//DEBUG_HALT();
+		goto out;
+	}
 
 	LOG_INF("*** ASPEED Preload FW version v%02d.%02d Board:%s ***", PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, CONFIG_BOARD);
 	aspeed_print_sysrst_info();
 
-	secure_boot_reg = sys_read32(SCU_HW_STRAP);
-#ifdef SECUREBOOT_ENABLED_BY_OTP
-	if (secure_boot_reg & SCU_OTP_STRAP_EN) {
-#else
-	if (secure_boot_reg & SCU_LOW_SECURITY_EN) {
-#endif
+	if (is_secureboot_en) {
 		// Secure boot is enabled
 		// Get device id certificate from internal flash
-		devid_cert_info = get_certificate_info();
-		if (devid_cert_info == NULL) {
-			DEBUG_HALT();
+		LOG_INF("Secure boot is enabled, handling certificate");
+		if (get_certificate_info(&devid_cert_info, sizeof(devid_cert_info))) {
+			//DEBUG_HALT();
+			LOG_ERR("Failed to get certificate!!!!!!");
+			goto out;
 		}
 
 		// If certificate type is CSR, it means device id is not provisioned.
@@ -75,26 +77,30 @@ void main(void)
 			// DONE:
 			// 4. verify certificate chain
 			// 5. replace CSR by singed certificate chain
-			cert_chain = get_certificate_chain(&cert_chain_len);
+			get_certificate_chain(cert_chain, &cert_chain_len);
+			LOG_INF("Received certificate chain from HSM, verifying");
 			if (verify_certificate(cert_chain, cert_chain_len)) {
 				LOG_ERR("Invalid certificate chain");
 				cleanup_cert_info();
-				DEBUG_HALT();
+				//DEBUG_HALT();
+				goto out;
 			}
 			LOG_INF("Replace CSR by certificate chain");
 			if (write_cert_chain(cert_chain, cert_chain_len)) {
 				LOG_ERR("Certificate chain replacement failed");
 				cleanup_cert_info();
-				DEBUG_HALT();
+				//DEBUG_HALT();
+				goto out;
 			}
+			LOG_INF("Certificate chain is updated successfully");
 		} else {
 			LOG_INF("Verify certificate chain...");
-			cert_chain = devid_cert_info->cert.data;
-			cert_chain_len = devid_cert_info->cert.length;
-			if (verify_certificate(cert_chain, cert_chain_len)) {
+			if (verify_certificate(devid_cert_info.cert.data,
+						devid_cert_info.cert.length)) {
 				LOG_ERR("Invalid certificate chain");
 				cleanup_cert_info();
-				DEBUG_HALT();
+				//DEBUG_HALT();
+				goto out;
 			}
 
 			cleanup_cert_info();
@@ -107,28 +113,24 @@ void main(void)
 		}
 	} else {
 		// Secure Boot is not enabled
-		// Perform the following process
-		// TODO:
-		// 1. Update OTP image
-		// 2. Generate vault key
-		// 3. Enable secure boot
-		// 4. Enable CDI
-		// 5. Erase OTP image
-#if 0
-		dev_entropy = device_get_binding(DT_LABEL(DT_NODELABEL(rng)));
-		if (!dev_entropy) {
-			LOG_ERR("Hardware random number generator not found");
-			DEBUG_HALT();
+		// Write necessary info to OTP memory
+		//
+		// otp_prog() does the following process:
+		//   1. Update OTP image from flash to OTP memory
+		//   2. Generate vault key
+		//   3. Enable secure boot
+		//   4. Enable CDI
+		//   5. Erase OTP image in flash
+		if (otp_prog(OTP_IMAGE_ADDR)) {
+			LOG_ERR("OTP image update failed");
 		}
-
-		entropy_get_entropy(dev_entropy, vault_key_buf, sizeof(vault_key_buf));
-		LOG_HEXDUMP_INF(vault_key_buf, sizeof(vault_key_buf), "vault key:");
-#endif
 	}
 
+out:
+	memset(cert_chain, 0, sizeof(cert_chain));
+	memset(&devid_cert_info, 0, sizeof(devid_cert_info));
 #if defined(CONFIG_ABR_FLOW_CTRL_ASPEED)
 	// Remove this if abr is not enabled.
 	disable_abr_wdt();
 #endif
-
 }

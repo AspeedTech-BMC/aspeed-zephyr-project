@@ -159,11 +159,7 @@
 };
 
 &spi1 {
-#if 0 // Enable for dual flash platform
 	num-cs = <2>;
-#else
-	num-cs = <1>;
-#endif
 	status = "okay";
 };
 
@@ -179,13 +175,11 @@
 	status = "okay";
 };
 
-#if 0 // Enable for dual flash platform
 &spi1_cs1 {
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
 };
-#endif
 
 &spi2_cs0 {
 	spi-max-buswidth = <4>;
@@ -224,7 +218,6 @@
 	status = "okay";
 };
 
-#if 0 // Enable for dual flash platform
 &spim2 {
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
 	log-ram-size = <0x200>;
@@ -235,7 +228,6 @@
 	ext-mux-sel = <1>;
 	status = "okay";
 };
-#endif
 
 &spim3 {
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
@@ -258,10 +250,6 @@
 
 	flash-device = <&spi2_cs1>;
 	ext-mux-sel = <1>;
-	status = "okay";
-};
-
-&sgpiom {
 	status = "okay";
 };
 

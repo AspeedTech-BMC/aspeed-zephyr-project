@@ -25,3 +25,7 @@ manifest:
       remote: gerrit
       revision: aspeed-dev
       path: middlewares/cerberus
+    - name: mcuboot
+      remote: gerrit
+      revision: aspeed-dev-v2.6.0
+      path: bootloader/mcuboot

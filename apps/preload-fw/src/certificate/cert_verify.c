@@ -20,29 +20,26 @@ LOG_MODULE_REGISTER(cert, CONFIG_LOG_DEFAULT_LEVEL);
 #define ALIAS_CERT_AREA_OFFSET        0x2000
 #define CERT_AREA_SIZE                0x2000
 
-static uint8_t cert_buf[CERT_AREA_SIZE] NON_CACHED_BSS_ALIGN16;
 static uint8_t devid_pub_key[ECDSA384_PUBLIC_KEY_SIZE] = {0};
 mbedtls_x509_crt leaf_cert;
 mbedtls_x509_crt root_cert;
 
-PFR_DEVID_CERT_INFO *get_certificate_info(void)
+int get_certificate_info(PFR_DEVID_CERT_INFO *devid_cert_info, uint32_t cert_size)
 {
 	const struct flash_area *fa = NULL;
-	PFR_DEVID_CERT_INFO *devid_cert_info;
 	PFR_CERT_INFO *cert_info;
 	uint8_t cert_hash[SHA256_HASH_LENGTH];
 
 	if (flash_area_open(FLASH_AREA_ID(certificate), &fa)) {
 		LOG_ERR("Failed to open certificate region");
-		return NULL;
+		return -1;
 	}
 
-	if (flash_area_read(fa, DEVID_CERT_AREA_OFFSET, cert_buf, sizeof(cert_buf))) {
+	if (flash_area_read(fa, DEVID_CERT_AREA_OFFSET, devid_cert_info, cert_size)) {
 		LOG_ERR("Failed to read certificate(s) from flash");
 		goto error;
 	}
 
-	devid_cert_info = (PFR_DEVID_CERT_INFO *)cert_buf;
 	cert_info = &devid_cert_info->cert;
 
 	if (cert_info->magic != CERT_INFO_MAGIC_NUM) {
@@ -61,10 +58,10 @@ PFR_DEVID_CERT_INFO *get_certificate_info(void)
 
 	memcpy(devid_pub_key, devid_cert_info->pubkey, ECDSA384_PUBLIC_KEY_SIZE);
 
-	return devid_cert_info;
+	return 0;
 error:
 	flash_area_close(fa);
-	return NULL;
+	return -1;
 }
 
 // Test function
@@ -73,16 +70,14 @@ error:
 // certificate chain size = 1645 bytes
 #define CERT_CHAIN_LENGTH 1645
 
-uint8_t *get_certificate_chain(uint32_t *cert_chain_len)
+uint8_t get_certificate_chain(uint8_t *cert_chain, uint32_t *cert_chain_len)
 {
-	const struct device *dev = device_get_binding("spi1_cs0");
-	uint8_t *cert_chain;
+	const struct device *dev = get_flash_dev(BMC_FLASH_ID);
 	uint32_t cert_addr = 0xd320000;
-	flash_read(dev, cert_addr, cert_buf, CERT_AREA_SIZE);
-	cert_chain = cert_buf;
 	*cert_chain_len = CERT_CHAIN_LENGTH;
+	flash_read(dev, cert_addr, cert_chain, *cert_chain_len);
 
-	return cert_chain;
+	return 0;
 }
 #endif
 
@@ -140,7 +135,7 @@ int verify_certificate(uint8_t *cert_chain, uint32_t cert_chain_len)
 
 		current_cert_len = asn1_len + (tmp_ptr - current_cert);
 
-		// Certificate Chain = Root CA + Intermediate Cert + Leaf Certi
+		// Certificate Chain = Root CA + Intermediate Cert + Leaf Cert
 		if (current_index < 2) {
 			ret = mbedtls_x509_crt_parse_der_nocopy(
 					&root_cert, current_cert, current_cert_len);
@@ -165,7 +160,6 @@ int verify_certificate(uint8_t *cert_chain, uint32_t cert_chain_len)
 		current_index++;
 	}
 
-
 	ret = mbedtls_x509_crt_verify(&leaf_cert, &root_cert, NULL, NULL, &flags, NULL, NULL);
 	if (ret < 0 || flags != 0) {
 		// Verify Failed
@@ -185,7 +179,6 @@ cleanup:
 
 void cleanup_cert_info(void)
 {
-	memset(cert_buf, 0, sizeof(cert_buf));
 	memset(devid_pub_key, 0, sizeof(devid_pub_key));
 }
 

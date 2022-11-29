@@ -1,4 +1,4 @@
-# Sample Certificate
+# Certificate Chain Sample
 
 The folder contains certificates and keys for testing.  
 Preload firmware should verify certificate chain to check whether device id is provisioned.

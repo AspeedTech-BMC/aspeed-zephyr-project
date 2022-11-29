@@ -19,4 +19,18 @@ config SPI_MUX_INVERSE
 	help
 	  Enable if SPI MUX connected to BMC/ROT is inverted
 
+config OTP_SIM
+	depends on !OTP_ASPEED
+	default n
+	bool "Simulate OTP"
+	help
+	  Enable using flash to simulate OTP memory
+
+config OTP_SIM_SHELL
+	depends on OTP_SIM
+	default n
+	bool "OTP shell commands"
+	help
+	  Enable OTP commands for read otp data from flash
+
 source "Kconfig.zephyr"
