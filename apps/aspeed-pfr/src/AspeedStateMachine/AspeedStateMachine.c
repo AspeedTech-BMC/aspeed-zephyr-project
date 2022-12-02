@@ -594,48 +594,40 @@ void enter_tzero(void *o)
 			LOG_ERR("Host firmware is invalid, host won't boot");
 	} else {
 		/* Unprovisioned - Releasing System Reset */
-		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
-			BMCBootRelease();
-			goto enter_tzero_end;
-		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
-			PCHBootRelease();
-			goto enter_tzero_end;
-		} else {
-			if (device_get_binding("spi_m1") != NULL) {
-				Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				SPI_Monitor_Enable("spi_m1", false);
-				LOG_INF("Bypass %s", "spi_m1");
-			}
+		if (device_get_binding("spi_m1") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_READ_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m1", SPI_FILTER_WRITE_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m1", false);
+			LOG_INF("Bypass %s", "spi_m1");
+		}
 
-			if (device_get_binding("spi_m2") != NULL) {
-				Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				SPI_Monitor_Enable("spi_m2", false);
-				LOG_INF("Bypass %s", "spi_m2");
-			}
+		if (device_get_binding("spi_m2") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_READ_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m2", SPI_FILTER_WRITE_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m2", false);
+			LOG_INF("Bypass %s", "spi_m2");
+		}
 
-			if (device_get_binding("spi_m3") != NULL) {
-				Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				SPI_Monitor_Enable("spi_m3", false);
-				LOG_INF("Bypass %s", "spi_m3");
-			}
+		if (device_get_binding("spi_m3") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_READ_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m3", SPI_FILTER_WRITE_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m3", false);
+			LOG_INF("Bypass %s", "spi_m3");
+		}
 
-			if (device_get_binding("spi_m4") != NULL) {
-				Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV,
-						SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-				SPI_Monitor_Enable("spi_m4", false);
-				LOG_INF("Bypass %s", "spi_m4");
-			}
+		if (device_get_binding("spi_m4") != NULL) {
+			Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_READ_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			Set_SPI_Filter_RW_Region("spi_m4", SPI_FILTER_WRITE_PRIV,
+					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+			SPI_Monitor_Enable("spi_m4", false);
+			LOG_INF("Bypass %s", "spi_m4");
 		}
 
 		/* Releasing I2C Filter */
@@ -670,8 +662,14 @@ void enter_tzero(void *o)
 			LOG_INF("Bypass %s", dev->name);
 		}
 
-		BMCBootRelease();
-		PCHBootRelease();
+		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
+			BMCBootRelease();
+		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
+			PCHBootRelease();
+		} else {
+			BMCBootRelease();
+			PCHBootRelease();
+		}
 	}
 
 enter_tzero_end:
