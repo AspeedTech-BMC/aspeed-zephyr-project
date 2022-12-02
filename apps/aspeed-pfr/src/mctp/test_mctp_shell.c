@@ -11,6 +11,7 @@
 #include "mctp/mctp_interface.h"
 #include "mctp_utils.h"
 #include "plat_mctp.h"
+#include "cmd_interface/device_manager.h"
 
 // #define MCTP_TEST_DEBUG
 static uint8_t request_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_BODY] = {0};
@@ -175,9 +176,39 @@ exit:
 	return 0;
 }
 
+static int cmd_mctp_show_device(const struct shell *shell, size_t argc, char **argv)
+{
+	ARG_UNUSED(shell);
+
+	struct device_manager *device_mgr = NULL;
+	mctp *mctp_inst = NULL;
+	uint8_t bus_num;
+	int i;
+
+	bus_num = strtol(argv[1], NULL, 16);
+
+	mctp_inst = find_mctp_by_smbus(bus_num);
+	if (mctp_inst == NULL) {
+		shell_error(shell, "mctp instance not found");
+		goto exit;
+	}
+
+	device_mgr = &mctp_inst->mctp_wrapper.device_mgr;
+	for (i = 0; i < device_mgr->num_devices; i++) {
+		shell_print(shell, "device %d:", i);
+		shell_print(shell, "          addr = 0x%02x", device_manager_get_device_addr(device_mgr, i));
+		shell_print(shell, "          eid = %d", device_manager_get_device_eid(device_mgr, i));
+		shell_print(shell, "          max_message_len = %d", device_manager_get_max_message_len(device_mgr, i));
+		shell_print(shell, "          max_transmission_unit = %d", device_manager_get_max_transmission_unit(device_mgr, i));
+	}
+exit:
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 	SHELL_CMD_ARG(send, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <option:payload>", cmd_mctp_send_msg, 7, 255),
 	SHELL_CMD_ARG(echo, NULL, "<bus> <dest_addr> <dest_eid> <payload_length> <option:default 1 time>", cmd_mctp_echo_test, 5, 1),
+	SHELL_CMD_ARG(device, NULL, "<bus>", cmd_mctp_show_device, 2, 0),
 	SHELL_SUBCMD_SET_END
 );
 
