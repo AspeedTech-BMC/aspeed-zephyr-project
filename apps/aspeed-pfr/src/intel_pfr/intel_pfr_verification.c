@@ -105,7 +105,7 @@ int intel_pfr_pit_level2_verify(void)
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
-	spi_flash->spi.device_id[0] = BMC_TYPE;
+	spi_flash->spi.state->device_id[0] = BMC_TYPE;
 	pfr_manifest->image_type = BMC_TYPE;
 	pfr_manifest->pfr_hash->length = flash_size;
 	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
@@ -130,7 +130,7 @@ int intel_pfr_pit_level2_verify(void)
 
 	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-	spi_flash->spi.device_id[0] = PCH_TYPE;
+	spi_flash->spi.state->device_id[0] = PCH_TYPE;
 	pfr_manifest->image_type = PCH_TYPE;
 	pfr_manifest->pfr_hash->length = flash_size;
 	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
