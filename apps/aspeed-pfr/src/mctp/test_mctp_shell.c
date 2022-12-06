@@ -12,6 +12,7 @@
 #include "mctp_utils.h"
 #include "plat_mctp.h"
 #include "cmd_interface/device_manager.h"
+#include "logging/logging_wrapper.h"
 
 // #define MCTP_TEST_DEBUG
 static uint8_t request_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_BODY] = {0};
@@ -19,8 +20,6 @@ static uint8_t message_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN] = {0};
 
 static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv)
 {
-	ARG_UNUSED(shell);
-
 	struct mctp_interface *mctp_interface = NULL;
 	mctp *mctp_inst = NULL;
 	int req_len = argc - 4;
@@ -69,8 +68,6 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 
 static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **argv)
 {
-	ARG_UNUSED(shell);
-
 	struct mctp_interface *mctp_interface = NULL;
 	uint8_t resp_header[4] = { 0 };
 	uint32_t payload_length;
@@ -178,8 +175,6 @@ exit:
 
 static int cmd_mctp_show_device(const struct shell *shell, size_t argc, char **argv)
 {
-	ARG_UNUSED(shell);
-
 	struct device_manager *device_mgr = NULL;
 	mctp *mctp_inst = NULL;
 	uint8_t bus_num;
@@ -205,10 +200,35 @@ exit:
 	return 0;
 }
 
+static int cmd_mctp_dump_log(const struct shell *shell, size_t argc, char **argv)
+{
+	ARG_UNUSED(shell);
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	debug_msg_display();
+	return 0;
+}
+
+static int cmd_mctp_clear_log(const struct shell *shell, size_t argc, char **argv)
+{
+	ARG_UNUSED(shell);
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	debug_log_clear();
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_log_cmds,
+	SHELL_CMD_ARG(dump, NULL, "dump log", cmd_mctp_dump_log, 1, 0),
+	SHELL_CMD_ARG(clear, NULL, "clear log", cmd_mctp_clear_log, 1, 0),
+	SHELL_SUBCMD_SET_END
+);
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 	SHELL_CMD_ARG(send, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <option:payload>", cmd_mctp_send_msg, 7, 255),
 	SHELL_CMD_ARG(echo, NULL, "<bus> <dest_addr> <dest_eid> <payload_length> <option:default 1 time>", cmd_mctp_echo_test, 5, 1),
 	SHELL_CMD_ARG(device, NULL, "<bus>", cmd_mctp_show_device, 2, 0),
+	SHELL_CMD(log, &sub_mctp_log_cmds, "Log Commands", NULL),
 	SHELL_SUBCMD_SET_END
 );
 

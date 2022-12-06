@@ -30,6 +30,7 @@
 #include "StateMachineAction/StateMachineActions.h"
 #include "pfr/pfr_util.h"
 #include "gpio/gpio_aspeed.h"
+#include "logging/logging_wrapper.h"
 #include "manifestProcessor/manifestProcessor.h"
 #include "pfr/pfr_recovery.h"
 #include "pfr/pfr_verification.h"
@@ -98,6 +99,7 @@ void do_init(void *o)
 #endif
 	initializeEngines();
 	initializeManifestProcessor();
+	debug_log_init();
 	spim_irq_init();
 
 	// DEBUG_HALT();
