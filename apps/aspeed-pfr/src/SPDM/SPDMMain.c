@@ -8,6 +8,7 @@
 #include <mbedtls/ecp.h>
 
 #include <soc.h>
+#include <portability/cmsis_os2.h>
 
 #include "SPDM/SPDMCommon.h"
 #include "SPDM/SPDMMctpBinding.h"
@@ -55,6 +56,7 @@ int get_measurement_by_index(uint8_t measurement_index, uint8_t *measurement, si
 			ret = flash_area_open(FLASH_AREA_ID(active), &area_measured);
 			area_size = FLASH_AREA_SIZE(active);
 			break;
+#if 0
 		case 2:
 			ret = flash_area_open(FLASH_AREA_ID(active), &area_measured);
 			area_size = FLASH_AREA_SIZE(active);
@@ -63,6 +65,7 @@ int get_measurement_by_index(uint8_t measurement_index, uint8_t *measurement, si
 			ret = flash_area_open(FLASH_AREA_ID(recovery), &area_measured);
 			area_size = FLASH_AREA_SIZE(recovery);
 			break;
+#endif
 		default:
 			ret = -1;
 			break;
@@ -134,7 +137,7 @@ int get_measurement(void *context,
 
 	if (measurement_index == SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER) {
 		/* Return the number of measurements in count */
-		*measurement_count = 3;
+		*measurement_count = 1;
 		*measurement_size = 0;
 	} else if (measurement_index == SPDM_MEASUREMENT_OPERATION_ALL_MEASUREMENTS) {
 		/* Calculate all measurements */
@@ -143,6 +146,7 @@ int get_measurement(void *context,
 		offset += *measurement_size;
 		remain_size -= *measurement_size;
 		*measurement_size = remain_size;
+#if 0
 		get_measurement_by_index(2, measurement + offset, measurement_size);
 		offset += *measurement_size;
 		remain_size -= *measurement_size;
@@ -151,6 +155,7 @@ int get_measurement(void *context,
 		offset += *measurement_size;
 		*measurement_count = 3;
 		*measurement_size = offset;
+#endif
 	} else {
 		ret = get_measurement_by_index(measurement_index, measurement, measurement_size);
 		if (ret == 0)
@@ -245,6 +250,9 @@ void init_spdm()
 			NULL, NULL, NULL,
 			SPDM_REQUESTER_PRIO, 0, K_NO_WAIT);
 	k_thread_name_set(spdm_requester_tid, "SPDM REQ");
+
+	extern osEventFlagsId_t spdm_attester_event;
+	spdm_attester_event = osEventFlagsNew(NULL);
 }
 
 #if defined(CONFIG_SHELL)

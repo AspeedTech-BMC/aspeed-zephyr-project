@@ -6,6 +6,9 @@
 
 #if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
+#include <storage/flash_map.h>
+#include <flash/flash_aspeed.h>
+
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_verification.h"
@@ -20,6 +23,9 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 {
 	int status = 0;
 	uint32_t read_address;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	bool verify_afm = false;
+#endif
 
 	LOG_INF("Verify recovery");
 
@@ -33,6 +39,18 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == AFM_TYPE) {
+		read_address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
+		manifest->pc_type = PFR_AFM;
+		manifest->image_type = BMC_TYPE;
+		verify_afm = true;
+	}
+#endif
+	else {
+		LOG_ERR("Incorrect manifest image_type");
+		return Failure;
+	}
 
 	manifest->address = read_address;
 
@@ -45,11 +63,19 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 		LOG_ERR("Verify recovery capsule failed");
 		return Failure;
 	}
-
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	if (verify_afm)
+		manifest->pc_type = PFR_AFM;
+	else if (manifest->image_type == BMC_TYPE)
+		manifest->pc_type = PFR_BMC_PFM;
+	else if (manifest->image_type == PCH_TYPE)
+		manifest->pc_type = PFR_PCH_PFM;
+#else
 	if (manifest->image_type == BMC_TYPE)
 		manifest->pc_type = PFR_BMC_PFM;
 	else if (manifest->image_type == PCH_TYPE)
 		manifest->pc_type = PFR_PCH_PFM;
+#endif
 
 	// Recovery region PFM verification
 	manifest->address += PFM_SIG_BLOCK_SIZE;
@@ -87,7 +113,13 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 				sizeof(read_address));
 		manifest->pc_type = PFR_PCH_PFM;
 	}
-
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == ROT_INTERNAL_AFM) {
+		/* Fixed partition so starts from zero */
+		read_address = 0;
+		manifest->pc_type = PFR_AFM;
+	}
+#endif
 	manifest->address = read_address;
 
 	LOG_INF("Active Firmware Verification");

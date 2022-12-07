@@ -142,6 +142,9 @@ void do_init(void *o)
 		/* Read UFM Setting */
 		if (IsSpdmAttestationEnabled()) {
 			spdm_enable_attester();
+			SetProvisionStatus2(0x01);
+		} else {
+			SetProvisionStatus2(0x00);
 		}
 #endif
 #endif
@@ -163,10 +166,6 @@ void enter_tmin1(void *o)
 	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	bool bmc_reset_only = false;
 	bool pch_reset_only = false;
-
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
-	spdm_stop_attester();
-#endif
 
 	LOG_DBG("Start");
 	if (evt_ctx->data.bit8[0] == BmcUpdateIntent) {
@@ -233,6 +232,17 @@ void verify_image(uint32_t image, uint32_t operation, uint32_t flash, struct smf
 			state->pch_active_object.RecoveryImageStatus = ret ? Failure : Success;
 		}
 	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (image == AFM_EVENT) {
+		if (operation == VERIFY_ACTIVE) {
+			LOG_INF("authentication_image afm active return %d", ret);
+			state->afm_active_object.ActiveImageStatus = ret ? Failure : Success;
+		} else if (operation == VERIFY_BACKUP) {
+			LOG_INF("authentication_image afm backup return %d", ret);
+			state->afm_active_object.RecoveryImageStatus = ret ? Failure : Success;
+		}
+	}
+#endif
 }
 
 #if defined(CONFIG_PIT_PROTECTION)
@@ -371,6 +381,12 @@ void handle_image_verification(void *o)
 				SetPlatformState(PCH_FLASH_AUTH);
 				verify_image(PCH_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
 				verify_image(PCH_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+				// SetPlatformState(AFM_FLASH_AUTH); // Not defined in documented
+				verify_image(AFM_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
+				verify_image(AFM_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+#endif
 			}
 
 
@@ -396,14 +412,21 @@ void handle_image_verification(void *o)
 			LOG_INF("BMC image verification recovery=%s active=%s",
 					state->bmc_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->bmc_active_object.ActiveImageStatus ? "Bad" : "Good");
+			last_bmc_recovery_verify_status = state->bmc_active_object.RecoveryImageStatus;
+			last_bmc_active_verify_status = state->bmc_active_object.ActiveImageStatus;
+
 			LOG_INF("PCH image verification recovery=%s active=%s",
 					state->pch_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->pch_active_object.ActiveImageStatus ? "Bad" : "Good");
-
-			last_bmc_recovery_verify_status = state->bmc_active_object.RecoveryImageStatus;
-			last_bmc_active_verify_status = state->bmc_active_object.ActiveImageStatus;
 			last_pch_recovery_verify_status = state->pch_active_object.RecoveryImageStatus;
 			last_pch_active_verify_status = state->pch_active_object.ActiveImageStatus;
+
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+			LOG_INF("AFM image verification recovery=%s active=%s",
+					state->afm_active_object.RecoveryImageStatus ? "Bad" : "Good",
+					state->afm_active_object.ActiveImageStatus ? "Bad" : "Good");
+#endif
+
 
 			if (evt_ctx->event != RECOVERY_DONE) {
 				if (state->pch_active_object.ActiveImageStatus == Failure
@@ -689,10 +712,6 @@ void enter_tzero(void *o)
 	}
 
 enter_tzero_end:
-
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
-	spdm_run_attester();
-#endif
 	LOG_DBG("End");
 }
 
@@ -767,6 +786,9 @@ void handle_checkpoint(void *o)
 		if (evt_ctx->data.bit8[1] == 0x09)
 			SetPlatformState(T0_BMC_BOOTED);
 		UpdateBmcCheckpoint(evt_ctx->data.bit8[1]);
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+		spdm_run_attester();
+#endif
 		break;
 	case AcmCheckpoint:
 		if (evt_ctx->data.bit8[1] == 0x09)
@@ -1063,7 +1085,7 @@ void enter_runtime(void *o)
 			}
 			break;
 	}
-	spdm_run_attester();
+
 	LOG_DBG("End");
 }
 
@@ -1071,7 +1093,9 @@ void exit_runtime(void *o)
 {
 	LOG_DBG("Start");
 
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	spdm_stop_attester();
+#endif
 
 	LOG_DBG("End");
 }

@@ -148,6 +148,15 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	BmcSeamlessUpdateIntent = 0x62,
 #endif
 	Reserved                = 0x63,
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	AfmActiveSvn            = 0x74,
+	AfmActiveMajorVersion   = 0x75,
+	AfmActiveMinorVersion   = 0x76,
+	AfmRecoverSvn           = 0x77,
+	AfmRecoverMajorVersion  = 0x78,
+	AfmRecoverMinorVersion  = 0x79,
+	ProvisionStatus2        = 0x7a,
+#endif
 	AcmBiosScratchPad       = 0x80,
 	BmcScratchPad           = 0xc0,
 } SMBUS_MAILBOX_RF_ADDRESS;
@@ -308,6 +317,20 @@ byte GetBmcPfmRecoverMajorVersion(void);
 void SetBmcPfmRecoverMajorVersion(byte RecoverMajorVersion);
 byte GetBmcPfmRecoverMinorVersion(void);
 void SetBmcPfmRecoverMinorVersion(byte RecoverMinorVersion);
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+byte GetAfmActiveSvn(void);
+void SetAfmActiveSvn(byte ActiveSVN);
+byte GetAfmActiveMajorVersion(void);
+void SetAfmActiveMajorVersion(byte ActiveMajorVersion);
+byte GetAfmActiveMinorVersion(void);
+void SetAfmActiveMinorVersion(byte ActiveMinorVersion);
+byte GetAfmRecoverSvn(void);
+void SetAfmRecoverSvn(byte RecoverSVN);
+byte GetAfmRecoverMajorVersion(void);
+void SetAfmRecoverMajorVersion(byte RecoverMajorVersion);
+byte GetAfmRecoverMinorVersion(void);
+void SetAfmRecoverMinorVersion(byte RecoverMinorVersion);
+#endif
 byte *GetCpldFpgaRotHash(void);
 void SetCpldFpgaRotHash(byte *HashData);
 byte *GetAcmBiosScratchPad(void);

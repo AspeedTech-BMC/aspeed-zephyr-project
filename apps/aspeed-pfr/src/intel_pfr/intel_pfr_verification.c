@@ -206,7 +206,8 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 int validate_pc_type(struct pfr_manifest *manifest, uint32_t pc_type)
 {
 	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_SEAMLESS_UPDATE_CAPSULE) {
-		LOG_ERR("Validation PC Type failed, block0_read_pc_type = %x, manifest_pc_type = %x", pc_type, manifest->pc_type);
+		LOG_ERR("Validation PC Type failed, block0_read_pc_type = %x, manifest_pc_type = %x",
+				pc_type, manifest->pc_type);
 		return Failure;
 	}
 
@@ -370,9 +371,15 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		sign_bit_verify = SIGN_PCH_UPDATE_BIT1;
 	}
 #endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->pc_type == PFR_AFM) {
+		sign_bit_verify = SIGN_AFM_UPDATE_BIT5;
+	}
+#endif
 
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
-		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x", block1_buffer->CskEntryInitial.KeyPermission);
+		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x",
+				block1_buffer->CskEntryInitial.KeyPermission);
 		return Failure;
 	}
 
@@ -384,7 +391,8 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		}
 	}
 
-	status = get_buffer_hash(manifest, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic, CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out);
+	status = get_buffer_hash(manifest, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic,
+			CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out);
 	if (status != Success) {
 		LOG_ERR("Block1 CSK Entry: Get hash failed");
 		return Failure;

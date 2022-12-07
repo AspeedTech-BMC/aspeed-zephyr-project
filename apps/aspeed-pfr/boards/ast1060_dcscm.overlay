@@ -189,8 +189,9 @@
 			reg = <0xE0000 0x10000>;
 		};
 
-		afm_partition: partition@5 {
-			label = "afm";
+		/* For Intel-PFR 3.0 */
+		afm_act_1_partition: partition@5 {
+			label = "afm_act_1";
 			reg = <0xF0000 0x10000>;
 		};
 	};
@@ -200,6 +201,34 @@
 	status = "okay";
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+#if 0
+		/* Reserved for Intel-PFR 4.0 */
+		afm_act_1_partition: partition@0 {
+			label = "afm_active_1";
+			reg = <0x0 0x80000>;
+		};
+
+		afm_act_2_partition: partition@1 {
+			label = "afm_active_2";
+		}
+			reg = <0x80000 0x80000>;
+
+		afm_rcv_1_partition: partition@2 {
+			label = "afm_recovery_1";
+			reg = <0x100000 0x80000>;
+		};
+
+		afm_rcv_2_partition: partition@3 {
+			label = "afm_recovery_2";
+			reg = <0x180000 0x80000>;
+		};
+#endif
+	};
 };
 
 &spi1 {

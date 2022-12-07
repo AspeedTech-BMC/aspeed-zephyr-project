@@ -36,14 +36,24 @@ int authentication_image(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI
-		LOG_INF("Image Type: BMC ");
+		LOG_INF("Image Type: BMC");
 		pfr_manifest->image_type = BMC_TYPE;
 
-	} else  {
+	} else if (EventData->image == PCH_EVENT) {
 		// PCH SPI
-		LOG_INF("Image Type: PCH ");
+		LOG_INF("Image Type: PCH");
 		pfr_manifest->image_type = PCH_TYPE;
 	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (EventData->image == AFM_EVENT) {
+		// AFM Image
+		LOG_INF("Image Type: AFM");
+		if (EventData->operation == VERIFY_BACKUP)
+			pfr_manifest->image_type = AFM_TYPE;
+		else
+			pfr_manifest->image_type = ROT_INTERNAL_AFM;
+	}
+#endif
 
 	if (EventData->operation == VERIFY_BACKUP) {
 		status = pfr_manifest->recovery_base->verify((struct recovery_image *)pfr_manifest,

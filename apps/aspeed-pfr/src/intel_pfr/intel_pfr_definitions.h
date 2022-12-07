@@ -13,6 +13,14 @@
 #define BMC_TYPE                        0
 #define PCH_TYPE                        2
 
+/* For Intel-PFR 3.0 */
+#if 1
+#define AFM_TYPE                        4
+#else
+/* Reserved for Intel-PFR 4.0 */
+#define AFM_TYPE                        5
+#endif
+
 #define UFM0                            4
 #define UFM0_SIZE                       512
 
@@ -81,6 +89,7 @@
 #define SIGN_BMC_PFM_BIT2               0x00000004
 #define SIGN_BMC_UPDATE_BIT3            0x00000008
 #define SIGN_CPLD_UPDATE_BIT4           0x00000010
+#define SIGN_AFM_UPDATE_BIT5            0x00000020
 #define SIGN_CPLD_UPDATE_BIT9           0x00000200
 
 #define SHA384_SIZE                     48

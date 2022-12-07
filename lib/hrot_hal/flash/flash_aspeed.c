@@ -182,9 +182,11 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = flash_area_open(FLASH_AREA_ID(certificate), &partition_device);
 		break;
 #endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	case ROT_INTERNAL_AFM:
-		ret = flash_area_open(FLASH_AREA_ID(afm), &partition_device);
+		ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &partition_device);
 		break;
+#endif
 	default:
 		ret = -1;
 		break;

@@ -147,6 +147,16 @@ config BMC_PFR_STAGING_OFFSET
 	help
 	  The starting offset of PFR staging region, and this is for Cerberus PFR provisioning.
 
+config BMC_AFM_RECOVERY_OFFSET
+	depends on PFR_SPDM_ATTESTATION
+	default 0x0d300000
+	hex "AFM recovery region in BMC flash"
+
+config BMC_AFM_STAGING_OFFSET
+	depends on PFR_SPDM_ATTESTATION
+	default 0x0d2e0000
+	hex "AFM staging region in BMC flash"
+
 config INIT_POWER_SEQUENCE
 	default n
 	bool "Wait for CPLD power sequence to start PFR functionality"

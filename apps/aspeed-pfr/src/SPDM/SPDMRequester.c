@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(spdm_req, CONFIG_LOG_DEFAULT_LEVEL);
 
 static void spdm_attester_tick(struct k_timer *timeer);
 
-static osEventFlagsId_t spdm_attester_event;
+osEventFlagsId_t spdm_attester_event;
 K_TIMER_DEFINE(spdm_attester_timer, spdm_attester_tick, NULL);
 
 int spdm_send_request(void *ctx, void *req, void *rsp)
@@ -204,7 +204,6 @@ AFM_DEVICE_STRUCTURE *afm_list[8] = {0};
 void spdm_attester_main(void *a, void *b, void *c)
 {
 	uint32_t events;
-	spdm_attester_event = osEventFlagsNew(NULL);
 	osEventFlagsWait(spdm_attester_event, SPDM_REQ_EVT_ENABLE, osFlagsNoClear, osWaitForever);
 	LOG_INF("SPDM Attester Thread Enabled");
 
@@ -315,7 +314,6 @@ void spdm_attester_main(void *a, void *b, void *c)
 	}
 }
 
-K_FIFO_DEFINE(spdm_req_fifo);
 void spdm_enable_attester()
 {
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_ENABLE);
@@ -323,8 +321,11 @@ void spdm_enable_attester()
 
 void spdm_run_attester()
 {
+	afm_list[0] = (uint8_t *)0x80000000 + 0xf1400;
+	afm_list[1] = (uint8_t *)0x80000000 + 0xf2400;
+
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0);
-	k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_MINUTES(1));
+	k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_SECONDS(3));
 }
 
 void spdm_stop_attester()

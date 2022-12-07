@@ -503,6 +503,15 @@ MBX_REG_SETTER_GETTER(PchPfmRecoverMinorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverSvn);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+MBX_REG_SETTER_GETTER(AfmActiveSvn);
+MBX_REG_SETTER_GETTER(AfmActiveMajorVersion);
+MBX_REG_SETTER_GETTER(AfmActiveMinorVersion);
+MBX_REG_SETTER_GETTER(AfmRecoverSvn);
+MBX_REG_SETTER_GETTER(AfmRecoverMajorVersion);
+MBX_REG_SETTER_GETTER(AfmRecoverMinorVersion);
+MBX_REG_SETTER_GETTER(ProvisionStatus2);
+#endif
 
 #if defined(CONFIG_FRONT_PANEL_LED)
 #include <drivers/timer/aspeed_timer.h>

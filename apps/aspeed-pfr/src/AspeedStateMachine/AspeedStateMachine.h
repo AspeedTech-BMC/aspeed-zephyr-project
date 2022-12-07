@@ -90,6 +90,9 @@ struct smf_context {
 	/* Firmware state */
 	AO_DATA bmc_active_object;
 	AO_DATA pch_active_object;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	AO_DATA afm_active_object;
+#endif
 };
 
 extern struct k_fifo aspeed_sm_fifo;
