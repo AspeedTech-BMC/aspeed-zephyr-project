@@ -8,6 +8,7 @@
 #if defined(CONFIG_SHELL)
 #include <zephyr.h>
 #include <shell/shell.h>
+#include <stdlib.h>
 #include "mctp/mctp_interface.h"
 #include "mctp_utils.h"
 #include "plat_mctp.h"

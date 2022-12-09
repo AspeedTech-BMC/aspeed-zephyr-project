@@ -41,7 +41,7 @@ int cmd_channel_mctp_receive_packet(struct cmd_channel *channel, struct cmd_pack
 	LOG_DBG("pkt_size = %d", packet->pkt_size);
 	LOG_DBG("dest_addr = %x", packet->dest_addr);
 	LOG_DBG("state = %d", packet->state);
-	LOG_DBG("pkt_timeout = %lld", packet->pkt_timeout.ticks);
+	LOG_DBG("pkt_timeout = %lld", packet->pkt_timeout);
 	LOG_DBG("timeout_valid = %d", packet->timeout_valid);
 
 	if (packet->state == CMD_OVERFLOW_PACKET)
@@ -79,7 +79,7 @@ int cmd_channel_mctp_send_packet(struct cmd_channel *channel, struct cmd_packet 
 	LOG_DBG("pkt_size = %d", packet->pkt_size);
 	LOG_DBG("dest_addr = %x", packet->dest_addr);
 	LOG_DBG("state = %d", packet->state);
-	LOG_DBG("pkt_timeout = %lld", packet->pkt_timeout.ticks);
+	LOG_DBG("pkt_timeout = %lld", packet->pkt_timeout);
 	LOG_DBG("timeout_valid = %d", packet->timeout_valid);
 
 	if (packet->state != CMD_VALID_PACKET)

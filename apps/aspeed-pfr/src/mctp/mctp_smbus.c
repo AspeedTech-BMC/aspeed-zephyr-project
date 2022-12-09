@@ -38,6 +38,7 @@ static uint16_t mctp_smbus_read(void *mctp_p, void *msg_p)
 	packet->dest_addr = mctp_inst->medium_conf.smbus_conf.rot_addr;
 	packet->pkt_size = 1;
 	packet->timeout_valid = 0;
+	packet->pkt_timeout = 0;
 	packet->state = CMD_VALID_PACKET;
 
 	do {

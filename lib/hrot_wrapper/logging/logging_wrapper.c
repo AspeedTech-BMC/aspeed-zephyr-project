@@ -62,7 +62,6 @@ void debug_msg_display(void)
 		offset += sizeof(struct logging_entry_header);
 
 		entry = (struct debug_log_entry_info *)&logging_dump[offset];
-
 		total_seconds = entry->time / freq;
 		seconds = total_seconds;
 		hours = seconds / 3600U;
