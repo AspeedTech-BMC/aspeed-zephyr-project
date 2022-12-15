@@ -387,8 +387,10 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 
 	/* PCH Update Intent */
 	(UPDATE_REQUESTED_PCH_PCH_ACT, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchActiveUpdate << 16)))),
-	(UPDATE_REQUESTED_PCH_PCH_RCV, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchRecoveryUpdate << 16)))),
-	(ATTESTATION_FAILED, ATTESTATION_FAILED)
+	(UPDATE_REQUESTED_PCH_PCH_RCV, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchRecoveryUpdate << 16))))
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	,(ATTESTATION_FAILED, ATTESTATION_FAILED)
+#endif
 
 );
 

@@ -190,7 +190,7 @@
 		};
 
 		afm_partition: partition@5 {
-			label = "afm";
+			label = "afm_act_1";
 			reg = <0xF0000 0x10000>;
 		};
 	};

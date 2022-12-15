@@ -12,14 +12,12 @@ set(PROJECT_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
 configure_file(build_config.h.in build_config.h)
 set(ASPEED_PFR_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
-FILE(GLOB_RECURSE app_sources src/*.c)
-target_sources(app PRIVATE ${app_sources})
+add_subdirectory(src)
 
 # target_sources(app PRIVATE src/test.c)
 
 set(CERBERUS_ROOT $ENV{ZEPHYR_BASE}/../middlewares/cerberus)
 
-#message(STATUS "Printing app_sources - ${app_sources}")
 zephyr_link_libraries(hrot_hal)
 zephyr_link_libraries(hrot_wrapper)
 zephyr_link_libraries(smf)
