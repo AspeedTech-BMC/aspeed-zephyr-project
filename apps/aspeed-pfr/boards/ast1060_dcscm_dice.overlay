@@ -185,8 +185,8 @@
 			reg = <0x80000 0x60000>;
 		};
 
-		afm_partition: partition@e0000 {
-			label = "afm";
+		afm_act_1_partition: partition@e0000 {
+			label = "afm_act_1";
 			reg = <0xe0000 0x6000>;
 		};
 
