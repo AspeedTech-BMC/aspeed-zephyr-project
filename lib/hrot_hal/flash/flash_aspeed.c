@@ -66,7 +66,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		return -1;
 	}
 
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	FlashSize = flash_get_flash_size(flash_device);
 	if (AdrOffset >= FlashSize) {
 		DeviceId += 1;

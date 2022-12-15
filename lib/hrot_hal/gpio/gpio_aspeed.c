@@ -36,7 +36,7 @@ int BMCBootHold(void)
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
@@ -59,6 +59,13 @@ int PCHBootHold(void)
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+#if defined(CONFIG_DUAL_FLASH)
+	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
+	spim_rst_flash(dev_m, 10);
+	spim_passthrough_config(dev_m, 0, false);
+	/* config spi monitor as master mode */
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+#endif
 
 	return 0;
 }
@@ -73,7 +80,7 @@ int BMCBootRelease(void)
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
@@ -102,6 +109,14 @@ int PCHBootRelease(void)
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+#if defined(CONFIG_DUAL_FLASH)
+	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
+	spim_rst_flash(dev_m, 10);
+	spim_passthrough_config(dev_m, 0, false);
+	aspeed_spi_monitor_sw_rst(dev_m);
+	/* config spi monitor as monitor mode */
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+#endif
 
 	pfr_pch_rst_enable_ctrl(false);
 	LOG_INF("release PCH");

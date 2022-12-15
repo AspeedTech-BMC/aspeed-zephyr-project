@@ -626,7 +626,7 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 	uint32_t pc_type_status = 0;
 	CPLD_STATUS cpld_update_status;
 	const struct device *dev_m = NULL;
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	uint32_t flash_size = flash_get_flash_size("spi1_cs0");
 	uint32_t staging_start_addr;
 #endif
@@ -663,6 +663,10 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 	LOG_INF("Switch PCH SPI MUX to ROT");
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+#if defined(CONFIG_DUAL_FLASH)
+	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+#endif
 
 	if (cpld_update_status.BmcToPchStatus == 1) {
 
@@ -678,7 +682,7 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 			goto release_pch_mux;
 
 		LOG_INF("Switch BMC SPI MUX to ROT");
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 		staging_start_addr = address;
 		if (staging_start_addr >= flash_size)
 			dev_m = device_get_binding(BMC_SPI_MONITOR_2);
@@ -727,7 +731,7 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 
 release_both_muxes:
 	LOG_INF("Switch BMC SPI MUX to BMC");
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	if (staging_start_addr >= flash_size)
 		dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	else
@@ -740,6 +744,10 @@ release_pch_mux:
 	LOG_INF("Switch PCH SPI MUX to PCH");
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+#if defined(CONFIG_DUAL_FLASH)
+	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+#endif
 
 	return status;
 }
