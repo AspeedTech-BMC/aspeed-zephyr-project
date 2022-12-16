@@ -13,6 +13,7 @@
 #define KCH_CAN_CERT_RESERVED_SIZE 124
 #define DECOMM_CAP_RESERVED_SIZE 128
 
+int get_cancellation_policy_offset(uint32_t pc_type);
 int validate_key_cancellation_flag(struct pfr_manifest *manifest);
 int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id);
 int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id);

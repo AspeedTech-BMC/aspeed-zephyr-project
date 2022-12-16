@@ -12,3 +12,7 @@ target_sources(app PRIVATE
 	cerberus_pfr_spi_filtering.c
 	cerberus_pfr_svn.c
 	)
+
+if(CONFIG_SHELL)
+        target_sources(app PRIVATE test_cerberus_pfr_shell.c)
+endif()

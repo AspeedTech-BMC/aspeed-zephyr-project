@@ -12,3 +12,7 @@ target_sources(app PRIVATE
 	intel_pfr_verification.c
 	intel_pfr_svn.c
 	)
+
+if(CONFIG_SHELL)
+        target_sources(app PRIVATE test_intel_pfr_shell.c)
+endif()
