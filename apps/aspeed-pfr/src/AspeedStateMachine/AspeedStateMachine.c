@@ -770,8 +770,17 @@ void handle_provision_image(void *o)
 
 	const struct device *dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+#if defined(CONFIG_DUAL_FLASH)
+	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+#endif
 	ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap);
+	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+#if defined(CONFIG_DUAL_FLASH)
+	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+#endif
 
 	LOG_INF("Provision result = %d", ret);
 }
