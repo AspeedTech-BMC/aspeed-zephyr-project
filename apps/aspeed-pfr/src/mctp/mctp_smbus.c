@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_PFR_MCTP)
 #include <zephyr.h>
 #include <device.h>
 #include <logging/log.h>
@@ -116,4 +115,3 @@ uint8_t mctp_smbus_deinit(mctp *mctp_inst)
 	return MCTP_SUCCESS;
 }
 
-#endif // CONFIG_PFR_MCTP

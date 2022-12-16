@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <stdlib.h>
 #include <logging/log.h>
 
@@ -478,4 +477,4 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 	manifest->address = manifest->staging_address;
 	return cerberus_pfr_verify_image(manifest);
 }
-#endif // CONFIG_CERBERUS_PFR
+

@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_PFR_MCTP)
-#if defined(CONFIG_SHELL)
 #include <zephyr.h>
 #include <shell/shell.h>
 #include <stdlib.h>
@@ -235,5 +233,3 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 
 SHELL_CMD_REGISTER(mctp, &sub_mctp_cmds, "MCTP Commands", NULL);
 
-#endif // CONFIG_SHELL
-#endif // CONFIG_PFR_MCTP

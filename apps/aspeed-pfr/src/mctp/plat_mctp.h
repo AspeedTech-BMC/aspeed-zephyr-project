@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_PFR_MCTP)
 #include "mctp_utils.h"
 
 typedef struct _mctp_smbus_port {
@@ -18,4 +17,3 @@ typedef struct _mctp_smbus_port {
 void plat_mctp_init(void);
 mctp *find_mctp_by_smbus(uint8_t bus);
 
-#endif // CONFIG_PFR_MCTP

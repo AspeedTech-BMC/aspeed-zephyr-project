@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <zephyr.h>
 #include <logging/log.h>
 #include <stdint.h>
@@ -111,5 +110,3 @@ int read_statging_area_pfm_svn(struct pfr_manifest *manifest, uint8_t *svn_versi
 	return Success;
 }
 
-
-#endif // CONFIG_INTEL_PFR

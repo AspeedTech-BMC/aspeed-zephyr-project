@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_PFR_MCTP)
 #include <zephyr.h>
 #include <logging/log.h>
 #include <stdio.h>
@@ -342,4 +341,3 @@ uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet)
 	return mctp_inst->read_data(mctp_inst, packet);
 }
 
-#endif // CONFIG_PFR_MCTP

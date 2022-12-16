@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
-
 #include <logging/log.h>
 
 #include "common/common.h"
@@ -506,4 +504,3 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 	return cerberus_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
 
-#endif // CONFIG_CERBERUS_PFR

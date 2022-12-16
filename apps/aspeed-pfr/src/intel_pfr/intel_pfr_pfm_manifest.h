@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
@@ -178,4 +177,4 @@ typedef struct {
 int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
 int get_active_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
 int pfm_spi_region_verification(struct pfr_manifest *manifest);
-#endif // CONFIG_INTEL_PFR
+

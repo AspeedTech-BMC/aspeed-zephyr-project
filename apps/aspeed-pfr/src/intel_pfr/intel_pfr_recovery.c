@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include "common/common.h"
@@ -261,4 +260,4 @@ int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flas
 
 	return intel_pfr_recover_update_action(pfr_manifest);
 }
-#endif // CONFIG_INTEL_PFR
+

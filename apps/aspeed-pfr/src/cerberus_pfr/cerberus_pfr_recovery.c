@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <stdlib.h>
 #include <logging/log.h>
 #include <storage/flash_map.h>
@@ -288,4 +287,4 @@ int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flas
 	// TODO
 	return Success;
 }
-#endif // CONFIG_CERBERUS_PFR
+

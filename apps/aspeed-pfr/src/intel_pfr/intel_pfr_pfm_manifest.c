@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <flash/flash_aspeed.h>
 
@@ -328,4 +327,4 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 
 	return Success;
 }
-#endif // CONFIG_INTEL_PFR
+

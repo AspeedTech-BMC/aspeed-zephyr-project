@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
-
 #include <stdint.h>
 #include <logging/log.h>
 #include "common/common.h"
@@ -89,4 +87,3 @@ void apply_pfm_protection(int spi_dev)
 	SPI_Monitor_Enable(spim_devs[spi_id], true);
 }
 
-#endif // CONFIG_CERBERUS_PFR

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_PFR_MCTP)
 #include <zephyr.h>
 #include <device.h>
 #include <logging/log.h>
@@ -121,4 +120,3 @@ void plat_mctp_init(void)
 	}
 }
 
-#endif // CONFIG_PFR_MCTP

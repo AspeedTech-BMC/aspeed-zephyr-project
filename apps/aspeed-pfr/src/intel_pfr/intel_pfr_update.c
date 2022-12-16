@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include <drivers/flash.h>
@@ -683,4 +682,4 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 {
 	return intel_pfr_update_verify(fw, hash, rsa);
 }
-#endif // CONFIG_INTEL_PFR
+

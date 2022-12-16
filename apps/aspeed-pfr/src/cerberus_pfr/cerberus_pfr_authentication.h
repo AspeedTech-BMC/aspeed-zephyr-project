@@ -6,9 +6,7 @@
 
 #pragma once
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include "pfr/pfr_common.h"
 
 int pfr_active_verify(struct pfr_manifest *manifest);
-#endif // CONFIG_CERBERUS_PFR
 

@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
-#if defined(CONFIG_SHELL)
-
 #include <zephyr.h>
 #include <shell/shell.h>
 #include <stdlib.h>
@@ -86,5 +83,3 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_cerberus_pfr_cmds,
 
 SHELL_CMD_REGISTER(cerberus_pfr, &sub_cerberus_pfr_cmds, "Cerberus PFR Commands", NULL);
 
-#endif // CONFIG_SHELL
-#endif // CONFIG_CERBERUS_PFR

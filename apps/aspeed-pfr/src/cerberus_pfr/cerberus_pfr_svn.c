@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <zephyr.h>
 #include <logging/log.h>
 #include <stdint.h>
@@ -21,4 +20,3 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 	return Success;
 }
 
-#endif // CONFIG_CERBERUS_PFR

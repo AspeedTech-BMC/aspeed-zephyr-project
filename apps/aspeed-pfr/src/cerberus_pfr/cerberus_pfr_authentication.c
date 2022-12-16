@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
-#if defined(CONFIG_CERBERUS_PFR)
+
 #include <logging/log.h>
 #include "pfr/pfr_common.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
@@ -42,4 +42,3 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	return Success;
 }
 
-#endif // CONFIG_CERBERUS_PFR

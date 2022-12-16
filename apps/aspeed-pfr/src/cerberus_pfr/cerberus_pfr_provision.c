@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include "AspeedStateMachine/common_smc.h"
@@ -213,4 +212,3 @@ int cerberus_verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *root_p
 	return Success;
 }
 
-#endif //CONFIG_CERBERUS_PFR

@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <stddef.h>
 #include "pfr/pfr_common.h"
 
@@ -45,4 +44,4 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 int cerberus_pfr_verify_image(struct pfr_manifest *pfr_manifest);
 int cerberus_verify_regions(struct manifest *manifest);
 void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest);
-#endif // CONFIG_CERBERUS_PFR
+

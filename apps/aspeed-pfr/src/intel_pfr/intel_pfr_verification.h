@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
@@ -230,4 +229,3 @@ int intel_fvms_verify(struct pfr_manifest *manifest);
 int intel_fvm_verify(struct pfr_manifest *manifest);
 #endif
 
-#endif // CONFIG_INTEL_PFR

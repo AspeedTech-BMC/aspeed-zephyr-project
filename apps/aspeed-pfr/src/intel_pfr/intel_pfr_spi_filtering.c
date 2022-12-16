@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include <logging/log.h>
 #include "common/common.h"
@@ -213,4 +212,4 @@ void apply_pfm_protection(int spi_device_id)
 
 	spi_filter->base.enable_filter(spi_filter, true);
 }
-#endif // CONFIG_INTEL_PFR
+

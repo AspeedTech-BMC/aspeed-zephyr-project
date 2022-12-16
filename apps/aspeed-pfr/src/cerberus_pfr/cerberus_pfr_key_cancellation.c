@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <logging/log.h>
 
 #include "pfr/pfr_common.h"
@@ -114,4 +113,3 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 	return Success;
 }
 
-#endif // CONFIG_CERBERUS_PFR

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_PFR_MCTP)
 #include <zephyr.h>
 #include <logging/log.h>
 #include <sys/util.h>
@@ -119,4 +118,3 @@ int cmd_channel_mctp_init(struct cmd_channel *channel, int id)
 	return 0;
 }
 
-#endif // CONFIG_PFR_MCTP

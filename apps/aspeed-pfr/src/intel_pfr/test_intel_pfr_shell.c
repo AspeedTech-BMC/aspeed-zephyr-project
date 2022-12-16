@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
-#if defined(CONFIG_SHELL)
-
 #include <zephyr.h>
 #include <shell/shell.h>
 #include <stdlib.h>
@@ -158,5 +155,3 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_intel_pfr_cmds,
 
 SHELL_CMD_REGISTER(intel_pfr, &sub_intel_pfr_cmds, "Intel PFR Commands", NULL);
 
-#endif // CONFIG_SHELL
-#endif // CONFIG_INTEL_PFR

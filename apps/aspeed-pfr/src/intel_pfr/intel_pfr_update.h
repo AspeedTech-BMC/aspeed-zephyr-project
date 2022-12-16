@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 
 int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa);
@@ -17,4 +16,4 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 #endif
 
 int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa);
-#endif // CONFIG_INTEL_PFR
+

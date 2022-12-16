@@ -6,7 +6,6 @@
 
 #pragma once
 
-# if defined(CONFIG_CERBERUS_PFR)
 #define BMC_FLASH_ID                0
 #define PCH_FLASH_ID                2
 
@@ -88,4 +87,3 @@ typedef struct _PFM_STRUCTURE {
 	uint32_t Length;
 } PFM_STRUCTURE;
 
-#endif // CONFIG_CERBERUS_PFR

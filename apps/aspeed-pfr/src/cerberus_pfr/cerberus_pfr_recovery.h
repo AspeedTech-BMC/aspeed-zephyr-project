@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_CERBERUS_PFR)
 #define DUAL_SPI 0
 
 #include <stdint.h>
@@ -42,4 +41,4 @@ int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flas
 int pfr_staging_pch_staging(struct pfr_manifest *manifest);
 int pfr_recover_active_region(struct pfr_manifest *manifest);
 int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest);
-#endif // CONFIG_CERBERUS_PFR
+

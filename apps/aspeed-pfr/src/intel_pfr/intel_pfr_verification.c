@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include <drivers/flash.h>
@@ -778,4 +777,4 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 {
 	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
-#endif // CONFIG_INTEL_PFR
+

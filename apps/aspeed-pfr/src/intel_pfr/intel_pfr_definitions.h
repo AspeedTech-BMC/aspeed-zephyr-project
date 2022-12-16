@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #define BMC_FLASH_ID                    0
 #define PCH_FLASH_ID                    1
 
@@ -139,4 +138,3 @@ typedef struct {
 	uint8_t Reserved[3];
 } CPLD_STATUS;
 
-#endif // CONFIG_INTEL_PFR

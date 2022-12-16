@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_PFR_MCTP)
 #include <stdint.h>
 #include <zephyr.h>
 #include <device.h>
@@ -124,4 +123,3 @@ uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet);
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_smbus_deinit(mctp *mctp_inst);
 
-#endif // CONFIG_PFR_MCTP
