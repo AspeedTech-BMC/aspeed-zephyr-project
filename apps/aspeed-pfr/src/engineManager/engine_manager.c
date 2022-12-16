@@ -77,6 +77,17 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 	FVM_STRUCTURE fvm;
 	PFM_SPI_DEFINITION spi_def;
 	uint32_t fvm_body_end_addr;
+	uint32_t region_start_address;
+	uint32_t region_end_address;
+	int region_length;
+#if defined(CONFIG_DUAL_FLASH)
+	int flash_size;
+#endif
+	int spi_id = 0;
+	char *pch_spim_devs[2] = {
+		"spi_m3",
+		"spi_m4"
+	};
 
 	spi_flash->spi.state->device_id[0] = PCH_SPI;
 	spi_flash->spi.base.read(&spi_flash->spi, fvm_offset, &fvm, sizeof(FVM_STRUCTURE));
@@ -86,36 +97,52 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 		spi_flash->spi.base.read(&spi_flash->spi, fvm_body_offset, &spi_def,
 				sizeof(PFM_SPI_DEFINITION));
 		if (spi_def.PFMDefinitionType == SPI_REGION) {
-			if (spi_def.ProtectLevelMask.ReadAllowed) {
-				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_READ_PRIV,
-						SPI_FILTER_PRIV_ENABLE, spi_def.RegionStartAddress,
-						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
-				LOG_INF("SPI_ID[2] fvm read enable 0x%08x to 0x%08x",
-					spi_def.RegionStartAddress,
-					spi_def.RegionEndAddress);
+			region_start_address = spi_def.RegionStartAddress;
+			region_end_address = spi_def.RegionEndAddress;
+			region_length = region_end_address - region_start_address;
+#if defined(CONFIG_DUAL_FLASH)
+			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+			if (region_start_address >= flash_size && region_end_address >= flash_size) {
+				region_start_address -= flash_size;
+				region_end_address -= flash_size;
+				spi_id = 1;
+			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+				LOG_ERR("ERROR: region start and end address should be in the same flash");
+				return;
 			} else {
-				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_READ_PRIV,
-						SPI_FILTER_PRIV_DISABLE, spi_def.RegionStartAddress,
-						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				spi_id = 0;
+			}
+#endif
+			if (spi_def.ProtectLevelMask.ReadAllowed) {
+				Set_SPI_Filter_RW_Region(pch_spim_devs[spi_id], SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_ENABLE, region_start_address,
+						region_length);
+				LOG_INF("SPI_ID[2] fvm read enable 0x%08x to 0x%08x",
+					region_start_address,
+					region_end_address);
+			} else {
+				Set_SPI_Filter_RW_Region(pch_spim_devs[spi_id], SPI_FILTER_READ_PRIV,
+						SPI_FILTER_PRIV_DISABLE, region_start_address,
+						region_length);
 				LOG_INF("SPI_ID[2] fvm read disable 0x%08x to 0x%08x",
-					spi_def.RegionStartAddress,
-					spi_def.RegionEndAddress);
+					region_start_address,
+					region_end_address);
 			}
 
 			if (spi_def.ProtectLevelMask.WriteAllowed) {
-				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_WRITE_PRIV,
-						SPI_FILTER_PRIV_ENABLE, spi_def.RegionStartAddress,
-						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				Set_SPI_Filter_RW_Region(pch_spim_devs[spi_id], SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_ENABLE, region_start_address,
+						region_length);
 				LOG_INF("SPI_ID[2] fvm write enable 0x%08x to 0x%08x",
-					spi_def.RegionStartAddress,
-					spi_def.RegionEndAddress);
+					region_start_address,
+					region_end_address);
 			} else {
-				Set_SPI_Filter_RW_Region(PCH_SPI_MONITOR, SPI_FILTER_WRITE_PRIV,
-						SPI_FILTER_PRIV_DISABLE, spi_def.RegionStartAddress,
-						(spi_def.RegionEndAddress - spi_def.RegionStartAddress));
+				Set_SPI_Filter_RW_Region(pch_spim_devs[spi_id], SPI_FILTER_WRITE_PRIV,
+						SPI_FILTER_PRIV_DISABLE, region_start_address,
+						region_length);
 				LOG_INF("SPI_ID[2] fvm write disable 0x%08x to 0x%08x",
-					spi_def.RegionStartAddress,
-					spi_def.RegionEndAddress);
+					region_start_address,
+					region_end_address);
 			}
 
 			if (spi_def.HashAlgorithmInfo.SHA256HashPresent) {
