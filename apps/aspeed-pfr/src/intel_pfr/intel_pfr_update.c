@@ -11,6 +11,7 @@
 #include "pfr/pfr_update.h"
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
+#include "pfr/pfr_recovery.h"
 #include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -24,8 +25,8 @@
 #include "intel_pfr_recovery.h"
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_update.h"
+#include "intel_pfr_svn.h"
 #include "StateMachineAction/StateMachineActions.h"
-#include "intel_pfr_pfm_manifest.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "gpio/gpio_aspeed.h"
@@ -135,56 +136,6 @@ int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash,
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) fw;
 
 	return pfr_staging_verify(pfr_manifest);
-}
-
-int set_ufm_svn(struct pfr_manifest *manifest, uint32_t offset, uint8_t svn_number)
-{
-	ARG_UNUSED(manifest);
-
-	int status = 0;
-	uint32_t svn_policy[2];
-	uint32_t new_svn_policy;
-
-	if (svn_number > SVN_MAX) {
-		LOG_ERR("SVN number(%02x) exceed SVN max(%02x)", svn_number, SVN_MAX);
-		return Failure;
-	}
-
-	memset(svn_policy, 0xff, sizeof(svn_policy));
-	new_svn_policy = ~((1 << (svn_number % 32)) - 1);
-	if (svn_number < 32)
-		svn_policy[0] = new_svn_policy;
-	else {
-		svn_policy[0] = 0;
-		if (svn_number < 64)
-			svn_policy[1] = new_svn_policy;
-		else if (svn_number == 64)
-			svn_policy[1] = 0;
-	}
-
-	status = ufm_write(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
-	if (status != Success) {
-		LOG_ERR("Set SVN number to UFM failed");
-		return Failure;
-	}
-
-	return Success;
-}
-
-uint8_t get_ufm_svn(struct pfr_manifest *manifest, uint32_t offset)
-{
-	ARG_UNUSED(manifest);
-
-	uint32_t svn_policy[2];
-	uint8_t index;
-
-	ufm_read(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
-	for (index = 0; index < 64; index++) {
-		if ((svn_policy[(index / 32)] & (1 << (index % 32))) != 0)
-			return index;
-	}
-
-	return 64;
 }
 
 int  check_rot_capsule_type(struct pfr_manifest *manifest)
@@ -300,26 +251,6 @@ int update_rot_fw(uint32_t address, uint32_t length)
 	return Success;
 }
 
-int rot_svn_policy_verify(struct pfr_manifest *manifest, uint32_t hrot_svn)
-{
-	uint8_t current_svn;
-
-	current_svn = get_ufm_svn(manifest, SVN_POLICY_FOR_CPLD_UPDATE);
-
-	if (hrot_svn > SVN_MAX) {
-		LOG_ERR("Invalid Staging area SVN Number, %02x", hrot_svn);
-		return Failure;
-	} else if (hrot_svn < current_svn) {
-		LOG_ERR("Can't update with older version of SVN current=%02x staging=%02x",
-				current_svn, hrot_svn);
-		return Failure;
-	}
-	set_ufm_svn(manifest, SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
-	SetCpldRotSvn((uint8_t)hrot_svn);
-
-	return Success;
-}
-
 int ast1060_update(struct pfr_manifest *manifest)
 {
 	uint32_t cancelled_id = 0;
@@ -381,7 +312,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 			return Failure;
 		}
 
-		status = rot_svn_policy_verify(manifest, hrot_svn);
+		status = svn_policy_verify(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
 		if (status != Success) {
 			LOG_ERR("ROT verify svn failed");
 			LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
@@ -395,42 +326,13 @@ int ast1060_update(struct pfr_manifest *manifest)
 			LOG_ERR("ROT update failed");
 			return Failure;
 		}
+
+		set_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
+		SetCpldRotSvn(hrot_svn);
 		LOG_INF("ROT update end");
 	}
 
 	return Success;
-}
-
-int check_svn_number(struct pfr_manifest *manifest, uint32_t read_address,
-		uint8_t current_svn_number)
-{
-	int status = 0;
-	uint32_t pfm_start_address = read_address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
-	uint8_t buffer[sizeof(PFM_STRUCTURE)] = { 0 };
-	uint8_t staging_svn_number = 0;
-
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
-			(uint8_t *)buffer);
-	if (status != Success)
-		return Failure;
-
-	staging_svn_number = ((PFM_STRUCTURE *)buffer)->SVN;
-
-	if (staging_svn_number > SVN_MAX) {
-		LOG_ERR("Invalid Staging area SVN Number");
-		return Failure;
-	} else if (staging_svn_number < current_svn_number) {
-		LOG_ERR("Can't update with older version of SVN current=%02x staging=%02x",
-				current_svn_number, staging_svn_number);
-		return Failure;
-	}
-
-	if (manifest->image_type == PCH_TYPE)
-		status = set_ufm_svn(manifest, SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn_number);
-	else
-		status = set_ufm_svn(manifest, SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn_number);
-
-	return status;
 }
 
 int update_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
@@ -445,7 +347,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	uint32_t act_pfm_offset;
 	uint32_t address = 0;
 	uint32_t pc_type_status = 0;
-	uint8_t active_svn_number = 0;
+	uint8_t staging_svn = 0;
 	CPLD_STATUS cpld_update_status;
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	DECOMPRESSION_TYPE_MASK_ENUM decomp_event;
@@ -558,12 +460,18 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		(PFM_SIG_BLOCK_SIZE + pfr_manifest->update_fw->pfm_length);
 
 	// SVN number validation
-	if (pfr_manifest->image_type ==  BMC_TYPE)
-		active_svn_number = get_ufm_svn(pfr_manifest, SVN_POLICY_FOR_BMC_FW_UPDATE);
-	else
-		active_svn_number = get_ufm_svn(pfr_manifest, SVN_POLICY_FOR_PCH_FW_UPDATE);
+	status = read_statging_area_pfm_svn(pfr_manifest, &staging_svn);
+	if (status != Success) {
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		LOG_ERR("Get staging svn failed");
+		return Failure;
+	}
 
-	status = check_svn_number(pfr_manifest, source_address, active_svn_number);
+	if (pfr_manifest->image_type == BMC_TYPE)
+		status = svn_policy_verify(SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn);
+	else
+		status = svn_policy_verify(SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn);
+
 	if (status != Success) {
 		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
 		LOG_ERR("Anti rollback");
@@ -611,6 +519,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			LOG_ERR("Recovery capsule update failed");
 			return Failure;
 		}
+
+		// update svn
+		if (pfr_manifest->image_type == BMC_TYPE)
+			status = set_ufm_svn(SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn);
+		else
+			status = set_ufm_svn(SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn);
+
+		return status;
 	}
 
 	return Success;

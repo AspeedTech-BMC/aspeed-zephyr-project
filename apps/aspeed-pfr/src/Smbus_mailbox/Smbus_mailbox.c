@@ -16,12 +16,12 @@
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
-#include "intel_pfr/intel_pfr_update.h"
+#include "intel_pfr/intel_pfr_svn.h"
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #include "cerberus_pfr/cerberus_pfr_provision.h"
-#include "cerberus_pfr/cerberus_pfr_update.h"
+#include "cerberus_pfr/cerberus_pfr_svn.h"
 #endif
 #include "pfr/pfr_ufm.h"
 
@@ -123,21 +123,6 @@ unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, ui
 	}
 
 	return status;
-}
-void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion)
-{
-	uint8_t status;
-	PFM_STRUCTURE Buffer;
-
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-
-	spi_flash->spi.state->device_id[0] = image_id; // Internal UFM SPI
-	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, address,
-			(uint8_t *)&Buffer, sizeof(PFM_STRUCTURE));
-
-	*SVN = Buffer.SVN;
-	*MajorVersion = Buffer.PfmRevision & 0xFF;
-	*MinorVersion = Buffer.PfmRevision >> 8;
 }
 
 #define SWMBX_NOTIFYEE_STACK_SIZE 1024
@@ -376,72 +361,15 @@ void InitializeSoftwareMailbox(void)
 
 void InitializeSmbusMailbox(void)
 {
-	uint32_t UfmStatus;
+	uint8_t policy_svn;
 
 	InitializeSoftwareMailbox();
 	ResetMailBox();
 
 	SetCpldIdentifier(0xDE);
 	SetCpldReleaseVersion((PROJECT_VERSION_MAJOR << 4) | PROJECT_VERSION_MINOR);
-
-	// get root key hash
-	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
-	get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
-	get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-
-	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
-		uint8_t PCHActiveMajorVersion, PCHActiveMinorVersion;
-		uint8_t PCHActiveSVN;
-		uint32_t pch_pfm_address;
-
-		memcpy(&pch_pfm_address, gPchOffsets, 4);
-		pch_pfm_address += 1024;
-		get_image_svn(PCH_SPI, pch_pfm_address, &PCHActiveSVN, &PCHActiveMajorVersion, &PCHActiveMinorVersion);
-		SetPchPfmActiveSvn(PCHActiveSVN);
-		SetPchPfmActiveMajorVersion(PCHActiveMajorVersion);
-		SetPchPfmActiveMinorVersion(PCHActiveMinorVersion);
-
-		uint8_t PCHRecoveryMajorVersion, PCHRecoveryMinorVersion;
-		uint8_t PCHRecoverySVN;
-		uint32_t pch_rec_address;
-
-		memcpy(&pch_rec_address, gPchOffsets + 4, 4);
-		pch_rec_address += 2048;
-		get_image_svn(PCH_SPI, pch_rec_address, &PCHRecoverySVN, &PCHRecoveryMajorVersion, &PCHRecoveryMinorVersion);
-		SetPchPfmRecoverSvn(PCHRecoverySVN);
-		SetPchPfmRecoverMajorVersion(PCHRecoveryMajorVersion);
-		SetPchPfmRecoverMinorVersion(PCHRecoveryMinorVersion);
-	}
-	// f1
-	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		uint8_t BMCActiveMajorVersion, BMCActiveMinorVersion;
-		uint8_t BMCActiveSVN;
-		uint32_t bmc_pfm_address;
-
-		memcpy(&bmc_pfm_address, gBmcOffsets, 4);
-		bmc_pfm_address += 1024;
-		get_image_svn(BMC_SPI, bmc_pfm_address, &BMCActiveSVN, &BMCActiveMajorVersion, &BMCActiveMinorVersion);
-		SetBmcPfmActiveSvn(BMCActiveSVN);
-		SetBmcPfmActiveMajorVersion(BMCActiveMajorVersion);
-		SetBmcPfmActiveMinorVersion(BMCActiveMinorVersion);
-
-		uint8_t BMCRecoveryMajorVersion, BMCRecoveryMinorVersion;
-		uint8_t BMCRecoverySVN;
-		uint32_t bmc_rec_address;
-
-		memcpy(&bmc_rec_address, gBmcOffsets + 4, 4);
-		bmc_rec_address += 2048;
-		get_image_svn(BMC_SPI, bmc_rec_address, &BMCRecoverySVN, &BMCRecoveryMajorVersion, &BMCRecoveryMinorVersion);
-		SetBmcPfmRecoverSvn(BMCRecoverySVN);
-		SetBmcPfmRecoverMajorVersion(BMCRecoveryMajorVersion);
-		SetBmcPfmRecoverMinorVersion(BMCRecoveryMinorVersion);
-	}
-
-	uint8_t current_svn;
-
-	current_svn = get_ufm_svn(NULL, SVN_POLICY_FOR_CPLD_UPDATE);
-	SetCpldRotSvn(current_svn);
+	policy_svn = get_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE);
+	SetCpldRotSvn(policy_svn);
 }
 
 #define MBX_REG_SETTER(REG) \

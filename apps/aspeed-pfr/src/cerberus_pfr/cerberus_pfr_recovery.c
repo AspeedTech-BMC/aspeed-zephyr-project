@@ -28,11 +28,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
-{
-	return Success;
-}
-
 int pfr_recover_active_region(struct pfr_manifest *manifest)
 {
 	struct recovery_header recovery_header;

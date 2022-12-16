@@ -15,7 +15,6 @@
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "manifest/pfm/pfm_manager.h"
 #include "intel_pfr_recovery.h"
-#include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_pbc.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_provision.h"
@@ -24,6 +23,7 @@
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "intel_pfr_svn.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -48,7 +48,7 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 	int status = 0;
 	uint8_t staging_svn, active_svn;
 
-	status = read_statging_area_pfm(manifest, &staging_svn);
+	status = read_statging_area_pfm_svn(manifest, &staging_svn);
 	if (status != Success)
 		return Failure;
 

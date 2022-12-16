@@ -132,12 +132,9 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	read_address = read_address + PFM_SIG_BLOCK_SIZE;
-	status = pfm_version_set(manifest, read_address);
-	if (status != Success) {
-		LOG_ERR("PFM version set failed");
+	status = get_active_pfm_version_details(manifest, read_address);
+	if (status != Success)
 		return Failure;
-	}
 
 	status = pfm_spi_region_verification(manifest);
 	if (status != Success) {

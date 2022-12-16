@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <stdlib.h>
 #include <zephyr.h>
 #include <sys/sys_heap.h>
 #include <smf.h>
