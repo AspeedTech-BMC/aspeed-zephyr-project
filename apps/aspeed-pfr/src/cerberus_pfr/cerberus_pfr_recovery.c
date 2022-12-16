@@ -5,6 +5,7 @@
  */
 
 #if defined(CONFIG_CERBERUS_PFR)
+#include <stdlib.h>
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include "common/common.h"

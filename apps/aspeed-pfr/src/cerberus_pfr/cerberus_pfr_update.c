@@ -5,6 +5,7 @@
  */
 
 #if defined(CONFIG_CERBERUS_PFR)
+#include <stdlib.h>
 #include <logging/log.h>
 
 #include "pfr/pfr_update.h"

@@ -5,6 +5,7 @@
  */
 #include <zephyr.h>
 #include <logging/log.h>
+#include <stdlib.h>
 
 #include "SPDM/SPDMCommon.h"
 #include "SPDM/SPDMMctpBinding.h"

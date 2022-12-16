@@ -7,6 +7,7 @@
 #if defined(CONFIG_CERBERUS_PFR)
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <logging/log.h>
 #include "AspeedStateMachine/common_smc.h"
 #include "cerberus_pfr_common.h"
