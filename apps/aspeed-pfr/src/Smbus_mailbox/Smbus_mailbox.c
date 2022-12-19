@@ -24,6 +24,7 @@
 #include "cerberus_pfr/cerberus_pfr_svn.h"
 #endif
 #include "pfr/pfr_ufm.h"
+#include "pfr/pfr_util.h"
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
@@ -359,7 +360,11 @@ void InitializeSoftwareMailbox(void)
 
 void InitializeSmbusMailbox(void)
 {
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	uint8_t sha_buffer[SHA384_DIGEST_LENGTH];
 	uint8_t policy_svn;
+	int status;
+	int i;
 
 	InitializeSoftwareMailbox();
 	ResetMailBox();
@@ -368,6 +373,22 @@ void InitializeSmbusMailbox(void)
 	SetCpldReleaseVersion((PROJECT_VERSION_MAJOR << 4) | PROJECT_VERSION_MINOR);
 	policy_svn = get_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE);
 	SetCpldRotSvn(policy_svn);
+
+	// Generate hash of rot active image
+	// default hashing algorithm sha384
+	pfr_manifest->image_type = ROT_INTERNAL_ACTIVE;
+	pfr_manifest->pfr_hash->type = HASH_TYPE_SHA384;
+	pfr_manifest->pfr_hash->start_address = 0;
+	pfr_manifest->pfr_hash->length = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
+	status = pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash, sha_buffer, SHA384_DIGEST_LENGTH);
+	if (status != Success)
+		LOG_ERR("Get rot hash failed");
+	else {
+		LOG_HEXDUMP_DBG(sha_buffer, sizeof(sha_buffer), "rot hash:");
+		// set rot hash to mailbox
+		for (i = 0; i < SHA384_DIGEST_LENGTH; i++)
+			swmbx_write(gSwMbxDev, false, CpldFPGARoTHash + i, &sha_buffer[i]);
+	}
 }
 
 #define MBX_REG_SETTER(REG) \
