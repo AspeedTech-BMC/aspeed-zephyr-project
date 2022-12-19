@@ -568,9 +568,6 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	if (block0_buffer->PcType == PFR_CPLD_UPDATE_CAPSULE)
-		SetCpldFpgaRotHash(&sha_buffer[0]);
-
 	LOG_INF("Block0: Hash Matched");
 	return Success;
 }

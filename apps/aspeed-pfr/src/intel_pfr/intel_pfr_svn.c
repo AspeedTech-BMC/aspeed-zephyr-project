@@ -11,7 +11,6 @@
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
 #include "AspeedStateMachine/common_smc.h"
-//#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_pfm_manifest.h"

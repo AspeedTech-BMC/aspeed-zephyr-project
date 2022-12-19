@@ -30,7 +30,6 @@
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
 static uint32_t gFailedUpdateAttempts = 0;
-static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 const struct device *gSwMbxDev = NULL;
 
 uint8_t gUfmFifoData[64];
@@ -58,7 +57,6 @@ AO_DATA UpdateActiveObject;
 
 void ResetMailBox(void)
 {
-	memset(&gSmbusMailboxData, 0, sizeof(gSmbusMailboxData));
 	SetUfmStatusValue(COMMAND_DONE);   // reset ufm status
 	SetUfmCmdTriggerValue(0x00);
 }
@@ -724,161 +722,6 @@ void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 {
 	return ((~UfmStatus & UfmStatusBitMask) == UfmStatusBitMask);
-}
-
-bool IsUfmStatusCommandBusy(void)
-{
-	return gSmbusMailboxData.CommandBusy ? true : false;
-}
-
-bool IsUfmStatusCommandDone(void)
-{
-	return gSmbusMailboxData.CommandDone ? true : false;
-}
-
-bool IsUfmStatusCommandError(void)
-{
-	return gSmbusMailboxData.CommandError ? true : false;
-}
-
-bool IsUfmStatusLocked(void)
-{
-	return gSmbusMailboxData.UfmLocked ? true : false;
-}
-
-bool IsUfmStatusUfmProvisioned(void)
-{
-	return gSmbusMailboxData.Ufmprovisioned ? true : false;
-}
-
-bool IsUfmStatusPitLevel1Enforced(void)
-{
-	return gSmbusMailboxData.PITlevel1enforced ? true : false;
-}
-
-bool IsUfmStatusPITL2CompleteSuccess(void)
-{
-	return gSmbusMailboxData.PITL2CompleteSuccess ? true : false;
-}
-
-// PCH UpdateIntent
-bool IsPchUpdateIntentPCHActive(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentPchActive ? true : false;
-}
-
-bool IsPchUpdateIntentPchRecovery(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentPchrecovery ? true : false;
-}
-
-bool IsPchUpdateIntentCpldActive(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentCpldActive ? true : false;
-}
-
-bool IsPchUpdateIntentCpldRecovery(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentCpldRecovery ? true : false;
-}
-
-bool IsPchUpdateIntentBmcActive(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentBmcActive ? true : false;
-}
-
-bool IsPchUpdateIntentBmcRecovery(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentBmcRecovery ? true : false;
-}
-
-bool IsPchUpdateIntentUpdateDynamic(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentUpdateDynamic ? true : false;
-}
-
-bool IsPchUpdateIntentUpdateAtReset(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentUpdateAtReset ? true : false;
-}
-
-byte GetPchUpdateIntent(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentValue;
-}
-
-void SetPchUpdateIntent(byte PchUpdateIntent)
-{
-	gSmbusMailboxData.PchUpdateIntentValue = PchUpdateIntent;
-	// UpdateMailboxRegisterFile(PchUpdateIntentValue, (uint8_t)gSmbusMailboxData.PchUpdateIntentValue);
-
-}
-
-// BMC UpdateIntent
-bool IsBmcUpdateIntentPchActive(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentPchActive ? true : false;
-}
-
-bool IsBmcUpdateIntentPchRecovery(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentPchrecovery ? true : false;
-}
-
-bool IsBmcUpdateIntentCpldActive(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentCpldActive ? true : false;
-}
-
-bool IsBmcUpdateIntentCpldRecovery(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentCpldRecovery ? true : false;
-}
-
-bool IsBmcUpdateIntentBmcActive(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentBmcActive ? true : false;
-}
-
-bool IsBmcUpdateIntentBmcRecovery(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentBmcRecovery ? true : false;
-}
-
-bool IsBmcUpdateIntentUpdateDynamic(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentUpdateDynamic ? true : false;
-}
-
-bool IsBmcUpdateIntentUpdateAtReset(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentUpdateAtReset ? true : false;
-}
-
-
-byte *GetCpldFpgaRotHash(void)
-{
-	uint8_t HashData[SHA384_DIGEST_LENGTH] = { 0 };
-
-	memcpy(HashData, gSmbusMailboxData.CpldFPGARoTHash, SHA384_DIGEST_LENGTH);
-	// add obb read code for bmc
-	return gSmbusMailboxData.CpldFPGARoTHash;
-}
-
-void SetCpldFpgaRotHash(byte *HashData)
-{
-	memcpy(gSmbusMailboxData.CpldFPGARoTHash, HashData, 64);
-	// UpdateMailboxRegisterFile(CpldFPGARoTHash, (uint8_t)gSmbusMailboxData.CpldFPGARoTHash);
-}
-
-byte *GetAcmBiosScratchPad(void)
-{
-	return gSmbusMailboxData.AcmBiosScratchPad;
-}
-
-void SetAcmBiosScratchPad(byte *AcmBiosScratchPad)
-{
-	memcpy(gSmbusMailboxData.AcmBiosScratchPad, AcmBiosScratchPad, 0x40);
 }
 
 unsigned char ProvisionRootKeyHash(void)

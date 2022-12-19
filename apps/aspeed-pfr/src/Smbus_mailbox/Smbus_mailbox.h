@@ -19,89 +19,6 @@ typedef char byte;
 #define BMC_MAXTIMEOUT CONFIG_BMC_CHECKPOINT_EXPIRE_TIME
 #define BIOS_MAXTIMEOUT CONFIG_PCH_CHECKPOINT_EXPIRE_TIME
 
-typedef struct _SMBUS_MAIL_BOX_ {
-	byte CpldIdentifier;
-	byte CpldReleaseVersion;
-	byte CpldRoTSVN;
-	byte PlatformState;
-	byte Recoverycount;
-	byte LastRecoveryReason;
-	byte PanicEventCount;
-	byte LastPanicReason;
-	byte MajorErrorCode;
-	byte MinorErrorCode;
-	union {
-		struct {
-			uint8_t CommandBusy : 1;
-			uint8_t CommandDone : 1;
-			uint8_t CommandError : 1;
-			uint8_t UfmStatusReserved : 1;
-			uint8_t UfmLocked : 1;
-			uint8_t Ufmprovisioned : 1;
-			uint8_t PITlevel1enforced : 1;
-			uint8_t PITL2CompleteSuccess : 1;
-		};
-		byte UfmStatusValue;
-	};
-	byte UfmCommand;
-	union {
-		struct {
-			uint8_t ExecuteCmd : 1;
-			uint8_t FlushWriteFIFO : 1;
-			uint8_t FlushReadFIFO : 1;
-			uint8_t UfmCmdTriggerReserved : 4;
-		};
-		byte UfmCmdTriggerValue;
-	};
-	byte UfmWriteFIFO;
-	byte UfmReadFIFO;
-	byte BmcCheckpoint;
-	byte AcmCheckpoint;
-	byte BiosCheckpoint;
-	union {
-		struct {
-			uint8_t PchUpdateIntentPchActive : 1;
-			uint8_t PchUpdateIntentPchrecovery : 1;
-			uint8_t PchUpdateIntentCpldActive : 1;
-			uint8_t PchUpdateIntentBmcActive : 1;
-			uint8_t PchUpdateIntentBmcRecovery : 1;
-			uint8_t PchUpdateIntentCpldRecovery : 1;
-			uint8_t PchUpdateIntentUpdateDynamic : 1;
-			uint8_t PchUpdateIntentUpdateAtReset : 1;
-		};
-		byte PchUpdateIntentValue;
-	};
-	union {
-		struct {
-			uint8_t BmcUpdateIntentPchActive : 1;
-			uint8_t BmcUpdateIntentPchrecovery : 1;
-			uint8_t BmcUpdateIntentCpldActive : 1;
-			uint8_t BmcUpdateIntentBmcActive : 1;
-			uint8_t BmcUpdateIntentBmcRecovery : 1;
-			uint8_t BmcUpdateIntentCpldRecovery : 1;
-			uint8_t BmcUpdateIntentUpdateDynamic : 1;
-			uint8_t BmcUpdateIntentUpdateAtReset : 1;
-		};
-		byte BmcUpdateIntentValue;
-	};
-	byte PchPFMActiveSVN;
-	byte PchPFMActiveMajorVersion;
-	byte PchPFMActiveMinorVersion;
-	byte BmcPFMActiveSVN;
-	byte BmcPFMActiveMajorVersion;
-	byte BmcPFMActiveMinorVersion;
-	byte PchPFMRecoverSVN;
-	byte PchPFMRecoverMajorVersion;
-	byte PchPFMRecoverMinorVersion;
-	byte BmcPFMRecoverSVN;
-	byte BmcPFMRecoverMajorVersion;
-	byte BmcPFMRecoverMinorVersion;
-	byte CpldFPGARoTHash[0x40];
-	byte Reserved[0x20];
-	byte AcmBiosScratchPad[0x40];
-	byte BmcScratchPad[0x40];
-} SMBUS_MAIL_BOX;
-
 typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	CpldIdentifier = 0x00,
 	CpldReleaseVersion = 0x01,
@@ -213,10 +130,7 @@ typedef enum _SEAMLESS_UPDATE_INTENT {
 
 unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize);
 int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
-// void ReadFullUFM(uint32_t UfmId,uint32_t UfmLocation,uint8_t *DataBuffer, uint16_t DataSize);
 unsigned char erase_provision_data_in_flash(void);
-void GetUpdateStatus(uint8_t *DataBuffer, uint8_t DataSize);
-void SetUpdateStatus(uint8_t *DataBuffer, uint8_t DataSize);
 
 void ResetMailBox(void);
 void InitializeSmbusMailbox(void);
@@ -254,13 +168,6 @@ void SetMajorErrorCode(byte MajorErrorCodeValue);
 byte GetMinorErrorCode(void);
 // void SetMinorErrorCode(MINOR_ERROR_CODE_VALUE MinorErrorCodeValue);
 void SetMinorErrorCode(byte MinorErrorCodeValue);
-bool IsUfmStatusCommandBusy(void);
-bool IsUfmStatusCommandDone(void);
-bool IsUfmStatusCommandError(void);
-bool IsUfmStatusLocked(void);
-bool IsUfmStatusUfmProvisioned(void);
-bool IsUfmStatusPitLevel1Enforced(void);
-bool IsUfmStatusPITL2CompleteSuccess(void);
 uint8_t GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
 void ClearUfmStatusValue(uint8_t UfmStatusBitMask);
@@ -273,26 +180,6 @@ byte GetBmcCheckPoint(void);
 void SetBmcCheckPoint(byte BmcCheckpoint);
 byte GetBiosCheckPoint(void);
 void SetBiosCheckPoint(byte BiosCheckpoint);
-bool IsPchUpdateIntentPCHActive(void);
-bool IsPchUpdateIntentPchRecovery(void);
-bool IsPchUpdateIntentCpldActive(void);
-bool IsPchUpdateIntentCpldRecovery(void);
-bool IsPchUpdateIntentBmcActive(void);
-bool IsPchUpdateIntentBmcRecovery(void);
-bool IsPchUpdateIntentUpdateDynamic(void);
-bool IsPchUpdateIntentUpdateAtReset(void);
-byte GetPchUpdateIntent(void);
-void SetPchUpdateIntent(byte PchUpdateIntent);
-bool IsBmcUpdateIntentPchActive(void);
-bool IsBmcUpdateIntentPchRecovery(void);
-bool IsBmcUpdateIntentCpldActive(void);
-bool IsBmcUpdateIntentCpldRecovery(void);
-bool IsBmcUpdateIntentBmcActive(void);
-bool IsBmcUpdateIntentBmcRecovery(void);
-bool IsBmcUpdateIntentUpdateDynamic(void);
-bool IsBmcUpdateIntentUpdateAtReset(void);
-byte GetBmcUpdateIntent(void);
-void SetBmcUpdateIntent(byte BmcUpdateIntent);
 byte GetPchPfmActiveSvn(void);
 void SetPchPfmActiveSvn(byte ActiveSVN);
 byte GetPchPfmActiveMajorVersion(void);
@@ -330,22 +217,12 @@ byte GetAfmRecoverMajorVersion(void);
 void SetAfmRecoverMajorVersion(byte RecoverMajorVersion);
 byte GetAfmRecoverMinorVersion(void);
 void SetAfmRecoverMinorVersion(byte RecoverMinorVersion);
+byte GettProvisionStatus2(void);
+void SetProvisionStatus2(byte ProvisionStatus2);
 #endif
-byte *GetCpldFpgaRotHash(void);
-void SetCpldFpgaRotHash(byte *HashData);
-byte *GetAcmBiosScratchPad(void);
-void SetAcmBiosScratchPad(byte *AcmBiosScratchPad);
-byte *GetBmcScratchPad(void);
-void SetBmcScratchPad(byte *BmcScratchPad);
-void HandleSmbusMailBoxWrite(unsigned char MailboxAddress, unsigned char ValueToWrite, int ImageType);
-void HandleSmbusMailBoxRead(int MailboxOffset, int ImageType);
 void process_provision_command(void);
 void UpdateBiosCheckpoint(byte Data);
 void UpdateBmcCheckpoint(byte Data);
-void UpdateIntentHandle(byte Data, uint32_t Source);
-bool WatchDogTimer(int ImageType);
-uint8_t PchBmcCommands(unsigned char *CipherText, uint8_t ReadFlag);
-void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion);
 void initializeFPLEDs(void);
 unsigned char erase_provision_flash(void);
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);

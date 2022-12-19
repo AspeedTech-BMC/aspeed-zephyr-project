@@ -126,10 +126,6 @@ static int cmd_set_svn(const struct shell *shell, size_t argc, char **argv)
 	if (set_ufm_svn(offset, svn) != 0)
 		shell_error(shell, "set svn policy for %s to %d failed", argv[1], svn);
 
-#if 0
-	if (offset == SVN_POLICY_FOR_CPLD_UPDATE)
-		SetCpldRotSvn(svn);
-#endif
 	ARG_UNUSED(argc);
 	return 0;
 }
