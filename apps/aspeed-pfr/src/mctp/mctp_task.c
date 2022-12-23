@@ -35,6 +35,20 @@ static uint8_t set_thread_name(mctp *mctp_inst)
 			 "mctptx_%02x_%02x", mctp_inst->medium_type, smbus_conf->bus);
 		ret = MCTP_SUCCESS;
 		break;
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+	case MCTP_MEDIUM_TYPE_I3C:
+		LOG_INF("medium_type: i3c");
+		mctp_i3c_conf *i3c_conf = (mctp_i3c_conf *)&mctp_inst->medium_conf;
+
+		snprintf(mctp_inst->mctp_rx_task_name, sizeof(mctp_inst->mctp_rx_task_name),
+				"mctprx_%02x_%02x_%02x", mctp_inst->medium_type, i3c_conf->bus,
+				i3c_conf->addr);
+		snprintf(mctp_inst->mctp_tx_task_name, sizeof(mctp_inst->mctp_tx_task_name),
+				"mctptx_%02x_%02x_%02x", mctp_inst->medium_type, i3c_conf->bus,
+				i3c_conf->addr);
+		ret = MCTP_SUCCESS;
+		break;
+#endif
 	default:
 		break;
 	}
@@ -54,6 +68,11 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		ret = mctp_smbus_init(mctp_inst, medium_conf);
 		break;
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+	case MCTP_MEDIUM_TYPE_I3C:
+		ret = mctp_i3c_init(mctp_inst, medium_conf);
+		break;
+#endif
 	default:
 		break;
 	}
@@ -70,6 +89,11 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		mctp_smbus_deinit(mctp_inst);
 		break;
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+	case MCTP_MEDIUM_TYPE_I3C:
+		mctp_i3c_deinit(mctp_inst);
+		break;
+#endif
 	default:
 		break;
 	}

@@ -130,6 +130,27 @@
 	status = "okay";
 };
 
+// For mctp over i3c
+// AST2600 i3c-1 -> AST1060 i3c-2
+&i3c2 {
+	status = "okay";
+	assigned-address = <0x9>;
+	pid-extra-info = <0x9>;
+	pinctrl-0 = <&pinctrl_i3c2_default>;
+	ibi-append-pec;
+	priv-xfer-pec;
+	secondary;
+	i3c2_smq:i3c-slave-mqueue@9 {
+		 compatible = "aspeed,i3c-slave-mqueue";
+		 reg = <0x9>;
+		 msg-size = <256>;
+		 num-of-msgs = <4>;
+		 mandatory-data-byte = <0xae>;
+		 label = "I3C_SMQ_2";
+		 status = "okay";
+	 };
+};
+
 &wdt0 {
 	status = "okay";
 };

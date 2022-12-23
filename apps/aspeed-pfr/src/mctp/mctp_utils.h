@@ -23,6 +23,7 @@
 typedef enum {
 	MCTP_MEDIUM_TYPE_UNKNOWN = 0,
 	MCTP_MEDIUM_TYPE_SMBUS,
+	MCTP_MEDIUM_TYPE_I3C,
 	MCTP_MEDIUM_TYPE_MAX
 } MCTP_MEDIUM_TYPE;
 
@@ -44,6 +45,13 @@ typedef struct _mctp_ext_params {
 typedef uint16_t (*medium_tx)(void *mctp_p, void *msg_p);
 typedef uint16_t (*medium_rx)(void *mctp_p, void *msg_p);
 
+/* i3c config for mctp medium_conf */
+typedef struct _mctp_i3c_conf {
+	uint8_t bus;
+	uint8_t addr;
+	uint32_t dummy;
+} mctp_i3c_conf;
+
 /* smbus config for mctp medium_conf */
 typedef struct _mctp_smbus_conf {
 	uint8_t bus;
@@ -54,6 +62,7 @@ typedef struct _mctp_smbus_conf {
 /* mctp medium conf */
 typedef union {
 	mctp_smbus_conf smbus_conf;
+	mctp_i3c_conf i3c_conf;
 } mctp_medium_conf;
 
 /* mctp tx message struct */
@@ -123,3 +132,5 @@ uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet);
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_smbus_deinit(mctp *mctp_inst);
 
+uint8_t mctp_i3c_init(mctp *mctp_instance, mctp_medium_conf medium_conf);
+uint8_t mctp_i3c_deinit(mctp *mctp_instance);
