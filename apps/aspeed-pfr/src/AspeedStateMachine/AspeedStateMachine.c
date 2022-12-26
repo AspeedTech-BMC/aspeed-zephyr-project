@@ -27,7 +27,6 @@
 #include "cerberus_pfr/cerberus_pfr_spi_filtering.h"
 #endif
 #include "Smbus_mailbox/Smbus_mailbox.h"
-#include "StateMachineAction/StateMachineActions.h"
 #include "pfr/pfr_util.h"
 #include "gpio/gpio_aspeed.h"
 #include "logging/logging_wrapper.h"

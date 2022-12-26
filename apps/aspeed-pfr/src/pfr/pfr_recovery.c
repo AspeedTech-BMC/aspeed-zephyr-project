@@ -6,7 +6,6 @@
 
 #include <logging/log.h>
 #include "pfr_recovery.h"
-#include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "common/common.h"

@@ -6,7 +6,6 @@
 #include <zephyr.h>
 #include <drivers/gpio.h>
 #include <logging/log.h>
-#include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 

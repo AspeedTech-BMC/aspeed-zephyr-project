@@ -15,7 +15,6 @@
 #include "cerberus_pfr/cerberus_pfr_verification.h"
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #endif
-#include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "flash/flash_aspeed.h"

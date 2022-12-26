@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include "include/SmbusMailBoxCom.h"
 #include "AspeedStateMachine/common_smc.h"
-#include "StateMachineAction/StateMachineActions.h"
 
 #pragma pack(1)
 
