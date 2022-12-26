@@ -5,7 +5,6 @@
  */
 
 #include <logging/log.h>
-#include "StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "include/SmbusMailBoxCom.h"
 #if defined(CONFIG_INTEL_PFR)
