@@ -76,14 +76,3 @@ typedef struct{
 	uint8_t  Reserved[3];
 } CPLD_STATUS;
 
-// temorary solution to fix build failed
-typedef struct _PFM_STRUCTURE {
-	uint32_t PfmTag;
-	uint8_t SVN;
-	uint8_t BkcVersion;
-	uint16_t PfmRevision;
-	uint32_t Reserved;
-	uint8_t OemSpecificData[16];
-	uint32_t Length;
-} PFM_STRUCTURE;
-
