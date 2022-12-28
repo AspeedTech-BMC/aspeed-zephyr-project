@@ -233,8 +233,8 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		else if (events[8].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Seamless Update Intent */
 			k_sem_take(events[8].sem, K_NO_WAIT);
-			data.bit8[0] = BmcSeamlessUpdateIntent;
-			swmbx_get_msg(0, BmcSeamlessUpdateIntent, &data.bit8[1]);
+			data.bit8[0] = BmcUpdateIntent2;
+			swmbx_get_msg(0, BmcUpdateIntent2, &data.bit8[1]);
 
 			GenerateStateMachineEvent(SEAMLESS_UPDATE_REQUESTED, data.ptr);
 		} else if (events[9].state == K_POLL_STATE_SEM_AVAILABLE) {
@@ -279,7 +279,7 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_seamless_update_intent_sem,
-			BmcSeamlessUpdateIntent, true);
+			BmcUpdateIntent2, true);
 #endif
 
 	/* From PCH */

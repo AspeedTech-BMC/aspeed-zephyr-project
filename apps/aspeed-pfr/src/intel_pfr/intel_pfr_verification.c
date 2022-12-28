@@ -180,6 +180,7 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 	status = pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type), (uint8_t *)&pc_type);
 	if (status != Success) {
 		LOG_ERR("Flash read PC type failed");
+		LOG_ERR("IMG_TYPE=%d ADDR=%p SIZE=%d", pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type));
 		return Failure;
 	}
 

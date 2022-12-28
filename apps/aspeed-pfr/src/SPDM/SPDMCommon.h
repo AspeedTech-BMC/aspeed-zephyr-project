@@ -68,3 +68,4 @@ typedef struct {
 } spdm_request_data;
 
 void init_spdm();
+void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid);

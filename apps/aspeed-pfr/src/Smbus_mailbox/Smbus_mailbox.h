@@ -58,7 +58,7 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 #endif
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	PchSeamlessUpdateIntent = 0x61,
-	BmcSeamlessUpdateIntent = 0x62,
+	BmcUpdateIntent2 = 0x62,
 #endif
 	Reserved                = 0x63,
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)

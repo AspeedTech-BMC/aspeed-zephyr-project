@@ -171,7 +171,7 @@ void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t d
 	spdm_mctp_init_req(context, bus, dst_sa, dst_eid);
 	context->release_connection_data = spdm_mctp_release_req;
 
-	// Set private/public key pair for signing
+	/* Set private/public key pair for signing */
 	int ret;
 	ret = mbedtls_ecp_group_load(&context->key_pair.MBEDTLS_PRIVATE(grp),
 			MBEDTLS_ECP_DP_SECP384R1);
@@ -184,7 +184,11 @@ void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t d
 			end_responder_key_der + end_responder_key_der_len - 97,  97);
 	LOG_INF("mbedtls_ecp_point_read_binary ret=%x", -ret);
 
-	ret = mbedtls_ecp_check_pub_priv(&context->key_pair, &context->key_pair, context->random_callback, context);
+	ret = mbedtls_ecp_check_pub_priv(
+			&context->key_pair,
+			&context->key_pair,
+			context->random_callback,
+			context);
 	LOG_INF("mbedtls_ecp_check_pub_priv ret=%x", -ret);
 }
 
@@ -257,28 +261,6 @@ void init_spdm()
 
 #if defined(CONFIG_SHELL)
 #include <shell/shell.h>
-
-static int cmd_spdm_req(const struct shell *shell, size_t argc, char **argv)
-{
-	uint16_t uuid = strtol(argv[2], NULL, 16);
-	if (strcmp(argv[1], "remove") == 0) {
-		spdm_remove_device(uuid);
-	} else {
-		spdm_add_device(uuid);
-	}
-	return 0;
-}
-
-static int cmd_spdm_rsp(const struct shell *shell, size_t argc, char **argv)
-{
-	extern struct spdm_context *context_rsp_oo;
-	struct spdm_context *context_rsp = spdm_context_create();
-
-	init_responder_context(context_rsp);
-	context_rsp_oo = context_rsp;
-	return 0;
-}
-
 #include <portability/cmsis_os2.h>
 static int cmd_spdm_run(const struct shell *shell, size_t argc, char **argv)
 {
@@ -300,13 +282,12 @@ static int cmd_spdm_enable(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_spdm_get(const struct shell *shell, size_t argc, char **argv)
 {
-	spdm_get_attester();
+	uint32_t event = spdm_get_attester();
+	shell_print(shell, "SPDM Event=%08x", event);
 	return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_spdm_cmds,
-	SHELL_CMD_ARG(req, NULL, "SPDM Requester: spdm req add|remove afm_offset", cmd_spdm_req, 3, 5),
-	SHELL_CMD(rsp, NULL, "Run SPDM Responder Thread", cmd_spdm_rsp),
 	SHELL_CMD(enable, NULL, "Stop attestation", cmd_spdm_enable),
 	SHELL_CMD(run, NULL, "Run attestation", cmd_spdm_run),
 	SHELL_CMD(stop, NULL, "Stop attestation", cmd_spdm_stop),

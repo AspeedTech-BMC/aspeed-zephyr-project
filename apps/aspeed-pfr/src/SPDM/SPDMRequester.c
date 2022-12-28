@@ -4,11 +4,15 @@
  * SPDX-License-Identifier: MIT
  */
 #include <portability/cmsis_os2.h>
+#include <storage/flash_map.h>
+#include <aspeed_util.h>
 
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "SPDM/SPDMCommon.h"
 #include "SPDM/RequestCmd/SPDMRequestCmd.h"
 
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
+#include "intel_pfr/intel_pfr_definitions.h"
 #include "include/SmbusMailBoxCom.h"
 #include "mctp/mctp_base_protocol.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -22,6 +26,18 @@ static void spdm_attester_tick(struct k_timer *timeer);
 
 osEventFlagsId_t spdm_attester_event;
 K_TIMER_DEFINE(spdm_attester_timer, spdm_attester_tick, NULL);
+
+/* Storing the offset in afm_act_1 partition */
+static off_t afm_list[8] = {0};
+
+enum ATTEST_RESULT {
+	ATTEST_SUCCEEDED,
+	ATTEST_FAILED_VCA = -1,
+	ATTEST_FAILED_DIGEST = -2,
+	ATTEST_FAILED_CERTIFICATE = -3,
+	ATTEST_FAILED_CHALLENGE_AUTH = -4,
+	ATTEST_FAILED_MEASUREMENTS_MISMATCH = -5,
+};
 
 int spdm_send_request(void *ctx, void *req, void *rsp)
 {
@@ -43,16 +59,7 @@ int spdm_send_request(void *ctx, void *req, void *rsp)
 	return ret;
 }
 
-enum ATTEST_RESULT {
-	ATTEST_SUCCEEDED,
-	ATTEST_FAILED_VCA = -1,
-	ATTEST_FAILED_DIGEST = -2,
-	ATTEST_FAILED_CERTIFICATE = -3,
-	ATTEST_FAILED_CHALLENGE_AUTH = -4,
-	ATTEST_FAILED_MEASUREMENTS_MISMATCH = -5,
-};
-
-int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
+static int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 	int ret = 0;
 	struct spdm_context *context = (struct spdm_context *)ctx;
 
@@ -119,7 +126,7 @@ int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 		}
 
 		/* Device Attestation */
-		uint8_t number_of_blocks = 0, measurement_block, received_blocks = 0;
+		uint8_t number_of_blocks = 0, measurement_block;
 		bool signature_verified = false;
 
 		spdm_context_reset_l1l2_hash(context);
@@ -165,9 +172,9 @@ int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 					signature_verified = true;
 					break;
 				} else {
-					possible_measure =
+					possible_measure = (AFM_DEVICE_MEASUREMENT_VALUE *)(
 						(uint8_t *)possible_measure + 4 +
-						possible_measure->ValueSize * possible_measure->PossibleMeasurements;
+						possible_measure->ValueSize * possible_measure->PossibleMeasurements);
 				}
 			} else if (ret == -1) {
 				/* Measurement not found check next one */
@@ -198,9 +205,6 @@ static void spdm_attester_tick(struct k_timer *timeer)
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_TICK);
 }
 
-struct spdm_context *target_list[8] = {0};
-AFM_DEVICE_STRUCTURE *afm_list[8] = {0};
-
 void spdm_attester_main(void *a, void *b, void *c)
 {
 	uint32_t events;
@@ -209,7 +213,6 @@ void spdm_attester_main(void *a, void *b, void *c)
 
 	uint32_t RUNNING_COUNT = 0;
 	while(1) {
-
 		// Schedule the next tick
 		// k_timer_start(&spdm_attester_timer, K_SECONDS(60), K_NO_WAIT);
 		// Tick event will be cleared.
@@ -217,7 +220,14 @@ void spdm_attester_main(void *a, void *b, void *c)
 				SPDM_REQ_EVT_TICK | SPDM_REQ_EVT_T0 | SPDM_REQ_EVT_ENABLE,
 				osFlagsWaitAll | osFlagsNoClear,
 				osWaitForever);
-		LOG_INF("Start SPDM attestation events=%08x count=%lu", events, ++RUNNING_COUNT);
+		LOG_INF("Start SPDM attestation events=%08x count=%u", events, ++RUNNING_COUNT);
+
+		const struct flash_area *afm_flash;
+		int ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &afm_flash);
+		if (ret != 0) {
+			LOG_ERR("Unable to open afm partition ret=%d", ret);
+			continue;
+		}
 
 		for (size_t device = 0; device < 8; ++device) {
 			// Make sure current state can run attestation
@@ -227,15 +237,20 @@ void spdm_attester_main(void *a, void *b, void *c)
 				LOG_ERR("T0 FLAG is cleared. Stop attestation at device[%d]", device);
 				break;
 			}
-#if 1
+
 			if (afm_list[device]) {
-				LOG_INF("Attestation device[%d] events=%08x SPDM_REQ_EVT_T0=%08x", device, events, SPDM_REQ_EVT_T0);
+				static uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+				AFM_DEVICE_STRUCTURE *afm_device = (AFM_DEVICE_STRUCTURE *)buffer;
+
+				ret = flash_area_read(afm_flash, afm_list[device], buffer, PAGE_SIZE);
+				LOG_INF("Attestation device[%d][%08x] events=%08x",
+						device, afm_list[device], events);
 				LOG_INF("UUID=%04x, BusId=%02x, DeviceAddress=%02x, BindingSped=%02x, Policy=%02x",
-						afm_list[device]->UUID,
-						afm_list[device]->BusID,
-						afm_list[device]->DeviceAddress,
-						afm_list[device]->BindingSpec,
-						afm_list[device]->Policy);
+						afm_device->UUID,
+						afm_device->BusID,
+						afm_device->DeviceAddress,
+						afm_device->BindingSpec,
+						afm_device->Policy);
 
 
 				/* Create context */
@@ -243,72 +258,67 @@ void spdm_attester_main(void *a, void *b, void *c)
 
 				// DEST_EID using NULL EID due to AFM device structure design
 				init_requester_context(context,
-						afm_list[device]->BusID,
-						afm_list[device]->DeviceAddress,
+						afm_device->BusID,
+						afm_device->DeviceAddress,
 						MCTP_BASE_PROTOCOL_NULL_EID);
 
 				/* Attested the device */
-				int ret = spdm_attest_device(/* target_list[device] */ context, afm_list[device]);
+				int ret = spdm_attest_device(context, afm_device);
 
 				/* Check Policy */
 				switch (ret) {
 				case ATTEST_SUCCEEDED:
-					LOG_INF("ATTEST UUID[%04x] Succeeded", afm_list[device]->UUID);
+					LOG_INF("ATTEST UUID[%04x] Succeeded", afm_device->UUID);
 					break;
 				case ATTEST_FAILED_VCA:
 					/* Protocol Error */
-					LOG_ERR("ATTEST UUID[%04x] Protocol Error", afm_list[device]->UUID);
+					LOG_ERR("ATTEST UUID[%04x] Protocol Error", afm_device->UUID);
 					LogErrorCodes(SPDM_PROTOCOL_ERROR_FAIL, SPDM_CONNECTION_FAIL);
-					if (afm_list[device]->Policy & BIT(2)) {
+					if (afm_device->Policy & BIT(2)) {
 						/* Lock down in reset */
 						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
 					}	
 					break;
 				case ATTEST_FAILED_DIGEST:
-					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_list[device]->UUID);
+					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
 					LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_DIGEST_FAIL);
-					if (afm_list[device]->Policy & BIT(1)) {
+					if (afm_device->Policy & BIT(1)) {
 						/* Lock down in reset */
 						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
 					}
 					break;
 				case ATTEST_FAILED_CERTIFICATE:
-					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_list[device]->UUID);
+					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
 					LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CERTIFICATE_FAIL);
-					if (afm_list[device]->Policy & BIT(1)) {
+					if (afm_device->Policy & BIT(1)) {
 						/* Lock down in reset */
 						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
 					}
 					break;
 				case ATTEST_FAILED_CHALLENGE_AUTH:
 					/* Challenge Error */
-					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_list[device]->UUID);
+					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
 					LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CHALLENGE_FAIL);
-					if (afm_list[device]->Policy & BIT(1)) {
+					if (afm_device->Policy & BIT(1)) {
 						/* Lock down in reset */
 						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
 					}
 					break;
 				case ATTEST_FAILED_MEASUREMENTS_MISMATCH:
 					/* Measurement unexpected or mismatch */
-					LOG_ERR("ATTEST UUID[%04x] Measurement Error", afm_list[device]->UUID);
+					LOG_ERR("ATTEST UUID[%04x] Measurement Error", afm_device->UUID);
 					LogErrorCodes(ATTESTATION_MEASUREMENT_FAIL, SPDM_MEASUREMENT_FAIL);
-					if (afm_list[device]->Policy & BIT(0)) {
+					if (afm_device->Policy & BIT(0)) {
 						/* Lock down in reset */
 						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
-					} 	
-					break;	
+					}
+					break;
 				default:
 					break;
 				}
 
 				spdm_context_release(context);
 			}
-#else
-			if (target_list[device])
-				spdm_attest_device(target_list[device]);
-#endif
-			// k_sleep(K_SECONDS(3));
 		}
 		osEventFlagsClear(spdm_attester_event, SPDM_REQ_EVT_TICK);
 	}
@@ -321,11 +331,35 @@ void spdm_enable_attester()
 
 void spdm_run_attester()
 {
-	afm_list[0] = (uint8_t *)0x80000000 + 0xf1400;
-	afm_list[1] = (uint8_t *)0x80000000 + 0xf2400;
+	/* AFM Active is already verified during Tmin1, and the AFM structure are
+	 * aligned at 4KB, so we scan through the partition for it */
+
+	const struct flash_area *afm_flash = NULL;
+	int ret;
+	int max_afm = 8;
+
+	ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &afm_flash);
+
+	/* First page is the block0/block1, start from page 1. */
+	for (uint8_t i = 1; i<max_afm; ++i) {
+		uint32_t magic_num;
+		ret = flash_area_read(afm_flash, i * PAGE_SIZE, &magic_num, sizeof(magic_num));
+		if (magic_num == BLOCK0TAG) {
+			afm_list[i] = (i * PAGE_SIZE) + 0x400;
+			LOG_INF("Add afm device offset [%08x]", afm_list[i]);
+		} else {
+			/* Offset 0x0000 is block0/1 header not AFM device structure,
+			 * so use this value as an empty slot 
+			 */
+			afm_list[i] = 0x00000000;
+		}
+	}
+
 
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0);
-	k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_SECONDS(3));
+	// For debug purpose
+	// k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_SECONDS(3));
+	k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_MINUTES(10));
 }
 
 void spdm_stop_attester()
@@ -335,38 +369,8 @@ void spdm_stop_attester()
 }
 
 #if defined(CONFIG_SHELL)
-void spdm_get_attester()
+uint32_t spdm_get_attester()
 {
-	uint32_t events = osEventFlagsGet(spdm_attester_event);
-	LOG_WRN("Attester Event Flag = 0x%08x", events);
-}
-
-void spdm_add_device(uint16_t uuid)
-{
-#if 1
-	afm_list[0] = (uint8_t *)0x80000000 + 0xf1400;
-	afm_list[1] = (uint8_t *)0x80000000 + 0xf2400;
-#else
-	// Only for testing. This should be in critical section
-	for (size_t i = 0; i < 8; ++i) {
-		if (target_list[i] == NULL) {
-			target_list[i] = spdm_context_create();
-			init_requester_context(target_list[i]);
-			break;
-		}
-	}
-#endif
-}
-
-void spdm_remove_device(uint16_t uuid)
-{
-	// Only for testing. This should be in critical section
-	for (size_t i = 0; i < 8; ++i) {
-		if (afm_list[i] != NULL) {
-			//spdm_context_release(target_list[i]);
-			afm_list[i] = NULL;
-			break;
-		}
-	}
+	return osEventFlagsGet(spdm_attester_event);
 }
 #endif

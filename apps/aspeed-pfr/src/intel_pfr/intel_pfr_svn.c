@@ -97,14 +97,19 @@ int read_statging_area_pfm_svn(struct pfr_manifest *manifest, uint8_t *svn_versi
 	// PFM data start address after Staging block and PFM block
 	pfm_start_address = manifest->address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
 
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
-			buffer);
+	if (manifest->image_type == AFM_TYPE)
+		status = pfr_spi_read(BMC_TYPE, pfm_start_address, sizeof(PFM_STRUCTURE),
+				buffer);
+	else
+		status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
+				buffer);
 	if (status != Success) {
-		LOG_ERR("Invalid Staging Area Pfm ");
+		LOG_ERR("Invalid Staging Area Pfm imgtype=%d pfr=%p", manifest->image_type, pfm_start_address);
 		return Failure;
 	}
 
 	*svn_version = ((PFM_STRUCTURE *)buffer)->SVN;
+	LOG_HEXDUMP_DBG(buffer, sizeof(PFM_STRUCTURE), "PFM:");
 
 	return Success;
 }

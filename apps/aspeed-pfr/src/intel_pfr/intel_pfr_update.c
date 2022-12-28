@@ -36,6 +36,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	int status = 0;
 	uint32_t read_address = 0;
 	uint32_t target_address = 0;
+	bool afm_update = false;
 
 	if (manifest->image_type == BMC_TYPE) {
 		LOG_INF("BMC Staging Region Verification");
@@ -71,14 +72,25 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		{
 			manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 		}
-	} else  {
+	} 
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == AFM_TYPE) {
+		LOG_INF("AFM Staging Region Verification");
+		manifest->image_type = BMC_TYPE;
+		read_address = CONFIG_BMC_AFM_STAGING_OFFSET;
+		target_address = 0;
+		manifest->pc_type = PFR_AFM;
+		afm_update = true;
+	}
+#endif
+	else {
 		return Failure;
 	}
 
 	manifest->address = read_address;
 	manifest->recovery_address = target_address;
 
-	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
+	LOG_INF("Verifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
@@ -90,7 +102,9 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 
 	manifest->update_fw->pc_length = manifest->pc_length;
 
-	if (manifest->image_type == BMC_TYPE)
+	if (afm_update == true)
+		manifest->pc_type = PFR_AFM;
+	else if (manifest->image_type == BMC_TYPE)
 		manifest->pc_type = PFR_BMC_PFM;
 	else if (manifest->image_type == PCH_TYPE)
 		manifest->pc_type = PFR_PCH_PFM;
@@ -120,6 +134,9 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 	}
 #endif
 	LOG_INF("Staging area verification successful");
+
+	if (afm_update)
+		manifest->image_type = AFM_TYPE;
 
 	return status;
 }
@@ -248,6 +265,38 @@ int update_rot_fw(uint32_t address, uint32_t length)
 	return Success;
 }
 
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+enum AFM_PARTITION_TYPE {
+	AFM_PART_ACT_1,
+	AFM_PART_RCV_1,
+	// Reserved for Intel PFR 4.0
+	AFM_PART_ACT_2,
+	AFM_PART_RCV_2,
+};
+
+int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length)
+{
+	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_AFM);
+	uint32_t source_address = address;
+	uint32_t length_page_align;
+
+	length_page_align =
+		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
+
+	if (pfr_spi_erase_region(ROT_INTERNAL_AFM, true, 0, region_size)) {
+		LOG_ERR("Failed to erase AFM Active Partition");
+		return Failure;
+	}
+	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
+				ROT_INTERNAL_AFM, 0, length_page_align)) {
+		LOG_ERR("Failed to write AFM Active Partition");
+		return Failure;
+	}
+
+	return Success;
+}
+#endif
+
 int ast1060_update(struct pfr_manifest *manifest)
 {
 	uint32_t cancelled_id = 0;
@@ -281,7 +330,6 @@ int ast1060_update(struct pfr_manifest *manifest)
 	LOG_INF("ROT update capsule verification success");
 	pc_type_status = check_rot_capsule_type(manifest);
 	payload_address = manifest->address + PFM_SIG_BLOCK_SIZE;
-
 	if (pc_type_status == DECOMMISSION_CAPSULE) {
 		// Decommission validation
 		manifest->address = payload_address;
@@ -328,6 +376,14 @@ int ast1060_update(struct pfr_manifest *manifest)
 		SetCpldRotSvn(hrot_svn);
 		LOG_INF("ROT update end");
 	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (pc_type_status == PFR_AFM) {
+		pc_length = manifest->pc_length;
+		payload_address = payload_address;
+		LOG_INF("AFM update start payload_address=%p pc_length=%x", payload_address, 64*1024 /*pc_length*/);
+		return update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
+	}
+#endif
 
 	return Success;
 }
@@ -376,7 +432,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	}
 
 	if (pfr_manifest->image_type == BMC_TYPE) {
-		LOG_INF("BMC Update in Progress");
+		LOG_INF("BMC Update in progress");
 		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
 					sizeof(source_address)))
 			return Failure;
@@ -384,7 +440,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 					sizeof(act_pfm_offset)))
 			return Failure;
 	} else if (pfr_manifest->image_type == PCH_TYPE) {
-		LOG_INF("PCH Update in Progress");
+		LOG_INF("PCH Update in progress");
 		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
 					sizeof(source_address)))
 			return Failure;
@@ -392,7 +448,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 					sizeof(act_pfm_offset)))
 			return Failure;
 	}
-
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (pfr_manifest->image_type == AFM_TYPE) {
+		LOG_INF("AFM Update in progress");
+		pfr_manifest->image_type = BMC_TYPE;
+		pfr_manifest->address = CONFIG_BMC_AFM_STAGING_OFFSET;
+		return ast1060_update(pfr_manifest);
+	}
+#endif
 	pfr_manifest->staging_address = source_address;
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
@@ -488,8 +551,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		uint32_t time_start, time_end;
 		time_start = k_uptime_get_32();
 
-		if (decompress_capsule(pfr_manifest, decomp_event)) {
-			LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+		if (pfr_manifest->image_type == BMC_TYPE || pfr_manifest->image_type == PCH_TYPE) {
+			if (decompress_capsule(pfr_manifest, decomp_event)) {
+				LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+				return Failure;
+			}
+		}
+		else {
+			LOG_ERR("Unsupported image_type=%d", pfr_manifest->image_type);
 			return Failure;
 		}
 

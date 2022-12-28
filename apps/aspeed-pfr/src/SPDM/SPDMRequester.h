@@ -16,3 +16,4 @@ int spdm_send_request(void *ctx, void *req_msg, void *rsp_msg);
 void spdm_enable_attester();
 void spdm_run_attester();
 void spdm_stop_attester();
+uint32_t spdm_get_attester();
