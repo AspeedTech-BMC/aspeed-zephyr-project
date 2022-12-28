@@ -24,11 +24,6 @@ struct spi_filter_engine_wrapper spiFilterEngineWrapper;
 
 static uint8_t hashStorage[RSA_MAX_KEY_LENGTH] __aligned(16);
 
-bool gBootCheckpointReceived;
-int gBMCWatchDogTimer = -1;
-int gPCHWatchDogTimer = -1;
-uint32_t gMaxTimeout = MAX_BIOS_BOOT_TIME;
-
 struct flash *getFlashDeviceInstance(void)
 {
 	return &spiEngineWrapper.spi.base;

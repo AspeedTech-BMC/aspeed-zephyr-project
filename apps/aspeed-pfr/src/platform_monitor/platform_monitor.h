@@ -6,6 +6,6 @@
 
 #pragma once
 
-void platform_monitor_init(void);
-void platform_monitor_remove(void);
+void bmc_reset_monitor_init(void);
+void bmc_reset_monitor_remove(void);
 void power_sequence(void);

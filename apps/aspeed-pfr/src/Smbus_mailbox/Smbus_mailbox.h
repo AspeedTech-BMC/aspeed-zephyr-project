@@ -15,9 +15,6 @@
 
 typedef char byte;
 
-#define BMC_MAXTIMEOUT CONFIG_BMC_CHECKPOINT_EXPIRE_TIME
-#define BIOS_MAXTIMEOUT CONFIG_PCH_CHECKPOINT_EXPIRE_TIME
-
 typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	CpldIdentifier = 0x00,
 	CpldReleaseVersion = 0x01,
@@ -89,7 +86,7 @@ typedef enum _EXECUTION_CHECKPOINT {
 	CompletingExecutionBlock,
 	EnteredManagementMode,
 	LeavingManagementMode,
-	ReadToBootOS = 0x80
+	ReadyToBootOS = 0x80
 } EXECUTION_CHECKPOINT;
 
 typedef enum _UPDATE_INTENT {
@@ -222,6 +219,7 @@ void SetProvisionStatus2(byte ProvisionStatus2);
 void process_provision_command(void);
 void UpdateBiosCheckpoint(byte Data);
 void UpdateBmcCheckpoint(byte Data);
+void UpdateAcmCheckpoint(byte Data);
 void initializeFPLEDs(void);
 unsigned char erase_provision_flash(void);
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);

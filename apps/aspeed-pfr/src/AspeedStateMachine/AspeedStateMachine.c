@@ -40,6 +40,7 @@
 #include "pfr/pfr_ufm.h"
 #include "flash/flash_aspeed.h"
 #include "flash/flash_wrapper.h"
+#include "watchdog_timer/wdt_utils.h"
 
 #if defined(CONFIG_PFR_MCTP)
 #include "mctp/mctp.h"
@@ -191,13 +192,16 @@ void enter_tmin1(void *o)
 	if (bmc_reset_only) {
 		BMCBootHold();
 		evt_ctx->data.bit8[2] = BmcOnlyReset;
+		gWdtBootStatus &= ~WDT_BMC_BOOT_DONE_MASK;
 	} else if (pch_reset_only) {
 		PCHBootHold();
 		evt_ctx->data.bit8[2] = PchOnlyReset;
+		gWdtBootStatus &= ~WDT_PCH_BOOT_DONE_MASK;
 	} else {
 		evt_ctx->data.bit8[2] = 0;
 		BMCBootHold();
 		PCHBootHold();
+		gWdtBootStatus &= ~WDT_ALL_BOOT_DONE_MASK;
 	}
 
 	SetPlatformState(ENTER_T_MINUS_1);
@@ -602,7 +606,7 @@ void enter_tzero(void *o)
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 
 	/* Arm reset monitor */
-	platform_monitor_init();
+	bmc_reset_monitor_init();
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 			apply_pfm_protection(BMC_SPI);
@@ -719,7 +723,7 @@ void exit_tzero(void *o)
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
 	/* Disarm reset monitor */
-	platform_monitor_remove();
+	bmc_reset_monitor_remove();
 	LOG_DBG("End");
 }
 
@@ -791,21 +795,15 @@ void handle_checkpoint(void *o)
 
 	switch (evt_ctx->data.bit8[0]) {
 	case BmcCheckpoint:
-		if (evt_ctx->data.bit8[1] == 0x09)
-			SetPlatformState(T0_BMC_BOOTED);
 		UpdateBmcCheckpoint(evt_ctx->data.bit8[1]);
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 		spdm_run_attester();
 #endif
 		break;
 	case AcmCheckpoint:
-		if (evt_ctx->data.bit8[1] == 0x09)
-			SetPlatformState(T0_ACM_BOOTED);
-		//UpdateAcmCheckpoint(evt_ctx->data.bit8[1]);
+		UpdateAcmCheckpoint(evt_ctx->data.bit8[1]);
 		break;
 	case BiosCheckpoint:
-		if (evt_ctx->data.bit8[1] == 0x09)
-			SetPlatformState(T0_BIOS_BOOTED);
 		UpdateBiosCheckpoint(evt_ctx->data.bit8[1]);
 		break;
 	default:
@@ -1086,18 +1084,18 @@ void enter_runtime(void *o)
 		default:
 			if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
-				AspeedPFR_EnableTimer(BMC_EVENT);
+				pfr_start_timer(BMC_TIMER, WDT_BMC_TIMER_MAXTIMEOUT);
 #endif
 			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
-				AspeedPFR_EnableTimer(PCH_EVENT);
+				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
 #endif
 			} else {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
-				AspeedPFR_EnableTimer(BMC_EVENT);
+				pfr_start_timer(BMC_TIMER, WDT_BMC_TIMER_MAXTIMEOUT);
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
-				AspeedPFR_EnableTimer(PCH_EVENT);
+				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
 #endif
 			}
 			break;

@@ -27,6 +27,8 @@
 #include "pfr/pfr_util.h"
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "watchdog_timer/wdt_utils.h"
+#include "watchdog_timer/wdt_handler.h"
 
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -42,19 +44,10 @@ uint8_t gBmcOffsets[12];
 uint8_t gPitPassword[8];
 #endif
 
-uint8_t gBiosBootDone = FALSE;
-uint8_t gBmcBootDone = FALSE;
-uint8_t gObbBootDone = FALSE;
-extern bool gBootCheckpointReceived;
-extern uint32_t gMaxTimeout;
-extern int gBMCWatchDogTimer;
-extern int gPCHWatchDogTimer;
 uint8_t gProvisionCount = 0;
 uint8_t gFifoData = 0;
 uint8_t gProvisionData = 0;
 CPLD_STATUS cpld_update_status;
-EVENT_CONTEXT UpdateEventData;
-AO_DATA UpdateActiveObject;
 
 void ResetMailBox(void)
 {
@@ -227,14 +220,14 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			data.bit8[0] = AcmCheckpoint;
 			swmbx_get_msg(0, AcmCheckpoint, &data.bit8[1]);
 
-			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
 		} else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BIOS Checkpoint */
 			k_sem_take(events[7].sem, K_NO_WAIT);
 			data.bit8[0] = BiosCheckpoint;
 			swmbx_get_msg(0, BiosCheckpoint, &data.bit8[1]);
 
-			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
 		}
 #if defined(CONFIG_SEAMLESS_UPDATE)
 		else if (events[8].state == K_POLL_STATE_SEM_AVAILABLE) {
@@ -683,6 +676,21 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
 	LogLastPanic(panic_reason);
 }
 
+/**
+ * @brief Log boot complete status in T0 mode
+ *
+ * @param current_boot_state the status for the component that has just completed boot
+ */
+void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot_state)
+{
+    if (is_timed_boot_done())
+        // If other components have finished booting, log timed boot complete status.
+        SetPlatformState(T0_BOOT_COMPLETED);
+    else
+        // Otherwise, just log the this boot complete status
+        SetPlatformState(current_boot_state);
+}
+
 // UFM Status
 uint8_t GetUfmStatusValue(void)
 {
@@ -1073,88 +1081,38 @@ void process_provision_command(void)
 }
 
 /**
- * Function to update the Bmc Checkpoint
- * @Param  NULL
+ * Function to update the BMC Checkpoint
+ *
+ * @Param  Data checkpoint command
  * @retval NULL
  **/
 void UpdateBmcCheckpoint(byte Data)
 {
-	if (gBmcBootDone == FALSE) {
-		// Start WDT for BMC boot
-		gBmcBootDone = START;
-		gBMCWatchDogTimer = 0;
-		SetBmcCheckpoint(Data);
-	} else
-		LOG_INF("BMC boot completed. Checkpoint update not allowed");
-
-	if (Data == PausingExecutionBlock) {
-		LOG_INF("Enter PausingExecution: Block Disable Timer");
-		AspeedPFR_DisableTimer(BMC_EVENT);
-	}
-	if (Data == ResumedExecutionBlock)
-		AspeedPFR_EnableTimer(BMC_EVENT);
-
-	// BMC boot completed
-	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
-		// If execution completed disable timer
-		LOG_INF("Enter CompletingExecution: Block Disable Timer");
-		AspeedPFR_DisableTimer(BMC_EVENT);
-		gBmcBootDone = TRUE;
-		gBMCWatchDogTimer = -1;
-#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
-		reset_recovery_level(BMC_SPI);
-#endif
-		SetPlatformState(T0_BMC_BOOTED);
-	}
-	if (Data == AUTHENTICATION_FAILED) {
-		gBmcBootDone = FALSE;
-		gBMCWatchDogTimer = BMC_MAXTIMEOUT;
-	}
-	if (gBmcBootDone == TRUE && gBiosBootDone == TRUE)
-		SetPlatformState(T0_BOOT_COMPLETED);
+	SetBmcCheckpoint(Data);
+	bmc_wdt_handler(Data);
 }
 
+/**
+ * Function to update the ACM Checkpoint
+ *
+ * @Param  Data checkpoint command
+ * @retval NULL
+ **/
+void UpdateAcmCheckpoint(byte Data)
+{
+	SetAcmCheckpoint(Data);
+	acm_wdt_handler(Data);
+}
+
+/**
+ * Function to update the BIOS Checkpoint
+ *
+ * @Param  Data checkpoint command
+ * @retval NULL
+ **/
 void UpdateBiosCheckpoint(byte Data)
 {
-	if (gBiosBootDone == TRUE) {
-		if (Data == EXECUTION_BLOCK_STARTED) {
-			gBiosBootDone = FALSE;
-			gObbBootDone = TRUE;
-		}
-	}
-	if (gBiosBootDone == FALSE) {
-		if (Data == EXECUTION_BLOCK_STARTED) {
-			// Set max time for BIOS boot & starts timer
-			gMaxTimeout = BIOS_MAXTIMEOUT;
-			gBootCheckpointReceived = false;
-			gBiosBootDone = START;
-			gPCHWatchDogTimer = 0;
-		}
-	}
-	if (Data == PausingExecutionBlock)
-		AspeedPFR_DisableTimer(PCH_EVENT);
-	if (Data == ResumedExecutionBlock)
-		AspeedPFR_EnableTimer(PCH_EVENT);
-	// BIOS boot completed
-	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
-		AspeedPFR_DisableTimer(PCH_EVENT);
-		gBiosBootDone = TRUE;
-		gBootCheckpointReceived = true;
-		gPCHWatchDogTimer = -1;
-		SetPlatformState(T0_BIOS_BOOTED);
-#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
-		reset_recovery_level(PCH_SPI);
-#endif
-		LOG_INF("BIOS boot completed. Checkpoint update not allowed");
-	}
-	if (Data == AUTHENTICATION_FAILED) {
-		gBiosBootDone = FALSE;
-		gPCHWatchDogTimer = gMaxTimeout;
-		gBootCheckpointReceived = false;
-		SetLastPanicReason(ACM_IBB_0BB_AUTH_FAIL);
-	}
-	if (gBmcBootDone == TRUE && gBiosBootDone == TRUE)
-		SetPlatformState(T0_BOOT_COMPLETED);
 	SetBiosCheckpoint(Data);
+	bios_wdt_handler(Data);
 }
 

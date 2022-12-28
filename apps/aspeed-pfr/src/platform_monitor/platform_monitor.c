@@ -22,7 +22,7 @@ void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint
 }
 
 /* Monitor BMC Reset Status */
-void platform_monitor_init(void)
+void bmc_reset_monitor_init(void)
 {
 	int ret;
 	struct gpio_dt_spec bmc_rstind =
@@ -36,7 +36,7 @@ void platform_monitor_init(void)
 	LOG_INF("BMC: gpio_add_callback = %d", ret);
 }
 
-void platform_monitor_remove(void)
+void bmc_reset_monitor_remove(void)
 {
 	struct gpio_dt_spec bmc_rstind =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), bmc_rst_ind_in_gpios, 0);
