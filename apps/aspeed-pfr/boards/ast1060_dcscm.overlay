@@ -130,6 +130,7 @@
 	status = "okay";
 };
 
+#if 0
 // For mctp over i3c
 // AST2600 i3c-1 -> AST1060 i3c-2
 &i3c2 {
@@ -150,6 +151,7 @@
 		 status = "okay";
 	 };
 };
+#endif
 
 &wdt0 {
 	status = "okay";
