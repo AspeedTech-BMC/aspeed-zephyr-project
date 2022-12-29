@@ -2,27 +2,11 @@
 # SPDX-License-Identifier: MIT
 
 description: |
-    This binding provides resources required to build and run the
-    samples/ast1060_evb/demo in Zephyr.
+    This binding provides gpio required to support pfr.
 
-compatible: "demo,gpio_basic_api"
+compatible: "aspeed,pfr-gpio-common"
 
 properties:
-    out-gpios:
-        type: phandle-array
-        required: false
-        description: |
-          Identity of a GPIO that will be configured as an output.  This
-          must be on the same device as in-gpios, and physically
-          connected to in-gpios.
-
-    in-gpios:
-        type: phandle-array
-        required: false
-        description: |
-          Identity of a GPIO that will be configured as an input.  This
-          must be on the same device as out-gpios,and physically
-          connected to out-gpios.
     bmc-srst-ctrl-out-gpios:
       type: phandle-array
       required: false
@@ -56,26 +40,6 @@ properties:
       type: phandle-array
       required: false
       description: Control PCH reset signal.
-
-    cpu0-rst-ind-in-gpios:
-      type: phandle-array
-      required: false
-      description: Detect CPU0 reset indicator.
-
-    cpu1-rst-ind-in-gpios:
-      type: phandle-array
-      required: false
-      description: Detect CPU1 reset indicator.
-
-    cpu0-flash-pwr-out-gpios:
-      type: phandle-array
-      required: false
-      description: PCH CPU0 SPI flash power control.
-
-    cpu1-flash-pwr-out-gpios:
-      type: phandle-array
-      required: false
-      description: PCH CPU1 SPI flash power control.
 
     platform-state-out-gpios:
       type: phandle-array

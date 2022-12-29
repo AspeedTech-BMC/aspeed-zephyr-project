@@ -1,0 +1,13 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+description: |
+    This binding provides gpio required to support intel birch stream platform.
+
+compatible: "aspeed,pfr-gpio-bhs"
+
+properties:
+    rst-pltrst-in-gpios:
+        type: phandle-array
+        required: false
+        description: Detect platform reset indicator.

@@ -1,0 +1,9 @@
+/ {
+	pfr_gpio_egs {
+		compatible = "aspeed,pfr-gpio-egs";
+		rst-pltrst-in-gpios = <&gpio0_q_t 26 0>; /* GPIO_T2 */
+		me-bt-done-in-gpios = <&gpio0_q_t 25 0>; /* GPIO_T1 */
+		me-authn-fail-in-gpios = <&gpio0_q_t 28 0>; /* GPIO_T4 */
+	};
+};
+

@@ -215,7 +215,6 @@ config PFR_DEBUG_SHELL
 	select GPIO_SHELL
 	select HWINFO_SHELL
 	select SPI_MONITOR_SHELL_ASPEED
-	select PFR_SHELL_ASPEED
 	select ASPEED_STATE_MACHINE_SHELL
 
 source "Kconfig.zephyr"

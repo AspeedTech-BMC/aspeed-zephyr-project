@@ -9,3 +9,7 @@
 void bmc_reset_monitor_init(void);
 void bmc_reset_monitor_remove(void);
 void power_sequence(void);
+void platform_reset_monitor_init(void);
+void platform_reset_monitor_remove(void);
+
+

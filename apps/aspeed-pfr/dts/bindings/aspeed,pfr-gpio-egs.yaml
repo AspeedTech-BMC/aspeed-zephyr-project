@@ -1,0 +1,23 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+description: |
+    This binding provides gpio required to support intel eagle stream platform.
+
+compatible: "aspeed,pfr-gpio-egs"
+
+properties:
+    rst-pltrst-in-gpios:
+        type: phandle-array
+        required: false
+        description: Detect platform reset indicator.
+
+    me-bt-done-in-gpios:
+        type: phandle-array
+        required: false
+        description: Detect ME boot done indicator.
+
+    me-authn-fail-in-gpios:
+        type: phandle-array
+        required: false
+        description: Detect ME authentication failure indicator.
