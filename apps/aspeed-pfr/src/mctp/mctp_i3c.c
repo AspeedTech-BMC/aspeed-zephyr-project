@@ -26,10 +26,6 @@
 
 LOG_MODULE_REGISTER(mctp_i3c);
 
-#ifndef MCTP_I3C_PEC_ENABLE
-#define MCTP_I3C_PEC_ENABLE 0
-#endif
-
 static uint16_t mctp_i3c_read_smq(void *mctp_p, void *msg_p)
 {
 	// Workaround
@@ -67,16 +63,6 @@ static uint16_t mctp_i3c_read_smq(void *mctp_p, void *msg_p)
 
 	LOG_HEXDUMP_DBG(&i3c_msg.data[0], i3c_msg.rx_len, "mctp_i3c_read_smq msg dump");
 
-	if (MCTP_I3C_PEC_ENABLE) {
-		/** pec byte use 7-degree polynomial with 0 init value and false reverse **/
-		uint8_t pec = crc8(&i3c_msg.data[0], i3c_msg.rx_len - 1, 0x07, 0x00, false);
-		if (pec != i3c_msg.data[i3c_msg.rx_len - 1]) {
-			LOG_ERR("mctp i3c pec error: crc8 should be 0x%02x, but got 0x%02x", pec,
-				i3c_msg.data[i3c_msg.rx_len - 1]);
-			return MCTP_SUCCESS;
-		}
-	}
-
 	memcpy(packet->data, &i3c_msg.data[0], i3c_msg.rx_len);
 	return MCTP_SUCCESS;
 }
@@ -103,14 +89,7 @@ static uint16_t mctp_i3c_write_smq(void *mctp_p, void *msg_p)
 	i3c_msg.bus = mctp_instance->medium_conf.i3c_conf.bus;
 	/** mctp package **/
 	memcpy(&i3c_msg.data[0], tx_msg->buf, len);
-	/** +1 pec; default no pec **/
-	if (MCTP_I3C_PEC_ENABLE) {
-		i3c_msg.tx_len = len + 1;
-		/** pec byte use 7-degree polynomial with 0 init value and false reverse **/
-		i3c_msg.data[len + 1] = crc8(&i3c_msg.data[0], len, 0x07, 0x00, false);
-	} else {
-		i3c_msg.tx_len = len;
-	}
+	i3c_msg.tx_len = len;
 
 	LOG_HEXDUMP_DBG(&i3c_msg.data[0], i3c_msg.tx_len, "mctp_i3c_write_smq msg dump");
 
