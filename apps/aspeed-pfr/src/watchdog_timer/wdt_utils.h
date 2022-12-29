@@ -9,7 +9,6 @@
 #include <stdint.h>
 
 static uint8_t gWdtBootStatus = 0;
-static uint8_t gWdtEenableStatus = 0;
 
 #define WDT_BMC_TIMER_MAXTIMEOUT CONFIG_BMC_CHECKPOINT_EXPIRE_TIME
 #define WDT_ACM_TIMER_MAXTIMEOUT CONFIG_PCH_CHECKPOINT_EXPIRE_TIME

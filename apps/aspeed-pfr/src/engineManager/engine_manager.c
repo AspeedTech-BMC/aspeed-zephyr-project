@@ -14,7 +14,6 @@
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "crypto/hash_wrapper.h"
 #include "engine_manager.h"
-#include "include/definitions.h"
 #include "common/common.h"
 #if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_verification.h"

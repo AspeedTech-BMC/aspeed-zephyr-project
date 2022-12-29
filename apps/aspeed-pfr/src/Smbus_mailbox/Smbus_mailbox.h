@@ -149,20 +149,14 @@ void ClearUpdateFailure(void);
 void LogLastPanic(uint8_t panic);
 void LogRecovery(uint8_t reason);
 void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason);
-
-// void SetLastRecoveryReason(LAST_RECOVERY_REASON_VALUE LastRecoveryReasonValue);
 void SetLastRecoveryReason(byte LastRecoveryReasonValue);
-
 byte GetPanicEventCount(void);
 void IncPanicEventCount(void);
 byte GetLastPanicReason(void);
-// void SetLastPanicReason(LAST_PANIC_REASON_VALUE LastPanicReasonValue);
 void SetLastPanicReason(byte LastPanicReasonValue);
 byte GetMajorErrorCode(void);
-// void SetMajorErrorCode(MAJOR_ERROR_CODE_VALUE MajorErrorCodeValue);
 void SetMajorErrorCode(byte MajorErrorCodeValue);
 byte GetMinorErrorCode(void);
-// void SetMinorErrorCode(MINOR_ERROR_CODE_VALUE MinorErrorCodeValue);
 void SetMinorErrorCode(byte MinorErrorCodeValue);
 uint8_t GetUfmStatusValue(void);
 void SetUfmStatusValue(uint8_t UfmStatusBitMask);
@@ -238,7 +232,4 @@ bool IsSpdmAttestationEnabled();
 
 // If root key hash, pch and bmc offsets are provisioned, we say CPLD has been provisioned
 #define UFM_STATUS_PROVISIONED_BIT_MASK               0b000001110
-
-extern uint8_t gBiosBootDone;
-extern uint8_t gBmcBootDone;
 

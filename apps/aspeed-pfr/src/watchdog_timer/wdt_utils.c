@@ -72,7 +72,7 @@ K_TIMER_DEFINE(pfr_bios_timer, wdt_callback_bios_timeout, NULL);
 K_TIMER_DEFINE(pfr_me_timer, wdt_callback_me_timeout, NULL);
 
 /**
- * @brief Check if all components (BMC/ME/ACM/BIOS) have completed boot.
+ * Check if all components (BMC/ME/ACM/BIOS) have completed boot.
  *
  * @return 1 if all components have completed boot. 0, otherwise.
  */

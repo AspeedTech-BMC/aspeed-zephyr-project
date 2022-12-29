@@ -677,7 +677,7 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
 }
 
 /**
- * @brief Log boot complete status in T0 mode
+ * Log boot complete status in T0 mode
  *
  * @param current_boot_state the status for the component that has just completed boot
  */
