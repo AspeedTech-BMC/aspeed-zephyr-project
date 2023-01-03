@@ -27,6 +27,7 @@ struct demo_spim_log_ctrl {
 	uint32_t pre_off;
 };
 
+struct k_work log_bmc_rst_work;
 struct k_sem sem_demo_log_op;
 struct demo_spim_log_ctrl log_ctrls[4];
 const struct device *spim_devs[4];
@@ -89,6 +90,26 @@ static void demo_spim_log_work(struct k_work *item)
 		k_sem_give(&sem_demo_log_op);
 }
 
+static void demo_spim_log_bmc_rst_work(struct k_work *item)
+{
+	ARG_UNUSED(item);
+	int i;
+	const struct device *spim_dev;
+	static char *spim_dev_names[2] = {
+		"spi_m1",
+		"spi_m2",
+	};
+
+	for (i = 0; i < 2; i++) {
+		spim_dev = device_get_binding(spim_dev_names[i]);
+		if (!spim_dev) {
+			LOG_ERR("Cannot get device, %s, skipped.", spim_dev_names[i]);
+			continue;
+		}
+		demo_rst_log_ptr(spim_dev);
+	}
+}
+
 static void demo_spim_isr_callback(const struct device *dev)
 {
 	uint32_t ctrl_idx = spim_get_ctrl_idx(dev);
@@ -108,7 +129,7 @@ void spim_irq_init(void)
 	if (IS_ENABLED(CONFIG_MULTITHREADING))
 		k_sem_init(&sem_demo_log_op, 1, 1);
 	memset(log_ctrls, 0x0, sizeof(struct demo_spim_log_ctrl));
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 4; i++) {
 		spim_devs[i] = device_get_binding(spim_dev_names[i]);
 		if (!spim_devs[i]) {
 			LOG_ERR("Cannot get device, %s, skipped.", spim_dev_names[i]);
@@ -118,4 +139,5 @@ void spim_irq_init(void)
 		spim_isr_callback_install(spim_devs[i], demo_spim_isr_callback);
 		k_work_init(&log_ctrls[i].log_work, demo_spim_log_work);
 	}
+	k_work_init(&log_bmc_rst_work, demo_spim_log_bmc_rst_work);
 }

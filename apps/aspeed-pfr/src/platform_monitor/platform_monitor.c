@@ -11,13 +11,16 @@
 
 LOG_MODULE_REGISTER(monitor, CONFIG_LOG_DEFAULT_LEVEL);
 
+extern struct k_work log_bmc_rst_work;
 static struct gpio_callback bmc_rstind_cb_data;
+
 void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
 	uint8_t gpio_pin = 31 - __builtin_clz(pins);
 	int ret = gpio_pin_get(dev, gpio_pin);
 	LOG_INF("[BMC->PFR] RSTIND[%s %d] = %d", dev->name, gpio_pin, ret);
 
+	k_work_submit(&log_bmc_rst_work);
 	GenerateStateMachineEvent(RESET_DETECTED, NULL);
 }
 
