@@ -380,7 +380,7 @@ int ast1060_update(struct pfr_manifest *manifest)
 	else if (pc_type_status == PFR_AFM) {
 		pc_length = manifest->pc_length;
 		payload_address = payload_address;
-		LOG_INF("AFM update start payload_address=%p pc_length=%x", payload_address, 64*1024 /*pc_length*/);
+		LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, 64*1024 /*pc_length*/);
 		return update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
 	}
 #endif

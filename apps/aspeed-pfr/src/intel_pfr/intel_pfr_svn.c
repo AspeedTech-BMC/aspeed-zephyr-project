@@ -104,7 +104,7 @@ int read_statging_area_pfm_svn(struct pfr_manifest *manifest, uint8_t *svn_versi
 		status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
 				buffer);
 	if (status != Success) {
-		LOG_ERR("Invalid Staging Area Pfm imgtype=%d pfr=%p", manifest->image_type, pfm_start_address);
+		LOG_ERR("Invalid Staging Area Pfm imgtype=%d pfr=%08x", manifest->image_type, pfm_start_address);
 		return Failure;
 	}
 
