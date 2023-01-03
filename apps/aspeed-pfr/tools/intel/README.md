@@ -87,3 +87,12 @@ intel-pfr-signing-utility -c kcc.xml -o kcc_signed.bin kcc.bin -v
 
 kcc_signed.bin is the signed key cancellation certificate.
 
+# Create AFM image and capsule
+The AFM image and capsule can be build with `intel_pfr` python module. We provide an example config file `afm_spdm-emu.json` for attesting spdm-emu in BMC side.
+
+```
+python3 -m intel_pfr.capsule afm -a afm_spdm-emu.json
+```
+
+**NOTICE** ast1060-dcscm machine only allocates 64KB AFM active partition by default, but `intel_pfr` module will always generate 128KB capsule. User could patch capsule.py:L61 to change the size, or user could enlarge AFM partition for storing more AFM measurement.
+
