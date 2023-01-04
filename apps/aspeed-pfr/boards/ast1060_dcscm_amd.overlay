@@ -1,5 +1,5 @@
 #include "ast1060_dcscm_gpio_common.dts"
-#include "ast1060_dcscm_gpio_egs.dts"
+#include "ast1060_dcscm_gpio_genoa.dts"
 
 &i2cfilter {
 	pinctrl-0 = <&pinctrl_smbflt_default>;

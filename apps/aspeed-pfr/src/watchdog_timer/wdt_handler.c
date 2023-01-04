@@ -78,8 +78,10 @@ void me_wdt_timer_handler(uint8_t cmd)
 		// When ME firmware booted and authentication pass
 		gWdtBootStatus |= WDT_ME_BOOT_DONE_MASK;
 		// Clear the fw recovery level upon successful boot of BIOS and ME
+#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
 		if (gWdtBootStatus & WDT_OBB_BOOT_DONE_MASK)
 			reset_recovery_level(PCH_SPI);
+#endif
 		// Log boot progress
 		log_t0_timed_boot_complete_if_ready(T0_ME_BOOTED);
 	}

@@ -614,7 +614,7 @@ void enter_tzero(void *o)
 
 	/* Arm reset monitor */
 	bmc_reset_monitor_init();
-	platform_reset_monitor_init();
+	platform_monitor_init();
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 			apply_pfm_protection(BMC_SPI);
@@ -732,7 +732,7 @@ void exit_tzero(void *o)
 	LOG_DBG("Start");
 	/* Disarm reset monitor */
 	bmc_reset_monitor_remove();
-	platform_reset_monitor_remove();
+	platform_monitor_remove();
 	LOG_DBG("End");
 }
 
@@ -1123,14 +1123,18 @@ void enter_runtime(void *o)
 #endif
 			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#ifdef SUPPORT_ME
 				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
+#endif
 #endif
 			} else {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
 				pfr_start_timer(BMC_TIMER, WDT_BMC_TIMER_MAXTIMEOUT);
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#ifdef SUPPORT_ME
 				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
+#endif
 #endif
 			}
 			break;

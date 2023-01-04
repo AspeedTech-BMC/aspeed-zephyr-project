@@ -1,0 +1,7 @@
+/ {
+	pfr_gpio_genoa {
+		compatible = "aspeed,pfr-gpio-genoa";
+		rst-pltrst-in-gpios = <&gpio0_q_t 26 0>; /* GPIO_T2 */
+	};
+};
+
