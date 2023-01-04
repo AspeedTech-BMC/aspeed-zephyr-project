@@ -50,6 +50,7 @@ static struct spdm_context *find_spdm_context(uint8_t bus, uint8_t src_eid)
 	return context_rsp_oo;
 }
 
+#if defined(CONFIG_PFR_SPDM_RESPONDER)
 int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t *length)
 {
 	struct spdm_context *context = NULL;
@@ -92,6 +93,14 @@ int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t 
 
 	return -1;
 }
+#else
+int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t *length)
+{
+	LOG_ERR("SPDM Responder not supported");
+	*length = 0;
+	return -1;
+}
+#endif
 
 static void handler(void *ctx, void *req, void *rsp)
 {
