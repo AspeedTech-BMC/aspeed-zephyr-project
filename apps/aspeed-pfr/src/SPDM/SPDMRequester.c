@@ -28,7 +28,7 @@ osEventFlagsId_t spdm_attester_event;
 K_TIMER_DEFINE(spdm_attester_timer, spdm_attester_tick, NULL);
 
 /* Storing the offset in afm_act_1 partition */
-static off_t afm_list[8] = {0};
+static off_t afm_list[CONFIG_PFR_SPDM_ATTESTATION_MAX_DEVICES] = {0};
 
 enum ATTEST_RESULT {
 	ATTEST_SUCCEEDED,
@@ -207,15 +207,15 @@ static void spdm_attester_tick(struct k_timer *timeer)
 
 void spdm_attester_main(void *a, void *b, void *c)
 {
+	static uint8_t buffer[CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET] NON_CACHED_BSS_ALIGN16;
 	uint32_t events;
+
 	osEventFlagsWait(spdm_attester_event, SPDM_REQ_EVT_ENABLE, osFlagsNoClear, osWaitForever);
 	LOG_INF("SPDM Attester Thread Enabled");
 
 	uint32_t RUNNING_COUNT = 0;
 	while(1) {
-		// Schedule the next tick
-		// k_timer_start(&spdm_attester_timer, K_SECONDS(60), K_NO_WAIT);
-		// Tick event will be cleared.
+		/* Wait for the next tick */
 		events = osEventFlagsWait(spdm_attester_event,
 				SPDM_REQ_EVT_TICK | SPDM_REQ_EVT_T0 | SPDM_REQ_EVT_ENABLE,
 				osFlagsWaitAll | osFlagsNoClear,
@@ -229,20 +229,23 @@ void spdm_attester_main(void *a, void *b, void *c)
 			continue;
 		}
 
-		for (size_t device = 0; device < 8; ++device) {
-			// Make sure current state can run attestation
+		for (size_t device = 0; device < CONFIG_PFR_SPDM_ATTESTATION_MAX_DEVICES; ++device) {
+			/* Make sure current state can run attestation */
 			events = osEventFlagsGet(spdm_attester_event);
 			if (!(events & SPDM_REQ_EVT_T0)) {
-				// Attestation is stopped by Aspeed State Machine
+				/* Attestation is stopped by Aspeed State Machine */
 				LOG_ERR("T0 FLAG is cleared. Stop attestation at device[%d]", device);
 				break;
 			}
 
 			if (afm_list[device]) {
-				static uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
 				AFM_DEVICE_STRUCTURE *afm_device = (AFM_DEVICE_STRUCTURE *)buffer;
 
-				ret = flash_area_read(afm_flash, afm_list[device], buffer, PAGE_SIZE);
+				ret = flash_area_read(afm_flash,
+						afm_list[device],
+						buffer,
+						CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET);
+
 				LOG_INF("Attestation device[%d][%08x] events=%08x",
 						device, afm_list[device], events);
 				LOG_INF("UUID=%04x, BusId=%02x, DeviceAddress=%02x, BindingSped=%02x, Policy=%02x",
@@ -256,7 +259,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 				/* Create context */
 				struct spdm_context *context = spdm_context_create();
 
-				// DEST_EID using NULL EID due to AFM device structure design
+				/* DEST_EID using NULL EID due to AFM device structure design */
 				init_requester_context(context,
 						afm_device->BusID,
 						afm_device->DeviceAddress,
@@ -277,7 +280,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 					if (afm_device->Policy & BIT(2)) {
 						/* Lock down in reset */
 						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
-					}	
+					}
 					break;
 				case ATTEST_FAILED_DIGEST:
 					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
@@ -336,30 +339,44 @@ void spdm_run_attester()
 
 	const struct flash_area *afm_flash = NULL;
 	int ret;
-	int max_afm = 8;
+	int max_afm = CONFIG_PFR_SPDM_ATTESTATION_MAX_DEVICES;
 
 	ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &afm_flash);
+	if (ret) {
+		LOG_ERR("Failed to open AFM partition ret=%d", ret);
+		return;
+	}
 
 	/* First page is the block0/block1, start from page 1. */
 	for (uint8_t i = 1; i<max_afm; ++i) {
 		uint32_t magic_num;
-		ret = flash_area_read(afm_flash, i * PAGE_SIZE, &magic_num, sizeof(magic_num));
+		ret = flash_area_read(afm_flash,
+				i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET,
+				&magic_num,
+				sizeof(magic_num));
+		if (ret) {
+			LOG_ERR("Failed to read AFM partition offset [%08x] ret=%d",
+					i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET,
+					ret);
+			afm_list[i] = 0x00000000;
+			continue;
+		}
 		if (magic_num == BLOCK0TAG) {
-			afm_list[i] = (i * PAGE_SIZE) + 0x400;
+			afm_list[i] = (i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET) + 0x400;
 			LOG_INF("Add afm device offset [%08x]", afm_list[i]);
 		} else {
 			/* Offset 0x0000 is block0/1 header not AFM device structure,
-			 * so use this value as an empty slot 
-			 */
+			 * so use this value as an empty slot */
 			afm_list[i] = 0x00000000;
 		}
 	}
 
 
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0);
-	// For debug purpose
-	// k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_SECONDS(3));
-	k_timer_start(&spdm_attester_timer, K_MINUTES(1), K_MINUTES(10));
+
+	k_timer_start(&spdm_attester_timer,
+			K_SECONDS(CONFIG_PFR_SPDM_ATTESTATION_DURATION),
+			K_SECONDS(CONFIG_PFR_SPDM_ATTESTATION_PERIOD));
 }
 
 void spdm_stop_attester()

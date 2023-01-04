@@ -203,10 +203,7 @@ config PFR_MCTP_I3C
 	help
 	  Enable MCTP over I3C support
 
-config PFR_SPDM_ATTESTATION
-	depends on PFR_MCTP
-	default n
-	bool "SPDM attestation support"
+rsource "Kconfig.spdm"
 
 config PFR_DEBUG_SHELL
 	bool "Enable debug shell for development"
