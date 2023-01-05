@@ -78,7 +78,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		LOG_INF("AFM Staging Region Verification");
 		manifest->image_type = BMC_TYPE;
 		read_address = CONFIG_BMC_AFM_STAGING_OFFSET;
-		target_address = 0;
+		target_address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
 		manifest->pc_type = PFR_AFM;
 		afm_update = true;
 	}
@@ -283,13 +283,34 @@ int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length)
 	length_page_align =
 		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_AFM, true, 0, region_size)) {
-		LOG_ERR("Failed to erase AFM Active Partition");
-		return Failure;
-	}
-	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
-				ROT_INTERNAL_AFM, 0, length_page_align)) {
-		LOG_ERR("Failed to write AFM Active Partition");
+	if (part == AFM_PART_ACT_1) {
+		if (pfr_spi_erase_region(ROT_INTERNAL_AFM, true, 0, region_size)) {
+			LOG_ERR("Failed to erase AFM Active Partition");
+			return Failure;
+		}
+
+		if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
+					ROT_INTERNAL_AFM, 0, length_page_align)) {
+			LOG_ERR("Failed to write AFM Active Partition");
+			return Failure;
+		}
+	} else if (part == AFM_PART_RCV_1) {
+		if (pfr_spi_erase_region(BMC_SPI, true,
+					CONFIG_BMC_AFM_RECOVERY_OFFSET,
+					CONFIG_BMC_AFM_STAGING_RECOVERY_SIZE)) {
+			LOG_ERR("Failed to erase AFM Recovery Partition");
+			return Failure;
+		}
+
+		if (pfr_spi_region_read_write_between_spi(
+					BMC_SPI, CONFIG_BMC_AFM_STAGING_OFFSET,
+					BMC_SPI, CONFIG_BMC_AFM_RECOVERY_OFFSET,
+					CONFIG_BMC_AFM_STAGING_RECOVERY_SIZE)) {
+			LOG_ERR("Failed to write AFM Recovery Partition");
+			return Failure;
+		}
+
+	} else {
 		return Failure;
 	}
 
@@ -297,7 +318,7 @@ int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length)
 }
 #endif
 
-int ast1060_update(struct pfr_manifest *manifest)
+int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
 {
 	uint32_t cancelled_id = 0;
 	uint32_t payload_address;
@@ -381,7 +402,32 @@ int ast1060_update(struct pfr_manifest *manifest)
 		pc_length = manifest->pc_length;
 		payload_address = payload_address;
 		LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, 64*1024 /*pc_length*/);
-		return update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
+		status = pfr_spi_read(manifest->image_type, payload_address + 1024 + 4,
+				sizeof(uint8_t), (uint8_t *)&hrot_svn);
+		if (status != Success) {
+			LOG_ERR("ROT flash read AFM SVN failed");
+			return Failure;
+		}
+
+		status = svn_policy_verify(SVN_POLICY_FOR_AFM, hrot_svn);
+		if (status != Success) {
+			LOG_ERR("ROT verify AFM SVN failed");
+			LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+			return Failure;
+		}
+
+		if (flash_select == PRIMARY_FLASH_REGION)
+			status = update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
+		else if (flash_select == SECONDARY_FLASH_REGION)
+			status = update_afm(AFM_PART_RCV_1, payload_address, 64*1024 /*pc_length*/);
+
+		if (status != Success) {
+			LOG_ERR("ROT update AFM failed");
+			return Failure;
+		}
+
+		set_ufm_svn(SVN_POLICY_FOR_AFM, hrot_svn);
+		LOG_INF("AFM update end");
 	}
 #endif
 
@@ -428,7 +474,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		source_address += CONFIG_BMC_STAGING_SIZE;
 		source_address += CONFIG_BMC_PCH_STAGING_SIZE;
 		pfr_manifest->address = source_address;
-		return ast1060_update(pfr_manifest);
+		return ast1060_update(pfr_manifest, PRIMARY_FLASH_REGION);
 	}
 
 	if (pfr_manifest->image_type == BMC_TYPE) {
@@ -453,7 +499,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		LOG_INF("AFM Update in progress");
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = CONFIG_BMC_AFM_STAGING_OFFSET;
-		return ast1060_update(pfr_manifest);
+		return ast1060_update(pfr_manifest, flash_select);
 	}
 #endif
 	pfr_manifest->staging_address = source_address;
@@ -496,7 +542,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	// Checking for key cancellation
 	pc_type_status = check_rot_capsule_type(pfr_manifest);
 	if (pc_type_status ==  KEY_CANCELLATION_CAPSULE)
-		return ast1060_update(pfr_manifest);
+		return ast1060_update(pfr_manifest, PRIMARY_FLASH_REGION);
 
 	// Staging area verification
 	LOG_INF("Staging Area verification");

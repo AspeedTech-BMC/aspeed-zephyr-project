@@ -53,11 +53,17 @@ int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
 
 	if (manifest->image_type == BMC_TYPE)
 		active_svn = GetBmcPfmActiveSvn();
-	else
+	else if (manifest->image_type == PCH_TYPE)
 		active_svn = GetPchPfmActiveSvn();
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == AFM_TYPE)
+		active_svn = GetAfmActiveSvn();
+#endif
+	else
+		active_svn = 0xff; /* Valid SVN is within 0-64, 0xff should be an invalid svn */
 
 	if (active_svn != staging_svn) {
-		LOG_ERR("SVN error");
+		LOG_ERR("SVN error ACT=%d STG=%d", active_svn, staging_svn);
 		return Failure;
 	}
 
@@ -97,7 +103,15 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 		if(ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
 					sizeof(act_pfm_offset)))
 			return Failure;
-	} else {
+	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == AFM_TYPE) {
+		manifest->image_type = BMC_TYPE;
+		manifest->address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
+		return ast1060_update(manifest);
+	}
+#endif
+	else {
 		return Failure;
 	}
 

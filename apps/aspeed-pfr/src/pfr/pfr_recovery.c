@@ -5,6 +5,8 @@
  */
 
 #include <logging/log.h>
+#include <storage/flash_map.h>
+
 #include "pfr_recovery.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -39,13 +41,25 @@ int recover_image(void *AoData, void *EventContext)
 
 	if (EventData->image == BMC_EVENT) {
 		// BMC SPI
-		LOG_INF("Image Type: BMC ");
+		LOG_INF("Image Type: BMC");
 		pfr_manifest->image_type = BMC_TYPE;
 
-	} else  {
+	} else if (EventData->image == PCH_EVENT) {
 		// PCH SPI
-		LOG_INF("Image Type: PCH ");
+		LOG_INF("Image Type: PCH");
 		pfr_manifest->image_type = PCH_TYPE;
+	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (EventData->image == AFM_EVENT) {
+		LOG_INF("Image Type: AFM");
+		pfr_manifest->image_type = AFM_TYPE;
+		pfr_manifest->address = CONFIG_BMC_AFM_STAGING_OFFSET;
+		pfr_manifest->recovery_address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
+	}
+#endif
+	else {
+		LOG_ERR("Unsupported recovery event type %d", EventData->image);
+		return Failure;
 	}
 
 	if (ActiveObjectData->RecoveryImageStatus != Success) {
@@ -71,7 +85,10 @@ int recover_image(void *AoData, void *EventContext)
 				return Failure;
 		}
 
-		status = pfr_recover_recovery_region(pfr_manifest->image_type, pfr_manifest->address, pfr_manifest->recovery_address);
+		status = pfr_recover_recovery_region(
+				pfr_manifest->image_type,
+				pfr_manifest->address,
+				pfr_manifest->recovery_address);
 		if (status != Success)
 			return Failure;
 
@@ -144,14 +161,21 @@ void init_recovery_manifest(struct recovery_image *image)
 int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
 {
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	int sector_sz = pfr_spi_get_block_size(image_type);
+	int sector_sz;
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 	size_t area_size = 0;
 
 	if (image_type == BMC_TYPE)
 		area_size = CONFIG_BMC_STAGING_SIZE;
-	else /* if (image_type == PCH_TYPE) */
+	else if (image_type == PCH_TYPE)
 		area_size = CONFIG_PCH_STAGING_SIZE;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (image_type == AFM_TYPE) {
+		area_size = FLASH_AREA_SIZE(afm_act_1);
+		image_type = BMC_TYPE;
+	}
+#endif
+	sector_sz = pfr_spi_get_block_size(image_type);
 	spi_flash->spi.state->device_id[0] = image_type;
 	LOG_INF("Recovering...");
 	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {
@@ -162,7 +186,7 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 
 	// use read_write_between spi for supporting dual flash
 	if (pfr_spi_region_read_write_between_spi(image_type, source_address,
-				image_type,target_address, area_size)) {
+				image_type, target_address, area_size)) {
 		LOG_ERR("Recovery region update failed");
 		return Failure;
 	}

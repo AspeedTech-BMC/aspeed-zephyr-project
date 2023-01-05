@@ -374,6 +374,9 @@ void handle_image_verification(void *o)
 					last_pch_active_verify_status;
 				state->pch_active_object.RecoveryImageStatus =
 					last_pch_recovery_verify_status;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+				verify_image(AFM_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+#endif
 			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 				verify_image(PCH_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
 				verify_image(PCH_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
@@ -381,6 +384,9 @@ void handle_image_verification(void *o)
 					last_bmc_active_verify_status;
 				state->bmc_active_object.RecoveryImageStatus =
 					last_bmc_recovery_verify_status;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+				verify_image(AFM_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+#endif
 			} else {
 				/* BMC Verification */
 				SetPlatformState(BMC_FLASH_AUTH);
@@ -442,7 +448,12 @@ void handle_image_verification(void *o)
 				if (state->pch_active_object.ActiveImageStatus == Failure
 						|| state->bmc_active_object.ActiveImageStatus == Failure
 						|| state->pch_active_object.RecoveryImageStatus == Failure
-						|| state->bmc_active_object.RecoveryImageStatus == Failure) {
+						|| state->bmc_active_object.RecoveryImageStatus == Failure
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+						|| state->afm_active_object.ActiveImageStatus == Failure
+						|| state->afm_active_object.RecoveryImageStatus == Failure
+#endif
+						) {
 					/* ACT/RCV region went wrong, go recovery */
 					GenerateStateMachineEvent(VERIFY_FAILED, evt_ctx->data.ptr);
 				} else {
@@ -555,6 +566,25 @@ void handle_recovery(void *o)
 				inc_recovery_level(PCH_SPI);
 #endif
 		}
+
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+		if (state->afm_active_object.RecoveryImageStatus == Failure) {
+			// LogRecovery(AFM_RECOVERY_FAIL);
+			evt_wrap.image = AFM_EVENT;
+			ret = recover_image(&state->afm_active_object, &evt_wrap);
+			recovery_done = 1;
+		}
+
+		if (state->afm_active_object.ActiveImageStatus == Failure) {
+			// LogRecovery(AFM_ACTIVE_FAIL);
+			evt_wrap.image = AFM_EVENT;
+			ret = recover_image(&state->afm_active_object, &evt_wrap);
+			LOG_INF("AFM Recovery return=%d", ret);
+			/* Even if AFM recovery failed, the BMC/PCH are still allow to boot,
+			 * but the attestation service will be disabled. */
+			recovery_done = 1;
+		}
+#endif
 		break;
 	default:
 		break;
@@ -950,6 +980,16 @@ void handle_update_requested(void *o)
 					evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 					update_region &= ~AfmActiveUpdate;
 					handled_region |= AfmActiveUpdate;
+					ao_data_wrap = &state->afm_active_object;
+					break;
+				}
+
+				if (update_region & AfmRecoveryUpdate) {
+					LOG_INF("AFM Recovery Firmware Update");
+					image_type = AFM_TYPE;
+					evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
+					update_region &= ~AfmRecoveryUpdate;
+					handled_region |= AfmRecoveryUpdate;
 					ao_data_wrap = &state->afm_active_object;
 					break;
 				}
