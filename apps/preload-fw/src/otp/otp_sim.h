@@ -48,43 +48,6 @@
 #define OTP_KEY_ECDSA384	6
 #define OTP_KEY_ECDSA384P	7
 
-struct otp_header {
-	uint8_t		otp_magic[8];
-	uint32_t	soc_ver;
-	uint32_t	otptool_ver;
-	uint32_t	image_info;
-	uint32_t	data_info;
-	uint32_t	config_info;
-	uint32_t	strap_info;
-	uint32_t	scu_protect_info;
-	uint32_t	checksum_offset;
-} __packed;
-
-struct otpstrap_status {
-	int value;
-	int option_array[7];
-	int remain_times;
-	int writeable_option;
-	int protected;
-};
-
-struct otpkey_type {
-	int value;
-	int key_type;
-	int need_id;
-	char information[110];
-};
-
-struct otp_pro_sts {
-	char mem_lock;
-	char pro_key_ret;
-	char pro_strap;
-	char pro_conf;
-	char pro_data;
-	char pro_sec;
-	uint32_t sec_size;
-};
-
 struct otpconf_info {
 	signed char dw_offset;
 	signed char bit_offset;
@@ -105,37 +68,6 @@ struct scu_info {
 	signed char bit_offset;
 	signed char length;
 	const char *information;
-};
-
-
-struct otp_info_cb {
-	int version;
-	char ver_name[10];
-	const struct otpstrap_info *strap_info;
-	int strap_info_len;
-	const struct otpconf_info *conf_info;
-	int conf_info_len;
-	const struct otpkey_type *key_info;
-	int key_info_len;
-	const struct scu_info *scu_info;
-	int scu_info_len;
-	struct otp_pro_sts pro_sts;
-};
-
-struct otp_image_layout {
-	int data_length;
-	int conf_length;
-	int strap_length;
-	int scu_pro_length;
-	uint8_t *data;
-	uint8_t *data_ignore;
-	uint8_t *conf;
-	uint8_t *conf_ignore;
-	uint8_t *strap;
-	uint8_t *strap_pro;
-	uint8_t *strap_ignore;
-	uint8_t *scu_pro;
-	uint8_t *scu_pro_ignore;
 };
 
 static const struct otpstrap_info ast1030a0_strap_info[] = {

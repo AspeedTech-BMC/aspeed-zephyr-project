@@ -114,6 +114,38 @@ def gen_preload_bin():
 
     return
 
+def gen_preload_bin_odm():
+    signed_mcuboot = mp_imgs_path + 'mcuboot.signed.bin'
+    signed_preload = mp_imgs_path + 'preload.signed.bin'
+    signed_rot = mp_imgs_path + 'rot.signed.bin'
+    otp_img = mp_imgs_path + 'otp-all.image'
+    mp_final_img = mp_imgs_path + 'ast1060-mp-odm-all.bin'
+
+    with open(signed_mcuboot, 'rb') as mbf:
+        mcuboot_content = mbf.read()
+
+    with open(signed_preload, 'rb') as plf:
+        preload_content = plf.read()
+
+    with open(signed_rot, 'rb') as srf:
+        rot_content = srf.read()
+
+    with open(otp_img, 'rb') as otf:
+        otp_content = otf.read()
+
+    with open(mp_final_img, 'wb') as f:
+        f.write(b'\xff' * 1024 * 1024)
+        f.seek(0)
+        f.write(mcuboot_content)
+        f.seek(0x20000)
+        f.write(preload_content)
+        f.seek(0x80000)
+        f.write(rot_content)
+        f.seek(0xe0000)
+        f.write(otp_content)
+
+    return
+
 cmd = 'rm -rf ' + mp_imgs_path
 os.system(cmd)
 cmd = 'mkdir -p ' + mp_imgs_path
@@ -130,6 +162,8 @@ gen_preload_bin()
 # Customer's firmware
 gen_rot_fw()
 sign_rot_fw()
+gen_preload_bin_odm()
+
 
 print("workspace      : " + workspace_path)
 print("build path     : " + build_path)

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <storage/flash_map.h>
 #include <logging/log.h>
 #include <zephyr.h>
 #include <build_config.h>
@@ -55,7 +56,7 @@ void main(void)
 		LOG_INF("Secure boot is enabled, handling certificate");
 		if (get_certificate_info(&devid_cert_info, sizeof(devid_cert_info))) {
 			//DEBUG_HALT();
-			LOG_ERR("Failed to get certificate!!!!!!");
+			LOG_ERR("Failed to get certificate!");
 			goto out;
 		}
 
@@ -93,6 +94,16 @@ void main(void)
 				goto out;
 			}
 			LOG_INF("Certificate chain is updated successfully");
+#if defined(CONFIG_ODM_ROT_REPLACEMENT)
+			// Erase aspeed preload firmware
+			// 1st-slot firmware will be replaced by 2nd-slot firmeware in mcuboot
+			const struct flash_area *fa;
+			if (flash_area_open(FLASH_AREA_ID(active), &fa)) {
+				LOG_ERR("Failed to find active fw region");
+				goto out;
+			}
+			flash_area_erase(fa, 0, fa->fa_size);
+#endif
 		} else {
 			LOG_INF("Verify certificate chain...");
 			if (verify_certificate(devid_cert_info.cert.data,
@@ -125,6 +136,15 @@ void main(void)
 			LOG_ERR("OTP image update failed");
 		}
 	}
+
+#if !defined(CONFIG_DEVID_CERT_PROVISIONING)
+	// Erase aspeed preload firmware
+	// 1st-slot firmware will be replaced by 2nd-slot firmeware in mcuboot
+	const struct flash_area *fa;
+	if (flash_area_open(FLASH_AREA_ID(active), &fa)) {
+	}
+	flash_area_erase(fa, 0, fa->fa_size);
+#endif
 
 out:
 	memset(cert_chain, 0, sizeof(cert_chain));
