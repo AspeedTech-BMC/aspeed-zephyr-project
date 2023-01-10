@@ -349,7 +349,7 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 
 	pc_length = manifest->pc_length;
 	payload_address = manifest->address + PFM_SIG_BLOCK_SIZE;
-	LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, 64*1024 /*pc_length*/);
+	LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, pc_length);
 	status = pfr_spi_read(manifest->image_type, payload_address + PFM_SIG_BLOCK_SIZE + 4,
 				sizeof(uint8_t), (uint8_t *)&hrot_svn);
 	if (status != Success) {
@@ -371,7 +371,7 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 			return Failure;
 		}
 
-		status = update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
+		status = update_afm(AFM_PART_ACT_1, payload_address, pc_length);
 	} else if (flash_select == SECONDARY_FLASH_REGION) {
 		if (ActiveObjectData->RestrictActiveUpdate == 1) {
 			manifest->image_type = AFM_TYPE;
