@@ -1,12 +1,14 @@
 # ASPEED Preload Firmware
 
-ASPEED preload firmware has the following features:  
-- Generate vault key
+ASPEED preload firmware supports following features:  
 - Program OTP image for writing public key to OTP
+- Generate vault key by HW TRNG and write to OTP
 - Enable secure boot and CDI by updating OTP
-- Send device id certificate request to HSM
+- Send device id certificate request to HSM (WIP)
 - Receive, verify and store signed certificate chain to AST1060 internal flash
-- Provide mailbox commands for preload firmware replacement
+- Provide mailbox commands for ROT firmware replacement
+
+Please note that all OTP operation are simulated in ast1060 internal flash.
 
 ## Bootup Flow
 
