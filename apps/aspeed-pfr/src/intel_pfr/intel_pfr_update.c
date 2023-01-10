@@ -72,7 +72,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		{
 			manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 		}
-	} 
+	}
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	else if (manifest->image_type == AFM_TYPE) {
 		LOG_INF("AFM Staging Region Verification");
@@ -316,6 +316,86 @@ int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length)
 
 	return Success;
 }
+
+int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void *AoData)
+{
+	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
+	uint32_t payload_address;
+	uint32_t pc_type_status;
+	uint32_t pc_length = 0;
+	uint32_t hrot_svn = 0;
+	uint32_t pc_type;
+	int status = 0;
+
+	// Checking the PC type
+	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)),
+			sizeof(pc_type), (uint8_t *)&pc_type);
+	if (status != Success) {
+		LOG_ERR("Flash read PC type failed");
+		return Failure;
+	}
+
+	manifest->pc_type = pc_type;
+
+	LOG_INF("manifest->address=%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("AFM update capsule verification failed");
+		LogUpdateFailure(UPD_CAPSULE_AUTH_FAIL, 1);
+		return Failure;
+	}
+
+	pc_length = manifest->pc_length;
+	payload_address = manifest->address + PFM_SIG_BLOCK_SIZE;
+	LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, 64*1024 /*pc_length*/);
+	status = pfr_spi_read(manifest->image_type, payload_address + PFM_SIG_BLOCK_SIZE + 4,
+				sizeof(uint8_t), (uint8_t *)&hrot_svn);
+	if (status != Success) {
+		LOG_ERR("Flash read AFM SVN failed");
+		return Failure;
+	}
+
+	status = svn_policy_verify(SVN_POLICY_FOR_AFM, hrot_svn);
+	if (status != Success) {
+		LOG_ERR("Verify AFM SVN failed");
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		return Failure;
+	}
+
+	if (flash_select == PRIMARY_FLASH_REGION) {
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			LOG_ERR("Restrict Active Update");
+			LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+			return Failure;
+		}
+
+		status = update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
+	} else if (flash_select == SECONDARY_FLASH_REGION) {
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			manifest->image_type = AFM_TYPE;
+			status = does_staged_fw_image_match_active_fw_image(manifest);
+			if (status != Success) {
+				LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+				return Failure;
+			}
+		}
+
+		status = update_afm(AFM_PART_RCV_1, payload_address, 64*1024 /*pc_length*/);
+	}
+
+	if (status != Success) {
+		LOG_ERR("Update AFM failed");
+		return Failure;
+	}
+
+	set_ufm_svn(SVN_POLICY_FOR_AFM, hrot_svn);
+	LOG_INF("AFM update end");
+
+	return Success;
+}
+
 #endif
 
 int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
@@ -397,40 +477,6 @@ int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
 		SetCpldRotSvn(hrot_svn);
 		LOG_INF("ROT update end");
 	}
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
-	else if (pc_type_status == PFR_AFM) {
-		pc_length = manifest->pc_length;
-		payload_address = payload_address;
-		LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, 64*1024 /*pc_length*/);
-		status = pfr_spi_read(manifest->image_type, payload_address + 1024 + 4,
-				sizeof(uint8_t), (uint8_t *)&hrot_svn);
-		if (status != Success) {
-			LOG_ERR("ROT flash read AFM SVN failed");
-			return Failure;
-		}
-
-		status = svn_policy_verify(SVN_POLICY_FOR_AFM, hrot_svn);
-		if (status != Success) {
-			LOG_ERR("ROT verify AFM SVN failed");
-			LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
-			return Failure;
-		}
-
-		if (flash_select == PRIMARY_FLASH_REGION)
-			status = update_afm(AFM_PART_ACT_1, payload_address, 64*1024 /*pc_length*/);
-		else if (flash_select == SECONDARY_FLASH_REGION)
-			status = update_afm(AFM_PART_RCV_1, payload_address, 64*1024 /*pc_length*/);
-
-		if (status != Success) {
-			LOG_ERR("ROT update AFM failed");
-			return Failure;
-		}
-
-		set_ufm_svn(SVN_POLICY_FOR_AFM, hrot_svn);
-		LOG_INF("AFM update end");
-	}
-#endif
-
 	return Success;
 }
 
@@ -499,7 +545,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		LOG_INF("AFM Update in progress");
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = CONFIG_BMC_AFM_STAGING_OFFSET;
-		return ast1060_update(pfr_manifest, flash_select);
+		return update_afm_image(pfr_manifest, flash_select, ActiveObjectData);
 	}
 #endif
 	pfr_manifest->staging_address = source_address;
@@ -624,6 +670,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		if (status != Success)
 			return status;
+
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			status = does_staged_fw_image_match_active_fw_image(pfr_manifest);
+			if (status != Success) {
+				LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+				return Failure;
+			}
+		}
 
 		status = update_recovery_region(pfr_manifest->image_type, source_address,
 				target_address);

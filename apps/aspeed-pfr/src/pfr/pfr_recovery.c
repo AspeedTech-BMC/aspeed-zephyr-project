@@ -40,12 +40,10 @@ int recover_image(void *AoData, void *EventContext)
 	pfr_manifest->state = FIRMWARE_RECOVERY;
 
 	if (EventData->image == BMC_EVENT) {
-		// BMC SPI
 		LOG_INF("Image Type: BMC");
 		pfr_manifest->image_type = BMC_TYPE;
 
 	} else if (EventData->image == PCH_EVENT) {
-		// PCH SPI
 		LOG_INF("Image Type: PCH");
 		pfr_manifest->image_type = PCH_TYPE;
 	}
@@ -67,6 +65,10 @@ int recover_image(void *AoData, void *EventContext)
 		if (status != Success) {
 			LOG_INF("PFR Staging Area Corrupted");
 			if (ActiveObjectData->ActiveImageStatus != Success) {
+				/* Scenarios
+				 * Active | Recovery | Staging
+				 * 0      | 0        | 0
+				 */
 				LogErrorCodes((pfr_manifest->image_type == BMC_TYPE ?
 							BMC_AUTH_FAIL : PCH_AUTH_FAIL),
 						ACTIVE_RECOVERY_STAGING_AUTH_FAIL);
@@ -76,15 +78,33 @@ int recover_image(void *AoData, void *EventContext)
 						return Failure;
 				} else
 					return Failure;
-			} else
-				return Failure;
+			} else {
+				/* Scenarios
+				 * Active | Recovery | Staging
+				 * 1      | 0        | 0
+				 */
+				ActiveObjectData->RestrictActiveUpdate = 1;
+				return VerifyActive;
+
+			}
 		}
 		if (ActiveObjectData->ActiveImageStatus == Success) {
-			status = pfr_active_recovery_svn_validation(pfr_manifest);
-			if (status != Success)
-				return Failure;
+			/* Scenarios
+			 * Active | Recovery | Staging
+			 * 1      | 0        | 1
+			 */
+			status = does_staged_fw_image_match_active_fw_image(pfr_manifest);
+			if (status != Success) {
+				ActiveObjectData->RestrictActiveUpdate = 1;
+				return VerifyActive;
+			}
 		}
 
+		/* Scenarios
+		 * Active | Recovery | Staging
+		 * 1      | 0        | 1 (Firmware match)
+		 * 0      | 0        | 1
+		 */
 		status = pfr_recover_recovery_region(
 				pfr_manifest->image_type,
 				pfr_manifest->address,
@@ -97,6 +117,11 @@ int recover_image(void *AoData, void *EventContext)
 	}
 
 	if (ActiveObjectData->ActiveImageStatus != Success) {
+		/* Scenarios
+		 * Active | Recovery | Staging
+		 * 0      | 1        | 0
+		 * 0      | 1        | 1
+		 */
 		status = pfr_recover_active_region(pfr_manifest);
 		if (status != Success)
 			return Failure;

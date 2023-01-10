@@ -425,22 +425,37 @@ void handle_image_verification(void *o)
 				LogErrorCodes(PCH_AUTH_FAIL, RECOVERY_AUTH_FAIL);
 			}
 
+			if (state->bmc_active_object.ActiveImageStatus || !state->bmc_active_object.RecoveryImageStatus)
+				state->bmc_active_object.RestrictActiveUpdate = 0;
+
+			if (state->pch_active_object.ActiveImageStatus || !state->pch_active_object.RecoveryImageStatus)
+				state->pch_active_object.RestrictActiveUpdate = 0;
+
 			LOG_INF("BMC image verification recovery=%s active=%s",
 					state->bmc_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->bmc_active_object.ActiveImageStatus ? "Bad" : "Good");
 			last_bmc_recovery_verify_status = state->bmc_active_object.RecoveryImageStatus;
 			last_bmc_active_verify_status = state->bmc_active_object.ActiveImageStatus;
+			if (state->bmc_active_object.RestrictActiveUpdate)
+				LOG_WRN("BMC Restrict Active Update Mode");
 
 			LOG_INF("PCH image verification recovery=%s active=%s",
 					state->pch_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->pch_active_object.ActiveImageStatus ? "Bad" : "Good");
 			last_pch_recovery_verify_status = state->pch_active_object.RecoveryImageStatus;
 			last_pch_active_verify_status = state->pch_active_object.ActiveImageStatus;
+			if (state->pch_active_object.RestrictActiveUpdate)
+				LOG_WRN("PCH Restrict Active Update Mode");
 
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
+			if (state->afm_active_object.ActiveImageStatus || !state->afm_active_object.RecoveryImageStatus)
+				state->afm_active_object.RestrictActiveUpdate = 0;
+
 			LOG_INF("AFM image verification recovery=%s active=%s",
 					state->afm_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->afm_active_object.ActiveImageStatus ? "Bad" : "Good");
+			if (state->afm_active_object.RestrictActiveUpdate)
+				LOG_WRN("AFM Restrict Active Update Mode");
 #endif
 
 
@@ -500,10 +515,8 @@ void handle_recovery(void *o)
 
 	initializeEngines();
 	initializeManifestProcessor();
-	//recovery_initialize();
-
-	/* TODO: Verify Staging? */
 	SetPlatformState(T_MINUS_1_FW_RECOVERY);
+
 	switch (evt_ctx->event) {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
 	case WDT_TIMEOUT:

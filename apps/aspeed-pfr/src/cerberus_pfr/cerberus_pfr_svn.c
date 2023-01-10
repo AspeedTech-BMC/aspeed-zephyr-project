@@ -15,7 +15,7 @@ uint8_t get_ufm_svn(uint32_t offset)
 	return 0;
 }
 
-int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
+int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 {
 	return Success;
 }
