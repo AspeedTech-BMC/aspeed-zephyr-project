@@ -655,6 +655,12 @@ void enter_tzero(void *o)
 			PCHBootRelease();
 			goto enter_tzero_end;
 		}
+#if defined(CONFIG_CERBERUS_PFR)
+		apply_pfm_smbus_protection(0);
+		apply_pfm_smbus_protection(1);
+		apply_pfm_smbus_protection(2);
+		apply_pfm_smbus_protection(3);
+#endif
 		/* Provisioned */
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
