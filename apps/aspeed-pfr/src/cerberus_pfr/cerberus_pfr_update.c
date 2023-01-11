@@ -4,19 +4,17 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
+#include <stdlib.h>
 #include <logging/log.h>
 
 #include "pfr/pfr_update.h"
 #include "pfr/pfr_recovery.h"
 #include "pfr/pfr_ufm.h"
-#include "StateMachineAction/StateMachineActions.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
 #include "include/SmbusMailBoxCom.h"
-#include "StateMachineAction/StateMachineActions.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "cerberus_pfr_common.h"
 #include "cerberus_pfr_definitions.h"
@@ -29,16 +27,6 @@
 #include "keystore/KeystoreManager.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-
-int cerberus_set_ufm_svn(struct pfr_manifest *manifest, uint8_t ufm_location, uint8_t svn_number)
-{
-	return Success;
-}
-
-uint8_t get_ufm_svn(struct pfr_manifest *manifest, uint32_t offset)
-{
-	return 0;
-}
 
 int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 {
@@ -161,12 +149,6 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 	return Success;
 }
 
-
-int cerberus_rot_svn_policy_verify(struct pfr_manifest *manifest, uint32_t hrot_svn)
-{
-	return Success;
-}
-
 int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_format)
 {
 	int status = 0;
@@ -229,11 +211,6 @@ int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_forma
 	}
 
 	return status;
-}
-
-int cerberus_check_svn_number(struct pfr_manifest *manifest, uint32_t read_address, uint8_t current_svn_number)
-{
-	return Success;
 }
 
 int cerberus_update_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
@@ -498,4 +475,4 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 	manifest->address = manifest->staging_address;
 	return cerberus_pfr_verify_image(manifest);
 }
-#endif // CONFIG_CERBERUS_PFR
+

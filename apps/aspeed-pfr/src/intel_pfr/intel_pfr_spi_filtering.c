@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include <logging/log.h>
 #include "common/common.h"
@@ -19,6 +18,7 @@ void apply_pfm_protection(int spi_device_id)
 {
 
 	int status = 0;
+	int spi_id = spi_device_id;
 	const char *spim_devs[SPIM_NUM] = {
 		"spi_m1",
 		"spi_m2",
@@ -37,9 +37,9 @@ void apply_pfm_protection(int spi_device_id)
 	uint8_t pfm_length[4];
 	uint32_t pfm_read_address;
 
-	if (spi_device_id == BMC_SPI)
+	if (spi_id == BMC_SPI)
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
-	else if (spi_device_id == PCH_SPI)
+	else if (spi_id == PCH_SPI)
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
 
 	// Block 0 + Block 1 = 1024 (0x400); PFM data(PFM Body = 0x20)
@@ -57,12 +57,12 @@ void apply_pfm_protection(int spi_device_id)
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
 #endif
 
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	int flash_size;
 #endif
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	spi_flash->spi.device_id[0] = spi_device_id;
+	spi_flash->spi.state->device_id[0] = spi_device_id;
 	spi_flash->spi.base.read(&spi_flash->spi, addr_size_of_pfm, pfm_length, 4);
 
 	int pfm_record_length = (pfm_length[0] & 0xff) | (pfm_length[1] << 8 & 0xff00) | (pfm_length[2] << 16 & 0xff0000) | (pfm_length[3] << 24 & 0xff000000);
@@ -90,15 +90,20 @@ void apply_pfm_protection(int spi_device_id)
 			region_end_address = (region_record[12] & 0xff) | (region_record[13] << 8 & 0xff00) |
 				(region_record[14] << 16 & 0xff0000) | (region_record[15] << 24 & 0xff000000);
 
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
 			if (region_start_address >= flash_size && region_end_address >= flash_size) {
 				region_start_address -= flash_size;
 				region_end_address -= flash_size;
-				spi_device_id = BMC_SPI_2;
+				spi_id = spi_device_id + 1;
+			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+				LOG_ERR("ERROR: region start and end address should be in the same flash");
+				return;
+			} else {
+				spi_id = spi_device_id;
 			}
 #endif
-			spi_filter->dev_id = spi_device_id;
+			spi_filter->dev_id = spi_id;
 			region_length = region_end_address - region_start_address;
 			if (region_record[1] & 0x02) {
 				/* Write allowed region */
@@ -106,33 +111,33 @@ void apply_pfm_protection(int spi_device_id)
 						region_id, region_start_address, region_end_address);
 				region_id++;
 				LOG_INF("SPI_ID[%d] write enable  0x%08x to 0x%08x",
-					spi_device_id, region_start_address, region_end_address);
+					spi_id, region_start_address, region_end_address);
 			} else {
 				/* Write not allowed region */
 				// Cerberus did not support write not allowed setting
-				Set_SPI_Filter_RW_Region(spim_devs[spi_device_id],
+				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
 						SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] write disable 0x%08x to 0x%08x",
-					spi_device_id, region_start_address, region_end_address);
+					spi_id, region_start_address, region_end_address);
 			}
 
 			if (region_record[1] & 0x01) {
 				/* Read allowed region */
 				// Cerberus did not support read disabled
-				Set_SPI_Filter_RW_Region(spim_devs[spi_device_id],
+				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] read  enable  0x%08x to 0x%08x",
-					spi_device_id, region_start_address, region_end_address);
+					spi_id, region_start_address, region_end_address);
 			} else {
 				/* Read not allowed region */
 				// Cerberus did not support read disabled
-				Set_SPI_Filter_RW_Region(spim_devs[spi_device_id],
+				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] read  disable 0x%08x to 0x%08x",
-					spi_device_id, region_start_address, region_end_address);
+					spi_id, region_start_address, region_end_address);
 			}
 
 			/* Hash Algorhtm 2 bytes:
@@ -207,4 +212,4 @@ void apply_pfm_protection(int spi_device_id)
 
 	spi_filter->base.enable_filter(spi_filter, true);
 }
-#endif // CONFIG_INTEL_PFR
+

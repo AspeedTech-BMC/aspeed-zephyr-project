@@ -63,6 +63,14 @@ struct otp_pro_sts {
 	uint32_t sec_size;
 };
 
+struct otpkey_type {
+	int value;
+	int key_type;
+	int need_id;
+	char information[110];
+};
+
+
 struct otp_info_cb {
 	int version;
 	char ver_name[10];
@@ -75,13 +83,6 @@ struct otp_info_cb {
 	const struct scu_info *scu_info;
 	int scu_info_len;
 	struct otp_pro_sts pro_sts;
-};
-
-struct otpkey_type {
-	int value;
-	int key_type;
-	int need_id;
-	char information[110];
 };
 
 static const struct otpkey_type ast10xxa0_key_type[] = {

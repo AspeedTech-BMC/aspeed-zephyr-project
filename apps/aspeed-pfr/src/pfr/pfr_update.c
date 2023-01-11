@@ -26,7 +26,6 @@
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "include/SmbusMailBoxCom.h"
-#include "StateMachineAction/StateMachineActions.h"
 #include "pfr_common.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);

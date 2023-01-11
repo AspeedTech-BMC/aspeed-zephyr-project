@@ -6,12 +6,19 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #define BMC_FLASH_ID                    0
 #define PCH_FLASH_ID                    1
 
 #define BMC_TYPE                        0
 #define PCH_TYPE                        2
+
+/* For Intel-PFR 3.0 */
+#if 1
+#define AFM_TYPE                        4
+#else
+/* Reserved for Intel-PFR 4.0 */
+#define AFM_TYPE                        5
+#endif
 
 #define UFM0                            4
 #define UFM0_SIZE                       512
@@ -81,6 +88,7 @@
 #define SIGN_BMC_PFM_BIT2               0x00000004
 #define SIGN_BMC_UPDATE_BIT3            0x00000008
 #define SIGN_CPLD_UPDATE_BIT4           0x00000010
+#define SIGN_AFM_UPDATE_BIT5            0x00000020
 #define SIGN_CPLD_UPDATE_BIT9           0x00000200
 
 #define SHA384_SIZE                     48
@@ -126,7 +134,7 @@ typedef struct {
 	uint8_t DecommissionFlag;
 	uint8_t CpldRecovery;
 	uint8_t BmcToPchStatus;
-	uint8_t Reserved[4];
+	uint8_t AttestationFlag;
+	uint8_t Reserved[3];
 } CPLD_STATUS;
 
-#endif // CONFIG_INTEL_PFR

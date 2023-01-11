@@ -22,7 +22,7 @@ int get_cpld_status(uint8_t *data, uint32_t data_length)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, data, data_length);
 
 	return Success;
@@ -34,7 +34,7 @@ int set_cpld_status(uint8_t *data, uint32_t data_length)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
 	status = pfr_spi_erase_4k(ROT_INTERNAL_STATE, 0);
 	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, 0, data, data_length);
 

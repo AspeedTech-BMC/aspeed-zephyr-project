@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
+#include <stdlib.h>
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include "common/common.h"
@@ -26,11 +26,6 @@
 #include "manifest/pfm/pfm.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-
-int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
-{
-	return Success;
-}
 
 int pfr_recover_active_region(struct pfr_manifest *manifest)
 {
@@ -214,7 +209,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->address = source_address;
 	manifest->flash_id = BMC_FLASH_ID;
 
-	LOG_INF("BMC's PCH Staging Area verfication");
+	LOG_INF("BMC's PCH Staging Area verification");
 	status = cerberus_pfr_verify_image(manifest);
 	if (status != Success) {
 		LOG_ERR("verify failed");
@@ -292,4 +287,4 @@ int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flas
 	// TODO
 	return Success;
 }
-#endif // CONFIG_CERBERUS_PFR
+

@@ -16,8 +16,9 @@
 #include <soc.h>
 
 #define LOG_MODULE_NAME spi_api
-#define NON_CACHED_SRAM_ADDR       DT_REG_ADDR_BY_IDX(DT_NODELABEL(sram0), 1)
+#define NON_CACHED_SRAM_START      DT_REG_ADDR_BY_IDX(DT_NODELABEL(sram0), 1)
 #define NON_CACHED_SRAM_SIZE       DT_REG_SIZE_BY_IDX(DT_NODELABEL(sram0), 1)
+#define NON_CACHED_SRAM_END        (NON_CACHED_SRAM_START + NON_CACHED_SRAM_SIZE)
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
@@ -50,7 +51,7 @@ static void Data_dump_buf(uint8_t *buf, uint32_t len)
 int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
 	const struct device *flash_device;
-	uint8_t DeviceId = flash->device_id[0];
+	uint8_t DeviceId = flash->state->device_id[0];
 	int AdrOffset = xfer->address;
 	int Datalen = xfer->length;
 	uint32_t buf_addr = xfer->data;
@@ -65,7 +66,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		return -1;
 	}
 
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	FlashSize = flash_get_flash_size(flash_device);
 	if (AdrOffset >= FlashSize) {
 		DeviceId += 1;
@@ -96,7 +97,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 	case MIDLEY_FLASH_CMD_READ:
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
-	        if (buf_addr >= NON_CACHED_SRAM_ADDR) {
+	        if (buf_addr >= NON_CACHED_SRAM_START && buf_addr < NON_CACHED_SRAM_END) {
 			ret = flash_read(flash_device, AdrOffset, xfer->data, Datalen);
 		} else {
 			ret = flash_read(flash_device, AdrOffset, flash_rw_buf, Datalen);
@@ -109,7 +110,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 	case MIDLEY_FLASH_CMD_PP://Flash Write
 #if defined(CONFIG_SPI_WRITE_DMA_SUPPORT_ASPEED)
-	        if (buf_addr >= NON_CACHED_SRAM_ADDR) {
+	        if (buf_addr >= NON_CACHED_SRAM_START && buf_addr < NON_CACHED_SRAM_END) {
 			ret = flash_write(flash_device, AdrOffset, xfer->data, Datalen);
 		} else {
 			memcpy(flash_rw_buf, xfer->data, Datalen);
@@ -149,29 +150,52 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	const struct device *flash_device;
 	const struct flash_area *partition_device;
 	uint32_t buf_addr = xfer->data;
-	uint32_t FlashSize = 0;
-	int AdrOffset = 0;
-	int Datalen = 0;
-	int err, ret = 0;
+	uint32_t FlashSize;
+	int AdrOffset;
+	int Datalen;
+	int ret = 0;
 
 	flash_device = device_get_binding(Flash_Devices_List[ROT_SPI]);
-	uint8_t DeviceId = flash->device_id[0];
+	uint8_t DeviceId = flash->state->device_id[0];
 
 	AdrOffset = xfer->address;
 	Datalen = xfer->length;
 
-	if (DeviceId == ROT_INTERNAL_ACTIVE)
-		err = flash_area_open(FLASH_AREA_ID(active), &partition_device);
-	else if (DeviceId == ROT_INTERNAL_RECOVERY)
-		err = flash_area_open(FLASH_AREA_ID(recovery), &partition_device);
-	else if (DeviceId == ROT_INTERNAL_STATE)
-		err = flash_area_open(FLASH_AREA_ID(state), &partition_device);
-	else if (DeviceId == ROT_INTERNAL_INTEL_STATE)
-		err = flash_area_open(FLASH_AREA_ID(intel_state), &partition_device);
-	else if (DeviceId == ROT_INTERNAL_KEY)
-		err = flash_area_open(FLASH_AREA_ID(key), &partition_device);
-	else if (DeviceId == ROT_INTERNAL_LOG)
-		err = flash_area_open(FLASH_AREA_ID(log), &partition_device);
+	switch (DeviceId) {
+	case ROT_INTERNAL_ACTIVE:
+		ret = flash_area_open(FLASH_AREA_ID(active), &partition_device);
+		break;
+	case ROT_INTERNAL_RECOVERY:
+		ret = flash_area_open(FLASH_AREA_ID(recovery), &partition_device);
+		break;
+	case ROT_INTERNAL_STATE:
+		ret = flash_area_open(FLASH_AREA_ID(state), &partition_device);
+		break;
+	case ROT_INTERNAL_INTEL_STATE:
+		ret = flash_area_open(FLASH_AREA_ID(intel_state), &partition_device);
+		break;
+	case ROT_INTERNAL_KEY:
+		ret = flash_area_open(FLASH_AREA_ID(key), &partition_device);
+		break;
+#if defined(CONFIG_BOOTLOADER_MCUBOOT)
+	case ROT_INTERNAL_CERTIFICATE:
+		ret = flash_area_open(FLASH_AREA_ID(certificate), &partition_device);
+		break;
+#endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	case ROT_INTERNAL_AFM:
+		ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &partition_device);
+		break;
+#endif
+	default:
+		ret = -1;
+		break;
+	}
+
+	if (ret) {
+		LOG_ERR("Unknown partition");
+		return ret;
+	}
 
 	switch (xfer->cmd) {
 	case SPI_APP_CMD_GET_FLASH_SIZE:
@@ -183,7 +207,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 	case MIDLEY_FLASH_CMD_READ:
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
-	        if (buf_addr >= NON_CACHED_SRAM_ADDR) {
+	        if (buf_addr >= NON_CACHED_SRAM_START && buf_addr < NON_CACHED_SRAM_END) {
 			ret = flash_area_read(partition_device, AdrOffset, xfer->data, Datalen);
 		} else {
 			ret = flash_area_read(partition_device, AdrOffset, flash_rw_buf, Datalen);
@@ -195,7 +219,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 	case MIDLEY_FLASH_CMD_PP://Flash Write
 #if defined(CONFIG_SPI_DMA_WRITE_SUPPORT_ASPEED)
-	        if (buf_addr >= NON_CACHED_SRAM_ADDR) {
+	        if (buf_addr >= NON_CACHED_SRAM_START && buf_addr < NON_CACHED_SRAM_END) {
 			ret = flash_area_write(partition_device, AdrOffset, xfer->data, Datalen);
 		} else {
 			memcpy(flash_rw_buf, xfer->data, Datalen);
@@ -223,7 +247,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		ret = 0;
 	break;
 	default:
-		LOG_DBG("%d Command is not supported\n", xfer->cmd);
+		LOG_ERR("%d Command is not supported\n", xfer->cmd);
 	break;
 	}
 
@@ -232,7 +256,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 
 int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
-	uint8_t DeviceId = flash->device_id[0];
+	uint8_t DeviceId = flash->state->device_id[0];
 	int ret  = 0;
 
 	if (DeviceId <= PCH_SPI)

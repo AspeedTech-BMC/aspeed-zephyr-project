@@ -4,9 +4,14 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <sys/printk.h>
+#include <zephyr.h>
+#include <logging/log.h>
 #include <drivers/watchdog.h>
-#include <watchdog/watchdog_aspeed.h>
+#include <device.h>
+#include "watchdog_aspeed.h"
+
+LOG_MODULE_REGISTER(hal_watchdog, CONFIG_LOG_DEFAULT_LEVEL);
+
 /**
  * Initial watchdog timer and configure timeout configuration.
  *
@@ -18,7 +23,6 @@
  * @retval 0 if successfully or an error code.
  *
  */
-
 int watchdog_init(const struct device *dev, struct watchdog_config *wdt_config)
 {
 	int ret = 0;
@@ -29,13 +33,13 @@ int watchdog_init(const struct device *dev, struct watchdog_config *wdt_config)
 	init_wdt_cfg.callback = wdt_config->wdt_cfg.callback;
 	ret = wdt_install_timeout(dev, &init_wdt_cfg);
 	if (ret != 0) {
-		printk("%s error: fail to install dev timeout.\n", __func__);
+		LOG_ERR("%s error: fail to install dev timeout", __func__);
 		return ret;
 	}
 
 	ret = wdt_setup(dev, wdt_config->reset_option);
 	if (ret != 0) {
-		printk("%s error: fail to setup dev timeout.\n", __func__);
+		LOG_ERR("%s error: fail to setup dev timeout", __func__);
 		return ret;
 	}
 

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <storage/flash_map.h>
 #include "common/common.h"
@@ -15,7 +14,6 @@
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "manifest/pfm/pfm_manager.h"
 #include "intel_pfr_recovery.h"
-#include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_pbc.h"
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_provision.h"
@@ -24,6 +22,7 @@
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "intel_pfr_svn.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -42,25 +41,110 @@ int intel_pfr_recovery_verify(struct recovery_image *image, struct hash_engine *
 	return pfr_recovery_verify(pfr_manifest);
 }
 
-int pfr_active_recovery_svn_validation(struct pfr_manifest *manifest)
+/*
+ * Compare staged firmware against active firmware.
+ * RoT concludes that active firwmare and staged firmware are identical, if
+ * the hashes of their PFM or AFM match exactly.
+ *
+ */
+int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 {
-
+	uint8_t act_pfm_sig_b0[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
+	uint8_t staging_pfm_sig_b0[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
+	uint8_t staging_pfm_sig_b1[256] = { 0 };
+	PFR_AUTHENTICATION_BLOCK0 *act_block0_buffer;
+	PFR_AUTHENTICATION_BLOCK0 *staging_block0_buffer;
+	PFR_AUTHENTICATION_BLOCK1 *staging_block1_buffer;
+	uint32_t act_pfm_image_type = 0;
+	uint8_t digest_length = 0;
+	uint32_t staging_address;
+	uint32_t act_pfm_offset;
+	uint8_t *staging_pfm_hash;
+	uint8_t *act_pfm_hash;
 	int status = 0;
-	uint8_t staging_svn, active_svn;
+	uint32_t backup_image_type = manifest->image_type;
 
-	status = read_statging_area_pfm(manifest, &staging_svn);
-	if (status != Success)
-		return Failure;
+	if (manifest->image_type == BMC_TYPE) {
+		act_pfm_image_type = BMC_TYPE;
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+				(uint8_t *)&staging_address, sizeof(staging_address)))
+			return Failure;
 
-	if (manifest->image_type == BMC_TYPE)
-		active_svn = GetBmcPfmActiveSvn();
-	else
-		active_svn = GetPchPfmActiveSvn();
+		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
+			return Failure;
+	} else if (manifest->image_type == PCH_TYPE) {
+		act_pfm_image_type = PCH_TYPE;
+		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&staging_address,
+					sizeof(staging_address)))
+			return Failure;
 
-	if (active_svn != staging_svn) {
-		LOG_ERR("SVN error");
+		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+					sizeof(act_pfm_offset)))
+			return Failure;
+	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == AFM_TYPE) {
+		manifest->image_type = BMC_TYPE;
+		staging_address = CONFIG_BMC_AFM_STAGING_OFFSET;
+		/* Fixed partition so starts from zero */
+		act_pfm_image_type = ROT_INTERNAL_AFM;
+		act_pfm_offset = 0;
+	}
+#endif
+
+	LOG_INF("Staging PFM signature, address=0x%08x, Active PFM signature, address=0x%08x", staging_address, act_pfm_offset);
+
+	// Active PFM signature start address after Active
+	status = pfr_spi_read(act_pfm_image_type, act_pfm_offset, sizeof(PFR_AUTHENTICATION_BLOCK0), act_pfm_sig_b0);
+	if (status != Success) {
+		LOG_ERR("Active pfm block0: Flash read data failed");
 		return Failure;
 	}
+
+	act_block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)act_pfm_sig_b0;
+
+	// Staging PFM signature start address after Staging block and capsule signature
+	status = pfr_spi_read(manifest->image_type, staging_address + PFM_SIG_BLOCK_SIZE, sizeof(PFR_AUTHENTICATION_BLOCK0), staging_pfm_sig_b0);
+	if (status != Success) {
+		LOG_ERR("Staging pfm block0: Flash read data failed");
+		return Failure;
+	}
+
+	staging_block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)staging_pfm_sig_b0;
+
+	status = pfr_spi_read(manifest->image_type, staging_address + PFM_SIG_BLOCK_SIZE + sizeof(PFR_AUTHENTICATION_BLOCK0),
+				sizeof(staging_block1_buffer->TagBlock1) + sizeof(staging_block1_buffer->ReservedBlock1) +
+				sizeof(staging_block1_buffer->RootEntry), staging_pfm_sig_b1);
+	if (status != Success) {
+		LOG_ERR("Staging pfm block1: Flash read data failed");
+		return Failure;
+	}
+
+	staging_block1_buffer = (PFR_AUTHENTICATION_BLOCK1 *)staging_pfm_sig_b1;
+
+	if (staging_block1_buffer->RootEntry.PubCurveMagic == PUBLIC_SECP256_TAG) {
+		act_pfm_hash = act_block0_buffer->Sha256Pc;
+		staging_pfm_hash = staging_block0_buffer->Sha256Pc;
+		digest_length = SHA256_DIGEST_LENGTH;
+	} else if (staging_block1_buffer->RootEntry.PubCurveMagic == PUBLIC_SECP384_TAG) {
+		act_pfm_hash = act_block0_buffer->Sha384Pc;
+		staging_pfm_hash = staging_block0_buffer->Sha384Pc;
+		digest_length = SHA384_DIGEST_LENGTH;
+	} else {
+		LOG_ERR("Staging block 1 root entry: Unsupported hash curve, %x", staging_block1_buffer->RootEntry.PubCurveMagic);
+		return Failure;
+	}
+
+	// If the hashes of PFM or AFM match, the active image and staging image must be the same firmware.
+	if (memcmp(act_pfm_hash, staging_pfm_hash, digest_length)) {
+		LOG_ERR("Staged firmware does not match active firmware");
+		LOG_HEXDUMP_INF(act_pfm_hash, digest_length, "act_pfm_hash:");
+		LOG_HEXDUMP_INF(staging_pfm_hash, digest_length, "staging_pfm_hash:");
+		return Failure;
+	}
+
+	manifest->image_type = backup_image_type;
 
 	return Success;
 }
@@ -95,10 +179,18 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 					sizeof(staging_address)))
 			return Failure;
 
-		if(ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
+		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
 					sizeof(act_pfm_offset)))
 			return Failure;
-	} else {
+	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->image_type == AFM_TYPE) {
+		manifest->image_type = BMC_TYPE;
+		manifest->address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
+		return ast1060_update(manifest);
+	}
+#endif
+	else {
 		return Failure;
 	}
 
@@ -167,7 +259,7 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
 
-	LOG_INF("BMC's PCH Staging Area verfication");
+	LOG_INF("BMC's PCH Staging Area verification");
 	LOG_INF("Veriifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
@@ -261,4 +353,4 @@ int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flas
 
 	return intel_pfr_recover_update_action(pfr_manifest);
 }
-#endif // CONFIG_INTEL_PFR
+

@@ -16,21 +16,23 @@
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_provision.h"
-#include "intel_pfr/intel_pfr_update.h"
+#include "intel_pfr/intel_pfr_svn.h"
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #include "cerberus_pfr/cerberus_pfr_provision.h"
-#include "cerberus_pfr/cerberus_pfr_update.h"
+#include "cerberus_pfr/cerberus_pfr_svn.h"
 #endif
 #include "pfr/pfr_ufm.h"
+#include "pfr/pfr_util.h"
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "watchdog_timer/wdt_utils.h"
+#include "watchdog_timer/wdt_handler.h"
 
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
 static uint32_t gFailedUpdateAttempts = 0;
-static SMBUS_MAIL_BOX gSmbusMailboxData = { 0 };
 const struct device *gSwMbxDev = NULL;
 
 uint8_t gUfmFifoData[64];
@@ -42,23 +44,13 @@ uint8_t gBmcOffsets[12];
 uint8_t gPitPassword[8];
 #endif
 
-uint8_t gBiosBootDone = FALSE;
-uint8_t gBmcBootDone = FALSE;
-uint8_t gObbBootDone = FALSE;
-extern bool gBootCheckpointReceived;
-extern uint32_t gMaxTimeout;
-extern int gBMCWatchDogTimer;
-extern int gPCHWatchDogTimer;
 uint8_t gProvisionCount = 0;
 uint8_t gFifoData = 0;
 uint8_t gProvisionData = 0;
 CPLD_STATUS cpld_update_status;
-EVENT_CONTEXT UpdateEventData;
-AO_DATA UpdateActiveObject;
 
 void ResetMailBox(void)
 {
-	memset(&gSmbusMailboxData, 0, sizeof(gSmbusMailboxData));
 	SetUfmStatusValue(COMMAND_DONE);   // reset ufm status
 	SetUfmCmdTriggerValue(0x00);
 }
@@ -72,7 +64,7 @@ unsigned char erase_provision_flash(void)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE;
 	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, 0);
 	return status;
 }
@@ -86,7 +78,7 @@ int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, addr, DataBuffer, length);
 
 	if (status == 0)
@@ -106,7 +98,7 @@ unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, ui
 		return Failure;
 	}
 
-	spi_flash->spi.device_id[0] = ROT_INTERNAL_INTEL_STATE;
+	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE;
 
 	// Read Intel State
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, buffer,
@@ -123,21 +115,6 @@ unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, ui
 	}
 
 	return status;
-}
-void get_image_svn(uint8_t image_id, uint32_t address, uint8_t *SVN, uint8_t *MajorVersion, uint8_t *MinorVersion)
-{
-	uint8_t status;
-	PFM_STRUCTURE Buffer;
-
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-
-	spi_flash->spi.device_id[0] = image_id; // Internal UFM SPI
-	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, address,
-			(uint8_t *)&Buffer, sizeof(PFM_STRUCTURE));
-
-	*SVN = Buffer.SVN;
-	*MajorVersion = Buffer.PfmRevision & 0xFF;
-	*MinorVersion = Buffer.PfmRevision >> 8;
 }
 
 #define SWMBX_NOTIFYEE_STACK_SIZE 1024
@@ -204,7 +181,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 				if (!ret) {
 					gUfmFifoData[gFifoData++] = c;
 				}
-			} while (!ret);
+			} while (!ret && (gFifoData < sizeof(gUfmFifoData)));
 		} else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Read FIFO empty prepare next data */
 			k_sem_take(events[1].sem, K_NO_WAIT);
@@ -243,21 +220,21 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 			data.bit8[0] = AcmCheckpoint;
 			swmbx_get_msg(0, AcmCheckpoint, &data.bit8[1]);
 
-			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
 		} else if (events[7].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BIOS Checkpoint */
 			k_sem_take(events[7].sem, K_NO_WAIT);
 			data.bit8[0] = BiosCheckpoint;
 			swmbx_get_msg(0, BiosCheckpoint, &data.bit8[1]);
 
-			GenerateStateMachineEvent(WDT_CHECKPOINT, NULL);
+			GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
 		}
 #if defined(CONFIG_SEAMLESS_UPDATE)
 		else if (events[8].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* BMC Seamless Update Intent */
 			k_sem_take(events[8].sem, K_NO_WAIT);
-			data.bit8[0] = BmcSeamlessUpdateIntent;
-			swmbx_get_msg(0, BmcSeamlessUpdateIntent, &data.bit8[1]);
+			data.bit8[0] = BmcUpdateIntent2;
+			swmbx_get_msg(0, BmcUpdateIntent2, &data.bit8[1]);
 
 			GenerateStateMachineEvent(SEAMLESS_UPDATE_REQUESTED, data.ptr);
 		} else if (events[9].state == K_POLL_STATE_SEM_AVAILABLE) {
@@ -302,7 +279,7 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_seamless_update_intent_sem,
-			BmcSeamlessUpdateIntent, true);
+			BmcUpdateIntent2, true);
 #endif
 
 	/* From PCH */
@@ -376,72 +353,35 @@ void InitializeSoftwareMailbox(void)
 
 void InitializeSmbusMailbox(void)
 {
-	uint32_t UfmStatus;
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	uint8_t sha_buffer[SHA384_DIGEST_LENGTH];
+	uint8_t policy_svn;
+	int status;
+	int i;
 
 	InitializeSoftwareMailbox();
 	ResetMailBox();
 
 	SetCpldIdentifier(0xDE);
 	SetCpldReleaseVersion((PROJECT_VERSION_MAJOR << 4) | PROJECT_VERSION_MINOR);
+	policy_svn = get_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE);
+	SetCpldRotSvn(policy_svn);
 
-	// get root key hash
-	get_provision_data_in_flash(ROOT_KEY_HASH, gRootKeyHash, SHA384_DIGEST_LENGTH);
-	get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, gPchOffsets, sizeof(gPchOffsets));
-	get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, gBmcOffsets, sizeof(gBmcOffsets));
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-
-	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
-		uint8_t PCHActiveMajorVersion, PCHActiveMinorVersion;
-		uint8_t PCHActiveSVN;
-		uint32_t pch_pfm_address;
-
-		memcpy(&pch_pfm_address, gPchOffsets, 4);
-		pch_pfm_address += 1024;
-		get_image_svn(PCH_SPI, pch_pfm_address, &PCHActiveSVN, &PCHActiveMajorVersion, &PCHActiveMinorVersion);
-		SetPchPfmActiveSvn(PCHActiveSVN);
-		SetPchPfmActiveMajorVersion(PCHActiveMajorVersion);
-		SetPchPfmActiveMinorVersion(PCHActiveMinorVersion);
-
-		uint8_t PCHRecoveryMajorVersion, PCHRecoveryMinorVersion;
-		uint8_t PCHRecoverySVN;
-		uint32_t pch_rec_address;
-
-		memcpy(&pch_rec_address, gPchOffsets + 4, 4);
-		pch_rec_address += 2048;
-		get_image_svn(PCH_SPI, pch_rec_address, &PCHRecoverySVN, &PCHRecoveryMajorVersion, &PCHRecoveryMinorVersion);
-		SetPchPfmRecoverSvn(PCHRecoverySVN);
-		SetPchPfmRecoverMajorVersion(PCHRecoveryMajorVersion);
-		SetPchPfmRecoverMinorVersion(PCHRecoveryMinorVersion);
+	// Generate hash of rot active image
+	// default hashing algorithm sha384
+	pfr_manifest->image_type = ROT_INTERNAL_ACTIVE;
+	pfr_manifest->pfr_hash->type = HASH_TYPE_SHA384;
+	pfr_manifest->pfr_hash->start_address = 0;
+	pfr_manifest->pfr_hash->length = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
+	status = pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash, sha_buffer, SHA384_DIGEST_LENGTH);
+	if (status != Success)
+		LOG_ERR("Get rot hash failed");
+	else {
+		LOG_HEXDUMP_DBG(sha_buffer, sizeof(sha_buffer), "rot hash:");
+		// set rot hash to mailbox
+		for (i = 0; i < SHA384_DIGEST_LENGTH; i++)
+			swmbx_write(gSwMbxDev, false, CpldFPGARoTHash + i, &sha_buffer[i]);
 	}
-	// f1
-	if (CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		uint8_t BMCActiveMajorVersion, BMCActiveMinorVersion;
-		uint8_t BMCActiveSVN;
-		uint32_t bmc_pfm_address;
-
-		memcpy(&bmc_pfm_address, gBmcOffsets, 4);
-		bmc_pfm_address += 1024;
-		get_image_svn(BMC_SPI, bmc_pfm_address, &BMCActiveSVN, &BMCActiveMajorVersion, &BMCActiveMinorVersion);
-		SetBmcPfmActiveSvn(BMCActiveSVN);
-		SetBmcPfmActiveMajorVersion(BMCActiveMajorVersion);
-		SetBmcPfmActiveMinorVersion(BMCActiveMinorVersion);
-
-		uint8_t BMCRecoveryMajorVersion, BMCRecoveryMinorVersion;
-		uint8_t BMCRecoverySVN;
-		uint32_t bmc_rec_address;
-
-		memcpy(&bmc_rec_address, gBmcOffsets + 4, 4);
-		bmc_rec_address += 2048;
-		get_image_svn(BMC_SPI, bmc_rec_address, &BMCRecoverySVN, &BMCRecoveryMajorVersion, &BMCRecoveryMinorVersion);
-		SetBmcPfmRecoverSvn(BMCRecoverySVN);
-		SetBmcPfmRecoverMajorVersion(BMCRecoveryMajorVersion);
-		SetBmcPfmRecoverMinorVersion(BMCRecoveryMinorVersion);
-	}
-
-	uint8_t current_svn;
-
-	current_svn = get_ufm_svn(NULL, SVN_POLICY_FOR_CPLD_UPDATE);
-	SetCpldRotSvn(current_svn);
 }
 
 #define MBX_REG_SETTER(REG) \
@@ -503,6 +443,15 @@ MBX_REG_SETTER_GETTER(PchPfmRecoverMinorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverSvn);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(BmcPfmRecoverMinorVersion);
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+MBX_REG_SETTER_GETTER(AfmActiveSvn);
+MBX_REG_SETTER_GETTER(AfmActiveMajorVersion);
+MBX_REG_SETTER_GETTER(AfmActiveMinorVersion);
+MBX_REG_SETTER_GETTER(AfmRecoverSvn);
+MBX_REG_SETTER_GETTER(AfmRecoverMajorVersion);
+MBX_REG_SETTER_GETTER(AfmRecoverMinorVersion);
+MBX_REG_SETTER_GETTER(ProvisionStatus2);
+#endif
 
 #if defined(CONFIG_FRONT_PANEL_LED)
 #include <drivers/timer/aspeed_timer.h>
@@ -664,14 +613,14 @@ void SetPlatformState(byte PlatformStateData)
 {
 #if defined(CONFIG_PLATFORM_STATE_LED)
 	static const struct gpio_dt_spec leds[] = {
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 0),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 1),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 2),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 3),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 4),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 5),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 6),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, demo_gpio_basic_api), platform_state_out_gpios, 7)};
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 1),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 2),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 3),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 4),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 5),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 6),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 7)};
 
 	for (uint8_t bit = 0; bit < 8; ++bit) {
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
@@ -725,6 +674,21 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
 {
 	LogRecovery(recovery_reason);
 	LogLastPanic(panic_reason);
+}
+
+/**
+ * Log boot complete status in T0 mode
+ *
+ * @param current_boot_state the status for the component that has just completed boot
+ */
+void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot_state)
+{
+    if (is_timed_boot_done())
+        // If other components have finished booting, log timed boot complete status.
+        SetPlatformState(T0_BOOT_COMPLETED);
+    else
+        // Otherwise, just log the this boot complete status
+        SetPlatformState(current_boot_state);
 }
 
 // UFM Status
@@ -787,161 +751,6 @@ void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 {
 	return ((~UfmStatus & UfmStatusBitMask) == UfmStatusBitMask);
-}
-
-bool IsUfmStatusCommandBusy(void)
-{
-	return gSmbusMailboxData.CommandBusy ? true : false;
-}
-
-bool IsUfmStatusCommandDone(void)
-{
-	return gSmbusMailboxData.CommandDone ? true : false;
-}
-
-bool IsUfmStatusCommandError(void)
-{
-	return gSmbusMailboxData.CommandError ? true : false;
-}
-
-bool IsUfmStatusLocked(void)
-{
-	return gSmbusMailboxData.UfmLocked ? true : false;
-}
-
-bool IsUfmStatusUfmProvisioned(void)
-{
-	return gSmbusMailboxData.Ufmprovisioned ? true : false;
-}
-
-bool IsUfmStatusPitLevel1Enforced(void)
-{
-	return gSmbusMailboxData.PITlevel1enforced ? true : false;
-}
-
-bool IsUfmStatusPITL2CompleteSuccess(void)
-{
-	return gSmbusMailboxData.PITL2CompleteSuccess ? true : false;
-}
-
-// PCH UpdateIntent
-bool IsPchUpdateIntentPCHActive(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentPchActive ? true : false;
-}
-
-bool IsPchUpdateIntentPchRecovery(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentPchrecovery ? true : false;
-}
-
-bool IsPchUpdateIntentCpldActive(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentCpldActive ? true : false;
-}
-
-bool IsPchUpdateIntentCpldRecovery(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentCpldRecovery ? true : false;
-}
-
-bool IsPchUpdateIntentBmcActive(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentBmcActive ? true : false;
-}
-
-bool IsPchUpdateIntentBmcRecovery(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentBmcRecovery ? true : false;
-}
-
-bool IsPchUpdateIntentUpdateDynamic(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentUpdateDynamic ? true : false;
-}
-
-bool IsPchUpdateIntentUpdateAtReset(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentUpdateAtReset ? true : false;
-}
-
-byte GetPchUpdateIntent(void)
-{
-	return gSmbusMailboxData.PchUpdateIntentValue;
-}
-
-void SetPchUpdateIntent(byte PchUpdateIntent)
-{
-	gSmbusMailboxData.PchUpdateIntentValue = PchUpdateIntent;
-	// UpdateMailboxRegisterFile(PchUpdateIntentValue, (uint8_t)gSmbusMailboxData.PchUpdateIntentValue);
-
-}
-
-// BMC UpdateIntent
-bool IsBmcUpdateIntentPchActive(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentPchActive ? true : false;
-}
-
-bool IsBmcUpdateIntentPchRecovery(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentPchrecovery ? true : false;
-}
-
-bool IsBmcUpdateIntentCpldActive(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentCpldActive ? true : false;
-}
-
-bool IsBmcUpdateIntentCpldRecovery(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentCpldRecovery ? true : false;
-}
-
-bool IsBmcUpdateIntentBmcActive(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentBmcActive ? true : false;
-}
-
-bool IsBmcUpdateIntentBmcRecovery(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentBmcRecovery ? true : false;
-}
-
-bool IsBmcUpdateIntentUpdateDynamic(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentUpdateDynamic ? true : false;
-}
-
-bool IsBmcUpdateIntentUpdateAtReset(void)
-{
-	return gSmbusMailboxData.BmcUpdateIntentUpdateAtReset ? true : false;
-}
-
-
-byte *GetCpldFpgaRotHash(void)
-{
-	uint8_t HashData[SHA384_DIGEST_LENGTH] = { 0 };
-
-	memcpy(HashData, gSmbusMailboxData.CpldFPGARoTHash, SHA384_DIGEST_LENGTH);
-	// add obb read code for bmc
-	return gSmbusMailboxData.CpldFPGARoTHash;
-}
-
-void SetCpldFpgaRotHash(byte *HashData)
-{
-	memcpy(gSmbusMailboxData.CpldFPGARoTHash, HashData, 64);
-	// UpdateMailboxRegisterFile(CpldFPGARoTHash, (uint8_t)gSmbusMailboxData.CpldFPGARoTHash);
-}
-
-byte *GetAcmBiosScratchPad(void)
-{
-	return gSmbusMailboxData.AcmBiosScratchPad;
-}
-
-void SetAcmBiosScratchPad(byte *AcmBiosScratchPad)
-{
-	memcpy(gSmbusMailboxData.AcmBiosScratchPad, AcmBiosScratchPad, 0x40);
 }
 
 unsigned char ProvisionRootKeyHash(void)
@@ -1069,12 +878,49 @@ void EnablePitLevel2(void)
 }
 #endif
 
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+bool IsSpdmAttestationEnabled()
+{
+	// This setting will active/deactive SPDM attestation on next boot.
+	CPLD_STATUS cpld_status;
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+	return cpld_status.AttestationFlag == 0x00 ? true : false;
+}
+
+void EnableSpdmAttestation(bool enable)
+{
+	// This setting will active/deactive SPDM attestation on next boot.
+	CPLD_STATUS cpld_status;
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+	if (enable) {
+		cpld_status.AttestationFlag = 0x00;
+	} else {
+		cpld_status.AttestationFlag = 0xFF;
+	}
+	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+}
+
+void ReadDeviceIdPublicKey(void)
+{
+
+}
+#endif
+
 void lock_provision_flash(void)
 {
 	uint32_t UfmStatus;
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-	SetUfmFlashStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK);
+
+	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BIT_MASK)) {
+		LOG_ERR("Cannot lock UFM unless root key hash and offsets are provisioned");
+		SetUfmStatusValue(COMMAND_ERROR);
+	}
+	else
+		SetUfmFlashStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK);
 }
 
 void ReadRootKey(void)
@@ -1184,6 +1030,22 @@ void process_provision_command(void)
 		EnablePitLevel2();
 		break;
 #endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	case ENABLE_DEVICE_ATTESTATION_REQUESTS:
+		LOG_INF("Enable SPDM Attestation");
+		EnableSpdmAttestation(true);
+		break;
+	case READ_DEVICE_ID_PUBLIC_KEY:
+		ReadDeviceIdPublicKey();
+		break;
+	case DISABLE_DEVICE_ATTESTATION_REQUESTS:
+		LOG_INF("Disable SPDM Attestation");
+		EnableSpdmAttestation(false);
+		break;
+#endif
+	default:
+		LOG_ERR("Unsupported provision command 0x%02x", UfmCommandData);
+		break;
 	}
 
 	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {
@@ -1219,88 +1081,38 @@ void process_provision_command(void)
 }
 
 /**
- * Function to update the Bmc Checkpoint
- * @Param  NULL
+ * Function to update the BMC Checkpoint
+ *
+ * @Param  Data checkpoint command
  * @retval NULL
  **/
 void UpdateBmcCheckpoint(byte Data)
 {
-	if (gBmcBootDone == FALSE) {
-		// Start WDT for BMC boot
-		gBmcBootDone = START;
-		gBMCWatchDogTimer = 0;
-		SetBmcCheckpoint(Data);
-	} else
-		LOG_INF("BMC boot completed. Checkpoint update not allowed");
-
-	if (Data == PausingExecutionBlock) {
-		LOG_INF("Enter PausingExecution: Block Disable Timer");
-		AspeedPFR_DisableTimer(BMC_EVENT);
-	}
-	if (Data == ResumedExecutionBlock)
-		AspeedPFR_EnableTimer(BMC_EVENT);
-
-	// BMC boot completed
-	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
-		// If execution completed disable timer
-		LOG_INF("Enter CompletingExecution: Block Disable Timer");
-		AspeedPFR_DisableTimer(BMC_EVENT);
-		gBmcBootDone = TRUE;
-		gBMCWatchDogTimer = -1;
-#if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
-		reset_recovery_level(BMC_SPI);
-#endif
-		SetPlatformState(T0_BMC_BOOTED);
-	}
-	if (Data == AUTHENTICATION_FAILED) {
-		gBmcBootDone = FALSE;
-		gBMCWatchDogTimer = BMC_MAXTIMEOUT;
-	}
-	if (gBmcBootDone == TRUE && gBiosBootDone == TRUE)
-		SetPlatformState(T0_BOOT_COMPLETED);
+	SetBmcCheckpoint(Data);
+	bmc_wdt_handler(Data);
 }
 
+/**
+ * Function to update the ACM Checkpoint
+ *
+ * @Param  Data checkpoint command
+ * @retval NULL
+ **/
+void UpdateAcmCheckpoint(byte Data)
+{
+	SetAcmCheckpoint(Data);
+	acm_wdt_handler(Data);
+}
+
+/**
+ * Function to update the BIOS Checkpoint
+ *
+ * @Param  Data checkpoint command
+ * @retval NULL
+ **/
 void UpdateBiosCheckpoint(byte Data)
 {
-	if (gBiosBootDone == TRUE) {
-		if (Data == EXECUTION_BLOCK_STARTED) {
-			gBiosBootDone = FALSE;
-			gObbBootDone = TRUE;
-		}
-	}
-	if (gBiosBootDone == FALSE) {
-		if (Data == EXECUTION_BLOCK_STARTED) {
-			// Set max time for BIOS boot & starts timer
-			gMaxTimeout = BIOS_MAXTIMEOUT;
-			gBootCheckpointReceived = false;
-			gBiosBootDone = START;
-			gPCHWatchDogTimer = 0;
-		}
-	}
-	if (Data == PausingExecutionBlock)
-		AspeedPFR_DisableTimer(PCH_EVENT);
-	if (Data == ResumedExecutionBlock)
-		AspeedPFR_EnableTimer(PCH_EVENT);
-	// BIOS boot completed
-	if (Data == CompletingExecutionBlock || Data == ReadToBootOS) {
-		AspeedPFR_DisableTimer(PCH_EVENT);
-		gBiosBootDone = TRUE;
-		gBootCheckpointReceived = true;
-		gPCHWatchDogTimer = -1;
-		SetPlatformState(T0_BIOS_BOOTED);
-#if defined(CONFIG_PCH_CHECKPOINT_RECOVERY) && defined(CONFIG_INTEL_PFR)
-		reset_recovery_level(PCH_SPI);
-#endif
-		LOG_INF("BIOS boot completed. Checkpoint update not allowed");
-	}
-	if (Data == AUTHENTICATION_FAILED) {
-		gBiosBootDone = FALSE;
-		gPCHWatchDogTimer = gMaxTimeout;
-		gBootCheckpointReceived = false;
-		SetLastPanicReason(ACM_IBB_0BB_AUTH_FAIL);
-	}
-	if (gBmcBootDone == TRUE && gBiosBootDone == TRUE)
-		SetPlatformState(T0_BOOT_COMPLETED);
 	SetBiosCheckpoint(Data);
+	bios_wdt_handler(Data);
 }
 

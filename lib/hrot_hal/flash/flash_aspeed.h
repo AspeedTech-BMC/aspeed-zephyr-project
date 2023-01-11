@@ -35,7 +35,8 @@ enum {
 	ROT_INTERNAL_STATE,
 	ROT_INTERNAL_INTEL_STATE,
 	ROT_INTERNAL_KEY,
-	ROT_INTERNAL_LOG,
+	ROT_INTERNAL_CERTIFICATE,
+	ROT_INTERNAL_AFM,
 };
 
 #define ROT_SPI 4
@@ -136,7 +137,7 @@ struct pflash {
 	 *
 	 * @return 0 if the device size was successfully read or an error code.
 	 */
-	int (*get_device_size)(struct flash *flash, uint32_t *bytes);
+	int (*get_device_size) (const struct flash *flash, uint32_t *bytes);
 
 	/**
 	 * Read data from flash.
@@ -148,7 +149,7 @@ struct pflash {
 	 *
 	 * @return 0 if the bytes were read from flash or an error code.
 	 */
-	int (*read)(struct flash *flash, uint32_t address, uint8_t *data, size_t length);
+	int (*read) (const struct flash *flash, uint32_t address, uint8_t *data, size_t length);
 
 	/**
 	 * Get the size of a flash page for write operations.
@@ -158,7 +159,7 @@ struct pflash {
 	 *
 	 * @return 0 if the page size was successfully read or an error code.
 	 */
-	int (*get_page_size)(struct flash *flash, uint32_t *bytes);
+	int (*get_page_size) (const struct flash *flash, uint32_t *bytes);
 
 	/**
 	 * Get the minimum number of bytes that must be written to a single flash page.  Writing fewer
@@ -170,7 +171,7 @@ struct pflash {
 	 *
 	 * @return 0 if the minimum write size was successfully read or an error code.
 	 */
-	int (*minimum_write_per_page)(struct flash *flash, uint32_t *bytes);
+	int (*minimum_write_per_page) (const struct flash *flash, uint32_t *bytes);
 
 	/**
 	 * Write data to flash.  The flash region being written to needs to be erased prior to writing.
@@ -185,7 +186,7 @@ struct pflash {
 	 * @return The number of bytes written to the flash or an error code.  Use ROT_IS_ERROR to check
 	 * the return value.
 	 */
-	int (*write)(struct flash *flash, uint32_t address, const uint8_t *data, size_t length);
+	int (*write) (const struct flash *flash, uint32_t address, const uint8_t *data, size_t length);
 
 	/**
 	 * Get the size of a flash sector for erase operations.
@@ -195,7 +196,7 @@ struct pflash {
 	 *
 	 * @return 0 if the sector size was successfully read or an error code.
 	 */
-	int (*get_sector_size)(struct flash *flash, uint32_t *bytes);
+	int (*get_sector_size) (const struct flash *flash, uint32_t *bytes);
 
 	/**
 	 * Erase a single sector of flash.
@@ -206,16 +207,17 @@ struct pflash {
 	 *
 	 * @return 0 if the sector was erased or an error code.
 	 */
-	int (*sector_erase)(struct flash *flash, uint32_t sector_addr);
+	int (*sector_erase) (const struct flash *flash, uint32_t sector_addr);
 
 	/**
 	 * Get the size of a flash block for erase operations.
 	 *
 	 * @param flash The flash to query.
 	 * @param bytes Output for the number of bytes in a flash block.
+	 *
 	 * @return 0 if the block size was successfully read or an error code.
 	 */
-	int (*get_block_size)(struct flash *flash, uint32_t *bytes);
+	int (*get_block_size) (const struct flash *flash, uint32_t *bytes);
 
 	/**
 	 * Erase a block of flash.
@@ -226,7 +228,8 @@ struct pflash {
 	 *
 	 * @return 0 if the block was erased or an error code.
 	 */
-	int (*block_erase)(struct flash *flash, uint32_t block_addr);
+	int (*block_erase) (const struct flash *flash, uint32_t block_addr);
+
 	/**
 	 * Erase the entire flash device.
 	 *
@@ -234,7 +237,7 @@ struct pflash {
 	 *
 	 * @return 0 if the all flash memory was erased or an error code.
 	 */
-	int (*chip_erase)(struct flash *flash);
+	int (*chip_erase) (const struct flash *flash);
 };
 
 /**
@@ -283,23 +286,30 @@ enum pspi_flash_sfdp_quad_enable {
 };
 
 /**
+ * Variable context for a SPI flash driver instance.
+ */
+struct pflash_state {
+	platform_mutex lock;								/**< Synchronization lock for accessing the flash. */
+	uint16_t addr_mode;									/**< The current address mode of the SPI flash device. */
+	uint8_t device_id[3];								/**< Device identification data. */
+	uint32_t device_size;								/**< The total capacity of the flash device. */
+	struct pspi_flash_commands command;					/**< Commands to use with the flash device. */
+	uint32_t capabilities;								/**< Capabilities of the flash device. */
+	bool use_fast_read;									/**< Flag to use fast read for SPI reads. */
+	bool use_busy_flag;									/**< Flag to use the busy status instead of WIP. */
+	enum pspi_flash_sfdp_4byte_addressing switch_4byte;	/**< Method for switching address mode. */
+	bool reset_3byte;									/**< Flag to switch to 3-byte mode on reset. */
+	enum pspi_flash_sfdp_quad_enable quad_enable;		/**< Method to enable QSPI. */
+	bool sr1_volatile;									/**< Flag to use volatile write enable for status register 1. */
+};
+
+/**
  * Interface to a single SPI flash.
  */
 struct pspi_flash {
-	struct pflash base;					/**< Base flash instance. */
-	struct flash_master *spi;				/**< The SPI master connected to the flash device. */
-	platform_mutex lock;					/**< Synchronization lock for accessing the flash. */
-	uint16_t addr_mode;					/**< The current address mode of the SPI flash device. */
-	uint8_t device_id[3];					/**< Device identification data. */
-	uint32_t device_size;					/**< The total capacity of the flash device. */
-	struct pspi_flash_commands command;			/**< Commands to use with the flash device. */
-	uint32_t capabilities;					/**< Capabilities of the flash device. */
-	bool use_fast_read;					/**< Flag to use fast read for SPI reads. */
-	bool use_busy_flag;					/**< Flag to use the busy status instead of WIP. */
-	enum pspi_flash_sfdp_4byte_addressing switch_4byte;	/**< Method for switching address mode. */
-	bool reset_3byte;					/**< Flag to switch to 3-byte mode on reset. */
-	enum pspi_flash_sfdp_quad_enable quad_enable;		/**< Method to enable QSPI. */
-	bool sr1_volatile;					/**< Flag to use volatile write enable for status register 1. */
+	struct pflash base;									/**< Base flash instance. */
+	struct pflash_state *state;						/**< Variable context for the flash instance. */
+	struct flash_master *spi;						/**< The SPI master connected to the flash device. */
 };
 
 int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer);

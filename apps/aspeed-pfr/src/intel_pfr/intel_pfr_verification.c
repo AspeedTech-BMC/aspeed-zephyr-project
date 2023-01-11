@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
 #include <stdint.h>
 #include <drivers/flash.h>
@@ -101,11 +100,11 @@ int intel_pfr_pit_level2_verify(void)
 	pfr_manifest->pfr_hash->start_address = 0;
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-#if defined(CONFIG_BMC_DUAL_FLASH)
+#if defined(CONFIG_DUAL_FLASH)
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
-	spi_flash->spi.device_id[0] = BMC_TYPE;
+	spi_flash->spi.state->device_id[0] = BMC_TYPE;
 	pfr_manifest->image_type = BMC_TYPE;
 	pfr_manifest->pfr_hash->length = flash_size;
 	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
@@ -130,7 +129,11 @@ int intel_pfr_pit_level2_verify(void)
 
 	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-	spi_flash->spi.device_id[0] = PCH_TYPE;
+#if defined(CONFIG_DUAL_FLASH)
+	flash_dev = device_get_binding(flash_devices[PCH_TYPE + 1]);
+	flash_size += flash_get_flash_size(flash_dev);
+#endif
+	spi_flash->spi.state->device_id[0] = PCH_TYPE;
 	pfr_manifest->image_type = PCH_TYPE;
 	pfr_manifest->pfr_hash->length = flash_size;
 	pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
@@ -177,6 +180,7 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 	status = pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type), (uint8_t *)&pc_type);
 	if (status != Success) {
 		LOG_ERR("Flash read PC type failed");
+		LOG_ERR("IMG_TYPE=%d ADDR=%08x SIZE=%d", pfr_manifest->image_type, pfr_manifest->address + BLOCK0_PCTYPE_ADDRESS, sizeof(pc_type));
 		return Failure;
 	}
 
@@ -190,12 +194,12 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 	if (status != Success)
 		return Failure;
 
-	// Block1verifcation
+	// Block1 Verification
 	status = pfr_manifest->pfr_authentication->block1_verify(pfr_manifest);
 	if (status != Success)
 		return status;
 
-	// Block0Verification
+	// Block0 Verification
 	status = pfr_manifest->pfr_authentication->block0_verify(pfr_manifest);
 	if (status != Success)
 		return Failure;
@@ -206,7 +210,8 @@ int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *has
 int validate_pc_type(struct pfr_manifest *manifest, uint32_t pc_type)
 {
 	if (pc_type != manifest->pc_type && manifest->pc_type != PFR_PCH_SEAMLESS_UPDATE_CAPSULE) {
-		LOG_ERR("Validation PC Type failed, block0_read_pc_type = %x, manifest_pc_type = %x", pc_type, manifest->pc_type);
+		LOG_ERR("Validation PC Type failed, block0_read_pc_type = %x, manifest_pc_type = %x",
+				pc_type, manifest->pc_type);
 		return Failure;
 	}
 
@@ -370,9 +375,15 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		sign_bit_verify = SIGN_PCH_UPDATE_BIT1;
 	}
 #endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (manifest->pc_type == PFR_AFM) {
+		sign_bit_verify = SIGN_AFM_UPDATE_BIT5;
+	}
+#endif
 
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
-		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x", block1_buffer->CskEntryInitial.KeyPermission);
+		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x",
+				block1_buffer->CskEntryInitial.KeyPermission);
 		return Failure;
 	}
 
@@ -384,7 +395,8 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		}
 	}
 
-	status = get_buffer_hash(manifest, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic, CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out);
+	status = get_buffer_hash(manifest, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic,
+			CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out);
 	if (status != Success) {
 		LOG_ERR("Block1 CSK Entry: Get hash failed");
 		return Failure;
@@ -556,9 +568,6 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 		LOG_HEXDUMP_INF(ptr_sha, hash_length, "Expected hash:");
 		return Failure;
 	}
-
-	if (block0_buffer->PcType == PFR_CPLD_UPDATE_CAPSULE)
-		SetCpldFpgaRotHash(&sha_buffer[0]);
 
 	LOG_INF("Block0: Hash Matched");
 	return Success;
@@ -766,4 +775,4 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 {
 	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
-#endif // CONFIG_INTEL_PFR
+

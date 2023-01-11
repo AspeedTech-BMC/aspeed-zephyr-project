@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
-#include <shell/shell.h>
 
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
@@ -30,6 +28,10 @@ int get_cancellation_policy_offset(uint32_t pc_type)
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_PFM;
 	else if ((pc_type == BMC_CAPSULE_CANCELLATION) || (pc_type == PFR_BMC_UPDATE_CAPSULE))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_UPDATE_CAPSULE;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if ((pc_type == AFM_CANCELLATION) || (pc_type == PFR_AFM))
+		return KEY_CANCELLATION_POLICY_FOR_AFM;
+#endif
 
 	return 0;
 }
@@ -162,70 +164,3 @@ int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 	return Success;
 }
 
-#ifdef CONFIG_SHELL
-static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **argv)
-{
-	struct pfr_manifest test_manifest;
-	uint8_t key_id;
-
-	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
-	key_id = strtoul(argv[2], NULL, 10);
-
-	cancel_csk_key_id(&test_manifest, key_id);
-
-	ARG_UNUSED(shell);
-	ARG_UNUSED(argc);
-	return 0;
-}
-
-static int cmd_verify_csk_key_id(const struct shell *shell, size_t argc, char **argv)
-{
-	struct pfr_manifest test_manifest;
-	uint8_t key_id;
-
-	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
-	key_id = strtoul(argv[2], NULL, 10);
-
-	if (!verify_csk_key_id(&test_manifest, key_id))
-		LOG_INF("This CSK key is not cancelled.., PC type = 0x%x, Key Id = %d", test_manifest.pc_type, key_id);
-
-	ARG_UNUSED(shell);
-	ARG_UNUSED(argc);
-	return 0;
-}
-
-static int cmd_dump_key_cancellation_policy(const struct shell *shell, size_t argc, char **argv)
-{
-	uint32_t buffer[4] = { 0 };
-	uint32_t offset = 0;
-	uint32_t pc_type;
-
-	pc_type = strtoul(argv[1], NULL, 16);
-	offset = get_cancellation_policy_offset(pc_type);
-
-	if (!offset) {
-		LOG_ERR("%s: Invalid provisioned UFM offset for key cancellation", __func__);
-		return Failure;
-	}
-
-	LOG_INF("UFM Offeset = %x", offset);
-	ufm_read(PROVISION_UFM, offset, (uint8_t *)buffer, sizeof(buffer));
-	LOG_HEXDUMP_INF(buffer, sizeof(buffer), "Key Cancellation Policy");
-
-	ARG_UNUSED(shell);
-	ARG_UNUSED(argc);
-	return 0;
-}
-
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
-	SHELL_CMD_ARG(verify, NULL, "<pc_type> <key_id>", cmd_verify_csk_key_id, 3, 0),
-	SHELL_CMD_ARG(cancel, NULL, "<pc_type> <key_id>", cmd_cancel_csk_key_id, 3, 0),
-	SHELL_CMD_ARG(dump, NULL, "<pc_type>", cmd_dump_key_cancellation_policy, 2, 0),
-	SHELL_SUBCMD_SET_END
-);
-
-SHELL_CMD_REGISTER(kc, &sub_kc_cmds, "Key Cancellation Commands", NULL);
-
-#endif
-
-#endif // CONFIG_INTEL_PFR

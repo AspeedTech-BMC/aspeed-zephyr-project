@@ -18,6 +18,10 @@ struct spi_engine_wrapper {
 	struct spi_flash spi;
 };
 
+struct spi_engine_state_wrapper {
+	struct spi_flash_state state;
+};
+
 struct xfer_engine_wrapper {
 	struct flash_xfer base;
 };
@@ -34,5 +38,5 @@ struct xfer_engine_wrapper {
 		return SPI_FLASH_OPERATION_OUT_OF_RANGE; \
 	}
 
-int flash_wrapper_init(struct spi_engine_wrapper *spi, struct flash_master_wrapper *engine);
+int flash_wrapper_init(struct spi_engine_wrapper *spi, struct flash_master_wrapper *engine, struct spi_engine_state_wrapper *flash_state);
 int flash_master_wrapper_init(struct flash_master_wrapper *spi);

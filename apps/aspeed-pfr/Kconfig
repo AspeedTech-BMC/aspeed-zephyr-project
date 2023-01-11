@@ -7,11 +7,11 @@ config ASPEED_DC_SCM
 	help
 	  Enable ASPEED DC-SCM board basic settings.
 
-config BMC_DUAL_FLASH
+config DUAL_FLASH
 	default n
 	bool "Enable dual flash support"
 	help
-	  Enable if BMC has dual flash
+	  Enable if BMC and/or PCH has dual flash
 
 config INTEL_PFR
 	default y
@@ -37,6 +37,47 @@ config ASPEED_STATE_MACHINE_SHELL
 	bool "Aspeed State Machine Shell"
 	help
 	  Enable if user need debug shell to interact with state machine
+
+config ASPEED_DICE_SHELL
+	default n
+	bool "Aspeed DICE Shell"
+	help
+	  Enable if user want to test ASPEED DICE core layer implementation.
+
+config ASPEED_DICE_CERT_VALID_FROM
+	depends on ASPEED_DICE_SHELL
+	default "20221010000000"
+	string "Aspeed DICE certificate validity, format : YYYYMMDDhhmmss"
+	help
+	  Certificate not valid before this date.
+
+config ASPEED_DICE_CERT_VALID_TO
+	depends on ASPEED_DICE_SHELL
+	default "20421010000000"
+	string "Aspeed DICE certificate validity, format : YYYYMMDDhhmmss"
+	help
+	  Certificate not valid after this date.
+
+config ASPEED_DICE_CERT_DEVID_ISSUER_NAME
+	depends on ASPEED_DICE_SHELL
+	default "CN=Aspeed PFR R00t,O=AST_TW,C=TW"
+	string "Aspeed DICE devid certificate issuer name"
+	help
+	  Name of the certification authority which issued the device id certificate.
+
+config ASPEED_DICE_CERT_ALIAS_ISSUER_NAME
+	depends on ASPEED_DICE_SHELL
+	default "CN=Aspeed PFR Core,O=AST_TW,C=TW"
+	string "Aspeed DICE alias certificate issuer name"
+	help
+	  Name of the certification authority which issued the alias certificate.
+
+config ASPEED_DICE_CERT_ALIAS_SUBJECT_NAME
+	depends on ASPEED_DICE_SHELL
+	default "CN=Aspeed PFR Core,O=AST_TW,C=TW"
+	string "Aspeed DICE alias certificate subject name"
+	help
+	  Name of the person or entity to whom the certificate is being issued.
 
 config BMC_CHECKPOINT_RECOVERY
 	default n
@@ -136,5 +177,16 @@ config PFR_SW_MAILBOX
         bool "SW mailbox solution"
         help
           Enable SW mailbox support.
+
+rsource "Kconfig.spdm"
+
+config PFR_DEBUG_SHELL
+	bool "Enable debug shell for development"
+	select SHELL
+	select FLASH_SHELL
+	select GPIO_SHELL
+	select HWINFO_SHELL
+	select SPI_MONITOR_SHELL_ASPEED
+	select ASPEED_STATE_MACHINE_SHELL
 
 source "Kconfig.zephyr"

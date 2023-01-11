@@ -3,7 +3,9 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <stdlib.h>
 #include <zephyr.h>
+#include <sys/sys_heap.h>
 #include <smf.h>
 #include <shell/shell.h>
 #include <logging/log.h>
@@ -26,6 +28,18 @@
 #include "gpio/gpio_aspeed.h"
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
+
+#include "sys/base64.h"
+#include "net/net_ip.h"
+#include "mbedtls/ecdsa.h"
+#include "mbedtls/hmac_drbg.h"
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/x509_csr.h"
+#include "mbedtls/oid.h"
+#include "mbedtls/base64.h"
+#include "mbedtls/asn1write.h"
+#include <crypto/hash.h>
+#include <crypto/hash_aspeed.h>
 
 LOG_MODULE_REGISTER(asm_test, LOG_LEVEL_DBG);
 
@@ -231,6 +245,8 @@ static int cmd_asm_ufm_status(const struct shell *shell, size_t argc,
 	shell_print(shell, "Region[1].ActiveRegion = %02x", cpld_update_status.Region[2].ActiveRegion);
 	shell_print(shell, "Region[2].Recoveryregion = %02x", cpld_update_status.Region[2].Recoveryregion);
 
+	shell_print(shell, "Attestation = %02x", cpld_update_status.AttestationFlag);
+
 
 	return 0;
 }
@@ -373,6 +389,9 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_asm_event,
 	/* PCH Update Intent */
 	(UPDATE_REQUESTED_PCH_PCH_ACT, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchActiveUpdate << 16)))),
 	(UPDATE_REQUESTED_PCH_PCH_RCV, (UPDATE_REQUESTED | ((PchUpdateIntent << 8 | PchRecoveryUpdate << 16))))
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	,(ATTESTATION_FAILED, ATTESTATION_FAILED)
+#endif
 
 );
 
@@ -410,8 +429,6 @@ static int cmd_test_plat_state_led(const struct shell *shell, size_t argc,
 		shell_print(shell, "State is not supported");
 		return 0;
 	}
-
-
 
 	SetPlatformState(pstate);
 	return 0;
@@ -481,7 +498,7 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 
 	for (size_t i=0; i < afm.Length/sizeof(AFM_ADDRESS_DEFINITION); ++i) {
 		AFM_ADDRESS_DEFINITION addr;
-		const size_t partition_offset = 0x07e00000; /* Test image coming from Archer City */
+		const size_t partition_offset = 0x80000000;
 		flash_read(dev, offset + 1024 + sizeof(AFM_STRUCTURE) + i*sizeof(AFM_ADDRESS_DEFINITION), &addr, sizeof(AFM_ADDRESS_DEFINITION));
 		shell_print(shell, "+++ AFM ADDR DEFINITION[%d] +++", i);
 		shell_print(shell, "-> Type:0x%02x DevAddr:0x%02x UUID:0x%04x Length:0x%08x AfmAdd:0x%08x",
@@ -560,6 +577,443 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 }
 #endif // CONFIG_INTEL_PFR
 
+#if defined(CONFIG_ASPEED_DICE_SHELL)
+
+extern uint8_t buffer[PAGE_SIZE] __aligned(16);
+
+#define CDI_LENGTH                        64
+#define CDI_ADDRESS                       0x79001800
+#define DEVICE_FIRMWARE_START_ADDRESS     0x10000
+#define DEVICE_FIRMWARE_SIZE              0x60000
+#define ECDSA384_PRIVATE_KEY_SIZE         SHA384_HASH_LENGTH + 1
+#define ECDSA384_PUBLIC_KEY_SIZE          SHA384_HASH_LENGTH * 2 + 1
+
+#define X509_KEY_USAGE                    0x04
+#define X509_SERIAL_NUM_LENGTH            8
+
+#define DER_MAX_PEM                       0x500
+#define DER_MAX_DER                       0x500
+
+static mbedtls_hmac_drbg_context hmac_drbg_ctx = {0};
+static uint8_t cdi_digest[SHA384_HASH_LENGTH] = {0};
+static uint8_t dev_fwid[SHA384_HASH_LENGTH] = {0};
+static uint8_t alias_digest[SHA384_HASH_LENGTH] = {0};
+
+uint8_t devid_priv_key_buf[ECDSA384_PRIVATE_KEY_SIZE] = {0};
+uint8_t devid_pub_key_buf[ECDSA384_PUBLIC_KEY_SIZE] = {0};
+uint8_t alias_priv_key_buf[ECDSA384_PRIVATE_KEY_SIZE] = {0};
+uint8_t alias_pub_key_buf[ECDSA384_PUBLIC_KEY_SIZE] = {0};
+uint8_t alias_cert_pem[DER_MAX_PEM];
+uint8_t devid_cert_pem[DER_MAX_PEM];
+uint8_t alias_cert_der[DER_MAX_DER];
+uint8_t devid_cert_der[DER_MAX_DER];
+
+// TODO:
+// Since srand() is not supported in current zephyr, we use the hash of cdi digest
+// as the seed of mbedtls random number generator.
+#if 0
+int get_rand_bytes( void *rngState, uint8_t *output, size_t length)
+{
+	ARG_UNUSED(rngState);
+	for (; length; length--)
+		*output++ = (uint8_t)rand();
+
+	return 0;
+}
+
+int seed_drbg(uint8_t *digest, uint32_t digest_len)
+{
+	uint32_t i, seed;
+	mbedtls_md_info_t *md_sha384;
+	int ret = -1;
+
+	for (i = 0; i < digest_len; i++) {
+		seed += ~(digest[i]);
+	}
+	srand(~seed);
+
+	mbedtls_hmac_drbg_init(&hmac_drbg_ctx);
+
+	if (!(md_sha384 = mbedtls_md_info_from_type(MBEDTLS_MD_SHA384)))
+		goto free_drbg;
+
+	if (mbedtls_hmac_drbg_seed(&hmac_drbg_ctx, md_sha384, get_rand_bytes, NULL, NULL, 0))
+		goto free_drbg;
+
+	ret = 0;
+
+free_drbg:
+	if (ret)
+		mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+
+	return ret;
+}
+#else
+
+// Temporary solution
+int get_rand_bytes_by_cdi(void *rngState, uint8_t *output, size_t length)
+{
+	uint8_t cdi_digest_digest[SHA384_HASH_LENGTH];
+	ARG_UNUSED(rngState);
+	hash_engine_sha_calculate(HASH_SHA384, (uint8_t *)cdi_digest, SHA384_HASH_LENGTH,
+			cdi_digest_digest, sizeof(cdi_digest_digest));
+	memset(output, 0, length);
+	memcpy(output, cdi_digest_digest,
+			(length <= SHA384_HASH_LENGTH) ? length : SHA384_HASH_LENGTH);
+
+	return 0;
+}
+
+int get_rand_bytes_by_cdi_fwid(void *rngState, uint8_t *output, size_t length)
+{
+	ARG_UNUSED(rngState);
+
+	// Combine CDI and FWID for deriving alias key
+	hash_engine_start(HASH_SHA384);
+	hash_engine_update(cdi_digest, SHA384_HASH_LENGTH);
+	hash_engine_update(dev_fwid, SHA384_HASH_LENGTH);
+	hash_engine_finish(alias_digest, sizeof(alias_digest));
+	memset(output, 0, length);
+	memcpy(output, alias_digest,
+			(length <= SHA384_HASH_LENGTH) ? length : SHA384_HASH_LENGTH);
+
+	return 0;
+}
+
+int seed_drbg(int (*f_entropy)(void *, unsigned char *, size_t), void *p_entropy)
+{
+	mbedtls_md_info_t *md_sha384;
+	int ret = -1;
+
+	if (hmac_drbg_ctx.MBEDTLS_PRIVATE(entropy_len))
+		mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+
+	mbedtls_hmac_drbg_init(&hmac_drbg_ctx);
+
+	if (!(md_sha384 = mbedtls_md_info_from_type(MBEDTLS_MD_SHA384)))
+		goto free_drbg;
+
+	if (mbedtls_hmac_drbg_seed(&hmac_drbg_ctx, md_sha384, f_entropy,
+				p_entropy, NULL, 0))
+		goto free_drbg;
+
+	ret = 0;
+
+free_drbg:
+	if (ret)
+		mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+
+	return ret;
+}
+
+#endif
+
+int hash_device_firmware(uint32_t addr, uint32_t fw_size, uint8_t *hash, uint32_t hash_len,
+		enum hash_algo algo)
+{
+	const struct device *flash_dev;
+	uint32_t read_len;
+	flash_dev = device_get_binding("fmc_cs0");
+	hash_engine_start(algo);
+	while (fw_size > 0) {
+		read_len = (fw_size < PAGE_SIZE) ? fw_size : PAGE_SIZE;
+		flash_read(flash_dev, addr, buffer, read_len);
+		hash_engine_update(buffer, read_len);
+		addr += read_len;
+		fw_size -= read_len;
+	}
+
+	hash_engine_finish(hash, hash_len);
+
+	return 0;
+}
+
+void x509_set_serial_number(mbedtls_mpi *serial_num, uint8_t *digest, uint8_t digest_len)
+{
+	uint8_t dice_seed[9] = "DICE_SEED";
+	uint8_t dice_seed_digest[SHA384_HASH_LENGTH];
+	uint8_t final_digest[SHA384_HASH_LENGTH];
+	hash_engine_sha_calculate(HASH_SHA384, dice_seed, sizeof(dice_seed),
+			dice_seed_digest, sizeof(dice_seed_digest));
+	hash_engine_start(HASH_SHA384);
+	hash_engine_update(dice_seed_digest, sizeof(dice_seed_digest));
+	hash_engine_update(digest, digest_len);
+	hash_engine_finish(final_digest, sizeof(final_digest));
+
+	// DER encoded serial number must be positive and the first byte must not be zero
+	final_digest[0] &= 0x7f;
+	final_digest[0] |= 0x01;
+	mbedtls_mpi_read_binary(serial_num, final_digest, X509_SERIAL_NUM_LENGTH);
+}
+
+void derive_key_pair(mbedtls_ecdsa_context *ctx_sign, uint8_t *privkey_buf,
+		uint8_t *pubkey_buf, int (*f_entropy)(void *, unsigned char *, size_t),
+		void *p_entropy)
+{
+	size_t len;
+	// Seed drbg with cdi digest
+	seed_drbg(f_entropy, p_entropy);
+
+	if (mbedtls_ecdsa_genkey(ctx_sign, MBEDTLS_ECP_DP_SECP384R1, mbedtls_hmac_drbg_random,
+				&hmac_drbg_ctx)) {
+		return;
+	}
+
+	if (mbedtls_mpi_write_binary(&ctx_sign->MBEDTLS_PRIVATE(d), privkey_buf,
+				ECDSA384_PRIVATE_KEY_SIZE)) {
+		LOG_ERR("Failed to get ecdsa privkey");
+		return;
+	}
+
+	if (mbedtls_ecp_point_write_binary(&ctx_sign->MBEDTLS_PRIVATE(grp),
+			&ctx_sign->MBEDTLS_PRIVATE(Q), MBEDTLS_ECP_PF_UNCOMPRESSED,
+			&len, pubkey_buf, ECDSA384_PUBLIC_KEY_SIZE)) {
+		LOG_ERR("Failed to get ecdsa pubkey");
+		return;
+	}
+}
+
+
+// Porting from upstream mbedtls pull request, it should be removed after
+// Mbedtls supports this api.
+int mbedtls_x509write_crt_set_ext_key_usage( mbedtls_x509write_cert *ctx,
+		const mbedtls_asn1_sequence *exts )
+{
+	unsigned char buf[256];
+	unsigned char *c = buf + sizeof(buf);
+	int ret;
+	size_t len = 0;
+	const mbedtls_asn1_sequence *last_ext = 0, *ext;
+
+	/* We need at least one extension: SEQUENCE SIZE (1..MAX) OF KeyPurposeId */
+	if( exts == NULL )
+		return( MBEDTLS_ERR_X509_BAD_INPUT_DATA );
+
+	/* Iterate over exts backwards, so we write them out in the requested order */
+	while( last_ext != exts )
+	{
+		for( ext = exts; ext->next != last_ext; ext = ext->next ) {}
+		if( ext->buf.tag != MBEDTLS_ASN1_OID )
+			return( MBEDTLS_ERR_X509_BAD_INPUT_DATA );
+		MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_raw_buffer( &c, buf, ext->buf.p, ext->buf.len ) );
+		MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_len( &c, buf, ext->buf.len ) );
+		MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_tag( &c, buf, MBEDTLS_ASN1_OID ) );
+		last_ext = ext;
+	}
+
+	MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_len( &c, buf, len ) );
+	MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_tag( &c, buf, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE ) );
+
+	ret = mbedtls_x509write_crt_set_extension( ctx,
+			MBEDTLS_OID_EXTENDED_KEY_USAGE,
+			MBEDTLS_OID_SIZE( MBEDTLS_OID_EXTENDED_KEY_USAGE ),
+			1, c, len );
+	if( ret != 0 )
+		return( ret );
+
+	return( 0 );
+}
+int convert_pem_to_der(const unsigned char *input, size_t ilen,
+		unsigned char *output, size_t *olen)
+{
+	int ret;
+	const unsigned char *s1, *s2, *end = input + ilen;
+	size_t len = 0;
+	s1 = (unsigned char *) strstr((const char *) input, "-----BEGIN");
+	if( s1 == NULL )
+		return -1;
+
+	s2 = (unsigned char *) strstr((const char *) input, "-----END");
+	if(s2 == NULL)
+		return -1;
+
+	s1 += 10;
+	while(s1 < end && *s1 != '-')
+		s1++;
+	while(s1 < end && *s1 == '-')
+		s1++;
+
+	if( *s1 == '\r' ) s1++;
+	if( *s1 == '\n' ) s1++;
+	if( s2 <= s1 || s2 > end )
+		return -1;
+	ret = mbedtls_base64_decode( NULL, 0, &len, (const unsigned char *)s1, s2 - s1 );
+	if(ret == MBEDTLS_ERR_BASE64_INVALID_CHARACTER)
+		return ret;
+	if( len > *olen )
+		return -1;
+	if((ret = mbedtls_base64_decode(output, len, &len, (const unsigned char *)s1,
+					s2 - s1)) != 0) {
+		return ret;
+	}
+	*olen = len;
+	return( 0 );
+}
+
+#define M_CHECK(f) do {if((ret = (f)) != 0 ) {goto mbedtls_cleanup;}}while (0)
+
+int dice_start(size_t cert_type)
+{
+	mbedtls_x509write_cert alias_crt, devid_crt;
+	mbedtls_asn1_sequence *ext_key_usage= NULL;
+	mbedtls_x509write_csr devid_csr;
+	mbedtls_pk_context devid_key;
+	mbedtls_pk_context alias_key;
+	mbedtls_mpi serial_num;
+	int ret = 0;
+
+	memset(devid_cert_pem, 0, sizeof(devid_cert_pem));
+	memset(alias_cert_pem, 0, sizeof(alias_cert_pem));
+	memset(devid_cert_der, 0, sizeof(devid_cert_der));
+	memset(alias_cert_der, 0, sizeof(alias_cert_der));
+
+	hash_engine_sha_calculate(HASH_SHA384, (uint8_t *)CDI_ADDRESS, CDI_LENGTH,
+			cdi_digest, sizeof(cdi_digest));
+	mbedtls_pk_init(&devid_key);
+	mbedtls_pk_init(&alias_key);
+	mbedtls_pk_setup(&devid_key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+	mbedtls_pk_setup(&alias_key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
+
+	mbedtls_mpi_init(&serial_num);
+	derive_key_pair(mbedtls_pk_ec(devid_key), devid_priv_key_buf, devid_pub_key_buf,
+			get_rand_bytes_by_cdi, NULL);
+	hash_device_firmware(DEVICE_FIRMWARE_START_ADDRESS, DEVICE_FIRMWARE_SIZE, dev_fwid,
+			SHA384_HASH_LENGTH, HASH_SHA384);
+	derive_key_pair(mbedtls_pk_ec(alias_key), alias_priv_key_buf, alias_pub_key_buf,
+			get_rand_bytes_by_cdi_fwid, NULL);
+
+	// Alias certificate
+	mbedtls_x509write_crt_init(&alias_crt);
+	x509_set_serial_number(&serial_num, alias_digest, sizeof(alias_digest));
+	mbedtls_x509write_crt_set_subject_key(&alias_crt, &alias_key);
+	mbedtls_x509write_crt_set_issuer_key(&alias_crt, &devid_key);
+	mbedtls_x509write_crt_set_md_alg(&alias_crt, MBEDTLS_MD_SHA384);
+	mbedtls_x509write_crt_set_version(&alias_crt, MBEDTLS_X509_CRT_VERSION_3);
+	M_CHECK(mbedtls_x509write_crt_set_serial(&alias_crt, &serial_num));
+	M_CHECK(mbedtls_x509write_crt_set_validity(&alias_crt,
+				CONFIG_ASPEED_DICE_CERT_VALID_FROM,
+				CONFIG_ASPEED_DICE_CERT_VALID_TO));
+	M_CHECK(mbedtls_x509write_crt_set_subject_name(&alias_crt,
+				CONFIG_ASPEED_DICE_CERT_ALIAS_SUBJECT_NAME));
+	M_CHECK(mbedtls_x509write_crt_set_issuer_name(&alias_crt,
+				CONFIG_ASPEED_DICE_CERT_ALIAS_ISSUER_NAME));
+
+	// Alias certificate extensions
+	M_CHECK(mbedtls_x509write_crt_set_basic_constraints(&alias_crt, 0, 1));
+	M_CHECK(mbedtls_x509write_crt_set_authority_key_identifier(&alias_crt));
+	M_CHECK(mbedtls_x509write_crt_set_key_usage(&alias_crt, X509_KEY_USAGE));
+
+	ext_key_usage = calloc(1, sizeof(mbedtls_asn1_sequence));
+	ext_key_usage->next = NULL;
+	ext_key_usage->buf.tag = MBEDTLS_ASN1_OID;
+	ext_key_usage->buf.len = MBEDTLS_OID_SIZE(MBEDTLS_OID_CLIENT_AUTH);
+	ext_key_usage->buf.p = MBEDTLS_OID_CLIENT_AUTH;
+	M_CHECK(mbedtls_x509write_crt_set_ext_key_usage(&alias_crt, ext_key_usage));
+	M_CHECK(mbedtls_x509write_crt_pem(&alias_crt, alias_cert_pem, DER_MAX_PEM,
+				mbedtls_hmac_drbg_random, &hmac_drbg_ctx));
+	size_t olen = sizeof(alias_cert_der);
+	M_CHECK(convert_pem_to_der(alias_cert_pem, sizeof(alias_cert_pem), alias_cert_der, &olen));
+
+	if (cert_type) {
+		// Self-Signed DevID certificate
+		mbedtls_x509write_crt_init(&devid_crt);
+		x509_set_serial_number(&serial_num, cdi_digest, sizeof(cdi_digest));
+		mbedtls_x509write_crt_set_subject_key(&devid_crt, &devid_key);
+		mbedtls_x509write_crt_set_issuer_key(&devid_crt, &devid_key);
+		mbedtls_x509write_crt_set_md_alg(&devid_crt, MBEDTLS_MD_SHA384);
+		mbedtls_x509write_crt_set_version(&devid_crt, MBEDTLS_X509_CRT_VERSION_3);
+		M_CHECK(mbedtls_x509write_crt_set_serial(&devid_crt, &serial_num));
+		M_CHECK(mbedtls_x509write_crt_set_validity(&devid_crt,
+					CONFIG_ASPEED_DICE_CERT_VALID_FROM,
+					CONFIG_ASPEED_DICE_CERT_VALID_TO));
+		M_CHECK(mbedtls_x509write_crt_set_subject_name(&devid_crt,
+					CONFIG_ASPEED_DICE_CERT_DEVID_ISSUER_NAME));
+		M_CHECK(mbedtls_x509write_crt_set_issuer_name(&devid_crt,
+					CONFIG_ASPEED_DICE_CERT_DEVID_ISSUER_NAME));
+
+		// DevID certificate extensions
+		M_CHECK(mbedtls_x509write_crt_set_key_usage(&devid_crt, X509_KEY_USAGE));
+		M_CHECK(mbedtls_x509write_crt_set_basic_constraints(&devid_crt, 1, 1));
+		M_CHECK(mbedtls_x509write_crt_pem(&devid_crt, devid_cert_pem, DER_MAX_PEM,
+				mbedtls_hmac_drbg_random, &hmac_drbg_ctx));
+	} else {
+		// DevID CSR
+		mbedtls_x509write_csr_init(&devid_csr);
+		mbedtls_x509write_csr_set_md_alg(&devid_csr, MBEDTLS_MD_SHA384);
+		mbedtls_x509write_csr_set_key(&devid_csr, &devid_key);
+		M_CHECK(mbedtls_x509write_csr_set_subject_name(&devid_csr,
+					CONFIG_ASPEED_DICE_CERT_ALIAS_ISSUER_NAME));
+		M_CHECK(mbedtls_x509write_csr_pem(&devid_csr, devid_cert_pem, DER_MAX_PEM,
+				mbedtls_hmac_drbg_random, &hmac_drbg_ctx));
+	}
+	olen = sizeof(devid_cert_der);
+	M_CHECK(convert_pem_to_der(devid_cert_pem, sizeof(devid_cert_pem), devid_cert_der, &olen));
+
+mbedtls_cleanup:
+	if (ext_key_usage)
+		free(ext_key_usage);
+	mbedtls_pk_free(&devid_key);
+	mbedtls_pk_free(&alias_key);
+	mbedtls_mpi_free(&serial_num);
+	mbedtls_hmac_drbg_free(&hmac_drbg_ctx);
+	mbedtls_x509write_crt_free(&alias_crt);
+	if (cert_type)
+		mbedtls_x509write_crt_free(&devid_crt);
+	else
+		mbedtls_x509write_csr_free(&devid_csr);
+
+	if (ret)
+		LOG_ERR("Failed to generate certificate, ret : -0x%2x", ret);
+
+	return ret;
+}
+
+static int cmd_dice(const struct shell *shell, size_t argc, char **argv)
+{
+	int ret;
+
+	if (argc != 2) {
+		shell_print(shell, "asm dice <0/1> for generating device id CSR(0) or CERT(1)");
+		return 0;
+	}
+
+	size_t cert_type = strtol(argv[1], NULL, 16);
+
+	LOG_INF("dice start");
+	ret = dice_start(cert_type);
+	if (ret)
+		return 0;
+	LOG_INF("dice done");
+
+	shell_print(shell, "DeviceID PRIV KEY :");
+	shell_hexdump(shell, devid_priv_key_buf, ECDSA384_PRIVATE_KEY_SIZE);
+	shell_print(shell, "DeviceID PUB KEY :");
+	shell_hexdump(shell, devid_pub_key_buf, ECDSA384_PUBLIC_KEY_SIZE);
+	shell_print(shell, "Alias PRIV KEY :");
+	shell_hexdump(shell, alias_priv_key_buf, ECDSA384_PRIVATE_KEY_SIZE);
+	shell_print(shell, "Alias PUB KEY :");
+	shell_hexdump(shell, alias_pub_key_buf, ECDSA384_PUBLIC_KEY_SIZE);
+
+	shell_print(shell, "Alias CERT DER :");
+	shell_hexdump(shell,alias_cert_der, sizeof(alias_cert_der));
+	shell_print(shell, "DevID CERT DER :");
+	shell_hexdump(shell,devid_cert_der, sizeof(devid_cert_der));
+	shell_print(shell, "Alias CERT PEM :");
+	shell_print(shell, "%s", alias_cert_pem);
+	shell_print(shell, "DevID %s PEM :", (cert_type) ? "CERT" : "CSR");
+	shell_print(shell, "%s", devid_cert_pem);
+
+	return 0;
+}
+#endif // CONFIG_ASPEED_DICE_SHELL
+
+extern struct sys_heap _system_heap;
+static int cmd_heap(const struct shell *shell, size_t argc, char **argv)
+{
+	sys_heap_print_info(&_system_heap, true);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
 	SHELL_CMD(event, &sub_event, "State Machine Event", NULL),
@@ -574,6 +1028,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 #if defined(CONFIG_INTEL_PFR)
 	SHELL_CMD(afm, NULL, "Dump AFM Structure: DEVICE OFFSET", cmd_afm),
 #endif
+#if defined(CONFIG_ASPEED_DICE_SHELL)
+	SHELL_CMD(dice, NULL, "Generate Cert Chain", cmd_dice),
+#endif
+	SHELL_CMD(heap, NULL, "Show system heap statistic", cmd_heap),
 	SHELL_SUBCMD_SET_END
 );
 

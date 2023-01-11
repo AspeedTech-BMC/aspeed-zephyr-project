@@ -6,32 +6,25 @@
 
 #pragma once
 
+#include <zephyr.h>
 #include <drivers/watchdog.h>
 #include <device.h>
 
 struct watchdog_config {
 	struct wdt_timeout_cfg wdt_cfg;
-	uint8_t reset_option; //WDT_FLAG_RESET_SHIFT , WDT_FLAG_RESET_CPU_CORE , WDT_FLAG_RESET_SOC
+	uint8_t reset_option; // WDT_FLAG_RESET_NONE , WDT_FLAG_RESET_CPU_CORE , WDT_FLAG_RESET_SOC
 };
 
-static const char *WDT_Devices_List[4] = {
-	"wdt1",
-	"wdt2",
-	"wdt3",
-	"wdt4"
-};
 /**
  * Initial watchdog timer and configure timeout configuration.
  *
  * @param dev Pointer to the device structure for the driver instance, the possible value is wdt1/wdt2/wdt3/wdt4 .
  * @param wdt_cfg Watchdog timeout configuration struct , refer to drivers/watchdog.h .
- * @param reset_option Configuration options , the possible value is WDT_FLAG_RESET_NONE/WDT_FLAG_RESET_CPU_CORE/WDT_FLAG_RESET_SOC, refer to drivers/watchdog.h .
- *
+ * @param reset_option Configuration options, the possible value is WDT_FLAG_RESET_NONE/WDT_FLAG_RESET_CPU_CORE/WDT_FLAG_RESET_SOC, refer to drivers/watchdog.h .
  *
  * @retval 0 if successfully or an error code.
  *
  */
-//int watchdog_init(const struct device *dev, const struct wdt_timeout_cfg *wdt_cfg, uint8_t reset_option);
 int watchdog_init(const struct device *dev, struct watchdog_config *wdt_cfg);
 
 /**
@@ -46,7 +39,6 @@ int watchdog_feed(const struct device *dev, int channel_id);
 
 /**
  * Disable watchdog instance.
- *
  *
  * @param dev Pointer to the device structure for the driver instance, the possible value is wdt1/wdt2/wdt3/wdt4 .
  *

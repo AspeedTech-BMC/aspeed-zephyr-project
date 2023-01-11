@@ -35,8 +35,6 @@
 #include <manifest/pfm/pfm_flash.h>
 #include <manifest/pfm/pfm_manager_flash.h>
 
-#include <i2c/I2C_wrapper.h>
-
 #define hashStorageLength 256
 #define MAX_BIOS_BOOT_TIME 300
 
@@ -48,9 +46,9 @@ struct pfm_flash *getPfmFlashInstance(void);
 struct signature_verification *getSignatureVerificationInstance(void);
 struct spi_flash *getSpiFlashInstance(void);
 struct rsa_engine_wrapper *getRsaEngineInstance(void);
-struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void);
 struct spi_filter_engine_wrapper *getSpiFilterEngineWrapper(void);
 struct spi_engine_wrapper *getSpiEngineWrapper(void);
+struct spi_engine_state_wrapper *getSpiEngineStateWrapper(void);
 uint8_t *getNewHashStorage(void);
 struct flash_master_wrapper *getFlashEngineWrapper(void);
 struct manifest_flash *getManifestFlashInstance(void);

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_INTEL_PFR)
 #include <logging/log.h>
+#include <flash/flash_aspeed.h>
+
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_definitions.h"
 #include "AspeedStateMachine/common_smc.h"
@@ -14,50 +15,57 @@
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "intel_pfr_svn.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address)
+int get_active_pfm_version_details(struct pfr_manifest *manifest, uint32_t address)
 {
 	int status = 0;
+	uint32_t pfm_data_address = 0;
 	uint8_t active_svn;
 	uint16_t active_major_version, active_minor_version;
-	uint8_t ufm_svn = 0;
 	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
-	status = pfr_spi_read(manifest->image_type, read_address, sizeof(PFM_STRUCTURE), buffer);
+	// PFM data start address after signature
+	pfm_data_address = address + PFM_SIG_BLOCK_SIZE;
+
+	status = pfr_spi_read(manifest->image_type, pfm_data_address, sizeof(PFM_STRUCTURE), buffer);
 	if (status != Success) {
 		LOG_ERR("Get Pfm Version Details failed");
 		return Failure;
 	}
 
-	if (((PFM_STRUCTURE *)buffer)->PfmTag != PFMTAG) {
-		LOG_ERR("PfmTag verification failed, expected: %x, actual: %x",
-			PFMTAG, ((PFM_STRUCTURE *)buffer)->PfmTag);
-		return Failure;
+	if (((PFM_STRUCTURE *)buffer)->PfmTag == PFMTAG) {
+		active_svn = ((PFM_STRUCTURE *)buffer)->SVN;
+		active_major_version = ((PFM_STRUCTURE *)buffer)->PfmRevision & 0xFF;
+		active_minor_version = ((PFM_STRUCTURE *)buffer)->PfmRevision >> 8;
+
+		if (manifest->image_type == PCH_TYPE) {
+			SetPchPfmActiveSvn(active_svn);
+			SetPchPfmActiveMajorVersion(active_major_version);
+			SetPchPfmActiveMinorVersion(active_minor_version);
+		} else if (manifest->image_type == BMC_TYPE) {
+			SetBmcPfmActiveSvn(active_svn);
+			SetBmcPfmActiveMajorVersion(active_major_version);
+			SetBmcPfmActiveMinorVersion(active_minor_version);
+		}
 	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (((PFM_STRUCTURE *)buffer)->PfmTag == AFM_TAG) {
+		active_svn = ((PFM_STRUCTURE *)buffer)->SVN;
+		active_major_version = ((PFM_STRUCTURE *)buffer)->PfmRevision & 0xFF;
+		active_minor_version = ((PFM_STRUCTURE *)buffer)->PfmRevision >> 8;
 
-	active_svn = ((PFM_STRUCTURE *)buffer)->SVN;
-	active_major_version = ((PFM_STRUCTURE *)buffer)->PfmRevision & 0xFF;
-	active_minor_version = ((PFM_STRUCTURE *)buffer)->PfmRevision >> 8;
-
-	if (manifest->image_type == PCH_TYPE) {
-		SetPchPfmActiveSvn(active_svn);
-		SetPchPfmActiveMajorVersion(active_major_version);
-		SetPchPfmActiveMinorVersion(active_minor_version);
-
-		ufm_svn = get_ufm_svn(manifest, SVN_POLICY_FOR_PCH_FW_UPDATE);
-		if (ufm_svn < active_svn)
-			status = set_ufm_svn(manifest, SVN_POLICY_FOR_PCH_FW_UPDATE, active_svn);
-
-	} else if (manifest->image_type == BMC_TYPE) {
-		SetBmcPfmActiveSvn(active_svn);
-		SetBmcPfmActiveMajorVersion(active_major_version);
-		SetBmcPfmActiveMinorVersion(active_minor_version);
-
-		ufm_svn = get_ufm_svn(manifest, SVN_POLICY_FOR_BMC_FW_UPDATE);
-		if (ufm_svn < active_svn)
-			status = set_ufm_svn(manifest, SVN_POLICY_FOR_BMC_FW_UPDATE, active_svn);
+		SetAfmActiveSvn(active_svn);
+		SetAfmActiveMajorVersion(active_major_version);
+		SetAfmActiveMinorVersion(active_minor_version);
+	}
+#endif
+	else {
+		LOG_ERR("PfmTag verification failed, expected: %x, actual: %x",
+				PFMTAG, ((PFM_STRUCTURE *)buffer)->PfmTag);
+		return Failure;
 	}
 
 	return Success;
@@ -69,7 +77,7 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 	uint32_t pfm_data_address = 0;
 	uint16_t recovery_major_version, recovery_minor_version;
 	uint8_t recovery_svn;
-	uint8_t ufm_svn;
+	uint8_t policy_svn;
 	PFM_STRUCTURE *pfm_data;
 	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
@@ -85,57 +93,46 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 
 	pfm_data = (PFM_STRUCTURE *)buffer;
 
-	if (pfm_data->PfmTag != PFMTAG) {
+	if (pfm_data->PfmTag == PFMTAG) {
+		recovery_svn = pfm_data->SVN;
+		recovery_major_version = pfm_data->PfmRevision & 0xFF;
+		recovery_minor_version = pfm_data->PfmRevision >> 8;
+
+		// MailBox Communication
+		if (manifest->image_type == PCH_TYPE) {
+			SetPchPfmRecoverSvn(recovery_svn);
+			SetPchPfmRecoverMajorVersion(recovery_major_version);
+			SetPchPfmRecoverMinorVersion(recovery_minor_version);
+			policy_svn = get_ufm_svn(SVN_POLICY_FOR_PCH_FW_UPDATE);
+			if (recovery_svn > policy_svn)
+				status = set_ufm_svn(SVN_POLICY_FOR_PCH_FW_UPDATE, recovery_svn);
+		} else if (manifest->image_type == BMC_TYPE) {
+			SetBmcPfmRecoverSvn(recovery_svn);
+			SetBmcPfmRecoverMajorVersion(recovery_major_version);
+			SetBmcPfmRecoverMinorVersion(recovery_minor_version);
+			policy_svn = get_ufm_svn(SVN_POLICY_FOR_BMC_FW_UPDATE);
+			if (recovery_svn > policy_svn)
+				status = set_ufm_svn(SVN_POLICY_FOR_BMC_FW_UPDATE, recovery_svn);
+		}
+	}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	else if (pfm_data->PfmTag == AFM_TAG) {
+		recovery_svn = pfm_data->SVN;
+		recovery_major_version = pfm_data->PfmRevision & 0xFF;
+		recovery_minor_version = pfm_data->PfmRevision >> 8;
+
+		SetAfmRecoverSvn(recovery_svn);
+		SetAfmRecoverMajorVersion(recovery_major_version);
+		SetAfmRecoverMinorVersion(recovery_minor_version);
+	}
+#endif
+	else {
 		LOG_ERR("PfmTag verification failed, expected: %x, actual: %x",
 			PFMTAG, ((PFM_STRUCTURE *)buffer)->PfmTag);
 		return Failure;
 	}
 
-	recovery_svn = pfm_data->SVN;
-	recovery_major_version = pfm_data->PfmRevision & 0xFF;
-	recovery_minor_version = pfm_data->PfmRevision >> 8;
-
-	// MailBox Communication
-	if (manifest->image_type == PCH_TYPE) {
-		SetPchPfmRecoverSvn(recovery_svn);
-		SetPchPfmRecoverMajorVersion(recovery_major_version);
-		SetPchPfmRecoverMinorVersion(recovery_minor_version);
-
-		ufm_svn = get_ufm_svn(manifest, SVN_POLICY_FOR_PCH_FW_UPDATE);
-		if (ufm_svn < recovery_svn)
-			status = set_ufm_svn(manifest, SVN_POLICY_FOR_PCH_FW_UPDATE, recovery_svn);
-	} else if (manifest->image_type == BMC_TYPE) {
-		SetBmcPfmRecoverSvn(recovery_svn);
-		SetBmcPfmRecoverMajorVersion(recovery_major_version);
-		SetBmcPfmRecoverMinorVersion(recovery_minor_version);
-
-		ufm_svn = get_ufm_svn(manifest, SVN_POLICY_FOR_BMC_FW_UPDATE);
-		if (ufm_svn < recovery_svn)
-			status = set_ufm_svn(manifest, SVN_POLICY_FOR_BMC_FW_UPDATE, recovery_svn);
-	}
-
 	return status;
-}
-
-int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version)
-{
-	int status = 0;
-	uint32_t pfm_start_address = 0;
-	uint8_t buffer[sizeof(PFM_STRUCTURE)];
-
-	// PFM data start address after Staging block and PFM block
-	pfm_start_address = manifest->address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
-
-	status = pfr_spi_read(manifest->image_type, pfm_start_address, sizeof(PFM_STRUCTURE),
-			buffer);
-	if (status != Success) {
-		LOG_ERR("Invalid Staging Area Pfm ");
-		return Failure;
-	}
-
-	*svn_version = ((PFM_STRUCTURE *)buffer)->SVN;
-
-	return Success;
 }
 
 int spi_region_hash_verification(struct pfr_manifest *pfr_manifest,
@@ -330,4 +327,4 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 
 	return Success;
 }
-#endif // CONFIG_INTEL_PFR
+

@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_CERBERUS_PFR)
 #include <stdint.h>
 #include <manifest/pfm/pfm_flash.h>
 #include "cerberus_pfr_definitions.h"
@@ -96,5 +95,4 @@ struct PROVISIONING_MANIFEST_DATA {
 
 int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest);
 int getCerberusProvisionData(int offset, uint8_t *data, uint32_t length);
-#endif // CONFIG_CERBERUS_PFR
 

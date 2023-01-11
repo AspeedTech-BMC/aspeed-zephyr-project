@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
@@ -198,7 +197,8 @@ enum {
 	PCH_CAPSULE_CANCELLATION,
 	BMC_PFM_CANCELLATION,
 	BMC_CAPSULE_CANCELLATION,
-	SEAMLESS_CAPSULE_CANCELLATION
+	SEAMLESS_CAPSULE_CANCELLATION,
+	AFM_CANCELLATION,
 };
 
 struct pfr_authentication {
@@ -229,4 +229,3 @@ int intel_fvms_verify(struct pfr_manifest *manifest);
 int intel_fvm_verify(struct pfr_manifest *manifest);
 #endif
 
-#endif // CONFIG_INTEL_PFR

@@ -23,7 +23,6 @@
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #endif
 #include "pfr/pfr_common.h"
-#include <logging/logging_wrapper.h>
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);

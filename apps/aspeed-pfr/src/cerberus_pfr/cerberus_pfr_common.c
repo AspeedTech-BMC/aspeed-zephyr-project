@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
-#if defined(CONFIG_CERBERUS_PFR)
-
 #include <stdint.h>
+#include <stdlib.h>
 #include <logging/log.h>
 #include "AspeedStateMachine/common_smc.h"
 #include "cerberus_pfr_common.h"
@@ -226,4 +225,4 @@ uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 
 	return update_regions;
 }
-#endif // CONFIG_CERBERUS_PFR
+

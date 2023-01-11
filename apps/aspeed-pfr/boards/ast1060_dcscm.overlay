@@ -1,66 +1,5 @@
-/ {
-	/* For v01.00.06 */
-	resources {
-		compatible = "demo,gpio_basic_api";
-		bmc-srst-ctrl-out-gpios = <&gpio0_m_p 5 0>; /* GPIO_M5 */
-		bmc-extrst-ctrl-out-gpios = <&gpio0_e_h 26 0>; /* GPIO_H2 */
-		bmc-rst-ind-in-gpios = <&gpio0_m_p 19 0>; /* GPIO_O3 */
-		bmc-cpu1-mux-sel-out-gpios = <&gpio0_a_d 26 0>; /* GPIO_D2 */
-		bic-rst-ind-in-gpios = <&gpio0_a_d 16 0>; /* GPIO_C0 */
-		pch-rst-ctrl-out-gpios = <&gpio0_m_p 4 0>; /* GPIO_M4 */
-		cpu0-rst-ind-in-gpios = <&gpio0_q_t 26 0>; /* GPIO_T2 */
-		cpu1-rst-ind-in-gpios = <&gpio0_q_t 28 0>; /* GPIO_T4 */
-		cpu0-flash-pwr-out-gpios = <&gpio0_i_l 26 0>; /* GPIO_L2 */
-		cpu1-flash-pwr-out-gpios = <&gpio0_i_l 27 0>; /* GPIO_L3 */
-
-		platform-state-out-gpios =
-			<&sgpiom_a_d 0 0>, <&sgpiom_a_d 1 0>,
-			<&sgpiom_a_d 2 0>, <&sgpiom_a_d 3 0>,
-			<&sgpiom_a_d 4 0>, <&sgpiom_a_d 5 0>,
-			<&sgpiom_a_d 6 0>, <&sgpiom_a_d 7 0>;
-
-		/* NOTICE:
-		 * Normally, these two pin should be GPIO_ACTIVE_LOW, but currently this EVB
-		 * doesn't produce correct power sequence by itself.
-		 */
-		rst-srst-bmc-in-gpios = <&gpio0_q_t 27 GPIO_ACTIVE_HIGH>; /* GPIO_T3 */
-		rst-rsmrst-in-gpios = <&gpio0_q_t 24 GPIO_ACTIVE_HIGH>; /* GPIO_T0 */
-	};
-
-	aliases {
-		led0 = &pfr_fp_green_led_out;
-		led1 = &pfr_fp_amber_led_out;
-		fp-input0 = &bmc_fp_green_led_in;
-		fp-input1 = &bmc_fp_amber_led_in;
-	};
-
-        gpio_keys {
-		compatible = "gpio-keys";
-		bmc_fp_green_led_in: fp_green_led_in {
-			gpios = <&gpio0_a_d 22 1>; /* GPIO_C6 */
-			label = "BMC FP GREEN LED";
-		};
-
-		bmc_fp_amber_led_in: fp_amber_led_in {
-			gpios = <&gpio0_a_d 21 1>; /* GPIO_C5 */
-			label = "BMC FP AMBER LED";
-		};
-	};
-
-	leds {
-		compatible = "gpio-leds";
-
-		pfr_fp_green_led_out: green_led {
-			gpios = <&gpio0_m_p 18 1>; /* GPIO_O2 */
-			label = "PFR_FP_GREEN_LED";
-		};
-
-		pfr_fp_amber_led_out: amber_led {
-			gpios = <&gpio0_e_h 25 1>; /* GPIO_H1 */
-			label = "PFR_FP_AMBER_LED";
-		};
-	};
-};
+#include "ast1060_dcscm_gpio_common.dts"
+#include "ast1060_dcscm_gpio_egs.dts"
 
 &i2cfilter {
 	pinctrl-0 = <&pinctrl_smbflt_default>;
@@ -130,6 +69,29 @@
 	status = "okay";
 };
 
+#if 0
+// For mctp over i3c
+// AST2600 i3c-1 -> AST1060 i3c-2
+&i3c2 {
+	status = "okay";
+	assigned-address = <0x9>;
+	pid-extra-info = <0x9>;
+	pinctrl-0 = <&pinctrl_i3c2_default>;
+	ibi-append-pec;
+	priv-xfer-pec;
+	secondary;
+	i3c2_smq:i3c-slave-mqueue@9 {
+		 compatible = "aspeed,i3c-slave-mqueue";
+		 reg = <0x9>;
+		 msg-size = <256>;
+		 num-of-msgs = <4>;
+		 mandatory-data-byte = <0xae>;
+		 label = "I3C_SMQ_2";
+		 status = "okay";
+	 };
+};
+#endif
+
 &wdt0 {
 	status = "okay";
 };
@@ -189,9 +151,10 @@
 			reg = <0xE0000 0x10000>;
 		};
 
-		log_partition: partition@5 {
-			label = "log";
-			reg = <0xF0000 0x20000>;
+		/* For Intel-PFR 3.0 */
+		afm_act_1_partition: partition@5 {
+			label = "afm_act_1";
+			reg = <0xF0000 0x10000>;
 		};
 	};
 };
@@ -200,6 +163,34 @@
 	status = "okay";
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+#if 0
+		/* Reserved for Intel-PFR 4.0 */
+		afm_act_1_partition: partition@0 {
+			label = "afm_active_1";
+			reg = <0x0 0x80000>;
+		};
+
+		afm_act_2_partition: partition@1 {
+			label = "afm_active_2";
+		}
+			reg = <0x80000 0x80000>;
+
+		afm_rcv_1_partition: partition@2 {
+			label = "afm_recovery_1";
+			reg = <0x100000 0x80000>;
+		};
+
+		afm_rcv_2_partition: partition@3 {
+			label = "afm_recovery_2";
+			reg = <0x180000 0x80000>;
+		};
+#endif
+	};
 };
 
 &spi1 {
@@ -284,6 +275,9 @@
 	flash-device = <&spi2_cs1>;
 	ext-mux-sel = <1>;
 	status = "okay";
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
 };
 
 &sgpiom {

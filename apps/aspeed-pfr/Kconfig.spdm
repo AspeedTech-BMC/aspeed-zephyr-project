@@ -1,0 +1,57 @@
+
+config PFR_MCTP
+	depends on CERBERUS
+	depends on CERBERUS_MCTP
+	default n
+	bool "PFR MCTP support"
+	help
+	  Enable PFR MCTP support.
+
+config PFR_MCTP_I3C
+	depends on PFR_MCTP
+	default n
+	bool "PFR MCTP over I3C support"
+	help
+	  Enable MCTP over I3C support
+
+config PFR_SPDM_ATTESTATION
+	depends on PFR_MCTP
+	default n
+	bool "SPDM attestation support"
+
+config PFR_SPDM_RESPONDER
+	depends on PFR_MCTP
+	default n
+	bool "SPDM responder support"
+
+if PFR_SPDM_ATTESTATION
+
+config BMC_AFM_RECOVERY_OFFSET
+	default 0x0d300000
+	hex "AFM recovery region offset in BMC flash"
+
+config BMC_AFM_STAGING_OFFSET
+	default 0x0d2e0000
+	hex "AFM staging region offset in BMC flash"
+
+config BMC_AFM_STAGING_RECOVERY_SIZE
+	default 0x20000
+	hex "AFM staging/recovery region size in BMC flash"
+
+config PFR_SPDM_ATTESTATION_DURATION
+	default 60
+	int "First attestation after boot complete checkpoint in seconds"
+
+config PFR_SPDM_ATTESTATION_PERIOD
+	default 600
+	int "Period of attestation in seconds"
+
+config PFR_SPDM_ATTESTATION_DEVICE_OFFSET
+	default 0x1000
+	hex "Device offset in AFM Device Structure, default is 4KB"
+
+config PFR_SPDM_ATTESTATION_MAX_DEVICES
+	default 8
+	int "Maximum supported device in AFM"
+
+endif # PFR_SPDM_ATTESTATION

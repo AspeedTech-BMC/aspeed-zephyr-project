@@ -1,0 +1,15 @@
+{
+    "name": "ast1060a1_mp",
+    "version": "1060A1",
+    "data_region": {
+        "ecc_region": false,
+        "key": [
+            {
+                "types": "ecdsa_pub",
+                "key_pem": "rk384_pub.pem",
+                "offset": "0x480",
+                "number_id": 0
+            }
+        ]
+    }
+}

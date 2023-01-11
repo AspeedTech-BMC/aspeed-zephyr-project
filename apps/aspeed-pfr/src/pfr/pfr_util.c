@@ -45,7 +45,7 @@ int pfr_spi_read(uint8_t device_id, uint32_t address, uint32_t data_length, uint
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, address, data, data_length);
 	return status;
 }
@@ -55,7 +55,7 @@ int pfr_spi_write(uint8_t device_id, uint32_t address, uint32_t data_length, uin
 	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.base.write((struct flash *)&spi_flash->spi, address, data, data_length);
 	return status;
 }
@@ -65,7 +65,7 @@ int pfr_spi_erase_4k(uint8_t device_id, uint32_t address)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, address);
 	return status;
 }
@@ -75,7 +75,7 @@ int pfr_spi_erase_block(uint8_t device_id, uint32_t address)
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	status = spi_flash->spi.base.block_erase((struct flash *)&spi_flash->spi, address);
 	return status;
 }
@@ -107,7 +107,7 @@ uint32_t pfr_spi_get_device_size(uint8_t device_id)
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	uint32_t size;
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &size);
 	return size;
 }
@@ -117,7 +117,7 @@ int pfr_spi_get_block_size(uint8_t device_id)
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int block_sz;
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.base.get_block_size((struct flash *)&spi_flash->spi, &block_sz);
 	return block_sz;
 }
@@ -126,7 +126,7 @@ int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t
 {
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	spi_flash->spi.device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	if (spi_flash->spi.base.read((struct flash *)&spi_flash->spi, source_address, buffer, PAGE_SIZE))
 		return Failure;
 	spi_flash->spi.base.write((struct flash *)&spi_flash->spi, target_address, buffer, PAGE_SIZE);
@@ -142,11 +142,11 @@ int pfr_spi_page_read_write_between_spi(uint8_t source_flash, uint32_t *source_a
 
 
 	for (index1 = 0; index1 < (PAGE_SIZE / MAX_READ_SIZE); index1++) {
-		spi_flash->spi.device_id[0] = source_flash; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
+		spi_flash->spi.state->device_id[0] = source_flash; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 		spi_flash->spi.base.read((struct flash *)&spi_flash->spi, *source_address, buffer, MAX_READ_SIZE);
 
 		for (index2 = 0; index2 < (MAX_READ_SIZE / MAX_WRITE_SIZE); index2++) {
-			spi_flash->spi.device_id[0] = target_flash;
+			spi_flash->spi.state->device_id[0] = target_flash;
 			spi_flash->spi.base.write((struct flash *)&spi_flash->spi, *target_address, &buffer[index2 * MAX_WRITE_SIZE], MAX_WRITE_SIZE);
 
 			*target_address += MAX_WRITE_SIZE;
@@ -165,9 +165,9 @@ int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	for (i = 0; i < length / PAGE_SIZE; i++) {
-		spi_flash->spi.device_id[0] = src_dev;
+		spi_flash->spi.state->device_id[0] = src_dev;
 		spi_flash->spi.base.read((struct flash *)&spi_flash->spi, src_addr, buffer, PAGE_SIZE);
-		spi_flash->spi.device_id[0] = dest_dev;
+		spi_flash->spi.state->device_id[0] = dest_dev;
 		spi_flash->spi.base.write((struct flash *)&spi_flash->spi, dest_addr, buffer, PAGE_SIZE);
 		src_addr += PAGE_SIZE;
 		dest_addr += PAGE_SIZE;

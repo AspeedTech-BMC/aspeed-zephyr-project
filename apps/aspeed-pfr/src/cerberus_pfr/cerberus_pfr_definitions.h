@@ -6,7 +6,6 @@
 
 #pragma once
 
-# if defined(CONFIG_CERBERUS_PFR)
 #define BMC_FLASH_ID                0
 #define PCH_FLASH_ID                2
 
@@ -73,18 +72,7 @@ typedef struct{
 	uint8_t DecommissionFlag;
 	uint8_t  CpldRecovery;
 	uint8_t  BmcToPchStatus;
-	uint8_t  Reserved[4];
+	uint8_t  AttestationFlag;
+	uint8_t  Reserved[3];
 } CPLD_STATUS;
 
-// temorary solution to fix build failed
-typedef struct _PFM_STRUCTURE {
-	uint32_t PfmTag;
-	uint8_t SVN;
-	uint8_t BkcVersion;
-	uint16_t PfmRevision;
-	uint32_t Reserved;
-	uint8_t OemSpecificData[16];
-	uint32_t Length;
-} PFM_STRUCTURE;
-
-#endif // CONFIG_CERBERUS_PFR

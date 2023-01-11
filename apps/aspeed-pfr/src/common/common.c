@@ -15,19 +15,14 @@ struct pfm_manager_flash pfmManagerFlash;
 struct signature_verification signatureVerification;	/**< PFM signature verification. */
 struct spi_flash spiFlash;					/**< Flash where the PFM is stored. */
 struct rsa_engine_wrapper rsaEngineWrapper;
-struct I2CSlave_engine_wrapper I2cSlaveEnginWrapper;
 
 // Zephyr Ported structures
 struct spi_engine_wrapper spiEngineWrapper;
+struct spi_engine_state_wrapper spiEngineStateWrapper;
 struct flash_master_wrapper flashEngineWrapper;
 struct spi_filter_engine_wrapper spiFilterEngineWrapper;
 
 static uint8_t hashStorage[RSA_MAX_KEY_LENGTH] __aligned(16);
-
-bool gBootCheckpointReceived;
-int gBMCWatchDogTimer = -1;
-int gPCHWatchDogTimer = -1;
-uint32_t gMaxTimeout = MAX_BIOS_BOOT_TIME;
 
 struct flash *getFlashDeviceInstance(void)
 {
@@ -84,14 +79,14 @@ struct spi_engine_wrapper *getSpiEngineWrapper(void)
 	return &spiEngineWrapper;
 }
 
+struct spi_engine_state_wrapper *getSpiEngineStateWrapper(void)
+{
+	return &spiEngineStateWrapper;
+}
+
 struct flash_master_wrapper *getFlashEngineWrapper(void)
 {
 	return &flashEngineWrapper;
-}
-
-struct I2CSlave_engine_wrapper *getI2CSlaveEngineInstance(void)
-{
-	return &I2cSlaveEnginWrapper.base;
 }
 
 uint8_t *getNewHashStorage(void)

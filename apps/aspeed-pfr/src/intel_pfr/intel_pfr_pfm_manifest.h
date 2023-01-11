@@ -6,7 +6,6 @@
 
 #pragma once
 
-#if defined(CONFIG_INTEL_PFR)
 #include <stdint.h>
 #include "pfr/pfr_common.h"
 
@@ -137,6 +136,7 @@ typedef struct _AFM_ADDRESS_DEFINITION {
 	uint32_t AfmAddress; /* Address of AFM must be at least 4k aligned */
 } AFM_ADDRESS_DEFINITION;
 
+/* TODO: This structure is changed after intel 60686 rev 2.3 to include measurement block index */
 typedef struct _AFM_DEVICE_MEASUREMENT_VALUE {
 	uint8_t PossibleMeasurements;
 	uint8_t ValueType; /* Defined in DSP0274 1.0.0 spec section 4.10 */
@@ -160,7 +160,8 @@ typedef struct _AFM_DEVICE_STRUCTURE {
 	uint8_t Reserved2[20];
 	uint8_t PublicKeyModuleXY[512];
 	uint32_t PublicKeyExponent;
-	uint32_t TotalMeasurements;
+	uint8_t TotalMeasurements;
+	uint8_t Reserved3[3];
 	AFM_DEVICE_MEASUREMENT_VALUE Measurements[];
 } AFM_DEVICE_STRUCTURE;
 
@@ -173,8 +174,7 @@ typedef struct {
 } ProtectLevelMask;
 #pragma pack()
 
-int read_statging_area_pfm(struct pfr_manifest *manifest, uint8_t *svn_version);
 int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
-int pfm_version_set(struct pfr_manifest *manifest, uint32_t read_address);
+int get_active_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);
 int pfm_spi_region_verification(struct pfr_manifest *manifest);
-#endif // CONFIG_INTEL_PFR
+
