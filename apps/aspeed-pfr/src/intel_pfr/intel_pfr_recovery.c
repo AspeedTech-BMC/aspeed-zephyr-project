@@ -23,6 +23,7 @@
 #include "flash/flash_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr_svn.h"
+#include "intel_pfr_update.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -185,14 +186,28 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	}
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	else if (manifest->image_type == AFM_TYPE) {
-		manifest->image_type = BMC_TYPE;
 		manifest->address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
-		return ast1060_update(manifest);
+		manifest->image_type = BMC_TYPE;
+		if (pfr_spi_read(manifest->image_type, manifest->address,
+			sizeof(PFR_AUTHENTICATION_BLOCK0), buffer)) {
+			LOG_ERR("Block0: Flash read data failed");
+			return Failure;
+		}
+
+		block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)buffer;
+		manifest->pc_length = block0_buffer->PcLength;
+		manifest->address += PFM_SIG_BLOCK_SIZE;
+
+		LOG_INF("AFM update start payload_address=%08x pc_length=%x", manifest->address, manifest->pc_length);
+		if (update_afm(AFM_PART_ACT_1, manifest->address, manifest->pc_length))
+			return Failure;
+
+		LOG_INF("Repair success");
+		return Success;
 	}
 #endif
-	else {
+	else
 		return Failure;
-	}
 
 	manifest->recovery_address = read_address;
 	manifest->staging_address = staging_address;

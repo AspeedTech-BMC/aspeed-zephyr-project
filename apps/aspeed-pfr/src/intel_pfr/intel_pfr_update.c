@@ -266,14 +266,6 @@ int update_rot_fw(uint32_t address, uint32_t length)
 }
 
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
-enum AFM_PARTITION_TYPE {
-	AFM_PART_ACT_1,
-	AFM_PART_RCV_1,
-	// Reserved for Intel PFR 4.0
-	AFM_PART_ACT_2,
-	AFM_PART_RCV_2,
-};
-
 int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length)
 {
 	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_AFM);
@@ -284,6 +276,11 @@ int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length)
 		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
 
 	if (part == AFM_PART_ACT_1) {
+		if (length_page_align > region_size) {
+			LOG_ERR("length(%x) exceed region size(%x)", length_page_align, region_size);
+			return Failure;
+		}
+
 		if (pfr_spi_erase_region(ROT_INTERNAL_AFM, true, 0, region_size)) {
 			LOG_ERR("Failed to erase AFM Active Partition");
 			return Failure;
@@ -321,7 +318,6 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 {
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	uint32_t payload_address;
-	uint32_t pc_type_status;
 	uint32_t pc_length = 0;
 	uint32_t hrot_svn = 0;
 	uint32_t pc_type;
@@ -372,6 +368,10 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 		}
 
 		status = update_afm(AFM_PART_ACT_1, payload_address, pc_length);
+		if (status != Success) {
+			LOG_ERR("Update AFM Active failed");
+			return Failure;
+		}
 	} else if (flash_select == SECONDARY_FLASH_REGION) {
 		if (ActiveObjectData->RestrictActiveUpdate == 1) {
 			manifest->image_type = AFM_TYPE;
@@ -382,15 +382,15 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 			}
 		}
 
-		status = update_afm(AFM_PART_RCV_1, payload_address, 64*1024 /*pc_length*/);
+		status = update_afm(AFM_PART_RCV_1, payload_address, pc_length);
+		if (status != Success) {
+			LOG_ERR("Update AFM Recovery failed");
+			return Failure;
+		}
+
+		set_ufm_svn(SVN_POLICY_FOR_AFM, hrot_svn);
 	}
 
-	if (status != Success) {
-		LOG_ERR("Update AFM failed");
-		return Failure;
-	}
-
-	set_ufm_svn(SVN_POLICY_FOR_AFM, hrot_svn);
 	LOG_INF("AFM update end");
 
 	return Success;
