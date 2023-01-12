@@ -42,7 +42,6 @@ int recover_image(void *AoData, void *EventContext)
 	if (EventData->image == BMC_EVENT) {
 		LOG_INF("Image Type: BMC");
 		pfr_manifest->image_type = BMC_TYPE;
-
 	} else if (EventData->image == PCH_EVENT) {
 		LOG_INF("Image Type: PCH");
 		pfr_manifest->image_type = PCH_TYPE;
