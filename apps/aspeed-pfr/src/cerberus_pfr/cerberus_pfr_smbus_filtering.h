@@ -7,6 +7,8 @@
 #pragma once
 #include <stdint.h>
 
+
+#pragma pack(1)
 /* TODO: Loading these setting from PFM */
 struct SMBUS_FILTER_DEVICE {
 
@@ -17,7 +19,14 @@ struct SMBUS_FILTER_DEVICE {
 
 /* Each instance represent for a bus */
 struct SMBUS_FILTER_MANIFEST {
-	struct SMBUS_FILTER_DEVICE device[16];
+	uint8_t filter_id;
+	uint8_t device_count;
 };
 
-void apply_pfm_smbus_protection(uint8_t smbus_filter);
+struct SMBUS_FILTER_RULE {
+	uint32_t magic_number;
+	uint8_t filter_count;
+};
+#pragma pack()
+
+void apply_pfm_smbus_protection(uint8_t spi_dev);

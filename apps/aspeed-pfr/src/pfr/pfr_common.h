@@ -44,7 +44,9 @@ struct pfr_manifest {
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	uint32_t target_fvm_addr;                               // fvm region for seamless update
 #endif
-
+#if defined(CONFIG_CERBERUS_PFR)
+	uint32_t i2c_filter_addr[2];                            // filter rule in BMC/PCH manifest
+#endif
 };
 
 struct active_image {

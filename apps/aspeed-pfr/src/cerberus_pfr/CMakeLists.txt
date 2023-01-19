@@ -10,7 +10,6 @@ target_sources(app PRIVATE
 	cerberus_pfr_verification.c
 	cerberus_pfr_key_cancellation.c
 	cerberus_pfr_smbus_filtering.c
-	cerberus_pfr_smbus_filtering_data.c
 	cerberus_pfr_spi_filtering.c
 	cerberus_pfr_svn.c
 	)

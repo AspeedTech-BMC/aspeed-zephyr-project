@@ -193,7 +193,7 @@ void apply_pfm_protection(int spi_device_id)
 				LOG_HEXDUMP_ERR(region_record, 40, "Invalid Bus ID or Rule ID");
 			}
 
-			pfm_region_Start += sizeof(PFM_SMBUS_RULE);;
+			pfm_region_Start += sizeof(PFM_SMBUS_RULE);
 			break;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 		case FVM_ADDR_DEF:

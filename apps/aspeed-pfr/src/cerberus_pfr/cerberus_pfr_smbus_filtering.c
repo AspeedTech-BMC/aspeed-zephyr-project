@@ -9,51 +9,70 @@
 #include <logging/log.h>
 #include <drivers/i2c/pfr/i2c_filter.h>
 #include "cerberus_pfr/cerberus_pfr_smbus_filtering.h"
+#include "cerberus_pfr/cerberus_pfr_definitions.h"
+#include "flash/flash_aspeed.h"
+#include "pfr/pfr_common.h"
+#include "pfr/pfr_util.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-extern struct SMBUS_FILTER_MANIFEST smbus_filter_manifest[4];
-
-void apply_pfm_smbus_protection(uint8_t smbus_filter)
+void apply_pfm_smbus_protection(uint8_t spi_dev)
 {
-	if (smbus_filter > 3) {
-		LOG_ERR("SMBus Filter device does not exist");
-		return;
-	}
-
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	struct SMBUS_FILTER_RULE i2c_rule;
+	struct SMBUS_FILTER_MANIFEST i2c_filter;
+	struct SMBUS_FILTER_DEVICE i2c_device;
 	const struct device *flt_dev = NULL;
 	char bus_dev_name[] = "I2C_FILTER_x";
-	int status = 0;
+	int status;
 
-	bus_dev_name[11] = smbus_filter + '0';
-	flt_dev = device_get_binding(bus_dev_name);
+	uint32_t i2c_filter_addr;
+	int id = (spi_dev == BMC_SPI) ? 0 : 1;
 
-	if (flt_dev) {
-		for (uint8_t dev_id = 0; dev_id < 16; ++dev_id) {
-			if (smbus_filter_manifest[smbus_filter].device[dev_id].enable) {
-				/* Load data into aspeed i2c filter */
-				status = ast_i2c_filter_en(flt_dev, true, true,	0, 0);
-				LOG_DBG("ast_i2c_filter_en ret=%d", status);
-
-				status = ast_i2c_filter_update(
-						flt_dev,
-						dev_id,
-						smbus_filter_manifest[smbus_filter].device[dev_id].slave_addr >> 1,
-						smbus_filter_manifest[smbus_filter].device[dev_id].whitelist_cmd
-						);
-				LOG_DBG("ast_i2c_filter_update ret=%d", status);
-
-				LOG_INF("SMBus Rule Bus[%d] RuleId[%d] DeviceAddr[%02x]",
-						smbus_filter, dev_id,
-						smbus_filter_manifest[smbus_filter].device[dev_id].slave_addr);
-
-				LOG_HEXDUMP_INF(smbus_filter_manifest[smbus_filter].device[dev_id].whitelist_cmd,
-						sizeof(smbus_filter_manifest[smbus_filter].device[dev_id].whitelist_cmd)
-						, "Whitelist");
-			}
-		}
-	} else {
-		LOG_ERR("%s device not found", bus_dev_name);
+	i2c_filter_addr = pfr_manifest->i2c_filter_addr[id];
+	if (i2c_filter_addr == 0) {
+		LOG_INF("I2c Filtering rule not found");
 		return;
 	}
+
+	pfr_spi_read(spi_dev, i2c_filter_addr, sizeof(struct SMBUS_FILTER_RULE),
+			(uint8_t *)&i2c_rule);
+	if ((i2c_rule.magic_number != I2C_FILTER_SECTION_MAGIC) || (i2c_rule.filter_count == 0)) {
+		LOG_ERR("I2c Filtering rule is invalid");
+		return;
+	}
+
+	i2c_filter_addr += sizeof(struct SMBUS_FILTER_RULE);
+
+	for (uint8_t fid = 0; fid < i2c_rule.filter_count; fid++) {
+		pfr_spi_read(spi_dev, i2c_filter_addr, sizeof(struct SMBUS_FILTER_MANIFEST),
+				(uint8_t *)&i2c_filter);
+
+		bus_dev_name[11] = i2c_filter.filter_id + '0';
+		flt_dev = device_get_binding(bus_dev_name);
+		if (!flt_dev) {
+			LOG_ERR("Failed to get i2c filter: %s", bus_dev_name);
+			return;
+		}
+
+		i2c_filter_addr += sizeof(struct SMBUS_FILTER_MANIFEST);
+		for (uint8_t devid = 0; devid < i2c_filter.device_count; devid++) {
+			pfr_spi_read(spi_dev, i2c_filter_addr,
+					sizeof(struct SMBUS_FILTER_DEVICE), (uint8_t *)&i2c_device);
+			i2c_filter_addr += sizeof(struct SMBUS_FILTER_DEVICE);
+			if (!i2c_device.enable) {
+				continue;
+			}
+			LOG_INF("SMBus Rule Bus[%d] RuleId[%d] DeviceAddr[%x]",
+					i2c_filter.filter_id, devid, i2c_device.slave_addr);
+			status = ast_i2c_filter_en(flt_dev, true, true, 0, 0);
+			LOG_INF("ast_i2c_filter_en ret=%d", status);
+			status = ast_i2c_filter_update(flt_dev, devid, i2c_device.slave_addr >> 1,
+					(struct ast_i2c_f_bitmap *)i2c_device.whitelist_cmd);
+			LOG_INF("ast_i2c_filter_update ret=%d", status);
+			LOG_HEXDUMP_INF(i2c_device.whitelist_cmd, sizeof(i2c_device.whitelist_cmd) ,
+					"Whitelist");
+		}
+	}
 }
+

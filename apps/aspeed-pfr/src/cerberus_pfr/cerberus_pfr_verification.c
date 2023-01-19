@@ -480,6 +480,16 @@ int cerberus_verify_regions(struct manifest *manifest)
 		LOG_INF("Digest verification succeeded");
 	}
 
+	// Record the i2c filtering rule address in manifest
+	// i2c filtering rule will be applied after verification.
+	uint32_t i2c_magic;
+	pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(i2c_magic),
+			(uint8_t *)&i2c_magic);
+	if (i2c_magic == I2C_FILTER_SECTION_MAGIC) {
+		uint8_t id = (pfr_manifest->image_type == BMC_TYPE) ? 0 : 1;
+		pfr_manifest->i2c_filter_addr[id] = read_address;
+	}
+
 	return Success;
 }
 

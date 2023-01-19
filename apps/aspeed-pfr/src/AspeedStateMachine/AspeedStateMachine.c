@@ -661,24 +661,27 @@ void enter_tzero(void *o)
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 			apply_pfm_protection(BMC_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(BMC_SPI);
+#endif
 			BMCBootRelease();
 			goto enter_tzero_end;
 		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 			apply_pfm_protection(PCH_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(PCH_SPI);
+#endif
 			PCHBootRelease();
 			goto enter_tzero_end;
 		}
-#if defined(CONFIG_CERBERUS_PFR)
-		apply_pfm_smbus_protection(0);
-		apply_pfm_smbus_protection(1);
-		apply_pfm_smbus_protection(2);
-		apply_pfm_smbus_protection(3);
-#endif
 		/* Provisioned */
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
 			/* Arm SPI/I2C Filter */
 			apply_pfm_protection(BMC_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(BMC_SPI);
+#endif
 			BMCBootRelease();
 		} else {
 			/* Should not enter here, redirect to LOCKDOWN */
@@ -688,6 +691,9 @@ void enter_tzero(void *o)
 		if (state->pch_active_object.ActiveImageStatus == Success) {
 			/* Arm SPI/I2C Filter */
 			apply_pfm_protection(PCH_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(PCH_SPI);
+#endif
 			PCHBootRelease();
 		} else
 			LOG_ERR("Host firmware is invalid, host won't boot");
