@@ -28,6 +28,18 @@ void apply_pfm_protection(int spi_device_id)
 
 	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
 	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
+	char bus_dev_name[] = "I2C_FILTER_x";
+	const struct device *flt_dev = NULL;
+
+	for (int i = 0; i < 4; i++) {
+		bus_dev_name[11] = i + '0';
+		flt_dev = device_get_binding(bus_dev_name);
+		if (flt_dev) {
+			ast_i2c_filter_init(flt_dev);
+			ast_i2c_filter_en(flt_dev, true, false, true, true);
+			ast_i2c_filter_default(flt_dev, 0);
+		}
+	}
 
 	// read PFR_Manifest
 	status = initializeEngines();
@@ -165,9 +177,8 @@ void apply_pfm_protection(int spi_device_id)
 				// Valid Bus ID should be 1~5 and reflect to I2C_FILTER_0 ~ I2C_FILTER_4
 				// Valid Rule ID should be 1~16 and refect to I2C Filter Driver Rule 0~15
 
-				char bus_dev_name[] = "I2C_FILTER_x";
 				bus_dev_name[11] = (region_record[5] - 1) + '0';
-				const struct device *flt_dev = device_get_binding(bus_dev_name);
+				flt_dev = device_get_binding(bus_dev_name);
 				if (flt_dev) {
 					status = ast_i2c_filter_en(
 							flt_dev,

@@ -42,6 +42,16 @@ void apply_pfm_smbus_protection(uint8_t spi_dev)
 		return;
 	}
 
+	for (int i = 0; i < 4; i++) {
+		bus_dev_name[11] = i + '0';
+		flt_dev = device_get_binding(bus_dev_name);
+		if (flt_dev) {
+			ast_i2c_filter_init(flt_dev);
+			ast_i2c_filter_en(flt_dev, true, false, true, true);
+			ast_i2c_filter_default(flt_dev, 0);
+		}
+	}
+
 	i2c_filter_addr += sizeof(struct SMBUS_FILTER_RULE);
 
 	for (uint8_t fid = 0; fid < i2c_rule.filter_count; fid++) {
