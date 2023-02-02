@@ -30,19 +30,34 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 {
+	CPLD_STATUS cpld_update_status;
+	uint32_t region_size;
 	int status = 0;
 
-	CPLD_STATUS cpld_update_status;
-
 	// Erasing provisioned data
-	status = ufm_erase(PROVISION_UFM);
-	if (status != Success)
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_INTEL_STATE);
+	if (pfr_spi_erase_region(ROT_INTERNAL_INTEL_STATE, true, 0, region_size)) {
+		LOG_ERR("Erase the provisioned UFM data failed");
 		return Failure;
+	}
 
-	LOG_INF("Decommission erasing the provisioned UFM data.");
+	// Erasing key manifest data
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+	if (pfr_spi_erase_region(ROT_INTERNAL_KEY, true, 0, region_size)) {
+		LOG_ERR("Erase the key manifest data failed");
+		return Failure;
+	}
+
+	// Erasing state data
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_STATE);
+	if (pfr_spi_erase_region(ROT_INTERNAL_STATE, true, 0, region_size)) {
+		LOG_ERR("Erase the state data failed");
+		return Failure;
+	}
+
+	LOG_INF("Decommission Success");
 
 	memset(&cpld_update_status, 0, sizeof(cpld_update_status));
-
 	cpld_update_status.DecommissionFlag = 1;
 	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	if (status != Success) {
