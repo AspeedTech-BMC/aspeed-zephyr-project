@@ -84,10 +84,16 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 		LOG_ERR("Image Header Magic Number is not Matched.");
 		return Failure;
 	}
+
 	// get public key and init signature
 	status = get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
 	if (status != Success) {
 		LOG_ERR("Unable to get public Key.");
+		return Failure;
+	}
+
+	if (public_key.mod_length != image_header.sign_length) {
+		LOG_ERR("root key length(%d) and signature length (%d) mismatch", public_key.mod_length, image_header.sign_length);
 		return Failure;
 	}
 
@@ -285,16 +291,22 @@ free_manifest:
  *     struct pfm_firmware_element
  *     struct pfm_firmware_version_element
  *     struct pfm_fw_version_element_rw_region
- *     struct pfm_fw_version_element_image
  *     struct signed_region_def {
- *         struct pfm_fw_version_element_image
+ *         struct pfm_fw_version_element_image {
+ *             u8 hash_type;       // The hashing algorithm.
+ *             u8 region_count;    // The number of flash regions.
+ *             u8 flags;           // ValidateOnBoot.
+ *             u8 reserved;        // key_id (0-based)
+ *         };
  *         u8 signature[256]
  *         u16 modulus_length
  *         u8 modulus[modulus_length]
  *         u8 exponent_length
  *         u8 exponent[exponent_length]
- *         u32 region_start_addr
- *         u32 region_end_addr
+ *         struct pfm_flash_region {
+ *             u32 region_start_addr
+ *             u32 region_end_addr
+ *       } regions[pfm_fw_version_element_image.region_count]
  *     } signed_region[pfm_firmware_version_element.img_count]
  * }
  *
@@ -327,11 +339,10 @@ int cerberus_verify_regions(struct manifest *manifest)
 	uint8_t alignment = (plat_id_header.id_length % 4) ?
 		(4 - (plat_id_header.id_length % 4)) : 0;
 	uint16_t id_length = plat_id_header.id_length + alignment;
-	read_address += sizeof(plat_id_header) + id_length;
-
 	// Flash Device Element Offset
 	struct pfm_flash_device_element flash_dev;
 
+	read_address += sizeof(plat_id_header) + id_length;
 	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(flash_dev),
 			(uint8_t *)&flash_dev)) {
 		LOG_ERR("Failed to get flash device element");
@@ -371,9 +382,10 @@ int cerberus_verify_regions(struct manifest *manifest)
 	// version length should be 4 byte aligned
 	alignment = (fw_ver_element.version_length % 4) ?
 		(4 - (fw_ver_element.version_length % 4)) : 0;
-	uint8_t ver_length = fw_ver_element.version_length + alignment;
-	read_address += sizeof(fw_ver_element) - sizeof(fw_ver_element.version) + ver_length;
 
+	uint8_t ver_length = fw_ver_element.version_length + alignment;
+
+	read_address += sizeof(fw_ver_element) - sizeof(fw_ver_element.version) + ver_length;
 	// PFM Firmware Version Elenemt RW Region
 	read_address += fw_ver_element.rw_count * sizeof(struct pfm_fw_version_element_rw_region);
 
@@ -383,8 +395,6 @@ int cerberus_verify_regions(struct manifest *manifest)
 	struct rsa_public_key pub_key;
 	uint16_t module_length;
 	uint8_t exponent_length;
-	uint32_t start_address;
-	uint32_t end_address;
 
 	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
 			signed_region_id++) {
@@ -393,6 +403,11 @@ int cerberus_verify_regions(struct manifest *manifest)
 			LOG_ERR("Failed to get PFM firmware version element image header");
 			return Failure;
 		}
+
+		LOG_INF("CSK KeyId = %d", fw_ver_element_img.reserved);
+
+		struct flash_region region_list[fw_ver_element_img.region_count];
+		struct pfm_flash_region region;
 
 		read_address += sizeof(fw_ver_element_img);
 
@@ -405,52 +420,69 @@ int cerberus_verify_regions(struct manifest *manifest)
 
 		read_address += manifest_flash->max_signature;
 
-		// Modulus length of Public Key
+		// Modulus length of CSK Public Key
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(module_length),
 					(uint8_t *)&module_length)) {
 			LOG_ERR("Failed to get modulus length");
 			return Failure;
 		}
 
+		if (module_length != manifest_flash->header.sig_length) {
+			LOG_ERR("CSK: key length(%d) and signature length (%d) mismatch", module_length, manifest_flash->header.sig_length);
+			return Failure;
+		}
+
 		pub_key.mod_length = module_length;
 		read_address += sizeof(module_length);
 
-		// Modulus of Public Key
+		// Modulus of CSK Public Key
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, module_length,
 					(uint8_t *)&pub_key.modulus)) {
 			LOG_ERR("Failed to get modulus");
 			return Failure;
 		}
+
 		read_address += module_length;
 
-		// Exponent length of Public Key
+		// Exponent length of CSK Public Key
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(exponent_length),
 				(uint8_t *)&exponent_length)) {
 			LOG_ERR("Failed to get exponent length");
 			return Failure;
 		}
+
 		read_address += sizeof(exponent_length);
 
-		// Exponent of Public Key
+		// Exponent of CSK Public Key
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, exponent_length,
 				(uint8_t *)&pub_key.exponent)) {
 			LOG_ERR("Failed to get exponent");
 			return Failure;
 		}
+
 		read_address += exponent_length;
 
-		// Region Start Address
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(start_address),
-				(uint8_t *)&start_address);
-		read_address += sizeof(start_address);
+		// Region Address
+		for (int count = 0; count < fw_ver_element_img.region_count; count++) {
+			if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(struct pfm_flash_region),
+					(uint8_t *)&region)) {
+				LOG_ERR("Failed to get signed region %d", count);
+				return Failure;
+			}
 
-		// Region End Address
-		pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(end_address),
-				(uint8_t *)&end_address);
-		read_address += sizeof(end_address);
+			read_address += sizeof(struct pfm_flash_region);
 
-		LOG_INF("RegionStartAddress: %x, RegionEndAddress: %x",
-				start_address, end_address);
+			if (region.end_addr <= region.start_addr) {
+				LOG_ERR("[Signed Region %d]: Failed to get region address, RegionStartAddress: %x, RegionEndAddress: %x",
+					count, region.start_addr, region.end_addr);
+				return Failure;
+			}
+
+			region_list[count].start_addr = region.start_addr;
+			region_list[count].length = (region.end_addr - region.start_addr) + 1;
+			LOG_INF("RegionStartAddress: %x, RegionEndAddress: %x",
+				region.start_addr, region.end_addr);
+		}
 
 		// Bypass verification if validation flag of the region is not set.
 		if (!(fw_ver_element_img.flags & PFM_IMAGE_MUST_VALIDATE)) {
@@ -458,9 +490,9 @@ int cerberus_verify_regions(struct manifest *manifest)
 			continue;
 		}
 
-		if (flash_verify_contents((struct flash *)pfr_manifest->flash,
-				start_address,
-				end_address - start_address + sizeof(uint8_t),
+		if (flash_verify_noncontiguous_contents((struct flash *)pfr_manifest->flash,
+				region_list,
+				fw_ver_element_img.region_count,
 				get_hash_engine_instance(),
 				manifest_flash->toc_hash_type,
 				&getRsaEngineInstance()->base,
@@ -473,9 +505,6 @@ int cerberus_verify_regions(struct manifest *manifest)
 			LOG_ERR("Digest verification failed");
 			return Failure;
 		}
-
-		// TODO: key management
-		// Validate the key of the region to check whether it was canceled.
 
 		LOG_INF("Digest verification succeeded");
 	}
