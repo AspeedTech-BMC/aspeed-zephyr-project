@@ -36,7 +36,7 @@
 
 // Will Remove after test
 #define UFM0                        4
-#define UFM0_SIZE                   1024
+#define UFM0_SIZE                   512
 #define UFM1                        3
 #define PROVISION_UFM               UFM0
 #define PROVISION_UFM_SIZE          UFM0_SIZE

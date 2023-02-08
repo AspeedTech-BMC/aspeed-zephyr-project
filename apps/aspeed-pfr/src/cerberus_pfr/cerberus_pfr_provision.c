@@ -9,10 +9,12 @@
 #include "AspeedStateMachine/common_smc.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_common.h"
-#include "cerberus_pfr_definitions.h"
 #include "pfr/pfr_util.h"
+#include "pfr/pfr_ufm.h"
+#include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_verification.h"
+#include "cerberus_pfr_key_manifest.h"
 #include "include/SmbusMailBoxCom.h"
 #include "flash/flash_aspeed.h"
 
@@ -40,175 +42,112 @@ int verify_cerberus_provisioning_type(uint16_t image_type)
 	return status;
 }
 
-unsigned char CerberusProvisionBmcOffsets(void)
-{
-	uint8_t Status;
-	uint32_t UfmStatus;
-
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-	if (cBmcOffsets == NULL)
-		return Failure;
-
-	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, cBmcOffsets, sizeof(cBmcOffsets));
-		if (Status == Success) {
-			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK);
-			LOG_INF("BMC offsets provisioned");
-			return Success;
-		}
-
-		LOG_ERR("BMC offsets provision failed...");
-		erase_provision_flash();
-		return Failure;
-	}
-
-	LOG_INF("%s, Provisioned or UFM Locked", __func__);
-	return UnSupported;
-}
-
-unsigned char CerberusProvisionPchOffsets(void)
-{
-	uint8_t Status;
-	uint32_t UfmStatus;
-
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-	if (cPchOffsets == NULL)
-		return Failure;
-
-	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)cPchOffsets, sizeof(cPchOffsets));
-		if (Status == Success) {
-			LOG_INF("PCH offsets provisioned");
-			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK);
-			return Success;
-		}
-
-		LOG_ERR("PCH offsets provision failed...");
-		erase_provision_flash();
-		return Failure;
-	}
-
-	LOG_INF("%s, Provisioned or UFM Locked", __func__);
-	return UnSupported;
-}
-
-unsigned char CerberusProvisionRootKeyHash(void)
-{
-	uint8_t Status;
-	uint32_t UfmStatus;
-
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
-	if (cRootKeyHash == NULL)
-		return Failure;
-
-	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
-		Status = set_provision_data_in_flash(ROOT_KEY_HASH, (uint8_t *)cRootKeyHash, SHA256_DIGEST_LENGTH);
-		if (Status == Success) {
-			LOG_INF("Root key provisioned");
-			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
-			return Success;
-		}
-
-		LOG_ERR("Root key provision failed...");
-		erase_provision_flash();
-		return Failure;
-	}
-
-	LOG_INF("%s, Provisioned or UFM Locked", __func__);
-	return UnSupported;
-}
-
-int getCerberusProvisionData(int offset, uint8_t *data, uint32_t length)
-{
-	int status = 0;
-
-	status = pfr_spi_read(ROT_INTERNAL_INTEL_STATE, offset, length, data);
-	return status;
-}
-
 int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 {
+	struct PROVISIONING_IMAGE_HEADER provision_header;
+	uint16_t modulus_length = 0;
+	uint32_t data_length = 0;
+	uint32_t region_size = 0;
+	CPLD_STATUS cpld_status;
+	uint8_t exponent_length;
 	int status = Success;
 
-	struct PROVISIONING_IMAGE_HEADER provision_header;
-
-	pfr_spi_read(manifest->flash_id, manifest->address, sizeof(provision_header), (uint8_t *)&provision_header);
-	LOG_HEXDUMP_INF(&provision_header, sizeof(provision_header), "Provision Header:");
-	LOG_INF("Verify Provisioning Type.");
-	status = verify_cerberus_provisioning_type(provision_header.image_type);
-	if (status != Success) {
-		LOG_ERR("Provisioning Type Error.");
+	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(provision_header), (uint8_t *)&provision_header)) {
+		LOG_ERR("Provisioning: Failed to read image header.");
 		return Failure;
 	}
 
-	LOG_INF("Verify Provisioning Magic Number.");
+	LOG_HEXDUMP_INF(&provision_header, sizeof(provision_header), "Provision Header:");
+	status = verify_cerberus_provisioning_type(provision_header.image_type);
+	if (status != Success) {
+		LOG_ERR("Provisioning: Type Error.");
+		return Failure;
+	}
+
 	status = verify_rcerberus_magic_number(provision_header.magic_num);
 	if (status != Success) {
-		LOG_ERR("Magic Number is not Matched.");
+		LOG_ERR("Provisioning: Magic Number is not Matched.");
 		return Failure;
 	}
 
 	if (provision_header.provisioning_flag[0] == PROVISION_OTP_KEY_FLAG) {
 		//Provision OTP Key Content
-		LOG_ERR("Unsupport");
+		LOG_ERR("Provisioning: Unsupport flag(%d)", provision_header.provisioning_flag[0]);
 		return Failure;
 	}
 
 	if (provision_header.provisioning_flag[0] == PROVISION_ROOT_KEY_FLAG) {
-		//Provision root Key Content
-		LOG_INF("Provisioning ROOT Key.");
-		uint16_t key_length = 0;
-
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_BMC_ACTIVE_OFFSET, 4, cBmcOffsets);
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_BMC_RECOVERY_OFFSET, 4, cBmcOffsets + 4);
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_BMC_STAGE_OFFSET, 4, cBmcOffsets + 8);
-		if (CerberusProvisionBmcOffsets() != Success)
+		if (ProvisionBmcOffsets(cBmcOffsets, sizeof(cBmcOffsets)) != Success)
 			return Failure;
 
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_PCH_ACTIVE_OFFSET, 4, cPchOffsets);
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_PCH_RECOVERY_OFFSET, 4, cPchOffsets + 4);
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_PCH_STAGE_OFFSET, 4, cPchOffsets + 8);
-		if (CerberusProvisionPchOffsets() != Success)
+		if (ProvisionPchOffsets(cPchOffsets, sizeof(cPchOffsets)) != Success)
 			return Failure;
 
-		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, sizeof(key_length), (uint8_t *)&key_length);
-
-		uint8_t cerberus_root_key[key_length];
-
-		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY, key_length, cerberus_root_key);
-
-		manifest->pfr_hash->start_address = manifest->address + CERBERUS_ROOT_KEY;
-		manifest->pfr_hash->length = key_length;
-		manifest->pfr_hash->type = HASH_TYPE_SHA256;
-		manifest->base->get_hash((struct manifest *)manifest, manifest->hash, cRootKeyHash, SHA256_DIGEST_LENGTH);
-		if (CerberusProvisionRootKeyHash() != Success)
+		if (cerberus_get_root_key_hash(manifest, manifest->address + CERBERUS_ROOT_KEY_LENGTH,
+			PROVISIONING_ROOT_KEY_HASH_TYPE, cRootKeyHash, sizeof(cRootKeyHash)) != Success) {
+			LOG_INF("Provisioning: Failed to get root key hash.");
 			return Failure;
-		//write root key to d0200
+		}
 
-		unsigned int data_length = 0;
-		uint8_t exponent_length;
+		if (ProvisionRootKeyHash(cRootKeyHash, sizeof(cRootKeyHash)) != Success)
+			return Failure;
 
-		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY + key_length, sizeof(exponent_length), &exponent_length);
+		// root key
+		// read modulus length
+		if (pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, sizeof(modulus_length), (uint8_t *)&modulus_length)) {
+			LOG_ERR("Provisioning: Failed to read root key modulus length");
+			return Failure;
+		}
 
-		data_length = sizeof(key_length) + key_length + sizeof(exponent_length) + exponent_length;
+		if (modulus_length > RSA_MAX_KEY_LENGTH) {
+			LOG_ERR("Provisioning: root key modulus length(%d) exceed max length (%d)", modulus_length, RSA_MAX_KEY_LENGTH);
+			return Failure;
+		}
+
+		// read exponent length
+		if (pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY + modulus_length, sizeof(exponent_length), &exponent_length)) {
+			LOG_ERR("Provisioning: Failed to read root key exponent length");
+			return Failure;
+		}
+
+		data_length = sizeof(modulus_length) + modulus_length + sizeof(exponent_length) + exponent_length;
 
 		uint8_t key_whole_data[data_length];
 
-		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, data_length, key_whole_data);
-		pfr_spi_write(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, data_length, key_whole_data);
+		if (pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_ROOT_KEY_LENGTH, data_length, key_whole_data)) {
+			LOG_ERR("Provisioning: Failed to read root key data");
+			return Failure;
+		}
+
+		// Erasing key manifest data
+		region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+		if (pfr_spi_erase_region(ROT_INTERNAL_KEY, true, 0, region_size)) {
+			LOG_ERR("Erase the key manifest data failed");
+			return Failure;
+		}
+
+		if (pfr_spi_write(ROT_INTERNAL_KEY, 0, data_length, key_whole_data)) {
+			LOG_ERR("Provisioning: Failed to save root key");
+			return Failure;
+		}
+
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+		if (cpld_status.DecommissionFlag == TRUE) {
+			cpld_status.DecommissionFlag = 0;
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+		}
+
 		SetUfmStatusValue(UFM_PROVISIONED);
-
-		LOG_INF("Provisioning Done.");
-
+		LOG_INF("Provisioning: Done.");
 	} else
 		return Failure;
 
 	return status;
-}
-
-// Verify Root Key hash
-int cerberus_verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *root_public_key)
-{
-	return Success;
 }
 

@@ -124,9 +124,13 @@ typedef enum _SEAMLESS_UPDATE_INTENT {
 
 #pragma pack()
 
-unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize);
+int set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t DataSize);
 int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
-unsigned char erase_provision_data_in_flash(void);
+int erase_provision_flash(void);
+int erase_provision_data_in_flash(void);
+int ProvisionRootKeyHash(uint8_t *DataBuffer, uint32_t length);
+int ProvisionPchOffsets(uint8_t *DataBuffer, uint32_t length);
+int ProvisionBmcOffsets(uint8_t *DataBuffer, uint32_t length);
 
 void ResetMailBox(void);
 void InitializeSmbusMailbox(void);
@@ -215,7 +219,6 @@ void UpdateBiosCheckpoint(byte Data);
 void UpdateBmcCheckpoint(byte Data);
 void UpdateAcmCheckpoint(byte Data);
 void initializeFPLEDs(void);
-unsigned char erase_provision_flash(void);
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
 
 bool IsSpdmAttestationEnabled();

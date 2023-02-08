@@ -14,7 +14,9 @@
 #define PROVISIONING_IMAGE_TYPE			0x02
 #define PROVISION_ROOT_KEY_FLAG			0x01
 #define PROVISION_OTP_KEY_FLAG			0x0f
-#define CERBERUS_ROOT_KEY_ADDRESS		0x200
+#define CERBERUS_ROOT_KEY_ADDRESS		0x00
+#define PROVISIONING_ROOT_KEY_HASH_TYPE		HASH_TYPE_SHA256
+#define PROVISIONING_ROOT_KEY_HASH_LENGTH	SHA256_DIGEST_LENGTH
 
 /*
  * revise provisioned data structure in UFM
@@ -94,5 +96,4 @@ struct PROVISIONING_MANIFEST_DATA {
 };
 
 int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest);
-int getCerberusProvisionData(int offset, uint8_t *data, uint32_t length);
 

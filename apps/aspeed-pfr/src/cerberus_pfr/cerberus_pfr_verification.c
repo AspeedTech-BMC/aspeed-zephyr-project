@@ -86,7 +86,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	}
 
 	// get public key and init signature
-	status = get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
+	status = get_rsa_public_key(ROT_INTERNAL_KEY, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
 	if (status != Success) {
 		LOG_ERR("Unable to get public Key.");
 		return Failure;
@@ -145,7 +145,12 @@ int rsa_verify_signature(struct signature_verification *verification,
 	struct rsa_public_key rsa_public;
 	int status = Success;
 
-	get_rsa_public_key(ROT_INTERNAL_INTEL_STATE, CERBERUS_ROOT_KEY_ADDRESS, &rsa_public);
+	status = get_rsa_public_key(ROT_INTERNAL_KEY, CERBERUS_ROOT_KEY_ADDRESS, &rsa_public);
+	if (status != Success) {
+		LOG_ERR("Unable to get public Key.");
+		return Failure;
+	}
+
 	status = rsa->base.sig_verify(&rsa->base, &rsa_public, signature, sig_length, digest, length);
 	if (status != Success) {
 		LOG_ERR("public key mod length = 0x%x", rsa_public.mod_length);

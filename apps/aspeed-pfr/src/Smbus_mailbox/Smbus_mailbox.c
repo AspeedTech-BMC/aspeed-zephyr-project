@@ -54,20 +54,23 @@ void ResetMailBox(void)
 	SetUfmStatusValue(COMMAND_DONE);   // reset ufm status
 	SetUfmCmdTriggerValue(0x00);
 }
+
 /**
  * Function to Erase th UFM
  * @Param  NULL
  * @retval NULL
  **/
-unsigned char erase_provision_flash(void)
+int erase_provision_flash(void)
 {
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE;
 	status = spi_flash->spi.base.sector_erase((struct flash *)&spi_flash->spi, 0);
+
 	return status;
 }
+
 /**
  * Function to Initialize Smbus Mailbox with default value
  * @Param  NULL
@@ -81,20 +84,20 @@ int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_INTEL_STATE; // Internal UFM SPI
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, addr, DataBuffer, length);
 
-	if (status == 0)
-		return Success;
-	else
+	if (status != Success)
 		return Failure;
+
+	return Success;
 }
 
-unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint8_t DataSize)
+int set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length)
 {
-	uint8_t status;
+	int status;
 	uint8_t buffer[PROVISION_UFM_SIZE];
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
-	if (addr + DataSize > ARRAY_SIZE(buffer)) {
-		LOG_ERR("offset(0x%x) exceeds UFM max size(%ld)",  addr + DataSize, ARRAY_SIZE(buffer));
+	if (addr + length > ARRAY_SIZE(buffer)) {
+		LOG_ERR("offset(0x%x) exceeds UFM max size(%ld)",  addr + length, ARRAY_SIZE(buffer));
 		return Failure;
 	}
 
@@ -103,18 +106,20 @@ unsigned char set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, ui
 	// Read Intel State
 	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, buffer,
 			ARRAY_SIZE(buffer));
+	if (status != Success)
+		return Failure;
 
-	if (status == Success) {
-		status = erase_provision_flash();
+	status = erase_provision_flash();
+	if (status != Success)
+		return Failure;
 
-		if (status == Success) {
-			memcpy(buffer + addr, DataBuffer, DataSize);
-			status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi,
+	memcpy(buffer + addr, DataBuffer, length);
+	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi,
 					0, buffer, ARRAY_SIZE(buffer));
-		}
-	}
+	if (status != ARRAY_SIZE(buffer))
+		return Failure;
 
-	return status;
+	return Success;
 }
 
 #define SWMBX_NOTIFYEE_STACK_SIZE 1024
@@ -683,12 +688,12 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
  */
 void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot_state)
 {
-    if (is_timed_boot_done())
-        // If other components have finished booting, log timed boot complete status.
-        SetPlatformState(T0_BOOT_COMPLETED);
-    else
-        // Otherwise, just log the this boot complete status
-        SetPlatformState(current_boot_state);
+	if (is_timed_boot_done())
+		// If other components have finished booting, log timed boot complete status.
+		SetPlatformState(T0_BOOT_COMPLETED);
+	else
+		// Otherwise, just log the this boot complete status
+		SetPlatformState(current_boot_state);
 }
 
 // UFM Status
@@ -753,14 +758,22 @@ int CheckUfmStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask)
 	return ((~UfmStatus & UfmStatusBitMask) == UfmStatusBitMask);
 }
 
-unsigned char ProvisionRootKeyHash(void)
+int ProvisionRootKeyHash(uint8_t *DataBuffer, uint32_t length)
 {
-	uint8_t Status;
 	uint32_t UfmStatus;
+	int Status;
 
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (!DataBuffer)
+		return Failure;
+
+	Status = get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (Status != Success) {
+		LOG_INF("Failed to get UFM status");
+		return Failure;
+	}
+
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK)) {
-		Status = set_provision_data_in_flash(ROOT_KEY_HASH, (uint8_t *)gRootKeyHash, SHA384_DIGEST_LENGTH);
+		Status = set_provision_data_in_flash(ROOT_KEY_HASH, DataBuffer, length);
 		if (Status == Success) {
 			LOG_INF("Root key provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK);
@@ -773,17 +786,26 @@ unsigned char ProvisionRootKeyHash(void)
 	}
 
 	LOG_INF("%s, Provisioned or UFM Locked", __func__);
+
 	return UnSupported;
 }
 
-unsigned char ProvisionPchOffsets(void)
+int ProvisionPchOffsets(uint8_t *DataBuffer, uint32_t length)
 {
-	uint8_t Status;
 	uint32_t UfmStatus;
+	int Status;
 
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (!DataBuffer)
+		return Failure;
+
+	Status = get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (Status != Success) {
+		LOG_INF("Failed to get UFM status");
+		return Failure;
+	}
+
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)gPchOffsets, sizeof(gPchOffsets));
+		Status = set_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, DataBuffer, length);
 		if (Status == Success) {
 			LOG_INF("PCH offsets provisioned");
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK);
@@ -799,15 +821,22 @@ unsigned char ProvisionPchOffsets(void)
 	return UnSupported;
 }
 
-unsigned char ProvisionBmcOffsets(void)
+int ProvisionBmcOffsets(uint8_t *DataBuffer, uint32_t length)
 {
-	uint8_t Status;
 	uint32_t UfmStatus;
+	int Status;
 
-	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (!DataBuffer)
+		return Failure;
+
+	Status = get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
+	if (Status != Success) {
+		LOG_INF("Failed to get UFM status");
+		return Failure;
+	}
 
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK) && !CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)gBmcOffsets, sizeof(gBmcOffsets));
+		Status = set_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, DataBuffer, length);
 		if (Status == Success) {
 			SetUfmFlashStatus(UfmStatus, UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK);
 			LOG_INF("BMC offsets provisioned");
@@ -918,8 +947,7 @@ void lock_provision_flash(void)
 	if (!CheckUfmStatus(UfmStatus, UFM_STATUS_PROVISIONED_BIT_MASK)) {
 		LOG_ERR("Cannot lock UFM unless root key hash and offsets are provisioned");
 		SetUfmStatusValue(COMMAND_ERROR);
-	}
-	else
+	} else
 		SetUfmFlashStatus(UfmStatus, UFM_STATUS_LOCK_BIT_MASK);
 }
 
@@ -982,11 +1010,10 @@ void process_provision_command(void)
 	switch (UfmCommandData) {
 	case ERASE_CURRENT:
 		Status = erase_provision_flash();
-		if (Status == Success) {
+		if (Status == Success)
 			gProvisionCount = 0;
-		} else {
+		else
 			SetUfmStatusValue(COMMAND_ERROR);
-		}
 		break;
 	case PROVISION_ROOT_KEY:
 		memcpy(gRootKeyHash, gUfmFifoData, SHA384_DIGEST_LENGTH);
@@ -1052,19 +1079,19 @@ void process_provision_command(void)
 		LOG_INF("Calling provisioing process..");
 		gProvisionData = 0;
 		gProvisionCount = 0;
-		Status = ProvisionRootKeyHash();
+		Status = ProvisionRootKeyHash(gRootKeyHash, sizeof(gRootKeyHash));
 		if (Status != Success) {
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
 
-		Status = ProvisionPchOffsets();
+		Status = ProvisionPchOffsets(gPchOffsets, sizeof(gPchOffsets));
 		if (Status != Success) {
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
 
-		Status = ProvisionBmcOffsets();
+		Status = ProvisionBmcOffsets(gBmcOffsets, sizeof(gBmcOffsets));
 		if (Status != Success) {
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
