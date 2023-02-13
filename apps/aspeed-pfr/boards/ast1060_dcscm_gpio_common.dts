@@ -27,6 +27,7 @@
 		led1 = &pfr_fp_amber_led_out;
 		fp-input0 = &bmc_fp_green_led_in;
 		fp-input1 = &bmc_fp_amber_led_in;
+		hbled0 = &pfr_hb_led_out;
 	};
 
 	gpio_keys {
@@ -53,6 +54,11 @@
 		pfr_fp_amber_led_out: amber_led {
 			gpios = <&gpio0_e_h 25 1>; /* GPIO_H1 */
 			label = "PFR_FP_AMBER_LED";
+		};
+
+		pfr_hb_led_out: hb_led {
+			gpios = <&gpio0_i_l 12 1>; /* GPIO_J4 */
+			label = "PFR_HB_LED";
 		};
 	};
 };

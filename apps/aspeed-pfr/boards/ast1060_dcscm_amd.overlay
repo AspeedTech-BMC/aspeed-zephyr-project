@@ -63,12 +63,6 @@
 	status = "okay";
 };
 
-// for i2c filter testing
-&i2c8 {
-	pinctrl-0 = <&pinctrl_i2c8_default>;
-	status = "okay";
-};
-
 &wdt0 {
 	status = "okay";
 };
