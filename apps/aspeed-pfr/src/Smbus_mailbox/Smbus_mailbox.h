@@ -56,10 +56,8 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 #if defined(CONFIG_PFR_MCTP)
 	BmcCheckpoint = 0x60,
 #endif
-#if defined(CONFIG_SEAMLESS_UPDATE)
-	PchSeamlessUpdateIntent = 0x61,
-	BmcUpdateIntent2 = 0x62,
-#endif
+	PchUpdateIntent2        = 0x61,
+	BmcUpdateIntent2        = 0x62,
 	Reserved                = 0x63,
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	AfmActiveSvn            = 0x74,
@@ -113,14 +111,13 @@ typedef enum _UPDATE_INTENT {
 	ExceptPchActiveUpdate                   = 0x3E,
 } UPDATE_INTENT;
 
-#if defined(CONFIG_SEAMLESS_UPDATE)
-typedef enum _SEAMLESS_UPDATE_INTENT {
-	PchFvSeamlessUpdate                     = 0x01,
+typedef enum _UPDATE_INTENT_2 {
+	SeamlessUpdate                          = 0x01,
 	AfmActiveUpdate                         = 0x02,
 	AfmRecoveryUpdate                       = 0x04,
 	AfmActiveAndRecoveryUpdate              = 0x06,
-} SEAMLESS_UPDATE_INTENT;
-#endif
+	CPLDUpdate                              = 0x10,
+} UPDATE_INTENT_2;
 
 #pragma pack()
 

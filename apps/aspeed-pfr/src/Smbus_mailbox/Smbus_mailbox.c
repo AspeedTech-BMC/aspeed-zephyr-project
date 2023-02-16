@@ -124,11 +124,7 @@ int set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 
 #define SWMBX_NOTIFYEE_STACK_SIZE 1024
 
-#if defined(CONFIG_SEAMLESS_UPDATE)
 #define TOTAL_MBOX_EVENT 10
-#else
-#define TOTAL_MBOX_EVENT 8
-#endif
 
 struct k_thread swmbx_notifyee_thread;
 K_THREAD_STACK_DEFINE(swmbx_notifyee_stack, SWMBX_NOTIFYEE_STACK_SIZE);
@@ -141,11 +137,8 @@ K_SEM_DEFINE(pch_update_intent_sem, 0, 1);
 K_SEM_DEFINE(bmc_checkpoint_sem, 0, 1);
 K_SEM_DEFINE(acm_checkpoint_sem, 0, 1);
 K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
-
-#if defined(CONFIG_SEAMLESS_UPDATE)
-K_SEM_DEFINE(bmc_seamless_update_intent_sem, 0, 1);
-K_SEM_DEFINE(pch_seamless_update_intent_sem, 0, 1);
-#endif
+K_SEM_DEFINE(bmc_update_intent2_sem, 0, 1);
+K_SEM_DEFINE(pch_update_intent2_sem, 0, 1);
 
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
@@ -159,10 +152,8 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	k_poll_event_init(&events[5], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_checkpoint_sem);
 	k_poll_event_init(&events[6], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &acm_checkpoint_sem);
 	k_poll_event_init(&events[7], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bios_checkpoint_sem);
-#if defined(CONFIG_SEAMLESS_UPDATE)
-	k_poll_event_init(&events[8], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_seamless_update_intent_sem);
-	k_poll_event_init(&events[9], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &pch_seamless_update_intent_sem);
-#endif
+	k_poll_event_init(&events[8], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_update_intent2_sem);
+	k_poll_event_init(&events[9], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &pch_update_intent2_sem);
 
 	int ret;
 
@@ -234,23 +225,21 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 
 			GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
 		}
-#if defined(CONFIG_SEAMLESS_UPDATE)
 		else if (events[8].state == K_POLL_STATE_SEM_AVAILABLE) {
-			/* BMC Seamless Update Intent */
+			/* BMC Update Intent 2 */
 			k_sem_take(events[8].sem, K_NO_WAIT);
 			data.bit8[0] = BmcUpdateIntent2;
 			swmbx_get_msg(0, BmcUpdateIntent2, &data.bit8[1]);
 
-			GenerateStateMachineEvent(SEAMLESS_UPDATE_REQUESTED, data.ptr);
+			GenerateStateMachineEvent(UPDATE_INTENT_2_REQUESTED, data.ptr);
 		} else if (events[9].state == K_POLL_STATE_SEM_AVAILABLE) {
-			/* PCH Seamless Update Intent */
+			/* PCH Update Intent 2 */
 			k_sem_take(events[9].sem, K_NO_WAIT);
-			data.bit8[0] = PchSeamlessUpdateIntent;
-			swmbx_get_msg(0, PchSeamlessUpdateIntent, &data.bit8[1]);
+			data.bit8[0] = PchUpdateIntent2;
+			swmbx_get_msg(0, PchUpdateIntent2, &data.bit8[1]);
 
-			GenerateStateMachineEvent(SEAMLESS_UPDATE_REQUESTED, data.ptr);
+			GenerateStateMachineEvent(UPDATE_INTENT_2_REQUESTED, data.ptr);
 		}
-#endif
 
 		for (size_t i = 0; i < TOTAL_MBOX_EVENT; ++i)
 			events[i].state = K_POLL_STATE_NOT_READY;
@@ -282,10 +271,8 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x0, &ufm_provision_trigger_sem, UfmCmdTriggerValue, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_update_intent_sem, BmcUpdateIntent, true);
 	swmbx_update_notify(swmbx_dev, 0x0, &bmc_checkpoint_sem, BmcCheckpoint, true);
-#if defined(CONFIG_SEAMLESS_UPDATE)
-	swmbx_update_notify(swmbx_dev, 0x0, &bmc_seamless_update_intent_sem,
+	swmbx_update_notify(swmbx_dev, 0x0, &bmc_update_intent2_sem,
 			BmcUpdateIntent2, true);
-#endif
 
 	/* From PCH */
 	swmbx_update_notify(swmbx_dev, 0x1, &ufm_write_fifo_data_sem, UfmWriteFIFO, true);
@@ -293,10 +280,7 @@ void InitializeSoftwareMailbox(void)
 	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent_sem, PchUpdateIntent, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &acm_checkpoint_sem, AcmCheckpoint, true);
 	swmbx_update_notify(swmbx_dev, 0x1, &bios_checkpoint_sem, BiosCheckpoint, true);
-#if defined(CONFIG_SEAMLESS_UPDATE)
-	swmbx_update_notify(swmbx_dev, 0x1, &pch_seamless_update_intent_sem,
-			PchSeamlessUpdateIntent, true);
-#endif
+	swmbx_update_notify(swmbx_dev, 0x1, &pch_update_intent2_sem, PchUpdateIntent2, true);
 
 	/* Protect bit:
 	 * 0 means readable/writable

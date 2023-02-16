@@ -1057,12 +1057,13 @@ void handle_seamless_update_requested(void *o)
 	LOG_DBG("SEAMLESS_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
 	switch (evt_ctx->data.bit8[0]) {
-		case PchSeamlessUpdateIntent:
-			update_region &= PchFvSeamlessUpdate;
+		case PchUpdateIntent2:
+			if (evt_ctx->data.bit8[1] & BIT(0))
+				update_region &= SeamlessUpdate;
 			break;
 		case BmcUpdateIntent2:
 			if (evt_ctx->data.bit8[1] & BIT(0)) {
-				update_region &= PchFvSeamlessUpdate;
+				update_region &= SeamlessUpdate;
 				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 				cpld_update_status.BmcToPchStatus = 1;
 				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
@@ -1079,13 +1080,13 @@ void handle_seamless_update_requested(void *o)
 		uint32_t image_type = 0xFFFFFFFF;
 		do {
 			/* PCH Seamless */
-			if (update_region & PchFvSeamlessUpdate) {
+			if (update_region & SeamlessUpdate) {
 				LOG_INF("PCH Seamless Update");
 				evt_ctx_wrap.operation = SEAMLESS_UPDATE_OP;
 				SetPlatformState(PCH_SEAMLESS_UPDATE);
 				image_type = PCH_TYPE;
-				update_region &= ~PchFvSeamlessUpdate;
-				handled_region |= PchFvSeamlessUpdate;
+				update_region &= ~SeamlessUpdate;
+				handled_region |= SeamlessUpdate;
 				break;
 			}
 		} while (0);
@@ -1496,18 +1497,18 @@ void AspeedStateMachine(void)
 					next_state = &state_table[FIRMWARE_RECOVERY];
 #endif
 				break;
-#if defined(CONFIG_SEAMLESS_UPDATE)
-			case SEAMLESS_UPDATE_REQUESTED:
+			case UPDATE_INTENT_2_REQUESTED:
 				if (getFailedUpdateAttemptsCount() >= MAX_UPD_FAILED_ALLOWED) {
 					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
 					break;
 				}
 				if (fifo_in->data.bit8[1] & AfmActiveAndRecoveryUpdate)
 					next_state = &state_table[FIRMWARE_UPDATE];
-				else
+#if defined(CONFIG_SEAMLESS_UPDATE)
+				else if (fifo_in->data.bit8[1] & SeamlessUpdate)
 					next_state = &state_table[SEAMLESS_UPDATE];
-				break;
 #endif
+				break;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 			case ATTESTATION_FAILED:
 				next_state = &state_table[SYSTEM_LOCKDOWN];
