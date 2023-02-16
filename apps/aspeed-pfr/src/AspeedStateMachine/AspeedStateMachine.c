@@ -1502,7 +1502,8 @@ void AspeedStateMachine(void)
 					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
 					break;
 				}
-				if (fifo_in->data.bit8[1] & AfmActiveAndRecoveryUpdate)
+				if (fifo_in->data.bit8[1] & AfmActiveAndRecoveryUpdate ||
+				    fifo_in->data.bit8[1] & CPLDUpdate)
 					next_state = &state_table[FIRMWARE_UPDATE];
 #if defined(CONFIG_SEAMLESS_UPDATE)
 				else if (fifo_in->data.bit8[1] & SeamlessUpdate)
