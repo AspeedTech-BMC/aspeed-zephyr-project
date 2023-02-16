@@ -290,7 +290,7 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 	return status;
 }
 
-int pfr_cpld_update_reboot(void)
+void pfr_cpld_update_reboot(void)
 {
 	LOG_INF("system going reboot ...");
 
@@ -301,6 +301,4 @@ int pfr_cpld_update_reboot(void)
 	sys_reboot(SYS_REBOOT_COLD);
 
 	CODE_UNREACHABLE;
-
-	return -1;
 }

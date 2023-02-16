@@ -47,12 +47,16 @@ void apply_pfm_protection(int spi_device_id)
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	uint8_t pfm_length[4];
-	uint32_t pfm_read_address;
+	uint32_t pfm_read_address = 0;
 
 	if (spi_id == BMC_SPI)
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
 	else if (spi_id == PCH_SPI)
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
+	else {
+		LOG_ERR("Incorrect spi_id %d", spi_id);
+		return;
+	}
 
 	// Block 0 + Block 1 = 1024 (0x400); PFM data(PFM Body = 0x20)
 	uint32_t pfm_region_Start = pfm_read_address + 0x400 + 0x20;

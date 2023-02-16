@@ -102,7 +102,11 @@ void do_init(void *o)
 	debug_log_init();
 	spim_irq_init();
 
-	// DEBUG_HALT();
+#if 0
+	// Halting for JTAG debug
+	DEBUG_HALT();
+#endif
+
 	BMCBootHold();
 	PCHBootHold();
 
@@ -122,12 +126,6 @@ void do_init(void *o)
 	state->afm_active_object.RecoveryImageStatus = Failure;
 	state->afm_active_object.RestrictActiveUpdate = 0;
 #endif
-
-	// I2c_slave_dev_debug+>
-	// struct i2c_slave_interface *I2CSlaveEngine = getI2CSlaveEngineInstance();
-	// struct I2CSlave_engine_wrapper *I2cSlaveEngineWrapper;
-
-	// I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
 
 	enum boot_indicator rot_boot_from = get_boot_indicator();
 
@@ -884,7 +882,7 @@ void handle_update_requested(void *o)
 	struct event_context *evt_ctx = state->event_ctx;
 	AO_DATA *ao_data_wrap = NULL;
 	EVENT_CONTEXT evt_ctx_wrap;
-	int ret;
+	int ret = Success;
 	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	CPLD_STATUS cpld_update_status;
 
@@ -1054,6 +1052,7 @@ void handle_seamless_update_requested(void *o)
 	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
 	CPLD_STATUS cpld_update_status;
 
+	evt_ctx_wrap.operation = NONE;
 	LOG_DBG("SEAMLESS_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
 	switch (evt_ctx->data.bit8[0]) {

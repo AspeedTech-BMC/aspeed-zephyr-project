@@ -537,8 +537,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		pfr_manifest->address = source_address;
 		return ast1060_update(pfr_manifest, PRIMARY_FLASH_REGION);
 	}
-
-	if (pfr_manifest->image_type == BMC_TYPE) {
+	else if (pfr_manifest->image_type == BMC_TYPE) {
 		LOG_INF("BMC Update in progress");
 		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
 					sizeof(source_address)))
@@ -563,6 +562,11 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return update_afm_image(pfr_manifest, flash_select, ActiveObjectData);
 	}
 #endif
+	else {
+		LOG_ERR("Unsupported image type %d", pfr_manifest->image_type);
+		return Failure;
+	}
+
 	pfr_manifest->staging_address = source_address;
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
@@ -672,15 +676,20 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		time_end = k_uptime_get_32();
 		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
 				(time_end - time_start));
-	} else   {
+	} else {
 		if (pfr_manifest->image_type == BMC_TYPE) {
 			LOG_INF("BMC Recovery Region Update");
 			status = ufm_read(PROVISION_UFM, BMC_RECOVERY_REGION_OFFSET,
 					(uint8_t *)&target_address, sizeof(target_address));
-		} else if (pfr_manifest->image_type == PCH_TYPE) {
+		}
+		else if (pfr_manifest->image_type == PCH_TYPE) {
 			LOG_INF("PCH Recovery Region Update");
 			status = ufm_read(PROVISION_UFM, PCH_RECOVERY_REGION_OFFSET,
 					(uint8_t *)&target_address, sizeof(target_address));
+		}
+		else {
+			LOG_ERR("Unsupported image_type=%d", pfr_manifest->image_type);
+			return Failure;
 		}
 
 		if (status != Success)

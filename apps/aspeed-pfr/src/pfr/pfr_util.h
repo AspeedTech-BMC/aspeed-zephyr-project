@@ -42,5 +42,5 @@ int compare_buffer(uint8_t *buffer1, uint8_t *buffer2, uint32_t length);
 int verify_signature(struct signature_verification *verification, const uint8_t *digest,
 		     size_t length, const uint8_t *signature, size_t sig_length);
 
-int pfr_cpld_update_reboot(void);
+void pfr_cpld_update_reboot(void);
 

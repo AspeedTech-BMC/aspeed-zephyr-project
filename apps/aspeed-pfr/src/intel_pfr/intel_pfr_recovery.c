@@ -93,6 +93,10 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 		act_pfm_offset = 0;
 	}
 #endif
+	else {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
 
 	LOG_INF("Staging PFM signature, address=0x%08x, Active PFM signature, address=0x%08x", staging_address, act_pfm_offset);
 

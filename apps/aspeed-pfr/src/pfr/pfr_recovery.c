@@ -186,7 +186,7 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 {
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int sector_sz;
-	bool support_block_erase = (sector_sz == BLOCK_SIZE);
+	bool support_block_erase;
 	size_t area_size = 0;
 
 	if (image_type == BMC_TYPE)
@@ -200,6 +200,7 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 	}
 #endif
 	sector_sz = pfr_spi_get_block_size(image_type);
+	support_block_erase = (sector_sz == BLOCK_SIZE);
 	spi_flash->spi.state->device_id[0] = image_type;
 	LOG_INF("Recovering...");
 	if (pfr_spi_erase_region(image_type, support_block_erase, target_address, area_size)) {

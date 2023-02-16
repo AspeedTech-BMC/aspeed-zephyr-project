@@ -76,14 +76,14 @@ static int cmd_get_svn(const struct shell *shell, size_t argc, char **argv)
 	uint32_t offset;
 	uint8_t svn;
 
-	if (strncmp(argv[1], "rot", strlen("rot")) == 0)
+	if (strncmp(argv[1], "rot", 3) == 0)
 		offset = SVN_POLICY_FOR_CPLD_UPDATE;
-	else if (strncmp(argv[1], "pch", strlen("pch")) == 0)
+	else if (strncmp(argv[1], "pch", 3) == 0)
 		offset = SVN_POLICY_FOR_PCH_FW_UPDATE;
-	else if (strncmp(argv[1], "bmc", strlen("bmc")) == 0)
+	else if (strncmp(argv[1], "bmc", 3) == 0)
 		offset = SVN_POLICY_FOR_BMC_FW_UPDATE;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
-	else if (strncmp(argv[1], "afm", strlen("afm")) == 0)
+	else if (strncmp(argv[1], "afm", 3) == 0)
 		offset = SVN_POLICY_FOR_AFM;
 #endif
 	else {
@@ -106,14 +106,14 @@ static int cmd_set_svn(const struct shell *shell, size_t argc, char **argv)
 	uint32_t offset;
 	uint8_t svn;
 
-	if (strncmp(argv[1], "rot", strlen("rot")) == 0)
+	if (strncmp(argv[1], "rot", 3) == 0)
 		offset = SVN_POLICY_FOR_CPLD_UPDATE;
-	else if (strncmp(argv[1], "pch", strlen("pch")) == 0)
+	else if (strncmp(argv[1], "pch", 3) == 0)
 		offset = SVN_POLICY_FOR_PCH_FW_UPDATE;
-	else if (strncmp(argv[1], "bmc", strlen("bmc")) == 0)
+	else if (strncmp(argv[1], "bmc", 3) == 0)
 		offset = SVN_POLICY_FOR_BMC_FW_UPDATE;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
-	else if (strncmp(argv[1], "afm", strlen("afm")) == 0)
+	else if (strncmp(argv[1], "afm", 3) == 0)
 		offset = SVN_POLICY_FOR_AFM;
 #endif
 	else {

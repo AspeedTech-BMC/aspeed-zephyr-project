@@ -29,7 +29,7 @@ int spdm_handle_get_version(void *ctx, void *req, void *rsp)
 	spdm_buffer_init(&rsp_msg->buffer, 2 + 2 * context->local.version.version_number_entry_count);
 	spdm_buffer_append_reserved(&rsp_msg->buffer, 1);
 	spdm_buffer_append_u8(&rsp_msg->buffer, context->local.version.version_number_entry_count);
-	for (uint8_t i=0; i < context->local.version.version_number_entry_count; ++i) {
+	for (uint8_t i=0; i < SPDM_MAX_VERSION && i < context->local.version.version_number_entry_count; ++i) {
 		spdm_buffer_append_u16(&rsp_msg->buffer, context->local.version.version_number_entry[i]);
 	}
 
