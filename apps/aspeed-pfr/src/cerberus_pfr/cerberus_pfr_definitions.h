@@ -18,6 +18,7 @@
 #define UPDATE_FORMAT_TPYE_HROT     0x0002
 #define UPDATE_FORMAT_TPYE_KCC      0x0004
 #define UPDATE_FORMAT_TPYE_DCC      0x0005
+#define UPDATE_FORMAT_TYPE_KEYM     0x0006
 
 #define FALSE                       0
 #define TRUE                        1

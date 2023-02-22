@@ -14,7 +14,6 @@
 #define PROVISIONING_IMAGE_TYPE			0x02
 #define PROVISION_ROOT_KEY_FLAG			0x01
 #define PROVISION_OTP_KEY_FLAG			0x0f
-#define CERBERUS_ROOT_KEY_ADDRESS		0x00
 #define PROVISIONING_ROOT_KEY_HASH_TYPE		HASH_TYPE_SHA256
 #define PROVISIONING_ROOT_KEY_HASH_LENGTH	SHA256_DIGEST_LENGTH
 
@@ -47,26 +46,26 @@ enum {
 };
 
 enum CERBERUS_PROVISION_STRUCT {
-	CERBERUS_PROVISION_IMAGE_LENGTH				= 0x000,
-	CERBERUS_IMAGE_TYPE					= 0x002,
-	CERBERUS_MAGIC_NUM					= 0x004,
-	CERBERUS_MANIFEST_LENGTH				= 0x008,
-	CERBERUS_MANIFEST_FLAG					= 0x00A,
-	CERBERUS_PROVISION_RESERVED				= 0x00E,
-	CERBERUS_BMC_ACTIVE_OFFSET				= 0x010,
-	CERBERUS_BMC_ACTIVE_SIZE				= 0x014,
-	CERBERUS_BMC_RECOVERY_OFFSET				= 0x018,
-	CERBERUS_BMC_RECOVERY_SIZE				= 0x01C,
-	CERBERUS_BMC_STAGE_OFFSET				= 0x020,
-	CERBERUS_BMC_STAGE_SIZE					= 0x024,
-	CERBERUS_PCH_ACTIVE_OFFSET				= 0x028,
-	CERBERUS_PCH_ACTIVE_SIZE				= 0x02C,
-	CERBERUS_PCH_RECOVERY_OFFSET				= 0x030,
-	CERBERUS_PCH_RECOVERY_SIZE				= 0x034,
-	CERBERUS_PCH_STAGE_OFFSET				= 0x038,
-	CERBERUS_PCH_STAGE_SIZE					= 0x03C,
-	CERBERUS_ROOT_KEY_LENGTH				= 0x040,
-	CERBERUS_ROOT_KEY					= 0x042
+	CERBERUS_PROVISION_IMAGE_LENGTH                         = 0x000,
+	CERBERUS_IMAGE_TYPE                                     = 0x002,
+	CERBERUS_MAGIC_NUM                                      = 0x004,
+	CERBERUS_MANIFEST_LENGTH                                = 0x008,
+	CERBERUS_MANIFEST_FLAG                                  = 0x00a,
+	CERBERUS_PROVISION_RESERVED                             = 0x00e,
+	CERBERUS_BMC_ACTIVE_OFFSET                              = 0x010,
+	CERBERUS_BMC_ACTIVE_SIZE                                = 0x014,
+	CERBERUS_BMC_RECOVERY_OFFSET                            = 0x018,
+	CERBERUS_BMC_RECOVERY_SIZE                              = 0x01c,
+	CERBERUS_BMC_STAGE_OFFSET                               = 0x020,
+	CERBERUS_BMC_STAGE_SIZE                                 = 0x024,
+	CERBERUS_PCH_ACTIVE_OFFSET                              = 0x028,
+	CERBERUS_PCH_ACTIVE_SIZE                                = 0x02c,
+	CERBERUS_PCH_RECOVERY_OFFSET                            = 0x030,
+	CERBERUS_PCH_RECOVERY_SIZE                              = 0x034,
+	CERBERUS_PCH_STAGE_OFFSET                               = 0x038,
+	CERBERUS_PCH_STAGE_SIZE                                 = 0x03c,
+	CERBERUS_ROOT_KEY                                       = 0x040,
+	CERBERUS_KEY_MANIFEST                                   = 0x800
 };
 
 struct PROVISIONING_IMAGE_HEADER {

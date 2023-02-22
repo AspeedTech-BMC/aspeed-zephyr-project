@@ -15,6 +15,7 @@
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_recovery.h"
+#include "cerberus_pfr_key_manifest.h"
 #include "keystore/KeystoreManager.h"
 #include "manifest/manifest_format.h"
 #include "manifest/pfm/pfm_format.h"
@@ -33,7 +34,10 @@ int get_signature(uint8_t flash_id, uint32_t address, uint8_t *signature, size_t
 int verify_recovery_header_magic_number(struct recovery_header rec_head)
 {
 	int status = Success;
-	if (rec_head.format == UPDATE_FORMAT_TPYE_KCC || rec_head.format == UPDATE_FORMAT_TPYE_DCC) {
+
+	if (rec_head.format == UPDATE_FORMAT_TPYE_KCC ||
+	    rec_head.format == UPDATE_FORMAT_TPYE_DCC ||
+	    rec_head.format == UPDATE_FORMAT_TYPE_KEYM) {
 		if (rec_head.magic_number != CANCELLATION_HEADER_MAGIC) {
 			status = Failure;
 		}
@@ -41,8 +45,8 @@ int verify_recovery_header_magic_number(struct recovery_header rec_head)
 		if (rec_head.magic_number != RECOVERY_HEADER_MAGIC)
 			status = Failure;
 	}
-	return status;
 
+	return status;
 }
 
 void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
@@ -85,15 +89,10 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	// get public key and init signature
-	status = get_rsa_public_key(ROT_INTERNAL_KEY, CERBERUS_ROOT_KEY_ADDRESS, &public_key);
+	// get root public key from key manifest 0
+	status = key_manifest_get_root_key(&public_key, KEY_MANIFEST_0_ADDRESS);
 	if (status != Success) {
-		LOG_ERR("Unable to get public Key.");
-		return Failure;
-	}
-
-	if (public_key.mod_length != image_header.sign_length) {
-		LOG_ERR("root key length(%d) and signature length (%d) mismatch", public_key.mod_length, image_header.sign_length);
+		LOG_ERR("Unable to get root public Key.");
 		return Failure;
 	}
 
@@ -145,9 +144,9 @@ int rsa_verify_signature(struct signature_verification *verification,
 	struct rsa_public_key rsa_public;
 	int status = Success;
 
-	status = get_rsa_public_key(ROT_INTERNAL_KEY, CERBERUS_ROOT_KEY_ADDRESS, &rsa_public);
+	status = key_manifest_get_root_key(&rsa_public, KEY_MANIFEST_0_ADDRESS);
 	if (status != Success) {
-		LOG_ERR("Unable to get public Key.");
+		LOG_ERR("Unable to get root public Key.");
 		return Failure;
 	}
 
@@ -169,47 +168,6 @@ int signature_verification_init(struct signature_verification *verification)
 	verification->verify_signature = rsa_verify_signature;
 
 	return Success;
-}
-
-int get_rsa_public_key(uint8_t flash_id, uint32_t address, struct rsa_public_key *public_key)
-{
-	uint32_t exponent_address;
-	uint32_t modules_address;
-	uint16_t key_length;
-	int status = Success;
-
-	//key length
-	status = pfr_spi_read(flash_id, address, sizeof(key_length), (uint8_t *)&key_length);
-	if (status != Success) {
-		LOG_ERR("Flash read rsa key length failed");
-		return Failure;
-	}
-
-	if (key_length > RSA_MAX_KEY_LENGTH) {
-		LOG_ERR("root key length(%d) exceed max length (%d)", key_length, RSA_MAX_KEY_LENGTH);
-		return Failure;
-	}
-
-	public_key->mod_length = key_length;
-	//rsa key modules
-	modules_address = address + sizeof(key_length);
-	status = pfr_spi_read(flash_id, modules_address, key_length, (uint8_t *)public_key->modulus);
-	if (status != Success) {
-		LOG_ERR("Flash read rsa key modules failed");
-		return Failure;
-	}
-
-	//rsa key exponent
-	exponent_address = address + sizeof(key_length) + key_length;
-	status = pfr_spi_read(flash_id, exponent_address, sizeof(public_key->exponent),
-			(uint8_t *)&public_key->exponent);
-	public_key->exponent = public_key->exponent >> 8;
-	if (status != Success) {
-		LOG_ERR("Flash read rsa key exponent failed");
-		return Failure;
-	}
-
-	return status;
 }
 
 int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
