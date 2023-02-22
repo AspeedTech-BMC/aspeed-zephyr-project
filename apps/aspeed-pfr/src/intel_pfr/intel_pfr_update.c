@@ -181,7 +181,6 @@ int pfr_decommission(struct pfr_manifest *manifest)
 {
 	uint8_t read_buffer[DECOMM_CAP_RESERVED_SIZE] = { 0 };
 	CPLD_STATUS cpld_update_status;
-	uint32_t region_size;
 	int status = 0;
 	int i;
 
@@ -198,26 +197,8 @@ int pfr_decommission(struct pfr_manifest *manifest)
 		}
 	}
 
-	// Erasing provisioned data
-	region_size = pfr_spi_get_device_size(ROT_INTERNAL_INTEL_STATE);
-	if (pfr_spi_erase_region(ROT_INTERNAL_INTEL_STATE, true, 0, region_size)) {
-		LOG_ERR("Erase the provisioned UFM data failed");
+	if (erase_provision_flash())
 		return Failure;
-	}
-
-	// Erasing key manifest data
-	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
-	if (pfr_spi_erase_region(ROT_INTERNAL_KEY, true, 0, region_size)) {
-		LOG_ERR("Erase the key manifest data failed");
-		return Failure;
-	}
-
-	// Erasing state data
-	region_size = pfr_spi_get_device_size(ROT_INTERNAL_STATE);
-	if (pfr_spi_erase_region(ROT_INTERNAL_STATE, true, 0, region_size)) {
-		LOG_ERR("Erase the state data failed");
-		return Failure;
-	}
 
 	LOG_INF("Decommission Success");
 

@@ -124,7 +124,7 @@ typedef enum _UPDATE_INTENT_2 {
 int set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t DataSize);
 int get_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t length);
 int erase_provision_flash(void);
-int erase_provision_data_in_flash(void);
+int erase_provision_ufm_flash(void);
 int ProvisionRootKeyHash(uint8_t *DataBuffer, uint32_t length);
 int ProvisionPchOffsets(uint8_t *DataBuffer, uint32_t length);
 int ProvisionBmcOffsets(uint8_t *DataBuffer, uint32_t length);

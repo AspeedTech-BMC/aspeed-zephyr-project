@@ -56,11 +56,44 @@ void ResetMailBox(void)
 }
 
 /**
- * Function to Erase th UFM
+ * Function to Erase th UFM, Key Manifest and State
  * @Param  NULL
  * @retval NULL
  **/
 int erase_provision_flash(void)
+{
+	uint32_t region_size;
+
+	// Erasing provisioned data
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_INTEL_STATE);
+	if (pfr_spi_erase_region(ROT_INTERNAL_INTEL_STATE, true, 0, region_size)) {
+		LOG_ERR("Erase the provisioned UFM data failed");
+		return Failure;
+	}
+
+	// Erasing key manifest data
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+	if (pfr_spi_erase_region(ROT_INTERNAL_KEY, true, 0, region_size)) {
+		LOG_ERR("Erase the key manifest data failed");
+		return Failure;
+	}
+
+	// Erasing state data
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_STATE);
+	if (pfr_spi_erase_region(ROT_INTERNAL_STATE, true, 0, region_size)) {
+		LOG_ERR("Erase the state data failed");
+		return Failure;
+	}
+
+	return Success;
+}
+
+/**
+ * Function to Erase th UFM
+ * @Param  NULL
+ * @retval NULL
+ **/
+int erase_provision_ufm_flash(void)
 {
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
@@ -109,7 +142,7 @@ int set_provision_data_in_flash(uint32_t addr, uint8_t *DataBuffer, uint32_t len
 	if (status != Success)
 		return Failure;
 
-	status = erase_provision_flash();
+	status = erase_provision_ufm_flash();
 	if (status != Success)
 		return Failure;
 
@@ -765,7 +798,7 @@ int ProvisionRootKeyHash(uint8_t *DataBuffer, uint32_t length)
 		}
 
 		LOG_ERR("Root key provision failed...");
-		erase_provision_flash();
+		erase_provision_ufm_flash();
 		return Failure;
 	}
 
@@ -797,7 +830,7 @@ int ProvisionPchOffsets(uint8_t *DataBuffer, uint32_t length)
 		}
 
 		LOG_ERR("PCH offsets provision failed...");
-		erase_provision_flash();
+		erase_provision_ufm_flash();
 		return Failure;
 	}
 
@@ -828,7 +861,7 @@ int ProvisionBmcOffsets(uint8_t *DataBuffer, uint32_t length)
 		}
 
 		LOG_ERR("BMC offsets provision failed...");
-		erase_provision_flash();
+		erase_provision_ufm_flash();
 		return Failure;
 	}
 
@@ -1084,7 +1117,7 @@ void process_provision_command(void)
 		CPLD_STATUS cpld_status;
 
 		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
-		if (cpld_status.DecommissionFlag == TRUE) {
+		if (cpld_status.DecommissionFlag) {
 			cpld_status.DecommissionFlag = 0;
 			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 		}
