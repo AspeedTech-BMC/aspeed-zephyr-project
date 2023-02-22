@@ -356,8 +356,6 @@ int cerberus_verify_regions(struct manifest *manifest)
 	struct pfm_fw_version_element_image fw_ver_element_img;
 	uint8_t *hashStorage = getNewHashStorage();
 	struct rsa_public_key pub_key;
-	uint16_t module_length;
-	uint8_t exponent_length;
 
 	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
 			signed_region_id++) {
@@ -383,47 +381,17 @@ int cerberus_verify_regions(struct manifest *manifest)
 
 		read_address += manifest_flash->max_signature;
 
-		// Modulus length of CSK Public Key
-		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(module_length),
-					(uint8_t *)&module_length)) {
-			LOG_ERR("Failed to get modulus length");
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(pub_key), (uint8_t *)&pub_key)) {
+			LOG_ERR("Failed to get CSK key");
 			return Failure;
 		}
 
-		if (module_length != manifest_flash->header.sig_length) {
-			LOG_ERR("CSK: key length(%d) and signature length (%d) mismatch", module_length, manifest_flash->header.sig_length);
+		if (pub_key.mod_length != manifest_flash->header.sig_length) {
+			LOG_ERR("CSK length(%d) and signature length (%d) mismatch", pub_key.mod_length, manifest_flash->header.sig_length);
 			return Failure;
 		}
 
-		pub_key.mod_length = module_length;
-		read_address += sizeof(module_length);
-
-		// Modulus of CSK Public Key
-		if (pfr_spi_read(pfr_manifest->image_type, read_address, module_length,
-					(uint8_t *)&pub_key.modulus)) {
-			LOG_ERR("Failed to get modulus");
-			return Failure;
-		}
-
-		read_address += module_length;
-
-		// Exponent length of CSK Public Key
-		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(exponent_length),
-				(uint8_t *)&exponent_length)) {
-			LOG_ERR("Failed to get exponent length");
-			return Failure;
-		}
-
-		read_address += sizeof(exponent_length);
-
-		// Exponent of CSK Public Key
-		if (pfr_spi_read(pfr_manifest->image_type, read_address, exponent_length,
-				(uint8_t *)&pub_key.exponent)) {
-			LOG_ERR("Failed to get exponent");
-			return Failure;
-		}
-
-		read_address += exponent_length;
+		read_address += sizeof(pub_key);
 
 		// Region Address
 		for (int count = 0; count < fw_ver_element_img.region_count; count++) {
