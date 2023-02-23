@@ -96,6 +96,11 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
+	if (public_key.mod_length != image_header.sign_length) {
+		LOG_ERR("root key length(%d) and signature length (%d) mismatch", public_key.mod_length, image_header.sign_length);
+		return Failure;
+	}
+
 	// get signature
 	signature_address = verify_addr + image_header.image_length - image_header.sign_length;
 	LOG_INF("signature_address=%x", signature_address);
@@ -147,6 +152,11 @@ int rsa_verify_signature(struct signature_verification *verification,
 	status = key_manifest_get_root_key(&rsa_public, KEY_MANIFEST_0_ADDRESS);
 	if (status != Success) {
 		LOG_ERR("Unable to get root public Key.");
+		return Failure;
+	}
+
+	if (rsa_public.mod_length != sig_length) {
+		LOG_ERR("root key length(%d) and signature length (%d) mismatch", rsa_public.mod_length, sig_length);
 		return Failure;
 	}
 

@@ -26,7 +26,7 @@ int cerberus_get_public_key_hash(struct pfr_manifest *manifest, uint32_t address
 	uint32_t digest_length;
 	int status;
 
-	if (!hash_buf)
+	if (!manifest || !hash_buf)
 		return Failure;
 
 	if (hash_type == HASH_TYPE_SHA256)
@@ -66,6 +66,9 @@ int key_manifest_get_root_key(struct rsa_public_key *public_key, uint32_t addres
 	uint32_t read_address = 0;
 	int status = Success;
 
+	if (!public_key)
+		return Failure;
+
 	pfr_spi_read(ROT_INTERNAL_KEY, address, sizeof(image_header), (uint8_t *)&image_header);
 	status = verify_recovery_header_magic_number(image_header);
 	if (status != Success) {
@@ -91,7 +94,7 @@ int cerberus_verify_root_key(struct pfr_manifest *manifest, struct rsa_public_ke
 	uint32_t hash_length = PROVISIONING_ROOT_KEY_HASH_LENGTH;
 	int status = 0;
 
-	if (!public_key)
+	if (!manifest || !public_key)
 		return Failure;
 
 	if (PROVISIONING_ROOT_KEY_HASH_TYPE == HASH_TYPE_SHA256) {

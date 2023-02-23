@@ -47,6 +47,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 	struct PROVISIONING_IMAGE_HEADER provision_header;
 	uint8_t keym_buffer[KEY_MANIFEST_SIZE];
 	CPLD_STATUS cpld_status;
+	uint32_t region_size;
 	int status = Success;
 
 	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(provision_header), (uint8_t *)&provision_header)) {
@@ -96,6 +97,12 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 		// Provisioning key manifest 0
 		if (pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_KEY_MANIFEST, KEY_MANIFEST_SIZE, keym_buffer)) {
 			LOG_ERR("Provisioning: failed to read key manifest 0");
+			return Failure;
+		}
+
+		region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+		if (pfr_spi_erase_region(ROT_INTERNAL_KEY, true, 0, region_size)) {
+			LOG_ERR("Provisioning: erase the key manifest data failed");
 			return Failure;
 		}
 
