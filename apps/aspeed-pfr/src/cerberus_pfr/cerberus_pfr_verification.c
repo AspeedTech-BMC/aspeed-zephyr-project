@@ -105,7 +105,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	signature_address = verify_addr + image_header.image_length - image_header.sign_length;
 	LOG_INF("signature_address=%x", signature_address);
 	status = get_signature(manifest->flash_id, signature_address, sig_data,
-			SHA256_SIGNATURE_LENGTH);
+			image_header.sign_length);
 	if (status != Success) {
 		LOG_ERR("Unable to get the Signature.");
 		return Failure;
@@ -120,10 +120,10 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 			HASH_TYPE_SHA256,
 			&getRsaEngineInstance()->base,
 			sig_data,
-			SHA256_SIGNATURE_LENGTH,
+			image_header.sign_length,
 			&public_key,
 			hashStorage,
-			SHA256_SIGNATURE_LENGTH
+			image_header.sign_length
 			);
 	if (status != Success) {
 		LOG_ERR("Image verify Fail manifest->flash_id=%d address=%x", manifest->flash_id,
@@ -132,7 +132,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 		LOG_HEXDUMP_ERR(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
 		LOG_ERR("image_header.image_length=%x", image_header.image_length);
 		LOG_ERR("image_header.sign_length=%x", image_header.sign_length);
-		LOG_HEXDUMP_ERR(sig_data, SHA256_SIGNATURE_LENGTH, "Image Signature:");
+		LOG_HEXDUMP_ERR(sig_data, image_header.sign_length, "Image Signature:");
 		return Failure;
 	}
 

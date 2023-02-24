@@ -77,22 +77,5 @@ struct PROVISIONING_IMAGE_HEADER {
 	uint8_t reserved[2];
 };
 
-struct PROVISIONING_MANIFEST_DATA {
-
-	uint32_t bmc_active_manifest_offset;
-	uint32_t bmc_active_size;
-	uint32_t bmc_recovery_offset;
-	uint32_t bmc_recovery_size;
-	uint32_t bmc_stage_offset;
-	uint32_t bmc_stage_size;
-	uint32_t pch_active_manifest_offset;
-	uint32_t pch_active_size;
-	uint32_t pch_recovery_offset;
-	uint32_t pch_recovery_size;
-	uint32_t pch_stage_offset;
-	uint32_t pch_stage_size;
-
-};
-
 int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest);
 

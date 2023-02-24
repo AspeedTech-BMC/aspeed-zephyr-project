@@ -24,7 +24,7 @@ uint8_t cRootKeyHash[SHA384_DIGEST_LENGTH] = {0};
 uint8_t cPchOffsets[12];
 uint8_t cBmcOffsets[12];
 
-int verify_rcerberus_magic_number(uint32_t magic_number)
+int verify_cerberus_magic_number(uint32_t magic_number)
 {
 	int status = Success;
 
@@ -62,9 +62,15 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	status = verify_rcerberus_magic_number(provision_header.magic_num);
+	status = verify_cerberus_magic_number(provision_header.magic_num);
 	if (status != Success) {
 		LOG_ERR("Provisioning: Magic Number is not Matched.");
+		return Failure;
+	}
+
+	if (provision_header.provisioning_flag[0] != PROVISION_OTP_KEY_FLAG &&
+	    provision_header.provisioning_flag[0] != PROVISION_ROOT_KEY_FLAG) {
+		LOG_ERR("Provisioning: Invalid flag(%d)", provision_header.provisioning_flag[0]);
 		return Failure;
 	}
 
@@ -75,7 +81,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 	}
 
 	if (provision_header.provisioning_flag[0] == PROVISION_ROOT_KEY_FLAG) {
-		if (cerberus_get_public_key_hash(manifest, manifest->address + CERBERUS_ROOT_KEY,
+		if (cerberus_pfr_get_public_key_hash(manifest, manifest->address + CERBERUS_ROOT_KEY,
 						 PROVISIONING_ROOT_KEY_HASH_TYPE, cRootKeyHash, sizeof(cRootKeyHash)))
 			return Failure;
 
@@ -119,9 +125,8 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 
 		SetUfmStatusValue(UFM_PROVISIONED);
 		LOG_INF("Provisioning: Done.");
-	} else
-		return Failure;
+	}
 
-	return status;
+	return Success;
 }
 

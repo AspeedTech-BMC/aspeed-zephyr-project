@@ -25,6 +25,7 @@
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #include "cerberus_pfr/cerberus_pfr_update.h"
 #include "cerberus_pfr/cerberus_pfr_spi_filtering.h"
+#include "cerberus_pfr/cerberus_pfr_key_manifest.h"
 #endif
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_util.h"
@@ -297,6 +298,28 @@ int handle_pit_verification(void *o)
 }
 #endif
 
+#if defined(CONFIG_CERBERUS_PFR)
+int handle_key_manifest_verification(void *o)
+{
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	byte provision_state = GetUfmStatusValue();
+
+	if (!(provision_state & UFM_PROVISIONED)) {
+		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
+		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
+		return Failure;
+	} else {
+		if (cerberus_pfr_verify_key_manifests(pfr_manifest)) {
+			// lockdown
+			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+			return Failure;
+		}
+	}
+
+	return Success;
+}
+#endif
+
 void handle_image_verification(void *o)
 {
 	struct smf_context *state = (struct smf_context *)o;
@@ -489,14 +512,17 @@ void handle_image_verification(void *o)
 
 void do_verify(void *o)
 {
-	int status = Success;
 	LOG_DBG("Start");
 #if defined(CONFIG_PIT_PROTECTION)
-	status = handle_pit_verification(o);
+	if (handle_pit_verification(o))
+		goto exit;
 #endif
-	if (status == Success)
-		handle_image_verification(o);
-
+#if defined(CONFIG_CERBERUS_PFR)
+	if (handle_key_manifest_verification(o))
+		goto exit;
+#endif
+	handle_image_verification(o);
+exit:
 	LOG_DBG("End");
 }
 
