@@ -217,8 +217,7 @@ int keystore_get_key_id(struct keystore *store, uint8_t *key, int *key_id, int *
 		}
 
 		// Compare key and key_buffer
-		status = compare_buffer(key, key_buffer, keystore_header->key_length);
-		if (status == Success) {
+		if (memcmp(key, key_buffer, keystore_header->key_length)) {
 			*key_id = keystore_header->key_id;
 			return Success;
 		}

@@ -5,7 +5,6 @@ target_sources(app PRIVATE main.c)
 # Common layer
 add_subdirectory(AspeedStateMachine)
 add_subdirectory(common)
-add_subdirectory(context_manager)
 add_subdirectory(include)
 add_subdirectory(keystore)
 add_subdirectory(engineManager)

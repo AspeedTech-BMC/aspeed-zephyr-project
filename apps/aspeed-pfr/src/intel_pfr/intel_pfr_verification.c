@@ -41,7 +41,7 @@ int intel_pfr_pit_level1_verify(void)
 			(uint8_t *)pit_password, sizeof(pit_password));
 	pfr_spi_read(ROT_INTERNAL_INTEL_STATE, RF_NVRAM_OFFSET, sizeof(rf_pit_password),
 			rf_pit_password);
-	if (compare_buffer(pit_password, rf_pit_password, sizeof(pit_password))) {
+	if (memcmp(pit_password, rf_pit_password, sizeof(pit_password))) {
 		SetPlatformState(LOCKDOWN_DUE_TO_PIT_L1);
 		LOG_ERR("PIT Level 1 verify failed, lockdown");
 		return Lockdown;
@@ -113,7 +113,7 @@ int intel_pfr_pit_level2_verify(void)
 	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK)) {
 		ufm_read(PROVISION_UFM, PIT_BMC_FW_HASH,
 				(uint8_t *)pit_hash_buffer, sizeof(pit_hash_buffer));
-		if (compare_buffer(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
+		if (memcmp(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
 			LOG_ERR("PIT L2 BMC hash mismatch");
 			LOG_HEXDUMP_ERR(sha_buffer, hash_length, "bmc pit hash :");
 			LOG_HEXDUMP_ERR(pit_hash_buffer, hash_length, "ufm pit hash :");
@@ -142,7 +142,7 @@ int intel_pfr_pit_level2_verify(void)
 	if (CheckUfmStatus(ufm_status, UFM_STATUS_PIT_HASH_STORED_BIT_MASK)) {
 		ufm_read(PROVISION_UFM, PIT_PCH_FW_HASH,
 				(uint8_t *)pit_hash_buffer, sizeof(pit_hash_buffer));
-		if (compare_buffer(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
+		if (memcmp(sha_buffer, pit_hash_buffer, sizeof(sha_buffer))) {
 			LOG_ERR("PIT L2 PCH hash mismatch");
 			LOG_HEXDUMP_ERR(sha_buffer, hash_length, "pch pit hash :");
 			LOG_HEXDUMP_ERR(pit_hash_buffer, hash_length, "ufm pit hash :");
@@ -395,10 +395,17 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		}
 	}
 
-	status = get_buffer_hash(manifest, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic,
-			CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out);
-	if (status != Success) {
-		LOG_ERR("Block1 CSK Entry: Get hash failed");
+	// Get hash
+	if (csk_key_curve_type == secp256r1) {
+		manifest->hash->start_sha256(manifest->hash);
+		manifest->hash->calculate_sha256(manifest->hash, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic,
+						 CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out, SHA256_HASH_LENGTH);
+	} else if (csk_key_curve_type == secp384r1) {
+		manifest->hash->start_sha384(manifest->hash);
+		manifest->hash->calculate_sha384(manifest->hash, (uint8_t *)&block1_buffer->CskEntryInitial.PubCurveMagic,
+						 CSK_ENTRY_PC_SIZE, manifest->pfr_hash->hash_out, SHA384_HASH_LENGTH);
+	} else	{
+		LOG_ERR("Block1 CSK Entry: Get hash failed, Unsupported curve magic, %x", csk_key_curve_type);
 		return Failure;
 	}
 
@@ -561,8 +568,7 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	}
 
 	LOG_INF("Block0: Verification PC, address = %x, length = %x", manifest->pfr_hash->start_address, manifest->pfr_hash->length);
-	status = compare_buffer(ptr_sha, sha_buffer, hash_length);
-	if (status != Success) {
+	if (memcmp(ptr_sha, sha_buffer, hash_length)) {
 		LOG_ERR("Block0: Verification PC failed");
 		LOG_HEXDUMP_INF(sha_buffer, hash_length, "Calculated hash:");
 		LOG_HEXDUMP_INF(ptr_sha, hash_length, "Expected hash:");
@@ -594,7 +600,7 @@ uint32_t find_fvm_addr(struct pfr_manifest *manifest, uint16_t fv_type)
 
 	act_pfm_end_addr = act_pfm_body_offset + act_pfm_header.Length - sizeof(PFM_STRUCTURE);
 
-	while(act_pfm_body_offset < act_pfm_end_addr) {
+	while (act_pfm_body_offset < act_pfm_end_addr) {
 		pfr_spi_read(image_type, act_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
 				(uint8_t *)&spi_def);
 		if (spi_def.PFMDefinitionType == SMBUS_RULE) {
@@ -664,7 +670,7 @@ int intel_fvm_verify(struct pfr_manifest *manifest)
 	if (act_fvm_header.SVN != cap_fvm_header.SVN) {
 		LOG_ERR("Capsule FVM SVN doesn't match the active FVM SVN");
 		return Failure;
-	} else if (act_fvm_header.Length != cap_fvm_header.Length){
+	} else if (act_fvm_header.Length != cap_fvm_header.Length) {
 		LOG_ERR("Capsule FVM length doesn't match the active FVM length");
 		return Failure;
 	}
@@ -686,7 +692,7 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 	PFM_SPI_DEFINITION spi_def;
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
 
-	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
+	if (pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
 		return Failure;
 
 	if (pfm_header.PfmTag != PFMTAG) {
@@ -697,7 +703,7 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 
 	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE);
 
-	while(cap_pfm_body_offset < cap_pfm_body_end_addr) {
+	while (cap_pfm_body_offset < cap_pfm_body_end_addr) {
 		pfr_spi_read(image_type, cap_pfm_body_offset, sizeof(PFM_SPI_DEFINITION),
 				(uint8_t *)&spi_def);
 		if (spi_def.PFMDefinitionType == SMBUS_RULE) {

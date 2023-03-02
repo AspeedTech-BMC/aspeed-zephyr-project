@@ -54,14 +54,6 @@
 #define MAX_WRITE_SIZE              0x1000
 #define PAGE_SIZE                   0x1000
 #define UFM_PAGE_SIZE               16
-#define ROOT_KEY_SIZE               64
-#define ROOT_KEY_X_Y_SIZE_256       32
-#define ROOT_KEY_X_Y_SIZE_384       48
-
-enum Ecc_Curve {
-	secp384r1 = 1,
-	secp256r1,
-};
 
 typedef struct {
 	uint8_t  ActiveRegion;
