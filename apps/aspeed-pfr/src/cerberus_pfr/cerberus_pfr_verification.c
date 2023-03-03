@@ -35,16 +35,18 @@ int verify_recovery_header_magic_number(struct recovery_header rec_head)
 {
 	int status = Success;
 
-	if (rec_head.format == UPDATE_FORMAT_TPYE_KCC ||
-	    rec_head.format == UPDATE_FORMAT_TPYE_DCC ||
-	    rec_head.format == UPDATE_FORMAT_TYPE_KEYM) {
-		if (rec_head.magic_number != CANCELLATION_HEADER_MAGIC) {
-			status = Failure;
-		}
-	} else {
+	if (rec_head.format == UPDATE_FORMAT_TYPE_BMC ||
+	    rec_head.format == UPDATE_FORMAT_TYPE_PCH ||
+	    rec_head.format == UPDATE_FORMAT_TYPE_HROT) {
 		if (rec_head.magic_number != RECOVERY_HEADER_MAGIC)
 			status = Failure;
-	}
+	} else if (rec_head.format == UPDATE_FORMAT_TYPE_KCC ||
+		   rec_head.format == UPDATE_FORMAT_TYPE_DCC ||
+		   rec_head.format == UPDATE_FORMAT_TYPE_KEYM) {
+		if (rec_head.magic_number != KEY_MANAGEMENT_HEADER_MAGIC)
+			status = Failure;
+	} else
+		status = Failure;
 
 	return status;
 }
@@ -366,6 +368,8 @@ int cerberus_verify_regions(struct manifest *manifest)
 	struct pfm_fw_version_element_image fw_ver_element_img;
 	uint8_t *hashStorage = getNewHashStorage();
 	struct rsa_public_key pub_key;
+	uint8_t key_id;
+	uint8_t key_manifest_id;
 
 	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
 			signed_region_id++) {
@@ -375,7 +379,8 @@ int cerberus_verify_regions(struct manifest *manifest)
 			return Failure;
 		}
 
-		LOG_INF("CSK KeyId = %d", fw_ver_element_img.reserved);
+		key_id = fw_ver_element_img.reserved;
+		LOG_INF("CSK KeyId = %d", key_id);
 
 		struct flash_region region_list[fw_ver_element_img.region_count];
 		struct pfm_flash_region region;
@@ -397,11 +402,16 @@ int cerberus_verify_regions(struct manifest *manifest)
 		}
 
 		if (pub_key.mod_length != manifest_flash->header.sig_length) {
-			LOG_ERR("CSK length(%d) and signature length (%d) mismatch", pub_key.mod_length, manifest_flash->header.sig_length);
+			LOG_ERR("CSK key length(%d) and signature length (%d) mismatch", pub_key.mod_length, manifest_flash->header.sig_length);
 			return Failure;
 		}
 
 		read_address += sizeof(pub_key);
+		// Verify CSK and find its key manifest id
+		if (cerberus_pfr_find_key_manifest_id(pfr_manifest, &pub_key, key_id, &key_manifest_id)) {
+			LOG_ERR("Verify CSK key failed");
+			return Failure;
+		}
 
 		// Region Address
 		for (int count = 0; count < fw_ver_element_img.region_count; count++) {

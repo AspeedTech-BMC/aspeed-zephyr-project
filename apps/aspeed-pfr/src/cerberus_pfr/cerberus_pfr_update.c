@@ -122,13 +122,13 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 			return Failure;
 		}
 
-		if (image_header.format == UPDATE_FORMAT_TPYE_HROT) {
+		if (image_header.format == UPDATE_FORMAT_TYPE_HROT) {
 			status = cerberus_update_rot_fw(manifest);
 			if (status != Success) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
-		} else if (image_header.format == UPDATE_FORMAT_TPYE_DCC) {
+		} else if (image_header.format == UPDATE_FORMAT_TYPE_DCC) {
 			status = cerberus_pfr_decommission(manifest);
 			if (status != Success) {
 				LOG_ERR("HRoT decommission failed.");
@@ -236,14 +236,14 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 		return Failure;
 	}
 
-	if (image_header.format != UPDATE_FORMAT_TPYE_BMC &&
-	    image_header.format != UPDATE_FORMAT_TPYE_PCH &&
-	    image_header.format != UPDATE_FORMAT_TPYE_KCC) {
+	if (image_header.format != UPDATE_FORMAT_TYPE_BMC &&
+	    image_header.format != UPDATE_FORMAT_TYPE_PCH &&
+	    image_header.format != UPDATE_FORMAT_TYPE_KCC) {
 		LOG_ERR("Unsupported image format(%d)", image_header.format);
 		return Failure;
 	}
 
-	if (image_header.format == UPDATE_FORMAT_TPYE_KCC) {
+	if (image_header.format == UPDATE_FORMAT_TYPE_KCC) {
 		return cerberus_keystore_update(manifest, image_header.format);
 	}
 

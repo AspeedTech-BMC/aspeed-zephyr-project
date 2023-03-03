@@ -137,7 +137,7 @@ int cerberus_pfr_verify_root_key(struct pfr_manifest *manifest, struct rsa_publi
 	return Success;
 }
 
-int cerberus_pfr_verify_key_manifest_id(struct pfr_manifest *manifest, uint32_t keym_id)
+int cerberus_pfr_verify_key_manifest(struct pfr_manifest *manifest, uint8_t keym_id)
 {
 	uint8_t sig_data[SHA512_SIGNATURE_LENGTH];
 	struct recovery_header image_header;
@@ -152,10 +152,15 @@ int cerberus_pfr_verify_key_manifest_id(struct pfr_manifest *manifest, uint32_t 
 	if (!manifest)
 		return Failure;
 
+	if (keym_id > MAX_KEY_MANIFEST_ID) {
+		LOG_ERR("Invalid key manifest Id: %d", keym_id);
+		return Failure;
+	}
+
 	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
 	keym_address = keym_id * KEY_MANIFEST_SIZE;
 	if (keym_address >= region_size) {
-		LOG_ERR("Invaild key manifest(%d)", keym_id);
+		LOG_ERR("Key partition size is too small");
 		return Failure;
 	}
 
@@ -196,7 +201,7 @@ int cerberus_pfr_verify_key_manifest_id(struct pfr_manifest *manifest, uint32_t 
 	LOG_INF("signature_address=%x", signature_address);
 	status = pfr_spi_read(ROT_INTERNAL_KEY, signature_address, image_header.sign_length, sig_data);
 	if (status != Success) {
-		LOG_ERR("Unable to get the Signature.");
+		LOG_ERR("Unable to get the signature.");
 		return Failure;
 	}
 
@@ -230,39 +235,37 @@ int cerberus_pfr_verify_key_manifest_id(struct pfr_manifest *manifest, uint32_t 
 	return Success;
 }
 
-int cerberus_pfr_verify_key_manifests(struct pfr_manifest *manifest)
+int cerberus_pfr_verify_all_key_manifests(struct pfr_manifest *manifest)
 {
 	struct recovery_header image_header;
 	uint32_t keym_address;
 	uint32_t region_size;
-	uint32_t keym_id;
-	uint32_t keym_count;
-	int status = Success;
+	uint8_t keym_count = 0;
+	uint8_t keym_id;
 
 	if (!manifest)
 		return Failure;
 
 	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
-	keym_address = KEY_MANIFEST_0_ADDRESS;
-	keym_id = 0;
-	keym_count = 0;
-
 	LOG_INF("Image Type: KEYM");
+
 	// lookup all key manifests
-	while (keym_address < region_size) {
+	for (keym_id = 0; keym_id <= MAX_KEY_MANIFEST_ID; keym_id++) {
+		keym_address = keym_id * KEY_MANIFEST_SIZE;
+		if (keym_address >= region_size)
+			break;
+
 		if (pfr_spi_read(ROT_INTERNAL_KEY, keym_address, sizeof(image_header), (uint8_t *)&image_header))
-			break;
+			continue;
 
-		if (image_header.format != UPDATE_FORMAT_TYPE_KEYM && image_header.magic_number != CANCELLATION_HEADER_MAGIC)
-			break;
+		if (image_header.format != UPDATE_FORMAT_TYPE_KEYM && image_header.magic_number != KEY_MANAGEMENT_HEADER_MAGIC)
+			continue;
 
-		if (cerberus_pfr_verify_key_manifest_id(manifest, keym_id)) {
+		if (cerberus_pfr_verify_key_manifest(manifest, keym_id)) {
 			LOG_INF("KEYM(%d) Image Verify Fail", keym_id);
 			return Failure;
 		}
 
-		keym_address += KEY_MANIFEST_SIZE;
-		keym_id++;
 		keym_count++;
 	}
 
@@ -272,5 +275,162 @@ int cerberus_pfr_verify_key_manifests(struct pfr_manifest *manifest)
 	}
 
 	return Success;
+}
+
+int cerberus_pfr_get_key_manifest(struct pfr_manifest *manifest, uint8_t keym_id, struct PFR_KEY_MANIFEST *pfr_key_manifest)
+{
+	struct recovery_section image_section;
+	struct recovery_header image_header;
+	uint32_t region_size;
+	uint32_t keym_address;
+	uint32_t read_address;
+	int status = Success;
+
+	if (!manifest || !pfr_key_manifest)
+		return Failure;
+
+	if (keym_id > MAX_KEY_MANIFEST_ID) {
+		LOG_ERR("Invalid key manifest Id: %d", keym_id);
+		return Failure;
+	}
+
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+	keym_address = keym_id * KEY_MANIFEST_SIZE;
+	read_address = keym_address;
+	if (keym_address >= region_size) {
+		LOG_ERR("Key partition size is too small");
+		return Failure;
+	}
+
+	// read recovery header
+	if (pfr_spi_read(ROT_INTERNAL_KEY, read_address, sizeof(image_header),
+			(uint8_t *)&image_header)) {
+		LOG_ERR("Failed to read image header");
+		return Failure;
+	}
+
+	status = verify_recovery_header_magic_number(image_header);
+	if (status != Success) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Image Header Magic Number is not Matched.");
+		return Failure;
+	}
+
+	read_address += image_header.header_length;
+
+	// read section header
+	if (pfr_spi_read(ROT_INTERNAL_KEY, read_address, sizeof(image_section),
+			(uint8_t *)&image_section)) {
+		LOG_ERR("Failed to read imag section");
+		return Failure;
+	}
+
+	if (image_section.magic_number != KEY_MANAGEMENT_SECTION_MAGIC &&
+	    image_section.header_length != sizeof(struct recovery_section) &&
+	    image_section.section_length != sizeof(struct PFR_KEY_MANIFEST)) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "section_header:");
+		LOG_ERR("Unable to get image section.");
+		return Failure;
+	}
+
+	read_address += image_section.header_length;
+
+	LOG_INF("flash_device_id = %d, read key manifest address = %x", ROT_INTERNAL_KEY, read_address);
+	if (pfr_spi_read(ROT_INTERNAL_KEY, read_address, sizeof(struct PFR_KEY_MANIFEST),
+			(uint8_t *)pfr_key_manifest)) {
+		LOG_ERR("Failed to read key manifest");
+		return Failure;
+	}
+
+	if (pfr_key_manifest->magic_number != KEY_MANIFEST_SECTION_MAGIC) {
+		LOG_ERR("Key Manifest Magic Number is not Matched.");
+		return Failure;
+	}
+
+	return Success;
+}
+
+int cerberus_pfr_verify_csk_key(struct pfr_manifest *manifest, struct rsa_public_key *public_key, uint8_t key_manifest_id, uint8_t key_id)
+{
+	uint8_t hash_buffer[SHA512_DIGEST_LENGTH];
+	struct PFR_KEY_MANIFEST pfr_key_manifest;
+	uint32_t hash_length;
+
+	if (!manifest || !public_key)
+		return Failure;
+
+	if (key_id > MAX_KEY_ID) {
+		LOG_ERR("Invalid key Id: %d", key_id);
+		return Failure;
+	}
+
+	if (cerberus_pfr_get_key_manifest(manifest, key_manifest_id, &pfr_key_manifest)) {
+		LOG_INF("KEYM(%d): Unable to get key manifest", key_manifest_id);
+		return Failure;
+	}
+
+	if (pfr_key_manifest.hash_type == HASH_TYPE_SHA256) {
+		manifest->hash->start_sha256(manifest->hash);
+		manifest->hash->calculate_sha256(manifest->hash, (uint8_t *)public_key, sizeof(struct rsa_public_key), hash_buffer, SHA256_HASH_LENGTH);
+		hash_length = SHA256_HASH_LENGTH;
+	} else if (pfr_key_manifest.hash_type == HASH_TYPE_SHA384) {
+		manifest->hash->start_sha384(manifest->hash);
+		manifest->hash->calculate_sha384(manifest->hash, (uint8_t *)public_key, sizeof(struct rsa_public_key), hash_buffer, SHA384_HASH_LENGTH);
+		hash_length = SHA384_HASH_LENGTH;
+	} else {
+		LOG_ERR("Unsupported hash type(%d)", pfr_key_manifest.hash_type);
+		return Failure;
+	}
+
+	if (memcmp(hash_buffer, pfr_key_manifest.key_list[key_id].key_hash, hash_length)) {
+		LOG_DBG("KEYM(%d): This CSK(%d) was not found.", key_manifest_id, key_id);
+		LOG_HEXDUMP_DBG(hash_buffer, hash_length, "Calculated hash:");
+		LOG_HEXDUMP_DBG(pfr_key_manifest.key_list[key_id].key_hash, hash_length, "Expected hash:");
+		return Failure;
+	}
+
+	return Success;
+}
+
+int cerberus_pfr_find_key_manifest_id(struct pfr_manifest *manifest, struct rsa_public_key *public_key, uint8_t key_id, uint8_t *get_keym_id)
+{
+	struct recovery_header image_header;
+	uint32_t keym_address;
+	uint32_t region_size;
+	uint8_t key_manifest_id;
+	int status = Success;
+
+	if (!manifest || !public_key || !get_keym_id)
+		return Failure;
+
+	if (key_id > MAX_KEY_ID) {
+		LOG_ERR("Invalid key Id: %d", key_id);
+		return Failure;
+	}
+
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+
+	// lookup all key manifests
+	for (key_manifest_id = 0; key_manifest_id <= MAX_KEY_MANIFEST_ID; key_manifest_id++) {
+		keym_address = key_manifest_id * KEY_MANIFEST_SIZE;
+		if (keym_address >= region_size)
+			break;
+
+		if (pfr_spi_read(ROT_INTERNAL_KEY, keym_address, sizeof(image_header), (uint8_t *)&image_header))
+			continue;
+
+		if (image_header.format != UPDATE_FORMAT_TYPE_KEYM && image_header.magic_number != KEY_MANAGEMENT_HEADER_MAGIC)
+			continue;
+
+		status = cerberus_pfr_verify_csk_key(manifest, public_key, key_manifest_id, key_id);
+		if (status == Success) {
+			LOG_INF("This CSK(%d) was found in KEYM(%d).", key_id, key_manifest_id);
+			*get_keym_id = key_manifest_id;
+			return Success;
+		}
+	}
+
+	LOG_ERR("This CSK(%d) was not found in all key manifests", key_id);
+	return Failure;
 }
 

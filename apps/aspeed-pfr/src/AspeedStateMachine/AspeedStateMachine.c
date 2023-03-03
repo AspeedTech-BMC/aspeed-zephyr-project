@@ -309,7 +309,7 @@ int handle_key_manifest_verification(void *o)
 		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
 		return Failure;
 	} else {
-		if (cerberus_pfr_verify_key_manifests(pfr_manifest)) {
+		if (cerberus_pfr_verify_all_key_manifests(pfr_manifest)) {
 			// lockdown
 			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
 			return Failure;
