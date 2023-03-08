@@ -177,12 +177,12 @@ void enter_tmin1(void *o)
 	if (evt_ctx->data.bit8[0] == BmcUpdateIntent) {
 		LogLastPanic(BMC_UPDATE_INTENT);
 		if (!(update_region & ExceptBmcActiveUpdate) &&
-				update_region & BmcActiveUpdate)
+				(update_region & BmcActiveUpdate))
 			bmc_reset_only = true;
 	} else if (evt_ctx->data.bit8[0] == PchUpdateIntent) {
 		LogLastPanic(PCH_UPDATE_INTENT);
 		if (!(update_region & ExceptPchActiveUpdate) &&
-				update_region & PchActiveUpdate)
+				(update_region & PchActiveUpdate))
 			pch_reset_only = true;
 	} else if (evt_ctx->event == RESET_DETECTED) {
 		LogLastPanic(BMC_RESET_DETECT);

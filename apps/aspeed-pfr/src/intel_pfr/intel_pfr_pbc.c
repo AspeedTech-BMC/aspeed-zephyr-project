@@ -59,9 +59,15 @@ void reset_recovery_level(uint32_t image_type)
 
 int update_active_pfm(struct pfr_manifest *manifest)
 {
-	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
-	int status = 0;
+	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
+	uint8_t buffer[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
+	PFR_AUTHENTICATION_BLOCK0 *block0_buffer;
+	bool support_block_erase = false;
+	uint32_t length_page_align;
 	uint32_t capsule_offset;
+
+	if (sector_sz == BLOCK_SIZE)
+		support_block_erase = true;
 
 	if (manifest->state == FIRMWARE_RECOVERY)
 		capsule_offset = manifest->recovery_address;
@@ -70,12 +76,34 @@ int update_active_pfm(struct pfr_manifest *manifest)
 
 	// Adjusting capsule offset size to PFM Signing chain
 	capsule_offset += PFM_SIG_BLOCK_SIZE;
-	spi_flash->spi.state->device_id[0] = manifest->image_type;
-	// Updating PFM from capsule to active region
-	status = flash_copy_and_verify((struct spi_flash *)&spi_flash->spi, manifest->active_pfm_addr,
-			capsule_offset, BLOCK_SIZE);
-	if (status != Success)
+
+	if (pfr_spi_read(manifest->image_type, capsule_offset,
+		sizeof(PFR_AUTHENTICATION_BLOCK0), buffer)) {
+		LOG_ERR("Block0: Flash read data failed");
 		return Failure;
+	}
+
+	block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)buffer;
+		manifest->pc_length = block0_buffer->PcLength;
+	manifest->pc_length = block0_buffer->PcLength;
+
+	// Updating PFM from capsule to active region
+	length_page_align =
+		(manifest->pc_length % PAGE_SIZE) ? (manifest->pc_length + (PAGE_SIZE - (manifest->pc_length % PAGE_SIZE))) : manifest->pc_length;
+
+	LOG_INF("manifest->image_type=%d, source_address=%x, target_address=%x, length=%x, length_page_align=%x",
+		manifest->image_type, capsule_offset, manifest->active_pfm_addr, manifest->pc_length, length_page_align);
+
+	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, manifest->active_pfm_addr, length_page_align)) {
+		LOG_ERR("Failed to erase Active PFM");
+		return Failure;
+	}
+
+	if (pfr_spi_region_read_write_between_spi(manifest->image_type, capsule_offset,
+			manifest->image_type, manifest->active_pfm_addr, length_page_align)) {
+		LOG_ERR("Failed to write Active PFM");
+		return Failure;
+	}
 
 	LOG_INF("Active PFM Updated!!");
 	return Success;
@@ -231,7 +259,7 @@ bool is_pbc_valid(PBC_HEADER *pbc)
 		return false;
 	}
 
-	if (pbc->bitmap_nbit % 8){
+	if (pbc->bitmap_nbit % 8) {
 		LOG_ERR("PBC bitmap size is invalid");
 		return false;
 	}
@@ -322,7 +350,7 @@ int decompress_fvm_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 			if (manifest->state != FIRMWARE_RECOVERY)
 				region_require_update = true;
 			else if (manifest->state == FIRMWARE_RECOVERY &&
-					(recovery_level & spi_reg->ProtectLevelMask ))
+					(recovery_level & spi_reg->ProtectLevelMask))
 				region_require_update = true;
 #else
 			bool region_require_update = true;
@@ -383,9 +411,9 @@ int decompress_fv_capsule(struct pfr_manifest *manifest)
 	// Erase and update active FVM region.
 	pfr_spi_erase_region(image_type, support_block_erase, manifest->target_fvm_addr,
 			manifest->pc_length);
-	pfr_spi_page_read_write(image_type, signed_fvm_offset , manifest->target_fvm_addr);
+	pfr_spi_page_read_write(image_type, signed_fvm_offset, manifest->target_fvm_addr);
 
-	if(pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
+	if (pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
 		return Failure;
 
 	if (decompress_fvm_spi_region(manifest, &pbc, pbc_offset, cap_fvm_offset,
@@ -412,7 +440,7 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	PFM_SPI_DEFINITION spi_def;
 	PBC_HEADER pbc;
 
-	if(pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
+	if (pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
 		return Failure;
 
 	cap_pfm_body_end_addr = cap_pfm_body_offset + pfm_header.Length - sizeof(PFM_STRUCTURE);
@@ -425,7 +453,7 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 #endif
 	pbc_offset = cap_pfm_offset + pfm_size;
 
-	if(pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
+	if (pfr_spi_read(image_type, pbc_offset, sizeof(PBC_HEADER), (uint8_t *)&pbc))
 		return Failure;
 
 	if (!is_pbc_valid(&pbc))
@@ -441,16 +469,16 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 			cap_pfm_body_offset += sizeof(PFM_SMBUS_RULE);
 		} else if (spi_def.PFMDefinitionType == SPI_REGION) {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
-				uint8_t recovery_level = get_recovery_level(image_type);
-				bool region_require_update = false;
-				PFM_SPI_REGION *spi_reg = (PFM_SPI_REGION *)&spi_def;
-				if (manifest->state != FIRMWARE_RECOVERY)
-					region_require_update = true;
-				else if (manifest->state == FIRMWARE_RECOVERY &&
-						(recovery_level & spi_reg->ProtectLevelMask ))
-					region_require_update = true;
+			uint8_t recovery_level = get_recovery_level(image_type);
+			bool region_require_update = false;
+			PFM_SPI_REGION *spi_reg = (PFM_SPI_REGION *)&spi_def;
+			if (manifest->state != FIRMWARE_RECOVERY)
+				region_require_update = true;
+			else if (manifest->state == FIRMWARE_RECOVERY &&
+					(recovery_level & spi_reg->ProtectLevelMask))
+				region_require_update = true;
 #else
-				bool region_require_update = true;
+			bool region_require_update = true;
 #endif
 			if (is_spi_region_static(&spi_def)) {
 				if ((decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK) &&
@@ -502,8 +530,10 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 		}
 	}
 
-	if (decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK)
-		update_active_pfm(manifest);
+	if (decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK) {
+		if (update_active_pfm(manifest))
+			return Failure;
+	}
 
 	return Success;
 }

@@ -103,7 +103,7 @@ int BMCBootHold(void)
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
 #endif
-
+	LOG_INF("hold BMC");
 	return 0;
 }
 
@@ -126,7 +126,7 @@ int PCHBootHold(void)
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
 #endif
-
+	LOG_INF("hold PCH");
 	return 0;
 }
 
