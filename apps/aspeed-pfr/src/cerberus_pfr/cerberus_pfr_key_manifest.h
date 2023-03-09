@@ -7,6 +7,7 @@
 #pragma once
 #include <stdint.h>
 #include "crypto/rsa.h"
+#include "pfr/pfr_common.h"
 
 #define KEY_MANIFEST_SIZE       2048
 #define KEY_MANIFEST_0_ADDRESS  0

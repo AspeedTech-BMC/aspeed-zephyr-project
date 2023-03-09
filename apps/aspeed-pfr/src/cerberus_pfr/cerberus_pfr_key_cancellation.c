@@ -12,6 +12,7 @@
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_key_cancellation.h"
+#include "cerberus_pfr_key_manifest.h"
 #include "AspeedStateMachine/common_smc.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
@@ -36,75 +37,82 @@ int get_cancellation_policy_offset(uint32_t pc_type)
 	return 0;
 }
 
-int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
+int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_manifest_id, uint8_t key_id)
 {
-
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
-	uint32_t policy_data;
-	uint32_t bit_offset;
+	uint8_t policy_data;
 	int status = 0;
 
+	if (!manifest)
+		return Failure;
+
 	if (!ufm_offset) {
-		LOG_ERR("%s: Invalid provisioned UFM offset for key cancellation", __func__);
+		LOG_ERR("Invalid provisioned UFM offset for key cancellation");
 		return Failure;
 	}
 
-	// key id must be within 0-127
-	if (key_id > KEY_CANCELLATION_MAX_KEY_ID) {
-		LOG_ERR("%s: Invalid key Id: %d", __func__, key_id);
+	if (key_manifest_id > MAX_KEY_MANIFEST_ID) {
+		LOG_ERR("Invalid key manifest Id: %d", key_manifest_id);
 		return Failure;
 	}
 
-	ufm_offset += (key_id / 32) * 4;
-	// bit little endian
-	bit_offset = 31 - (key_id % 32);
+	if (key_id > MAX_KEY_ID) {
+		LOG_ERR("Invalid key Id: %d", key_id);
+		return Failure;
+	}
 
-	status = ufm_read(PROVISION_UFM, ufm_offset, (uint8_t *)&policy_data, sizeof(policy_data));
+	ufm_offset += key_manifest_id;
+
+	status = ufm_read(PROVISION_UFM, ufm_offset, &policy_data, sizeof(policy_data));
 	if (status != Success) {
-		LOG_ERR("%s: Read cancellation policy status from UFM failed", __func__);
+		LOG_ERR("Read cancellation policy status from UFM failed");
 		return Failure;
 	}
 
-	if (!(policy_data & (0x01 << bit_offset))) {
-		LOG_ERR("This CSK key was cancelled..! Can't Proceed with verify with this key Id: %d", key_id);
+	if (!(policy_data & (0x01 << key_id))) {
+		LOG_ERR("KEYM(%d): This CSK key was cancelled..! Can't Proceed with verify with this key Id: %d", key_manifest_id, key_id);
 		return Failure;
 	}
 
 	return Success;
 }
 
-int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
+int cancel_csk_key_id(struct pfr_manifest *manifest, uint8_t key_manifest_id, uint8_t key_id)
 {
 	uint32_t ufm_offset = get_cancellation_policy_offset(manifest->pc_type);
-	uint32_t policy_data;
-	uint32_t bit_offset;
+	uint8_t policy_data;
 	int status = 0;
 
+	if (!manifest)
+		return Failure;
+
 	if (!ufm_offset) {
-		LOG_ERR("%s: Invalid provisioned UFM offset for key cancellation", __func__);
+		LOG_ERR("Invalid provisioned UFM offset for key cancellation");
 		return Failure;
 	}
 
-	// key id must be within 0-127
-	if (key_id > KEY_CANCELLATION_MAX_KEY_ID) {
-		LOG_ERR("%s: Invalid key Id: %d", __func__, key_id);
+	if (key_manifest_id > MAX_KEY_MANIFEST_ID) {
+		LOG_ERR("Invalid key manifest Id: %d", key_manifest_id);
 		return Failure;
 	}
 
-	ufm_offset += (key_id / 32) * 4;
-	// bit little endian
-	bit_offset = 31 - (key_id % 32);
+	if (key_id > MAX_KEY_ID) {
+		LOG_ERR("Invalid key Id: %d", key_id);
+		return Failure;
+	}
+
+	ufm_offset += key_manifest_id;
 
 	// store policy data from flash part
-	status = ufm_read(PROVISION_UFM, ufm_offset, (uint8_t *)&policy_data, sizeof(policy_data));
+	status = ufm_read(PROVISION_UFM, ufm_offset, &policy_data, sizeof(policy_data));
 	if (status != Success) {
-		LOG_ERR("%s: Read cancellation policy status from UFM failed", __func__);
+		LOG_ERR("Read cancellation policy status from UFM failed");
 		return Failure;
 	}
 
-	policy_data &= ~(0x01 << bit_offset);
+	policy_data &= ~(0x01 << key_id);
 
-	status = ufm_write(PROVISION_UFM, ufm_offset, (uint8_t *)&policy_data, sizeof(policy_data));
+	status = ufm_write(PROVISION_UFM, ufm_offset, &policy_data, sizeof(policy_data));
 	if (status != Success) {
 		LOG_ERR("Write cancellation policy status to UFM failed, offset = %x, data = %x", ufm_offset, policy_data);
 		return Failure;

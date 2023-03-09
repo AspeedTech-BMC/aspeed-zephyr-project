@@ -335,7 +335,7 @@ int cerberus_pfr_get_key_manifest(struct pfr_manifest *manifest, uint8_t keym_id
 
 	read_address += image_section.header_length;
 
-	LOG_INF("flash_device_id = %d, read key manifest address = %x", ROT_INTERNAL_KEY, read_address);
+	LOG_INF("flash_device_id=%d, read_key_manifest_address=%x", ROT_INTERNAL_KEY, read_address);
 	if (pfr_spi_read(ROT_INTERNAL_KEY, read_address, sizeof(struct PFR_KEY_MANIFEST),
 			(uint8_t *)pfr_key_manifest)) {
 		LOG_ERR("Failed to read key manifest");
