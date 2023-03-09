@@ -16,7 +16,6 @@
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_recovery.h"
 #include "cerberus_pfr_key_manifest.h"
-#include "keystore/KeystoreManager.h"
 #include "manifest/manifest_format.h"
 #include "manifest/pfm/pfm_format.h"
 #include "crypto/rsa.h"
