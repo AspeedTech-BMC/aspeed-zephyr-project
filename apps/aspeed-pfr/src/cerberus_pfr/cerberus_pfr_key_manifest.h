@@ -28,6 +28,7 @@ int cerberus_pfr_get_public_key_hash(struct pfr_manifest *manifest, uint32_t add
 int cerberus_pfr_verify_root_key(struct pfr_manifest *manifest, struct rsa_public_key *public_key);
 int cerberus_pfr_verify_key_manifest(struct pfr_manifest *manifest, uint8_t keym_id);
 int cerberus_pfr_verify_all_key_manifests(struct pfr_manifest *manifest);
+int cerberus_pfr_get_key_manifest(struct pfr_manifest *manifest, uint8_t keym_id, struct PFR_KEY_MANIFEST *pfr_key_manifest);
 int cerberus_pfr_verify_csk_key(struct pfr_manifest *manifest, struct rsa_public_key *public_key, uint8_t key_manifest_id, uint8_t key_id);
 int cerberus_pfr_find_key_manifest_id(struct pfr_manifest *manifest, struct rsa_public_key *public_key, uint8_t key_id, uint8_t *get_keym_id);
 

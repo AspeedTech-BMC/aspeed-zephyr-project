@@ -20,8 +20,10 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 
 	if (manifest->image_type == BMC_TYPE) {
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&manifest->address, sizeof(manifest->address));
+		manifest->pc_type = PFR_BMC_PFM;
 	} else {
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&manifest->address, sizeof(manifest->address));
+		manifest->pc_type = PFR_PCH_PFM;
 	}
 
 	LOG_INF("Active Firmware Verification");

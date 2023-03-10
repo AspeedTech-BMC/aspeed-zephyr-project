@@ -248,6 +248,7 @@ int cerberus_pfr_verify_all_key_manifests(struct pfr_manifest *manifest)
 
 	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
 	LOG_INF("Image Type: KEYM");
+	LOG_INF("Key Manifest Verification");
 
 	// lookup all key manifests
 	for (keym_id = 0; keym_id <= MAX_KEY_MANIFEST_ID; keym_id++) {

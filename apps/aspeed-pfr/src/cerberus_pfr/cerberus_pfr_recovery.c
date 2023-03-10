@@ -167,7 +167,8 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	time_end = k_uptime_get_32();
 	LOG_INF("Firmware recovery completed, elapsed time = %u milliseconds",
 			(time_end - time_start));
-	LOG_INF("Repair success\r\n");
+	LOG_INF("Active Updated!!");
+	LOG_INF("Repair success");
 	status = Success;
 
 recovery_failed:
@@ -224,8 +225,8 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
-	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
-			source_address, target_address);
+	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x, length: 0x%08x",
+			source_address, target_address, CONFIG_PCH_STAGING_SIZE);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
 				CONFIG_PCH_STAGING_SIZE))
@@ -277,6 +278,7 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 	ARG_UNUSED(pfm);
 	struct pfr_manifest *manifest = (struct pfr_manifest *)image;
 
+	LOG_INF("Verify recovery");
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->recovery_address;
 	return cerberus_pfr_verify_image(manifest);

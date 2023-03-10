@@ -20,8 +20,8 @@
 #include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
-#include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_recovery.h"
+#include "cerberus_pfr_key_cancellation.h"
 #include "flash/flash_aspeed.h"
 #include "common/common.h"
 
@@ -131,6 +131,12 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 			status = cerberus_pfr_decommission(manifest);
 			if (status != Success) {
 				LOG_ERR("HRoT decommission failed.");
+				return Failure;
+			}
+		} else if (image_header.format == UPDATE_FORMAT_TYPE_KCC) {
+			status = cerberus_pfr_cancel_csk_keys(manifest);
+			if (status != Success) {
+				LOG_ERR("HRoT cancel CSK keys failed.");
 				return Failure;
 			}
 		} else {

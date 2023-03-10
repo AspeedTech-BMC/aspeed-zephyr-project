@@ -406,9 +406,15 @@ int cerberus_verify_regions(struct manifest *manifest)
 		}
 
 		read_address += sizeof(pub_key);
-		// Verify CSK and find its key manifest id
+		// Validate CSK and find its key manifest id
 		if (cerberus_pfr_find_key_manifest_id(pfr_manifest, &pub_key, key_id, &key_manifest_id)) {
 			LOG_ERR("Verify CSK key failed");
+			return Failure;
+		}
+
+		// Validate Key cancellation
+		if (pfr_manifest->keystore->kc_flag->verify_kc_flag(pfr_manifest, key_manifest_id, key_id)) {
+			LOG_ERR("Verify CSK key cancellation failed");
 			return Failure;
 		}
 
