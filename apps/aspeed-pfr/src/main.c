@@ -64,7 +64,7 @@ K_TIMER_DEFINE(hbled_timer, hbled_tick, NULL);
 
 void main(void)
 {
-	LOG_INF("*** ASPEED_PFR version v%02d.%02d Board:%s ***",
+	LOG_INF("*** ASPEED_PFR version v%02d.%02d-dev Board:%s ***",
 			PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, CONFIG_BOARD);
 
 	aspeed_print_sysrst_info();
