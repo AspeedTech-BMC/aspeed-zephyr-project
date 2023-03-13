@@ -27,16 +27,19 @@
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "gpio/gpio_aspeed.h"
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+#include "intel_pfr_rsu_utils.h"
+#endif
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 int pfr_staging_verify(struct pfr_manifest *manifest)
 {
-
 	int status = 0;
 	uint32_t read_address = 0;
 	uint32_t target_address = 0;
 	bool afm_update = false;
+	bool cpld_update = false;
 
 	if (manifest->image_type == BMC_TYPE) {
 		LOG_INF("BMC Staging Region Verification");
@@ -83,6 +86,15 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		afm_update = true;
 	}
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (manifest->image_type == CPLD_TYPE) {
+		LOG_INF("Intel CPLD Staging Region Verification");
+		manifest->image_type = BMC_TYPE;
+		read_address = CONFIG_BMC_INTEL_CPLD_STAGING_OFFSET;
+		manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
+		cpld_update = true;
+	}
+#endif
 	else {
 		return Failure;
 	}
@@ -104,6 +116,8 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 
 	if (afm_update == true)
 		manifest->pc_type = PFR_AFM;
+	else if (cpld_update == true)
+		manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
 	else if (manifest->image_type == BMC_TYPE)
 		manifest->pc_type = PFR_BMC_PFM;
 	else if (manifest->image_type == PCH_TYPE)
@@ -137,6 +151,8 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 
 	if (afm_update)
 		manifest->image_type = AFM_TYPE;
+	else if (cpld_update)
+		manifest->image_type = CPLD_TYPE;
 
 	return status;
 }
@@ -159,12 +175,14 @@ int  check_rot_capsule_type(struct pfr_manifest *manifest)
 
 	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(pc_type)),
 			sizeof(pc_type), (uint8_t *)&pc_type);
-	if (pc_type == DECOMMISSION_CAPSULE) {
+	if (pc_type == PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON) {
 		LOG_INF("Decommission Certificate found");
-		return DECOMMISSION_CAPSULE;
-	} else if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PCH_PFM_CANCELLATION) ||
-			(pc_type == PCH_CAPSULE_CANCELLATION)
-		   || (pc_type == BMC_PFM_CANCELLATION) || (pc_type == BMC_CAPSULE_CANCELLATION)) {
+		return PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON;
+	} else if ((pc_type == CPLD_CAPSULE_CANCELLATION) ||
+			(pc_type == PCH_PFM_CANCELLATION) ||
+			(pc_type == PCH_CAPSULE_CANCELLATION) ||
+			(pc_type == BMC_PFM_CANCELLATION) ||
+			(pc_type == BMC_CAPSULE_CANCELLATION)) {
 		return KEY_CANCELLATION_CAPSULE;
 	} else if (pc_type == PFR_CPLD_UPDATE_CAPSULE) {
 		return PFR_CPLD_UPDATE_CAPSULE;
@@ -394,6 +412,121 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 
 #endif
 
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+int update_cpld_image(struct pfr_manifest *manifest)
+{
+	uint32_t dst_addr = 0;
+	uint8_t rsu_type;
+	uint8_t minor_error;
+	uint8_t err_count = 0;
+
+#if defined(CONFIG_INTEL_SCM_CPLD_UPDATE_ONLY)
+	dst_addr = CONFIG_INTEL_SCM_RSU_FLASH_ADDR;
+	minor_error = INTEL_CPLD_IMAGE_SCM_CPLD;
+	rsu_type = SCM_CPLD;
+	if (intel_rsu_perform_update(manifest, rsu_type, dst_addr)) {
+		LOG_ERR("Failed to update CPLD firmware, rsu_type = %d", rsu_type);
+		LogErrorCodes(INTEL_CPLD_UPDATE_FAIL, minor_error);
+		err_count++;
+	}
+#else
+	uint32_t fw_size = 0;
+	uint8_t board_id = intel_rsu_get_scm_board_id();
+	uint8_t rsu_count = (board_id == SCM_BOARD_ID_DEFAULT) ? MAX_RSU_TYPE : (MAX_RSU_TYPE - 1);
+	for (rsu_type = 0; rsu_type < rsu_count; rsu_type++) {
+		fw_size = manifest->intel_cpld_img_size[rsu_type];
+		if (fw_size == 0)
+			continue;
+
+		switch (rsu_type) {
+		case CPU_CPLD:
+			dst_addr = CONFIG_INTEL_CPU_RSU_FLASH_ADDR;
+			minor_error = INTEL_CPLD_IMAGE_CPU_CPLD;
+			break;
+		case SCM_CPLD:
+			dst_addr = CONFIG_INTEL_SCM_RSU_FLASH_ADDR;
+			minor_error = INTEL_CPLD_IMAGE_SCM_CPLD;
+			break;
+		case DEBUG_CPLD:
+			dst_addr = CONFIG_INTEL_DEBUG_RSU_FLASH_ADDR;
+			minor_error = INTEL_CPLD_IMAGE_DEBUG_CPLD;
+			break;
+		default:
+			LOG_ERR("Invalid RSU type");
+			return Failure;
+		}
+
+		if (intel_rsu_perform_update(manifest, rsu_type, dst_addr)) {
+			LOG_ERR("Failed to update CPLD firmware, rsu_type = %d", rsu_type);
+			LogErrorCodes(INTEL_CPLD_UPDATE_FAIL, minor_error);
+			err_count++;
+		}
+	}
+#endif
+
+	if (err_count)
+		return Failure;
+
+	LOG_INF("Intel CPLD update succesful");
+	return Success;
+}
+
+int verify_and_update_cpld_images(struct pfr_manifest *manifest, uint32_t flash_select,
+		void *AoData)
+{
+	ARG_UNUSED(AoData);
+	uint32_t read_addr = manifest->address;
+	uint32_t region_size;
+
+	manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
+
+	if (manifest->pfr_authentication->online_update_cap_verify(manifest)) {
+		LOG_ERR("Verify BMC's CPLD staging region failed");
+		return Failure;
+	}
+
+	region_size = pfr_spi_get_device_size(ROT_EXT_CPLD_ACT);
+	if (pfr_spi_erase_region(ROT_EXT_CPLD_ACT, true, 0, region_size)) {
+		LOG_ERR("Erase CPLD active region failed");
+		return Failure;
+	}
+
+
+	LOG_INF("Copying BMC's CPLD staging region to ROT's CPLD active region");
+	if (pfr_spi_region_read_write_between_spi(BMC_SPI, read_addr,
+				ROT_EXT_CPLD_ACT, 0, region_size)) {
+		LOG_ERR("Failed to write CPLD image to ROT's CPLD active region");
+		return Failure;
+	}
+
+	// Verify the copied capsule
+	manifest->address = 0;
+	manifest->image_type = ROT_EXT_CPLD_ACT;
+	if (manifest->pfr_authentication->online_update_cap_verify(manifest)) {
+		LOG_ERR("Verify ROT's CPLD active region failed");
+		return Failure;
+	}
+
+	if (update_cpld_image(manifest))
+		return Failure;
+
+	region_size = pfr_spi_get_device_size(ROT_EXT_CPLD_RC);
+	if (pfr_spi_erase_region(ROT_EXT_CPLD_RC, true, 0, region_size)) {
+		LOG_ERR("Erase CPLD recovery region failed");
+		return Failure;
+	}
+
+	LOG_INF("Copying ROT's active CPLD region to ROT's recovery CPLD region");
+	if (pfr_spi_region_read_write_between_spi(ROT_EXT_CPLD_ACT, 0,
+				ROT_EXT_CPLD_RC, 0, region_size)) {
+		LOG_ERR("Failed to write CPLD image to ROT's CPLD recovery region");
+		return Failure;
+	}
+
+	return Success;
+}
+#endif
+
 int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
 {
 	uint32_t cancelled_id = 0;
@@ -427,7 +560,7 @@ int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
 	LOG_INF("ROT update capsule verification success");
 	pc_type_status = check_rot_capsule_type(manifest);
 	payload_address = manifest->address + PFM_SIG_BLOCK_SIZE;
-	if (pc_type_status == DECOMMISSION_CAPSULE) {
+	if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON) {
 		// Decommission validation
 		manifest->address = payload_address;
 		status = pfr_decommission(manifest);
@@ -541,6 +674,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = CONFIG_BMC_AFM_STAGING_OFFSET;
 		return update_afm_image(pfr_manifest, flash_select, ActiveObjectData);
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (pfr_manifest->image_type == CPLD_TYPE) {
+		LOG_INF("SCM/CPU/Debug CPLD Update in progress");
+		pfr_manifest->image_type = BMC_TYPE;
+		pfr_manifest->address = CONFIG_BMC_INTEL_CPLD_STAGING_OFFSET;
+		return verify_and_update_cpld_images(pfr_manifest, flash_select, ActiveObjectData);
 	}
 #endif
 	else {

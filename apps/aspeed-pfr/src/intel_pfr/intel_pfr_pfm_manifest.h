@@ -19,6 +19,8 @@
 #define FVM_ADDR_DEF   0x3
 #define FVM_CAP        0x4
 
+#define CFM_SPI_REGION 0x03
+
 #define SIZE_OF_PCH_SMBUS_RULE 40
 #define SPI_REGION_DEF_MIN_SIZE 16
 
@@ -172,6 +174,40 @@ typedef struct {
 	uint8_t DynamicEraseTriggered : 1;
 	uint8_t Reserved : 2;
 } ProtectLevelMask;
+
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+
+typedef struct _CPLD_PFM_STRUCTURE {
+	uint32_t PfmTag;
+	uint8_t SVN;
+	uint8_t BkcVersion;
+	uint16_t PfmRevision;
+	uint16_t DevId;
+	uint16_t Reserved;
+	uint8_t OemSpecificData[16];
+	uint32_t Length;
+} CPLD_PFM_STRUCTURE;
+
+typedef struct _CPLD_ADDR_DEF_STRUCTURE {
+	uint8_t FmDef;
+	uint16_t FwType;
+	uint8_t Reserved;
+	uint32_t Length;
+	uint32_t ImageStartAddr;
+} CPLD_ADDR_DEF_STRUCTURE;
+
+typedef struct _CFM_STRUCTURE {
+	uint32_t CfmTag;
+	uint8_t SVN;
+	uint8_t Reserved1;
+	uint16_t CpldRevision;
+	uint16_t Reserved2;
+	uint16_t FwType;
+	uint8_t OemSpecificData[16];
+	uint32_t Length;
+} CFM_STRUCTURE;
+#endif
+
 #pragma pack()
 
 int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t address);

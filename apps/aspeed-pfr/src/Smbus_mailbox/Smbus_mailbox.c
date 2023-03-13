@@ -582,6 +582,11 @@ MBX_REG_SETTER_GETTER(AfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(AfmRecoverMinorVersion);
 MBX_REG_SETTER_GETTER(ProvisionStatus2);
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+MBX_REG_SETTER_GETTER(IntelCpldActiveSvn);
+MBX_REG_SETTER_GETTER(IntelCpldActiveMajorVersion);
+MBX_REG_SETTER_GETTER(IntelCpldActiveMinorVersion);
+#endif
 
 #if defined(CONFIG_FRONT_PANEL_LED)
 #include <drivers/timer/aspeed_timer.h>
@@ -742,15 +747,16 @@ void SetFPLEDState(byte PlatformStateData)
 void SetPlatformState(byte PlatformStateData)
 {
 #if defined(CONFIG_PLATFORM_STATE_LED)
+	// Per RSU IP, platform state should be bit reversed.
 	static const struct gpio_dt_spec leds[] = {
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 0),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 1),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 2),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 3),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 4),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 5),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 7),
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 6),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 7)};
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 5),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 4),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 3),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 2),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 1),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 0)};
 
 	for (uint8_t bit = 0; bit < 8; ++bit) {
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);

@@ -21,5 +21,6 @@ enum _hrot_event {
 	BMC_EVENT = 1,
 	PCH_EVENT,
 	AFM_EVENT,
+	CPLD_EVENT,
 };
 

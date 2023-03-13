@@ -9,6 +9,9 @@
 #include "intel_pfr/intel_pfr_authentication.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_definitions.h"
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+#include "intel_pfr/intel_pfr_rsu_utils.h"
+#endif
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_authentication.h"
@@ -51,6 +54,31 @@ int authentication_image(void *AoData, void *EventContext)
 			pfr_manifest->image_type = AFM_TYPE;
 		else
 			pfr_manifest->image_type = ROT_INTERNAL_AFM;
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (EventData->image == CPLD_EVENT) {
+		// Intel CPLD Image
+		LOG_INF("Image Type: Intel CPLD");
+		pfr_manifest->image_type = CPLD_TYPE;
+		if (EventData->operation == VERIFY_ACTIVE) {
+#if defined(CONFIG_INTEL_SCM_CPLD_UPDATE_ONLY)
+			if (intel_rsu_handshake(SCM_CPLD))
+				return Failure;
+			if (intel_rsu_check_fw_loaded(SCM_CPLD, RSU_CFG_STS_CFM1_LOADED))
+				return Failure;
+#else
+			uint8_t board_id = intel_rsu_get_scm_board_id();
+			uint8_t rsu_count = (board_id == SCM_BOARD_ID_DEFAULT) ?
+				MAX_RSU_TYPE : (MAX_RSU_TYPE - 1);
+			for (uint8_t rsu_type = 0; rsu_type < rsu_count; rsu_type++) {
+				if (intel_rsu_handshake(rsu_type))
+					return Failure;
+				if (intel_rsu_check_fw_loaded(rsu_type, RSU_CFG_STS_CFM1_LOADED))
+					return Failure;
+			}
+#endif
+		}
 	}
 #endif
 

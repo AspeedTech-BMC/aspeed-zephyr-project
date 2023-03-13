@@ -1,0 +1,71 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config INTEL_PFR_CPLD_UPDATE
+	depends on INTEL_PFR
+	default n
+	bool "Intel PFR 4.0 CPLD update"
+	help
+	  Enable Intel PFR CPLD update support
+
+if INTEL_PFR_CPLD_UPDATE
+
+config INTEL_SCM_CPLD_UPDATE_ONLY
+	default y
+	bool "If using DCSCM demo board enable it as the board only has SCM CPLD"
+	help
+	  Only update SCM CPLD when received CPLD update reqeust
+
+config INTEL_SCM_RSU_DEV
+	default I2C_4
+	string "The bus that used to communicate with Intel SCM CPLD RSU"
+
+config INTEL_CPU_RSU_DEV
+	default I2C_4
+	string "The bus that used to communicate with Intel CPU CPLD RSU"
+
+config INTEL_DEBUG_RSU_DEV
+	default I2C_4
+	string "The bus that used to communicate with Intel Debug CPLD RSU"
+
+config INTEL_SCM_RSU_DEV_ADDR
+	default 0x60
+	hex "Slave address of Intel SCM RSU"
+
+config INTEL_CPU_RSU_DEV_ADDR
+	default 0x62
+	hex "Slave address of Intel CPU RSU"
+
+config INTEL_DEBUG_RSU_DEV_ADDR
+	default 0x64
+	hex "Slave address of Intel Debug RSU"
+
+config INTEL_SCM_RSU_DEV_ID
+	default 0x11ad
+	hex "SCM CPLD device id"
+
+config INTEL_CPU_RSU_DEV_ID
+	default 0x11ad
+	hex "CPU CPLD device id"
+
+config INTEL_DEBUG_RSU_DEV_ID
+	default 0x11ad
+	hex "Debug CPLD device id"
+
+config INTEL_SCM_RSU_FLASH_ADDR
+	default 0x2000
+	hex "SCM CPLD CFM1 start address(dword)"
+
+config INTEL_CPU_RSU_FLASH_ADDR
+	default 0x2000
+	hex "CPU CPLD CFM1 start address(dword)"
+
+config INTEL_DEBUG_RSU_FLASH_ADDR
+	default 0x2000
+	hex "Debug CPLD CFM1 start address(dword)"
+
+config BMC_INTEL_CPLD_STAGING_OFFSET
+	default 0x0cee0000
+	hex "Intel PFR CPLD staging region offset in BMC flash"
+
+endif # INTEL_PFR_CPLD_UPDATE

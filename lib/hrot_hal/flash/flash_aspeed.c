@@ -155,8 +155,11 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	int Datalen;
 	int ret = 0;
 
-	flash_device = device_get_binding(Flash_Devices_List[ROT_SPI]);
 	uint8_t DeviceId = flash->state->device_id[0];
+	if (DeviceId <= ROT_INTERNAL_AFM)
+		flash_device = device_get_binding(Flash_Devices_List[ROT_SPI]);
+	else
+		flash_device = device_get_binding(Flash_Devices_List[ROT_EXT_SPI]);
 
 	AdrOffset = xfer->address;
 	Datalen = xfer->length;
@@ -185,6 +188,14 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	case ROT_INTERNAL_AFM:
 		ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &partition_device);
+		break;
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	case ROT_EXT_CPLD_ACT:
+		ret = flash_area_open(FLASH_AREA_ID(intel_cpld_act), &partition_device);
+		break;
+	case ROT_EXT_CPLD_RC:
+		ret = flash_area_open(FLASH_AREA_ID(intel_cpld_rc), &partition_device);
 		break;
 #endif
 	default:

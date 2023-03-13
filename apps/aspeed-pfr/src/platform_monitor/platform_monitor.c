@@ -85,6 +85,19 @@ static void platform_reset_handler(const struct device *dev, struct gpio_callbac
 /* Monitor Platform Reset Status */
 static void platform_reset_monitor_init(void)
 {
+#ifdef INTEL_BHS
+	int ret;
+	struct gpio_dt_spec rst_pltrst =
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), rst_pltrst_in_gpios, 0);
+
+	ret = gpio_pin_configure_dt(&rst_pltrst, GPIO_INPUT);
+	LOG_INF("Platform: gpio_pin_configure_dt[%s %d] = %d", rst_pltrst.port->name, rst_pltrst.pin, ret);
+	ret = gpio_pin_interrupt_configure_dt(&rst_pltrst, GPIO_INT_EDGE_RISING);
+	LOG_INF("Platform: gpio_pin_interrupt_configure_dt = %d", ret);
+	gpio_init_callback(&rst_pltrst_cb_data, platform_reset_handler, BIT(rst_pltrst.pin));
+	ret = gpio_add_callback(rst_pltrst.port, &rst_pltrst_cb_data);
+	LOG_INF("Platform: gpio_add_callback = %d", ret);
+#endif
 #ifdef INTEL_EGS
 	int ret;
 	struct gpio_dt_spec rst_pltrst =
@@ -115,6 +128,13 @@ static void platform_reset_monitor_init(void)
 
 static void platform_reset_monitor_remove(void)
 {
+#ifdef INTEL_BHS
+	struct gpio_dt_spec rst_pltrst =
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), rst_pltrst_in_gpios, 0);
+
+	gpio_pin_interrupt_configure_dt(&rst_pltrst, GPIO_INT_DISABLE);
+	gpio_remove_callback(rst_pltrst.port, &rst_pltrst_cb_data);
+#endif
 #ifdef INTEL_EGS
 	struct gpio_dt_spec rst_pltrst =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_egs), rst_pltrst_in_gpios, 0);

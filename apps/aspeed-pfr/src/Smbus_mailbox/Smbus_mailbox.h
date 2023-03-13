@@ -68,6 +68,11 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	AfmRecoverMinorVersion  = 0x79,
 	ProvisionStatus2        = 0x7a,
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	IntelCpldActiveSvn          = 0x7b,
+	IntelCpldActiveMajorVersion = 0x7c,
+	IntelCpldActiveMinorVersion = 0x7d,
+#endif
 	AcmBiosScratchPad       = 0x80,
 	BmcScratchPad           = 0xc0,
 } SMBUS_MAILBOX_RF_ADDRESS;
@@ -210,6 +215,14 @@ byte GetAfmRecoverMinorVersion(void);
 void SetAfmRecoverMinorVersion(byte RecoverMinorVersion);
 byte GettProvisionStatus2(void);
 void SetProvisionStatus2(byte ProvisionStatus2);
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+byte GetIntelCpldActiveSvn(void);
+void SetIntelCpldActiveSvn(byte ActiveSVN);
+byte GetIntelCpldActiveMajorVersion(void);
+void SetIntelCpldActiveMajorVersion(byte ActiveMajorVersion);
+byte GetIntelCpldActiveMinorVersion(void);
+void SetIntelCpldActiveMinorVersion(byte ActiveMinorVersion);
 #endif
 void process_provision_command(void);
 void UpdateBiosCheckpoint(byte Data);

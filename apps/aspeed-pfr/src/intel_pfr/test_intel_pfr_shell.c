@@ -15,6 +15,7 @@
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_svn.h"
 #include "intel_pfr_key_cancellation.h"
+#include "intel_pfr_rsu_utils.h"
 
 // key cancellation
 static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **argv)
@@ -130,6 +131,98 @@ static int cmd_set_svn(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+static int cmd_get_rsu_reg(const struct shell *shell, size_t argc, char **argv)
+{
+	uint8_t rsu_type;
+	uint8_t reg;
+	uint16_t val;
+
+	intel_rsu_unhide_rsu();
+
+	if (strncmp(argv[1], "scm", 3) == 0)
+		rsu_type = SCM_CPLD;
+	else if (strncmp(argv[1], "cpu", 3) == 0)
+		rsu_type = CPU_CPLD;
+	else if (strncmp(argv[1], "dbg", 3) == 0)
+		rsu_type = DEBUG_CPLD;
+	else {
+		shell_error(shell, "unsupported rsu type");
+		goto error;
+	}
+
+	reg = strtoul(argv[2], NULL, 16);
+
+	if (intel_rsu_read_ctrl_reg(rsu_type, reg, &val))
+		shell_error(shell, "failed to get rsu ctrl register");
+	else
+		shell_print(shell, "%04x", val);
+
+error:
+	intel_rsu_hide_rsu();
+
+	return 0;
+}
+
+static int cmd_set_rsu_reg(const struct shell *shell, size_t argc, char **argv)
+{
+	uint8_t rsu_type;
+	uint8_t reg;
+	uint8_t data_h;
+	uint8_t data_l;
+
+	intel_rsu_unhide_rsu();
+
+	if (strncmp(argv[1], "scm", 3) == 0)
+		rsu_type = SCM_CPLD;
+	else if (strncmp(argv[1], "cpu", 3) == 0)
+		rsu_type = CPU_CPLD;
+	else if (strncmp(argv[1], "dbg", 3) == 0)
+		rsu_type = DEBUG_CPLD;
+	else {
+		shell_error(shell, "unsupported rsu type");
+		goto error;
+	}
+
+	reg = strtoul(argv[2], NULL, 16);
+	data_h = strtoul(argv[3], NULL, 16);
+	data_l = strtoul(argv[4], NULL, 16);
+
+	if (intel_rsu_write_ctrl_reg(rsu_type, reg, data_h, data_l))
+		shell_error(shell, "failed to set rsu ctrl register");
+
+error:
+	intel_rsu_hide_rsu();
+
+	return 0;
+}
+
+static int cmd_cpld_fw_dump(const struct shell *shell, size_t argc, char **argv)
+{
+	uint8_t rsu_type;
+	uint32_t addr;
+	uint32_t dw_len;
+
+	if (strncmp(argv[1], "scm", 3) == 0)
+		rsu_type = SCM_CPLD;
+	else if (strncmp(argv[1], "cpu", 3) == 0)
+		rsu_type = CPU_CPLD;
+	else if (strncmp(argv[1], "dbg", 3) == 0)
+		rsu_type = DEBUG_CPLD;
+	else {
+		shell_error(shell, "unsupported rsu type");
+		return 0;
+	}
+	addr = strtoul(argv[2], NULL, 16);
+	dw_len = strtoul(argv[3], NULL, 10);
+
+	if (intel_rsu_dump_cpld_flash(rsu_type, addr, dw_len))
+		shell_error(shell, "failed to dump %s cpld flash", argv[1]);
+
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
 	SHELL_CMD_ARG(verify, NULL, "<pc_type> <key_id>", cmd_verify_csk_key_id, 3, 0),
 	SHELL_CMD_ARG(cancel, NULL, "<pc_type> <key_id>", cmd_cancel_csk_key_id, 3, 0),
@@ -143,9 +236,21 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_svn_cmds,
 	SHELL_SUBCMD_SET_END
 );
 
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_rsu_cmds,
+	SHELL_CMD_ARG(get, NULL, "<rsu type> <reg>", cmd_get_rsu_reg, 3, 0),
+	SHELL_CMD_ARG(set, NULL, "<rsu type> <reg> <data_h> <data_l>", cmd_set_rsu_reg, 5, 0),
+	SHELL_CMD_ARG(dump_fl, NULL, "<rsu type> <addr> <word_len>", cmd_cpld_fw_dump, 4, 0),
+	SHELL_SUBCMD_SET_END
+);
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_intel_pfr_cmds,
 	SHELL_CMD(kc, &sub_kc_cmds, "Key Cancellation Commands", NULL),
 	SHELL_CMD(svn, &sub_svn_cmds, "SVN Commands", NULL),
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	SHELL_CMD(rsu, &sub_rsu_cmds, "CPLD RSU Commands", NULL),
+#endif
 	SHELL_SUBCMD_SET_END
 );
 

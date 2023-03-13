@@ -54,6 +54,14 @@ int recover_image(void *AoData, void *EventContext)
 		pfr_manifest->recovery_address = CONFIG_BMC_AFM_RECOVERY_OFFSET;
 	}
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (EventData->image == CPLD_EVENT) {
+		LOG_INF("Image Type: Intel CPLD");
+		pfr_manifest->image_type = CPLD_TYPE;
+		pfr_manifest->address = CONFIG_BMC_INTEL_CPLD_STAGING_OFFSET;
+		pfr_manifest->recovery_address = 0;
+	}
+#endif
 	else {
 		LOG_ERR("Unsupported recovery event type %d", EventData->image);
 		return Failure;
@@ -197,6 +205,27 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 	else if (image_type == AFM_TYPE) {
 		area_size = FLASH_AREA_SIZE(afm_act_1);
 		image_type = BMC_TYPE;
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (image_type == CPLD_TYPE) {
+		uint32_t region_size;
+		LOG_INF("Recovering...");
+		region_size = pfr_spi_get_device_size(ROT_EXT_CPLD_RC);
+		if (pfr_spi_erase_region(ROT_EXT_CPLD_RC, true, 0, region_size)) {
+			LOG_ERR("Erase CPLD recovery region failed");
+			return Failure;
+		}
+
+		LOG_INF("Copying BMC's CPLD staging region to ROT's recovery CPLD region");
+		if (pfr_spi_region_read_write_between_spi(BMC_TYPE,
+					CONFIG_BMC_INTEL_CPLD_STAGING_OFFSET,
+					ROT_EXT_CPLD_RC, 0, region_size)) {
+			LOG_ERR("Failed to write CPLD image to ROT's CPLD recovery region");
+			return Failure;
+		}
+		LOG_INF("Recovery region update completed");
+		return Success;
 	}
 #endif
 	sector_sz = pfr_spi_get_block_size(image_type);

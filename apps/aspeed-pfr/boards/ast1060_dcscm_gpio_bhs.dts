@@ -1,0 +1,22 @@
+/ {
+	pfr_gpio_bhs {
+		compatible = "aspeed,pfr-gpio-bhs";
+		rst-pltrst-in-gpios = <&gpio0_q_t 26 0>; /* GPIO_T2 */
+		rst-rtcrst-cpu0-out-gpios = <&gpio0_m_p 1 0>; /* GPIO_M1 */
+		rst-rtcrst-cpu1-out-gpios = <&gpio0_i_l 3 0>; /* GPIO_I3 */
+		rst-pltrst-cpu0-out-gpios = <&gpio0_m_p 2 0>; /* GPIO_M2 */
+		rst-pltrst-cpu1-out-gpios = <&gpio0_m_p 17 0>; /* GPIO_O1 */
+		pwrgd-cpu0-out-gpios = <&gpio0_m_p 4 0>;      /* GPIO_M4 */
+		pwrgd-cpu1-out-gpios = <&gpio0_m_p 14 0>;      /* GPIO_N6 */
+		i3c-mng-mux-sel-out-gpios = <&gpio0_m_p 12 0>; /* GPIO_N4 */
+		scm-board-id0-in-gpios = <&sgpiom_a_d 5 0>;
+		scm-board-id1-in-gpios = <&sgpiom_a_d 4 0>;
+		scm-board-id2-in-gpios = <&sgpiom_a_d 3 0>;
+		scm-board-id3-in-gpios = <&sgpiom_a_d 2 0>;
+		scm-board-id4-in-gpios = <&sgpiom_a_d 1 0>;
+		scm-board-id5-in-gpios = <&sgpiom_a_d 0 0>;
+		scm-rsu-hide-done-in-gpios = <&sgpiom_a_d 6 0>;
+		scm-rsu-hide-out-gpios = <&sgpiom_a_d 8 0>;
+	};
+};
+

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- For image signing -->
+<blocksign>
+  <version>1</version>
+  <!-- Block 0 -->
+  <block0>
+    <magic>0xB6EAFD19</magic>
+    <pctype>7</pctype>
+  </block0>
+  <!-- Block 1 -->
+  <block1>
+    <magic>0xF27F28D7</magic>
+    <!-- Root key -->
+    <rkey>
+      <magic>0xA757A046</magic>
+      <curvemagic>0x08F07B47</curvemagic>
+      <permissions>-1</permissions>
+      <keyid>-1</keyid>
+      <pubkey>rk384_pub.pem</pubkey>
+    </rkey>
+    <!-- Code signing key -->
+    <cskey>
+      <magic>0x14711C2F</magic>
+      <curvemagic>0x08F07B47</curvemagic>
+      <permissions>64</permissions>
+      <keyid>0</keyid>
+      <pubkey>csk384_pub.pem</pubkey>
+      <sigmagic>0xEA2A50E9</sigmagic>
+      <hashalg>sha384</hashalg>
+      <signkey>rk384_prv.pem</signkey>
+    </cskey>
+    <!-- Signature over Block 0 -->
+    <b0_sig>
+      <magic>0x15364367</magic>
+      <sigmagic>0xEA2A50E9</sigmagic>
+      <hashalg>sha384</hashalg>
+      <signkey>csk384_prv.pem</signkey>
+    </b0_sig>
+  </block1>
+
+  <!-- CPLD image section -->
+  <cpld_img_section>
+      <!-- Platform Firmware Manifest -->
+      <pfm>
+          <svn>1</svn>
+          <bkc_ver>1</bkc_ver>
+          <maj_ver>0</maj_ver>
+          <min_ver>1</min_ver>
+          <dev_id>0x29</dev_id>
+          <!-- Maximum length of PFM oem_data is 16 bytes, it is optional -->
+          <oem_data></oem_data>
+      </pfm>
+      <!-- CPLD Firmware Manifest -->
+      <cfm>
+          <svn>1</svn>
+          <maj_ver>0</maj_ver>
+          <min_ver>1</min_ver>
+          <fw_type>1</fw_type>
+          <!-- Maximum length of CFM oem_data is 16 bytes, it is optional -->
+          <!-- Per the following sample, the value will be 1a 2d 3c 4d 01 00 ... 00 in the image -->
+          <oem_data>0x1a2b3c4d01</oem_data>
+          <image>scmfpga_cfm1_11cf.rpd</image>
+      </cfm>
+  </cpld_img_section>
+</blocksign>

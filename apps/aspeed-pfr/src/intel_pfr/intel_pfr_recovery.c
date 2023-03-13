@@ -19,6 +19,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_verification.h"
 #include "intel_pfr_authentication.h"
+#include "intel_pfr_rsu_utils.h"
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
@@ -91,6 +92,14 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 		/* Fixed partition so starts from zero */
 		act_pfm_image_type = ROT_INTERNAL_AFM;
 		act_pfm_offset = 0;
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (manifest->image_type == CPLD_TYPE) {
+		manifest->image_type = BMC_TYPE;
+		staging_address = CONFIG_BMC_INTEL_CPLD_STAGING_OFFSET;
+		act_pfm_image_type = ROT_EXT_CPLD_ACT;
+		act_pfm_offset = PFM_SIG_BLOCK_SIZE;
 	}
 #endif
 	else {
@@ -205,6 +214,54 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 		LOG_INF("AFM update start payload_address=%08x pc_length=%x", manifest->address, manifest->pc_length);
 		if (update_afm(AFM_PART_ACT_1, manifest->address, manifest->pc_length))
 			return Failure;
+
+		LOG_INF("Repair success");
+		return Success;
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if(manifest->image_type == CPLD_TYPE) {
+		uint32_t region_size;
+		manifest->image_type = ROT_EXT_CPLD_RC;
+		manifest->address = 0;
+
+		if(manifest->pfr_authentication->cfms_verify(manifest)) {
+			LOG_ERR("CFM signature verification failed");
+			LogErrorCodes(INTEL_CPLD_UPDATE_FAIL, INTEL_CPLD_IMAGE_TOCTOU);
+			return Failure;
+		}
+
+		region_size = pfr_spi_get_device_size(ROT_EXT_CPLD_ACT);
+		if (pfr_spi_erase_region(ROT_EXT_CPLD_ACT, true, 0, region_size)) {
+			LOG_ERR("Erase CPLD active region failed");
+			return Failure;
+		}
+
+		LOG_INF("Copying ROT's recovery CPLD region to ROT's active CPLD region");
+		if (pfr_spi_region_read_write_between_spi(ROT_EXT_CPLD_RC, 0,
+					ROT_EXT_CPLD_ACT, 0, region_size)) {
+			LOG_ERR("Failed to write CPLD image to ROT's CPLD active region");
+			return Failure;
+		}
+
+		if (update_cpld_image(manifest)) {
+#if defined(CONFIG_INTEL_SCM_CPLD_UPDATE_ONLY)
+			if (intel_rsu_check_fw_loaded(SCM_CPLD, RSU_CFG_STS_CFM1_LOADED)) {
+				intel_rsu_load_fw(SCM_CPLD, RSU_LOAD_CFM0);
+				return Failure;
+			}
+
+#else
+			for (uint8_t rsu_type = 0; rsu_type < MAX_RSU_TYPE; rsu_type++) {
+				if (intel_rsu_check_fw_loaded(rsu_type, RSU_CFG_STS_CFM1_LOADED)) {
+					intel_rsu_load_fw(rsu_type, RSU_LOAD_CFM0);
+					return Failure;
+				}
+
+			}
+#endif
+			return Failure;
+		}
 
 		LOG_INF("Repair success");
 		return Success;

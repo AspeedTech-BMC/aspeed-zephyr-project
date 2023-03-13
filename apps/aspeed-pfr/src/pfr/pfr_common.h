@@ -47,6 +47,10 @@ struct pfr_manifest {
 #if defined(CONFIG_CERBERUS_PFR)
 	uint32_t i2c_filter_addr[2];                            // filter rule in BMC/PCH manifest
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	uint32_t intel_cpld_addr[3];                            // CPU/SCM/Debug CPLD firmware addr
+	uint32_t intel_cpld_img_size[3];                        // CPU/SCM/Debug CPLD image size
+#endif
 };
 
 struct active_image {

@@ -13,6 +13,7 @@
 #endif
 
 #if DT_NODE_HAS_STATUS(DT_INST(0, aspeed_pfr_gpio_bhs), okay)
+#define SUPPORT_PLTRST
 #define INTEL_BHS
 #endif
 

@@ -19,6 +19,9 @@ enum AFM_PARTITION_TYPE {
 
 int update_afm(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length);
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+int update_cpld_image(struct pfr_manifest *manifest);
+#endif
 
 int intel_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa);
 int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext);

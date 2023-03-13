@@ -148,6 +148,9 @@ struct smf_context {
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	AO_DATA afm_active_object;
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	AO_DATA cpld_active_object;
+#endif
 };
 
 extern struct k_fifo aspeed_sm_fifo;

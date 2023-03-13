@@ -192,6 +192,7 @@ config KEY_MANIFEST_MAX_COUNT
 	  The max count of key manifest for Cerberus PFR.
 
 rsource "Kconfig.spdm"
+rsource "Kconfig.rsu"
 
 config PFR_DEBUG_SHELL
 	bool "Enable debug shell for development"

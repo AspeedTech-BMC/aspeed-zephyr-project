@@ -20,6 +20,8 @@
 #define AFM_TYPE                        5
 #endif
 
+#define CPLD_TYPE                       6
+
 #define UFM0                            4
 #define UFM0_SIZE                       512
 
@@ -89,6 +91,9 @@
 #define SIGN_BMC_UPDATE_BIT3            0x00000008
 #define SIGN_CPLD_UPDATE_BIT4           0x00000010
 #define SIGN_AFM_UPDATE_BIT5            0x00000020
+// Intel CPU/SCM/Debug CPLD capsule
+#define SIGN_INTEL_CPLD_UPDATE_BIT6     0x00000040
+
 #define SIGN_CPLD_UPDATE_BIT9           0x00000200
 
 #define SHA384_SIZE                     48

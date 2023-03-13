@@ -21,6 +21,9 @@
 #include "intel_pfr/intel_pfr_update.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_spi_filtering.h"
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+#include "intel_pfr/intel_pfr_rsu_utils.h"
+#endif
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
@@ -72,6 +75,10 @@ static uint8_t last_bmc_active_verify_status = Failure;
 static uint8_t last_bmc_recovery_verify_status = Failure;
 static uint8_t last_pch_active_verify_status = Failure;
 static uint8_t last_pch_recovery_verify_status = Failure;
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+static uint8_t last_cpld_active_verify_status = Failure;
+static uint8_t last_cpld_recovery_verify_status = Failure;
+#endif
 
 static bool reset_from_unprovision_state = false;
 
@@ -124,6 +131,13 @@ void do_init(void *o)
 	state->afm_active_object.ActiveImageStatus = Failure;
 	state->afm_active_object.RecoveryImageStatus = Failure;
 	state->afm_active_object.RestrictActiveUpdate = 0;
+#endif
+
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	state->cpld_active_object.type = CPLD_EVENT;
+	state->cpld_active_object.ActiveImageStatus = Failure;
+	state->cpld_active_object.RecoveryImageStatus = Failure;
+	state->cpld_active_object.RestrictActiveUpdate = 0;
 #endif
 
 	enum boot_indicator rot_boot_from = get_boot_indicator();
@@ -211,6 +225,9 @@ void enter_tmin1(void *o)
 		evt_ctx->data.bit8[2] = 0;
 		BMCBootHold();
 		PCHBootHold();
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		intel_rsu_unhide_rsu();
+#endif
 		gWdtBootStatus &= ~WDT_ALL_BOOT_DONE_MASK;
 #if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
 		if (mctp_i3c_detach_slave_dev())
@@ -259,6 +276,17 @@ void verify_image(uint32_t image, uint32_t operation, uint32_t flash, struct smf
 		} else if (operation == VERIFY_BACKUP) {
 			LOG_INF("authentication_image afm backup return %d", ret);
 			state->afm_active_object.RecoveryImageStatus = ret ? Failure : Success;
+		}
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (image == CPLD_EVENT) {
+		if (operation == VERIFY_ACTIVE) {
+			LOG_INF("authentication_image intel cpld active return %d", ret);
+			state->cpld_active_object.ActiveImageStatus = ret ? Failure : Success;
+		} else if (operation == VERIFY_BACKUP) {
+			LOG_INF("authentication_image intel cpld backup return %d", ret);
+			state->cpld_active_object.RecoveryImageStatus = ret ? Failure : Success;
 		}
 	}
 #endif
@@ -434,6 +462,12 @@ void handle_image_verification(void *o)
 				verify_image(AFM_EVENT, VERIFY_BACKUP, SECONDARY_FLASH_REGION, state);
 				verify_image(AFM_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+				// Only verify CPLD images in platform reset
+				SetPlatformState(INTEL_CPLD_STATE_AUTH);
+				verify_image(CPLD_EVENT, VERIFY_ACTIVE, PRIMARY_FLASH_REGION, state);
+				verify_image(CPLD_EVENT, VERIFY_BACKUP, PRIMARY_FLASH_REGION, state);
+#endif
 			}
 
 
@@ -488,6 +522,13 @@ void handle_image_verification(void *o)
 			if (state->afm_active_object.RestrictActiveUpdate)
 				LOG_WRN("AFM Restrict Active Update Mode");
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+			LOG_INF("CPLD image verification recovery=%s active=%s",
+					state->cpld_active_object.RecoveryImageStatus ? "Bad" : "Good",
+					state->cpld_active_object.ActiveImageStatus ? "Bad" : "Good");
+			last_cpld_recovery_verify_status = state->cpld_active_object.RecoveryImageStatus;
+			last_cpld_active_verify_status = state->cpld_active_object.ActiveImageStatus;
+#endif
 
 
 			if (evt_ctx->event != RECOVERY_DONE) {
@@ -498,6 +539,10 @@ void handle_image_verification(void *o)
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 						|| state->afm_active_object.ActiveImageStatus == Failure
 						|| state->afm_active_object.RecoveryImageStatus == Failure
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+						|| state->cpld_active_object.ActiveImageStatus == Failure
+						|| state->cpld_active_object.RecoveryImageStatus == Failure
 #endif
 						) {
 					/* ACT/RCV region went wrong, go recovery */
@@ -632,6 +677,18 @@ void handle_recovery(void *o)
 			recovery_done = 1;
 		}
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		if (state->cpld_active_object.RecoveryImageStatus == Failure) {
+			evt_wrap.image = CPLD_EVENT;
+			ret = recover_image(&state->cpld_active_object, &evt_wrap);
+			recovery_done = 1;
+		}
+		if (state->cpld_active_object.ActiveImageStatus == Failure) {
+			evt_wrap.image = CPLD_EVENT;
+			ret = recover_image(&state->cpld_active_object, &evt_wrap);
+			recovery_done = 1;
+		}
+#endif
 		break;
 	default:
 		break;
@@ -708,6 +765,9 @@ void enter_tzero(void *o)
 			PCHBootRelease();
 			goto enter_tzero_end;
 		}
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		intel_rsu_hide_rsu();
+#endif
 		/* Provisioned */
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
@@ -800,6 +860,10 @@ void enter_tzero(void *o)
 			ast_i2c_filter_en(dev, true, false, false, false);
 			LOG_INF("Bypass %s", dev->name);
 		}
+
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		intel_rsu_unhide_rsu();
+#endif
 
 		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 			BMCBootRelease();
@@ -949,10 +1013,16 @@ void handle_update_requested(void *o)
 			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 		}
 		break;
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	case BmcUpdateIntent2:
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 		if (evt_ctx->data.bit8[1] & AfmActiveAndRecoveryUpdate) {
 			update_region &= AfmActiveAndRecoveryUpdate;
+		}
+		break;
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		if (evt_ctx->data.bit8[1] & CPLDUpdate) {
+			update_region &= CPLDUpdate;
 		}
 		break;
 #endif
@@ -1040,8 +1110,8 @@ void handle_update_requested(void *o)
 					break;
 				}
 			}
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 			else if (evt_ctx->data.bit8[0] == BmcUpdateIntent2) {
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 				if (update_region & AfmActiveUpdate) {
 					LOG_INF("AFM Active Firmware Update");
 					image_type = AFM_TYPE;
@@ -1061,8 +1131,19 @@ void handle_update_requested(void *o)
 					ao_data_wrap = &state->afm_active_object;
 					break;
 				}
-			}
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+				if (update_region & CPLDUpdate) {
+					SetPlatformState(INTEL_CPLD_STATE_UPDATE);
+					LOG_INF("CPLD Firmware Update");
+					image_type = CPLD_TYPE;
+					evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
+					update_region &= ~CPLDUpdate;
+					handled_region |= CPLDUpdate;
+					ao_data_wrap = &state->cpld_active_object;
+				}
+#endif
+			}
 			else {
 				LOG_ERR("Unsupported update intent");
 			}
