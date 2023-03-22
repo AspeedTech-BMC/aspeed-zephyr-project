@@ -27,7 +27,7 @@ int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_reg
 	// Get region counts
 	struct manifest_toc_header toc_header;
 	if (pfr_spi_read(spi_dev, read_address, sizeof(toc_header),
-				(uint8_t*)&toc_header)) {
+				(uint8_t *)&toc_header)) {
 		LOG_ERR("Failed to read toc header");
 		return Failure;
 	}
@@ -110,7 +110,7 @@ int cerberus_get_image_pfm_addr(struct pfr_manifest *manifest,
 			image_header->sign_length;
 	uint32_t read_address = manifest->address + image_header->header_length;
 	// Find PFM in update image
-	while(read_address < sig_address) {
+	while (read_address < sig_address) {
 		if (pfr_spi_read(manifest->image_type, read_address, sizeof(image_section),
 					(uint8_t *)&image_section)) {
 			LOG_ERR("Failed to read image section info in Flash : %d , Offset : %x",
@@ -143,6 +143,7 @@ int cerberus_get_image_pfm_addr(struct pfr_manifest *manifest,
 	}
 
 	if (!found_pfm) {
+		LOG_ERR("Failed to get PFM from update image");
 		return Failure;
 	}
 
@@ -156,19 +157,21 @@ uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 		struct recovery_header *image_header, uint32_t *region_cnt)
 {
 	uint32_t read_address, src_pfm_addr, dest_pfm_addr;
+	uint32_t *update_regions = NULL;
 
 	// Find PFM in update image
 	if (cerberus_get_image_pfm_addr(manifest, image_header, &src_pfm_addr, &dest_pfm_addr)) {
 		LOG_ERR("PFM doesn't exist in update image");
-		return NULL;
+		goto error;
 	}
 
 	uint32_t rw_region_addr;
 	struct pfm_firmware_version_element fw_ver_element;
+
 	if (cerberus_get_rw_region_info(manifest->image_type, src_pfm_addr, &rw_region_addr,
 				&fw_ver_element)) {
 		LOG_ERR("Failed to get rw regions");
-		return NULL;
+		goto error;
 	}
 
 	// PFM Firmware Version Elenemt RW Region
@@ -176,11 +179,15 @@ uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 		sizeof(struct pfm_fw_version_element_rw_region);
 
 	// PFM Firmware Version Element Image Offset
-	uint16_t module_length;
-	uint8_t exponent_length;
-	uint32_t start_address;
-	uint32_t end_address;
-	uint32_t *update_regions = malloc(sizeof(uint32_t) * (fw_ver_element.img_count + 1));
+	struct pfm_fw_version_element_image fw_ver_element_img;
+	struct pfm_flash_region region;
+
+	update_regions = malloc(sizeof(uint32_t) * ((fw_ver_element.img_count * 5) + 1));
+
+	if (!update_regions) {
+		LOG_ERR("Failed to malloc update_regions");
+		goto error;
+	}
 
 	*region_cnt = 0;
 	update_regions[*region_cnt] = dest_pfm_addr;
@@ -188,41 +195,46 @@ uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 
 	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
 			signed_region_id++) {
-		read_address += sizeof(struct pfm_fw_version_element_image);
+		if (pfr_spi_read(manifest->image_type, read_address, sizeof(fw_ver_element_img),
+					(uint8_t *)&fw_ver_element_img)) {
+			LOG_ERR("Failed to get PFM firmware version element image header(%d)", signed_region_id);
+			goto error;
+		}
+
+		if (fw_ver_element_img.region_count > 5) {
+			LOG_ERR("PFM firmware version element image(%d): image regions(%d) exceeds 5",
+				signed_region_id, fw_ver_element_img.region_count);
+			goto error;
+		}
+
+		read_address += sizeof(fw_ver_element_img);
+
+		// signature length
 		read_address += RSA_KEY_LENGTH_2K;
 
-		// Modulus length of Public Key
-		if (pfr_spi_read(manifest->image_type, read_address, sizeof(module_length),
-					(uint8_t *)&module_length)) {
-			LOG_ERR("Failed to get modulus length");
-			return NULL;
+		// public key lenght
+		read_address += sizeof(struct rsa_public_key);
+
+		// Region Address
+		for (int count = 0; count < fw_ver_element_img.region_count; count++) {
+			if (pfr_spi_read(manifest->image_type, read_address, sizeof(struct pfm_flash_region),
+					(uint8_t *)&region)) {
+				LOG_ERR("PFM firmware version element image(%d): failed to get regions", signed_region_id);
+				goto error;
+			}
+
+			read_address += sizeof(region);
+			update_regions[*region_cnt] = region.start_addr;
+			++*region_cnt;
 		}
-
-		read_address += sizeof(module_length);
-		read_address += module_length;
-
-		// Exponent length of Public Key
-		if (pfr_spi_read(manifest->image_type, read_address, sizeof(exponent_length),
-					(uint8_t *)&exponent_length)) {
-			LOG_ERR("Failed to get exponent length");
-			return NULL;
-		}
-		read_address += sizeof(exponent_length);
-		read_address += exponent_length;
-
-		// Region Start Address
-		pfr_spi_read(manifest->image_type, read_address, sizeof(start_address),
-				(uint8_t *)&start_address);
-		read_address += sizeof(start_address);
-
-		// Region End Address
-		pfr_spi_read(manifest->image_type, read_address, sizeof(end_address),
-				(uint8_t *)&end_address);
-		read_address += sizeof(end_address);
-		update_regions[*region_cnt] = start_address;
-		++*region_cnt;
 	}
 
 	return update_regions;
+
+error:
+	if (update_regions)
+		free(update_regions);
+
+	return NULL;
 }
 

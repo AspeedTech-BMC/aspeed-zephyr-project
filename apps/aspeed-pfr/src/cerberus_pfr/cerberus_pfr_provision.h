@@ -7,9 +7,8 @@
 #pragma once
 
 #include <stdint.h>
-#include <manifest/pfm/pfm_flash.h>
-#include "cerberus_pfr_definitions.h"
 #include "pfr/pfr_common.h"
+#include "cerberus_pfr_definitions.h"
 
 #define PROVISIONING_IMAGE_TYPE			0x02
 #define PROVISION_ROOT_KEY_FLAG			0x01
