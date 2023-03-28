@@ -35,7 +35,6 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	uint32_t section_length;
 	struct pfm_fw_version_element_rw_region *rw_region = NULL;
 	struct recovery_section recovery_section;
-	uint8_t platform_length;
 	uint32_t source_address;
 	uint32_t src_pfm_addr, dest_pfm_addr;
 	uint32_t manifest_addr = manifest->address;
@@ -113,10 +112,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	}
 
 	sig_address = source_address + recovery_header.image_length - recovery_header.sign_length;
-	recovery_offset = source_address + sizeof(recovery_header);
-	status = pfr_spi_read(manifest->image_type, recovery_offset, sizeof(platform_length),
-			(uint8_t *)&platform_length);
-	recovery_offset = recovery_offset + platform_length + 1;
+	recovery_offset = source_address + recovery_header.header_length;
 
 	bool is_rw_region_handled;
 
@@ -125,7 +121,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 		status = pfr_spi_read(manifest->image_type, recovery_offset,
 				sizeof(recovery_section), (uint8_t *)&recovery_section);
 		if (recovery_section.magic_number != RECOVERY_SECTION_MAGIC) {
-			LOG_ERR("Recovery Section not matched..\n");
+			LOG_ERR("Recovery Section not matched..");
 			break;
 		}
 		start_address = recovery_section.start_addr;

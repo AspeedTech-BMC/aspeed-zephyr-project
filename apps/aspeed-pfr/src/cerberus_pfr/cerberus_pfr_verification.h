@@ -10,17 +10,12 @@
 #include "pfr/pfr_common.h"
 #include "cerberus_pfr_recovery.h"
 
-#define DECOMMISSION_CAPSULE             0x200
-
 enum {
 	PFR_CPLD_UPDATE_CAPSULE = 0x00,
 	PFR_PCH_PFM,
 	PFR_PCH_UPDATE_CAPSULE,
 	PFR_BMC_PFM,
 	PFR_BMC_UPDATE_CAPSULE,
-	PFR_PCH_CPU_Seamless_Update_Capsule,
-	PFR_AFM,
-	PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON = 0x200
 };
 
 // Key Cancellation Enum
@@ -30,7 +25,6 @@ enum {
 	PCH_CAPSULE_CANCELLATION,
 	BMC_PFM_CANCELLATION,
 	BMC_CAPSULE_CANCELLATION,
-	SEAMLESS_CAPSULE_CANCELLATION
 };
 
 struct pfr_authentication {

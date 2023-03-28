@@ -11,6 +11,7 @@
 
 #define MAX_CANCEL_KEY 8
 
+#pragma pack(1)
 struct PFR_KEY_CANCELLATION_MANIFEST {
 	uint32_t magic_number;
 	uint16_t key_policy;
@@ -21,6 +22,7 @@ struct PFR_KEY_CANCELLATION_MANIFEST {
 		uint8_t key_hash[64];
 	} key_cancel_list[8];
 };
+#pragma pack()
 
 int get_cancellation_policy_offset(uint32_t pc_type);
 int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_manifest_id, uint8_t key_id);

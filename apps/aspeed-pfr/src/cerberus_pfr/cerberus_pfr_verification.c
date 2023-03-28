@@ -22,14 +22,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-int get_signature(uint8_t flash_id, uint32_t address, uint8_t *signature, size_t signature_length)
-{
-	int status = Success;
-	status = pfr_spi_read(flash_id, address, signature_length, signature);
-
-	return status;
-}
-
 int verify_recovery_header_magic_number(struct recovery_header rec_head)
 {
 	int status = Success;
@@ -52,6 +44,9 @@ int verify_recovery_header_magic_number(struct recovery_header rec_head)
 
 void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
 {
+	if (!pfr_manifest)
+		return;
+
 	if (pfr_manifest->image_type == BMC_TYPE) {
 		get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET,
 				(uint8_t *)&pfr_manifest->staging_address, sizeof(pfr_manifest->address));
@@ -69,45 +64,57 @@ void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
 	}
 }
 
-int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
+/*
+ * Key Management images which are key cancellation image,
+ * key manifest image and decommission image are signed by root key.
+ * It should verify root public key and image signature.
+ * The root public key hash is provisioned in UFM and it cannot be cancelled..
+ *
+ * Aspeed Cerberus key management image format:
+ *
+ * struct key_management_image {
+ *     struct recovery_header
+ *     struct recovery_section
+ *     u8 imagedata[image_length]
+ *     u8 signature[sign_length]
+ *     struct rsa_public_key // (root key)
+ * }
+ *
+ */
+int cerberus_pfr_verify_key_management_image(struct pfr_manifest *manifest, struct recovery_header *image_header)
 {
-	int status = Success;
-	struct recovery_header image_header;
-	struct rsa_public_key public_key;
+	if (!manifest || !image_header)
+		return Failure;
 
-	uint32_t signature_address;
-	uint32_t verify_addr = manifest->address;
 	uint8_t sig_data[SHA256_SIGNATURE_LENGTH];
+	struct rsa_public_key public_key;
 	uint8_t *hashStorage = NULL;
+	uint32_t signature_address;
+	uint32_t rootkey_address;
+	uint32_t verify_address;
+	int status = Success;
 
-	LOG_INF("manifest->flash_id=%d verify address=%x", manifest->flash_id, verify_addr);
-	pfr_spi_read(manifest->flash_id, verify_addr, sizeof(image_header), (uint8_t *)&image_header);
-
-	status = verify_recovery_header_magic_number(image_header);
-	if (status != Success) {
-		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
-		LOG_ERR("Image Header Magic Number is not Matched.");
+	verify_address = manifest->address;
+	rootkey_address = verify_address + image_header->image_length;
+	LOG_INF("rootkey_address=%08x", rootkey_address);
+	if (pfr_spi_read(manifest->flash_id, rootkey_address, sizeof(public_key), (uint8_t *)&public_key)) {
+		LOG_ERR("Unable to get root key");
 		return Failure;
 	}
 
-	// get root public key from key manifest 0
-	status = key_manifest_get_root_key(&public_key, KEY_MANIFEST_0_ADDRESS);
-	if (status != Success) {
-		LOG_ERR("Unable to get root public Key.");
+	if (public_key.mod_length != image_header->sign_length) {
+		LOG_ERR("root key length(%d) and signature length (%d) mismatch", public_key.mod_length, image_header->sign_length);
 		return Failure;
 	}
 
-	if (public_key.mod_length != image_header.sign_length) {
-		LOG_ERR("root key length(%d) and signature length (%d) mismatch", public_key.mod_length, image_header.sign_length);
+	// verify root key hash
+	if (cerberus_pfr_verify_root_key(manifest, &public_key))
 		return Failure;
-	}
 
 	// get signature
-	signature_address = verify_addr + image_header.image_length - image_header.sign_length;
-	LOG_INF("signature_address=%x", signature_address);
-	status = get_signature(manifest->flash_id, signature_address, sig_data,
-			image_header.sign_length);
-	if (status != Success) {
+	signature_address = verify_address + image_header->image_length - image_header->sign_length;
+	LOG_INF("signature_address=%08x", signature_address);
+	if (pfr_spi_read(manifest->flash_id, signature_address, image_header->sign_length, (uint8_t *)sig_data)) {
 		LOG_ERR("Unable to get the Signature.");
 		return Failure;
 	}
@@ -115,7 +122,123 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	// verify
 	manifest->flash->state->device_id[0] = manifest->flash_id;
 	status = flash_verify_contents((struct flash *)manifest->flash,
-			verify_addr,
+			verify_address,
+			(image_header->image_length - image_header->sign_length),
+			get_hash_engine_instance(),
+			HASH_TYPE_SHA256,
+			&getRsaEngineInstance()->base,
+			sig_data,
+			image_header->sign_length,
+			&public_key,
+			hashStorage,
+			image_header->sign_length
+			);
+	if (status != Success) {
+		LOG_ERR("Key Management Image Verify Fail manifest->flash_id=%d address=%08x", manifest->flash_id,
+				verify_address);
+		LOG_ERR("Public Key Exponent=%08x", public_key.exponent);
+		LOG_HEXDUMP_ERR(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
+		LOG_ERR("image_header->image_length=%x", image_header->image_length);
+		LOG_ERR("image_header->sign_length=%x", image_header->sign_length);
+		LOG_HEXDUMP_ERR(sig_data, image_header->sign_length, "Image Signature:");
+		return Failure;
+	}
+
+	if (manifest->state == FIRMWARE_UPDATE)
+		LOG_INF("Stage Key Management Image Verify Success.");
+
+	return Success;
+}
+
+/*
+ * Both recovery and update images are signed by CSK keys.
+ * It should verify CSK public key, CSK key cancellation and image signature.
+ * The CSK public key hash is provisioned in key manifests.
+ *
+ * Aspeed Cerberus recovery and update image format:
+ *
+ * struct recovery_image {
+ *     struct recovery_header
+ *     struct recovery_image_section_lists {
+ *         struct recovery_section
+ *         u8 imagedata[image_length]
+ *     }
+ *     u8 signature[sign_length]
+ *     struct rsa_public_key // (CSK key)
+ * }
+ *
+ */
+int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
+{
+	if (!manifest)
+		return Failure;
+
+	struct recovery_header image_header;
+	struct rsa_public_key public_key;
+	uint32_t signature_address;
+	uint32_t cskkey_address;
+	uint32_t verify_address;
+	uint8_t sig_data[SHA256_SIGNATURE_LENGTH];
+	uint8_t *hashStorage = NULL;
+	uint8_t key_manifest_id;
+	uint8_t key_id;
+	int status = Success;
+
+	verify_address = manifest->address;
+	LOG_INF("manifest->flash_id=%d verify address=%08x", manifest->flash_id, verify_address);
+	if (pfr_spi_read(manifest->flash_id, verify_address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	if (verify_recovery_header_magic_number(image_header)) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Image Header Magic Number is not Matched.");
+		return Failure;
+	}
+
+	if (image_header.format == UPDATE_FORMAT_TYPE_KCC ||
+	    image_header.format == UPDATE_FORMAT_TYPE_DCC ||
+	    image_header.format == UPDATE_FORMAT_TYPE_KEYM)
+		return cerberus_pfr_verify_key_management_image(manifest, &image_header);
+
+	// get csk key
+	cskkey_address = verify_address + image_header.image_length;
+	LOG_INF("cskkey_address=%08x", cskkey_address);
+	if (pfr_spi_read(manifest->flash_id, cskkey_address, sizeof(public_key), (uint8_t *)&public_key)) {
+		LOG_ERR("Unable to get CSK key");
+		return Failure;
+	}
+
+	if (public_key.mod_length != image_header.sign_length) {
+		LOG_ERR("CSK key length(%d) and signature length (%d) mismatch", public_key.mod_length, image_header.sign_length);
+		return Failure;
+	}
+
+	// Validate CSK and find its key manifest id and key id
+	if (cerberus_pfr_find_key_manifest_id_and_key_id(manifest, &public_key, &key_manifest_id, &key_id)) {
+		LOG_ERR("Verify CSK key failed");
+		return Failure;
+	}
+
+	// Validate Key cancellation
+	if (manifest->keystore->kc_flag->verify_kc_flag(manifest, key_manifest_id, key_id)) {
+		LOG_ERR("Verify CSK key cancellation failed");
+		return Failure;
+	}
+
+	// get signature
+	signature_address = verify_address + image_header.image_length - image_header.sign_length;
+	LOG_INF("signature_address=%08x", signature_address);
+	if (pfr_spi_read(manifest->flash_id, signature_address, image_header.sign_length, (uint8_t *)sig_data)) {
+		LOG_ERR("Unable to get the Signature.");
+		return Failure;
+	}
+
+	// verify
+	manifest->flash->state->device_id[0] = manifest->flash_id;
+	status = flash_verify_contents((struct flash *)manifest->flash,
+			verify_address,
 			(image_header.image_length - image_header.sign_length),
 			get_hash_engine_instance(),
 			HASH_TYPE_SHA256,
@@ -127,8 +250,8 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 			image_header.sign_length
 			);
 	if (status != Success) {
-		LOG_ERR("Image verify Fail manifest->flash_id=%d address=%x", manifest->flash_id,
-				verify_addr);
+		LOG_ERR("Image Verify Fail manifest->flash_id=%d address=%08x", manifest->flash_id,
+				verify_address);
 		LOG_ERR("Public Key Exponent=%08x", public_key.exponent);
 		LOG_HEXDUMP_ERR(public_key.modulus, public_key.mod_length, "Public Key Modulus:");
 		LOG_ERR("image_header.image_length=%x", image_header.image_length);
@@ -146,6 +269,9 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 int rsa_verify_signature(struct signature_verification *verification,
 		const uint8_t *digest, size_t length, const uint8_t *signature, size_t sig_length)
 {
+	if (!verification || !digest || !signature)
+		return Failure;
+
 	struct rsa_engine_wrapper *rsa = getRsaEngineInstance();
 	struct rsa_public_key rsa_public;
 	int status = Success;
@@ -175,6 +301,9 @@ int rsa_verify_signature(struct signature_verification *verification,
 
 int signature_verification_init(struct signature_verification *verification)
 {
+	if (!verification)
+		return Failure;
+
 	memset(verification, 0, sizeof(struct signature_verification));
 	verification->verify_signature = rsa_verify_signature;
 
@@ -184,12 +313,16 @@ int signature_verification_init(struct signature_verification *verification)
 int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
 {
+	if (!manifest || !hash || !verification || !hash_out)
+		return Failure;
+
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 	struct manifest_toc_header *toc_header = &manifest_flash->toc_header;
 	uint32_t read_address;
 	int status = 0;
+
 	status = signature_verification_init(getSignatureVerificationInstance());
 	if (status)
 		return Failure;
@@ -270,13 +403,10 @@ free_manifest:
  *             u8 hash_type;       // The hashing algorithm.
  *             u8 region_count;    // The number of flash regions.
  *             u8 flags;           // ValidateOnBoot.
- *             u8 reserved;        // key_id (0-based)
+ *             u8 reserved;        // key_id (0-based) 0~7
  *         };
  *         u8 signature[256]
- *         u16 modulus_length
- *         u8 modulus[modulus_length]
- *         u8 exponent_length
- *         u8 exponent[exponent_length]
+ *         struct rsa_public_key // CSK key
  *         struct pfm_flash_region {
  *             u32 region_start_addr
  *             u32 region_end_addr
@@ -287,6 +417,9 @@ free_manifest:
  */
 int cerberus_verify_regions(struct manifest *manifest)
 {
+	if (!manifest)
+		return Failure;
+
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 	struct manifest_toc_header *toc_header = &manifest_flash->toc_header;
@@ -436,7 +569,7 @@ int cerberus_verify_regions(struct manifest *manifest)
 
 			region_list[count].start_addr = region.start_addr;
 			region_list[count].length = (region.end_addr - region.start_addr) + 1;
-			LOG_INF("RegionStartAddress: %x, RegionEndAddress: %x",
+			LOG_INF("RegionStartAddress: %08x, RegionEndAddress: %08x",
 				region.start_addr, region.end_addr);
 		}
 
@@ -496,6 +629,9 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		struct signature_verification *verification, uint8_t *hash_out,
 		size_t hash_length)
 {
+	if (!manifest || !hash || !verification || !hash_out)
+		return Failure;
+
 	return cerberus_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
 }
 

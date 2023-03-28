@@ -166,7 +166,6 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	uint32_t start_address, erase_address, section_length;
 	uint32_t region_cnt;
 	uint32_t *update_regions = NULL;
-	uint8_t platform_length;
 	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
@@ -193,10 +192,7 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 
 	sig_address = manifest->address + image_header.image_length -
 		image_header.sign_length;
-	recovery_offset = manifest->address + sizeof(image_header);
-	status = pfr_spi_read(manifest->image_type, recovery_offset,
-			sizeof(platform_length), &platform_length);
-	recovery_offset = recovery_offset + platform_length + 1;
+	recovery_offset = manifest->address + image_header.header_length;
 	bool should_update = false;
 
 	while (recovery_offset < sig_address) {

@@ -33,7 +33,7 @@ int get_cancellation_policy_offset(uint32_t pc_type)
 	else if ((pc_type == BMC_PFM_CANCELLATION) || (pc_type == PFR_BMC_PFM))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_PFM;
 
-	else if ((pc_type == BMC_CAPSULE_CANCELLATION) || (pc_type == PFR_BMC_UPDATE_CAPSULE) || (pc_type == DECOMMISSION_CAPSULE))
+	else if ((pc_type == BMC_CAPSULE_CANCELLATION) || (pc_type == PFR_BMC_UPDATE_CAPSULE))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_UPDATE_CAPSULE;
 
 	return 0;
@@ -159,8 +159,8 @@ int cerberus_pfr_get_key_cancellation_manifest(struct pfr_manifest *manifest,
 		return Failure;
 	}
 
-	if (image_section.magic_number != KEY_MANAGEMENT_SECTION_MAGIC &&
-	    image_section.header_length != sizeof(struct recovery_section) &&
+	if (image_section.magic_number != KEY_MANAGEMENT_SECTION_MAGIC ||
+	    image_section.header_length != sizeof(struct recovery_section) ||
 	    image_section.section_length != sizeof(struct PFR_KEY_CANCELLATION_MANIFEST)) {
 		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "section_header:");
 		LOG_ERR("Unable to get image section.");
