@@ -275,6 +275,13 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 	struct pfr_manifest *manifest = (struct pfr_manifest *)image;
 
 	LOG_INF("Verify recovery");
+
+	if (manifest->image_type != BMC_TYPE &&
+	    manifest->image_type != PCH_TYPE) {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
+
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->recovery_address;
 	return cerberus_pfr_verify_image(manifest);

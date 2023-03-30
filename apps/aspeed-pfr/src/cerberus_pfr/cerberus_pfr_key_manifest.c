@@ -130,8 +130,8 @@ int cerberus_pfr_verify_root_key(struct pfr_manifest *manifest, struct rsa_publi
 
 	if (memcmp(hash_buffer, ufm_sha_data, hash_length)) {
 		LOG_ERR("Verify root key failed.");
-		LOG_HEXDUMP_INF(hash_buffer, hash_length, "Calculated hash:");
-		LOG_HEXDUMP_INF(ufm_sha_data, hash_length, "Expected hash:");
+		LOG_HEXDUMP_ERR(hash_buffer, hash_length, "Calculated hash:");
+		LOG_HEXDUMP_ERR(ufm_sha_data, hash_length, "Expected hash:");
 		return Failure;
 	}
 
@@ -400,7 +400,7 @@ int cerberus_pfr_find_key_manifest_id_and_key_id(struct pfr_manifest *manifest, 
 			continue;
 
 		if (cerberus_pfr_get_key_manifest(manifest, key_manifest_id, &pfr_key_manifest)) {
-			LOG_INF("KEYM(%d): Unable to get key manifest", key_manifest_id);
+			LOG_WRN("KEYM(%d): Unable to get key manifest", key_manifest_id);
 			continue;
 		}
 
@@ -413,7 +413,7 @@ int cerberus_pfr_find_key_manifest_id_and_key_id(struct pfr_manifest *manifest, 
 			manifest->hash->calculate_sha384(manifest->hash, (uint8_t *)public_key, sizeof(struct rsa_public_key), hash_buffer, SHA384_HASH_LENGTH);
 			hash_length = SHA384_HASH_LENGTH;
 		} else {
-			LOG_ERR("KEYM(%d): Unsupported hash type(%d)", key_manifest_id, pfr_key_manifest.hash_type);
+			LOG_WRN("KEYM(%d): Unsupported hash type(%d)", key_manifest_id, pfr_key_manifest.hash_type);
 			continue;
 		}
 

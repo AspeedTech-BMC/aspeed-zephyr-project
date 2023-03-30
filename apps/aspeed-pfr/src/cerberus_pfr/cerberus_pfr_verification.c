@@ -12,6 +12,7 @@
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "cerberus_pfr_common.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_recovery.h"
@@ -327,13 +328,7 @@ int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *
 	if (status)
 		return Failure;
 
-	if (pfr_manifest->image_type == BMC_SPI)
-		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
-				sizeof(read_address));
-	else
-		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&read_address,
-				sizeof(read_address));
-
+	read_address = pfr_manifest->address;
 	spi_flash->spi.state->device_id[0] = pfr_manifest->image_type;
 	status = manifest_flash_init(manifest_flash, getFlashDeviceInstance(), read_address,
 			PFM_V2_MAGIC_NUM);
@@ -397,7 +392,7 @@ free_manifest:
  *     struct pfm_flash_device_element
  *     struct pfm_firmware_element
  *     struct pfm_firmware_version_element
- *     struct pfm_fw_version_element_rw_region
+ *     struct pfm_fw_version_element_rw_region[rw_count]
  *     struct signed_region_def {
  *         struct pfm_fw_version_element_image {
  *             u8 hash_type;       // The hashing algorithm.
@@ -410,7 +405,7 @@ free_manifest:
  *         struct pfm_flash_region {
  *             u32 region_start_addr
  *             u32 region_end_addr
- *       } regions[pfm_fw_version_element_image.region_count]
+ *         } regions[pfm_fw_version_element_image.region_count]
  *     } signed_region[pfm_firmware_version_element.img_count]
  * }
  *
@@ -422,79 +417,19 @@ int cerberus_verify_regions(struct manifest *manifest)
 
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
-	struct manifest_toc_header *toc_header = &manifest_flash->toc_header;
+	struct pfm_firmware_version_element fw_ver_element;
 	uint8_t signature[RSA_MAX_KEY_LENGTH];
+	uint32_t signed_region_address;
 	uint32_t read_address;
 
-	// Manifest Header + TOC Header + TOC Entries + TOC Entries Hash + TOC Hash
-	read_address = pfr_manifest->address + sizeof(struct manifest_header) +
-		sizeof(struct manifest_toc_header) +
-		(toc_header->entry_count * sizeof(struct manifest_toc_entry)) +
-		(toc_header->entry_count * manifest_flash->toc_hash_length) +
-		manifest_flash->toc_hash_length;
-
-	// Platform Header Offset
-	struct manifest_platform_id plat_id_header;
-
-	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(plat_id_header),
-			(uint8_t *)&plat_id_header)) {
-		LOG_ERR("Failed to read TOC header");
+	read_address = pfr_manifest->address;
+	if (cerberus_get_signed_region_info(pfr_manifest->image_type, read_address,
+		&signed_region_address, &fw_ver_element)) {
+		LOG_ERR("Failed to get signed regions");
 		return Failure;
 	}
 
-	// id length should be 4 byte aligned
-	uint8_t alignment = (plat_id_header.id_length % 4) ?
-		(4 - (plat_id_header.id_length % 4)) : 0;
-	uint16_t id_length = plat_id_header.id_length + alignment;
-	// Flash Device Element Offset
-	struct pfm_flash_device_element flash_dev;
-
-	read_address += sizeof(plat_id_header) + id_length;
-	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(flash_dev),
-			(uint8_t *)&flash_dev)) {
-		LOG_ERR("Failed to get flash device element");
-		return Failure;
-	}
-
-	if (flash_dev.fw_count == 0) {
-		LOG_ERR("Unknow firmware");
-		return Failure;
-	}
-
-	read_address += sizeof(flash_dev);
-
-	// PFM Firmware Element Offset
-	struct pfm_firmware_element fw_element;
-
-	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_element),
-			(uint8_t *)&fw_element)) {
-		LOG_ERR("Failed to get PFM firmware element");
-		return Failure;
-	}
-
-	// id length should be 4 byte aligned
-	alignment = (fw_element.id_length % 4) ? (4 - (fw_element.id_length % 4)) : 0;
-	id_length = fw_element.id_length + alignment;
-	read_address += sizeof(fw_element) - sizeof(fw_element.id) + id_length;
-
-	// PFM Firmware Version Element Offset
-	struct pfm_firmware_version_element fw_ver_element;
-
-	if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_ver_element),
-			(uint8_t *)&fw_ver_element)) {
-		LOG_ERR("Failed to get PFM firmware version element");
-		return Failure;
-	}
-
-	// version length should be 4 byte aligned
-	alignment = (fw_ver_element.version_length % 4) ?
-		(4 - (fw_ver_element.version_length % 4)) : 0;
-
-	uint8_t ver_length = fw_ver_element.version_length + alignment;
-
-	read_address += sizeof(fw_ver_element) - sizeof(fw_ver_element.version) + ver_length;
-	// PFM Firmware Version Elenemt RW Region
-	read_address += fw_ver_element.rw_count * sizeof(struct pfm_fw_version_element_rw_region);
+	read_address = signed_region_address;
 
 	// PFM Firmware Version Element Image Offset
 	struct pfm_fw_version_element_image fw_ver_element_img;
@@ -512,7 +447,7 @@ int cerberus_verify_regions(struct manifest *manifest)
 		}
 
 		key_id = fw_ver_element_img.reserved;
-		LOG_INF("CSK KeyId = %d", key_id);
+		LOG_INF("CSK KeyId=%d", key_id);
 
 		struct flash_region region_list[fw_ver_element_img.region_count];
 		struct pfm_flash_region region;

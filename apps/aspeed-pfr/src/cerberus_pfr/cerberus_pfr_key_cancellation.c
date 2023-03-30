@@ -245,13 +245,13 @@ int cerberus_pfr_cancel_csk_keys(struct pfr_manifest *manifest)
 			continue;
 
 		if (cerberus_pfr_get_key_manifest(manifest, key_manifest_id, &key_manifest)) {
-			LOG_INF("KEYM(%d): Unable to get key manifest", key_manifest_id);
+			LOG_WRN("KEYM(%d): Unable to get key manifest", key_manifest_id);
 			continue;
 		}
 
 		if (kc_manifest.hash_type != key_manifest.hash_type) {
-			LOG_ERR("hash type not matched, key_cancellation_manifest_hash_type=%d, key_manifest_hash_type=%d",
-				kc_manifest.hash_type, key_manifest.hash_type);
+			LOG_WRN("KEYM(%d): hash type not matched, hash_type=%d and key_cancellation_manifest_hash_type=%d",
+				key_manifest_id, key_manifest.hash_type, kc_manifest.hash_type);
 			continue;
 		}
 

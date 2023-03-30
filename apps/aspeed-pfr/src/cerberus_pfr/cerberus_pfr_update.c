@@ -288,6 +288,9 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		pfr_manifest->address = BMC_CPLD_STAGING_ADDRESS;
 		pfr_manifest->flash_id = BMC_FLASH_ID;
 		return cerberus_hrot_update(pfr_manifest);
+	} else {
+		LOG_ERR("Unsupported image type %d", pfr_manifest->image_type);
+		return Failure;
 	}
 
 	pfr_manifest->staging_address = source_address;
@@ -361,24 +364,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		status = cerberus_update_recovery_region(image_type, source_address, target_address);
 	}
-	return status;
-}
-
-void cerberus_watchdog_timer(uint32_t image_type)
-{
-#if 0
-	if (image_type == BMC_TYPE)
-		printk("Watchdog timer BMC TYPE\r\n");
-	else
-		printk("Watchdog timer PCH TYPE\r\n");
-#endif
-}
-
-int check_staging_area(void)
-{
-
-	int status = 0;
-
 	return status;
 }
 
