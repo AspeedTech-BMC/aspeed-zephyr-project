@@ -30,7 +30,7 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 	}
 
 	LOG_INF("Active Firmware Verification");
-	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
+	LOG_INF("Verifying PFM, address=0x%08x", manifest->address);
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base, manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
 	if (status != Success) {
 		LOG_ERR("Verify active PFM failed");

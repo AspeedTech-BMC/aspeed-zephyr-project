@@ -160,6 +160,7 @@ int cerberus_pfr_verify_key_manifest(struct pfr_manifest *manifest, uint8_t keym
 
 	manifest->address = keym_address;
 	manifest->flash_id = ROT_INTERNAL_KEY;
+	LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
 
 	if (cerberus_pfr_verify_image(manifest)) {
 		LOG_ERR("KEYM(%d) Image Verify Fail", keym_id);

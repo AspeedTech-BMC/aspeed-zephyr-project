@@ -273,6 +273,10 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 	ARG_UNUSED(hash_length);
 	ARG_UNUSED(pfm);
 	struct pfr_manifest *manifest = (struct pfr_manifest *)image;
+	struct recovery_header image_header;
+	uint32_t dest_pfm_addr;
+	uint32_t src_pfm_addr;
+	int status;
 
 	LOG_INF("Verify recovery");
 
@@ -284,7 +288,41 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->recovery_address;
-	return cerberus_pfr_verify_image(manifest);
+	LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
+	if (cerberus_pfr_verify_image(manifest)) {
+		LOG_ERR("Recovery Image Verify Failed");
+		return Failure;
+	}
+
+	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	// Find PFM in update image
+	if (cerberus_get_image_pfm_addr(manifest, &image_header, &src_pfm_addr, &dest_pfm_addr)) {
+		LOG_ERR("PFM doesn't exist in recovery image");
+		return Failure;
+	}
+
+	manifest->address = src_pfm_addr;
+	LOG_INF("Verifying PFM address=0x%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base,
+			manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("Verify PFM failed");
+		return Failure;
+	}
+
+	status = cerberus_pfr_verify_pfm_csk_key(manifest);
+	if (status != Success) {
+		LOG_ERR("Verify PFM CSK key failed");
+		return Failure;
+	}
+
+	LOG_INF("Recovery area verification successful");
+
+	return Success;
 }
 
 int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash)

@@ -186,7 +186,6 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	int status = Success;
 
 	verify_address = manifest->address;
-	LOG_INF("manifest->flash_id=%d verify address=%08x", manifest->flash_id, verify_address);
 	if (pfr_spi_read(manifest->flash_id, verify_address, sizeof(image_header), (uint8_t *)&image_header)) {
 		LOG_ERR("Unable to get image header.");
 		return Failure;
@@ -410,6 +409,78 @@ free_manifest:
  * }
  *
  */
+int cerberus_pfr_verify_pfm_csk_key(struct pfr_manifest *manifest)
+{
+	if (!manifest)
+		return Failure;
+
+	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
+	struct manifest_flash *manifest_flash = getManifestFlashInstance();
+	struct pfm_fw_version_element_image fw_ver_element_img;
+	struct pfm_firmware_version_element fw_ver_element;
+	struct rsa_public_key pub_key;
+	uint32_t signed_region_addr;
+	uint8_t key_manifest_id;
+	uint32_t read_address;
+	uint8_t key_id;
+
+	read_address = pfr_manifest->address;
+	if (cerberus_get_signed_region_info(pfr_manifest->image_type, read_address,
+		&signed_region_addr, &fw_ver_element)) {
+		LOG_ERR("Failed to get signed regions");
+		return Failure;
+	}
+
+	read_address = signed_region_addr;
+	LOG_INF("signed_region_address=0x%08x", read_address);
+
+	// PFM Firmware Version Element Image Offset
+	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count; signed_region_id++) {
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_ver_element_img),
+					(uint8_t *)&fw_ver_element_img)) {
+			LOG_ERR("Signed Region(%d): Failed to get PFM firmware version element image header", signed_region_id);
+			return Failure;
+		}
+
+		key_id = fw_ver_element_img.reserved;
+		LOG_INF("Signed Region(%d): CSK KeyId=%d", signed_region_id, key_id);
+		read_address += sizeof(fw_ver_element_img);
+
+		// signature length
+		read_address += manifest_flash->header.sig_length;
+
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(pub_key), (uint8_t *)&pub_key)) {
+			LOG_ERR("Signed Region(%d): Failed to get CSK key", signed_region_id);
+			return Failure;
+		}
+
+		if (pub_key.mod_length != manifest_flash->header.sig_length) {
+			LOG_ERR("Signed Region(%d): CSK key length(%d) and signature length (%d) mismatch",
+				signed_region_id, pub_key.mod_length, manifest_flash->header.sig_length);
+			return Failure;
+		}
+
+		read_address += sizeof(pub_key);
+
+		// Validate CSK and find its key manifest id
+		if (cerberus_pfr_find_key_manifest_id(pfr_manifest, &pub_key, key_id, &key_manifest_id)) {
+			LOG_ERR("Signed Region(%d): Verify CSK key failed", signed_region_id);
+			return Failure;
+		}
+
+		// Validate Key cancellation
+		if (pfr_manifest->keystore->kc_flag->verify_kc_flag(pfr_manifest, key_manifest_id, key_id)) {
+			LOG_ERR("Signed Region(%d): Verify CSK key cancellation failed", signed_region_id);
+			return Failure;
+		}
+
+		// Region Address
+		read_address += sizeof(struct pfm_flash_region) * fw_ver_element_img.region_count;
+	}
+
+	return Success;
+}
+
 int cerberus_verify_regions(struct manifest *manifest)
 {
 	if (!manifest)
@@ -419,35 +490,36 @@ int cerberus_verify_regions(struct manifest *manifest)
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 	struct pfm_firmware_version_element fw_ver_element;
 	uint8_t signature[RSA_MAX_KEY_LENGTH];
-	uint32_t signed_region_address;
+	uint32_t signed_region_addr;
 	uint32_t read_address;
 
 	read_address = pfr_manifest->address;
 	if (cerberus_get_signed_region_info(pfr_manifest->image_type, read_address,
-		&signed_region_address, &fw_ver_element)) {
+		&signed_region_addr, &fw_ver_element)) {
 		LOG_ERR("Failed to get signed regions");
 		return Failure;
 	}
 
-	read_address = signed_region_address;
+	read_address = signed_region_addr;
+	LOG_INF("signed_region_address=0x%08x", read_address);
 
 	// PFM Firmware Version Element Image Offset
 	struct pfm_fw_version_element_image fw_ver_element_img;
 	uint8_t *hashStorage = getNewHashStorage();
 	struct rsa_public_key pub_key;
-	uint8_t key_id;
 	uint8_t key_manifest_id;
+	uint8_t key_id;
 
 	for (int signed_region_id = 0; signed_region_id < fw_ver_element.img_count;
 			signed_region_id++) {
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(fw_ver_element_img),
 					(uint8_t *)&fw_ver_element_img)) {
-			LOG_ERR("Failed to get PFM firmware version element image header");
+			LOG_ERR("Signed Region(%d): Failed to get PFM firmware version element image header", signed_region_id);
 			return Failure;
 		}
 
 		key_id = fw_ver_element_img.reserved;
-		LOG_INF("CSK KeyId=%d", key_id);
+		LOG_INF("Signed Region(%d): CSK KeyId=%d", signed_region_id, key_id);
 
 		struct flash_region region_list[fw_ver_element_img.region_count];
 		struct pfm_flash_region region;
@@ -457,32 +529,33 @@ int cerberus_verify_regions(struct manifest *manifest)
 		// Image Signature
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(signature),
 					(uint8_t *)signature)) {
-			LOG_ERR("Failed to get region signature");
+			LOG_ERR("Signed Region(%d): Failed to get region signature", signed_region_id);
 			return Failure;
 		}
 
-		read_address += manifest_flash->max_signature;
+		read_address += manifest_flash->header.sig_length;
 
 		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(pub_key), (uint8_t *)&pub_key)) {
-			LOG_ERR("Failed to get CSK key");
+			LOG_ERR("Signed Region(%d): Failed to get CSK key", signed_region_id);
 			return Failure;
 		}
 
 		if (pub_key.mod_length != manifest_flash->header.sig_length) {
-			LOG_ERR("CSK key length(%d) and signature length (%d) mismatch", pub_key.mod_length, manifest_flash->header.sig_length);
+			LOG_ERR("Signed Region(%d): CSK key length(%d) and signature length (%d) mismatch",
+				signed_region_id, pub_key.mod_length, manifest_flash->header.sig_length);
 			return Failure;
 		}
 
 		read_address += sizeof(pub_key);
 		// Validate CSK and find its key manifest id
 		if (cerberus_pfr_find_key_manifest_id(pfr_manifest, &pub_key, key_id, &key_manifest_id)) {
-			LOG_ERR("Verify CSK key failed");
+			LOG_ERR("Signed Region(%d): Verify CSK key failed", signed_region_id);
 			return Failure;
 		}
 
 		// Validate Key cancellation
 		if (pfr_manifest->keystore->kc_flag->verify_kc_flag(pfr_manifest, key_manifest_id, key_id)) {
-			LOG_ERR("Verify CSK key cancellation failed");
+			LOG_ERR("Signed Region(%d): Verify CSK key cancellation failed", signed_region_id);
 			return Failure;
 		}
 
@@ -490,27 +563,27 @@ int cerberus_verify_regions(struct manifest *manifest)
 		for (int count = 0; count < fw_ver_element_img.region_count; count++) {
 			if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(struct pfm_flash_region),
 					(uint8_t *)&region)) {
-				LOG_ERR("Failed to get signed region %d", count);
+				LOG_ERR("Signed Region(%d), Failed to get region (%d)", signed_region_id, count);
 				return Failure;
 			}
 
 			read_address += sizeof(struct pfm_flash_region);
 
 			if (region.end_addr <= region.start_addr) {
-				LOG_ERR("[Signed Region %d]: Failed to get region address, RegionStartAddress: %x, RegionEndAddress: %x",
-					count, region.start_addr, region.end_addr);
+				LOG_ERR("Signed Region(%d): Failed to get region address(%d), RegionStartAddress: %x, RegionEndAddress: %x",
+					signed_region_id, count, region.start_addr, region.end_addr);
 				return Failure;
 			}
 
 			region_list[count].start_addr = region.start_addr;
 			region_list[count].length = (region.end_addr - region.start_addr) + 1;
-			LOG_INF("RegionStartAddress: %08x, RegionEndAddress: %08x",
-				region.start_addr, region.end_addr);
+			LOG_INF("Signed Region(%d): RegionStartAddress: %08x, RegionEndAddress: %08x",
+				signed_region_id, region.start_addr, region.end_addr);
 		}
 
 		// Bypass verification if validation flag of the region is not set.
 		if (!(fw_ver_element_img.flags & PFM_IMAGE_MUST_VALIDATE)) {
-			LOG_INF("Digest verification bypassed");
+			LOG_INF("Signed Region(%d): Digest verification bypassed", signed_region_id);
 			continue;
 		}
 
@@ -526,11 +599,11 @@ int cerberus_verify_regions(struct manifest *manifest)
 				hashStorage,
 				manifest_flash->max_signature
 				)) {
-			LOG_ERR("Digest verification failed");
+			LOG_ERR("Signed Region(%d): Digest verification failed", signed_region_id);
 			return Failure;
 		}
 
-		LOG_INF("Digest verification succeeded");
+		LOG_INF("Signed Region(%d): Digest verification succeeded", signed_region_id);
 	}
 
 	// Record the i2c filtering rule address in manifest
