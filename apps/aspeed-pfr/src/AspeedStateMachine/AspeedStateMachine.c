@@ -12,8 +12,12 @@
 #include <drivers/i2c/pfr/i2c_filter.h>
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include <drivers/flash.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "AspeedStateMachine.h"
+#include "common_smc.h"
 #include "include/SmbusMailBoxCom.h"
 #if defined(CONFIG_INTEL_PFR)
 #include "intel_pfr/intel_pfr_definitions.h"
@@ -146,6 +150,12 @@ void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 int is_afm_ready(void)
 {
 	return (!last_afm_active_verify_status && !last_afm_recovery_verify_status);
+}
+
+bool pltrst_sync = false;
+int is_pltrst_sync(void)
+{
+	return pltrst_sync;
 }
 
 void do_init(void *o)
@@ -950,6 +960,7 @@ void enter_tzero(void *o)
 		}
 	}
 
+	power_btn(true);
 enter_tzero_end:
 	LOG_DBG("End");
 }
@@ -959,6 +970,7 @@ void exit_tzero(void *o)
 	ARG_UNUSED(o);
 	LOG_DBG("Start");
 	/* Disarm reset monitor */
+	power_btn(false);
 	bmc_reset_monitor_remove();
 	platform_monitor_remove();
 	LOG_DBG("End");

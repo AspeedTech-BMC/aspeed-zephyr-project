@@ -12,6 +12,21 @@ properties:
         required: false
         description: Detect platform reset indicator.
 
+    i3c-mng-mux-sel-out-gpios:
+        type: phandle-array
+        required: false
+        description: I3C MNG Mux select.
+
+    fp-pwr-btn-in-gpios:
+        type: phandle-array
+        required: true
+        description: Power button gate/passthrough input.
+
+    bmc-pwr-btn-out-gpios:
+        type: phandle-array
+        required: true
+        description: Power button gate/passthrough output.
+
     rst-rtcrst-cpu0-out-gpios:
         type: phandle-array
         required: false
@@ -81,8 +96,3 @@ properties:
         type: phandle-array
         required: false
         description: GPIO to hide RSU IP.
-
-    i3c-mng-mux-sel-out-gpios:
-        type: phandle-array
-        required: false
-        description: I3C MNG Mux select.

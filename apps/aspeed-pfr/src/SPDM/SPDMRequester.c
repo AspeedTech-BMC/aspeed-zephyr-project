@@ -7,6 +7,7 @@
 #include <storage/flash_map.h>
 #include <aspeed_util.h>
 
+#include "SPDM/SPDMRequester.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "SPDM/SPDMCommon.h"
 #include "SPDM/RequestCmd/SPDMRequestCmd.h"
@@ -38,6 +39,22 @@ enum ATTEST_RESULT {
 	ATTEST_FAILED_CHALLENGE_AUTH = -4,
 	ATTEST_FAILED_MEASUREMENTS_MISMATCH = -5,
 };
+
+void spdm_stop_attester()
+{
+	k_timer_stop(&spdm_attester_timer);
+	osEventFlagsClear(spdm_attester_event, SPDM_REQ_EVT_T0);
+}
+
+uint32_t spdm_get_attester()
+{
+	return osEventFlagsGet(spdm_attester_event);
+}
+
+void spdm_request_tick()
+{
+	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_TICK);
+}
 
 int spdm_send_request(void *ctx, void *req, void *rsp)
 {
@@ -156,7 +173,7 @@ static int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 		/* This is Intel EGS style of measurement attestation, the AFM device structure
 		 * doesn't contain measurement block index, so we need to scan through it.
 		 *
-		 * TODO: In Intel BHS, the AFM device structure has extended to include 
+		 * TODO: In Intel BHS, the AFM device structure has extended to include
 		 * measurement block index, so we could directly ask for it.
 		 */
 		while (afm_body->TotalMeasurements != afm_index) {
@@ -207,7 +224,7 @@ static int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 
 static void spdm_attester_tick(struct k_timer *timeer)
 {
-	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_TICK);
+	spdm_request_tick();
 }
 
 void spdm_attester_main(void *a, void *b, void *c)
@@ -260,6 +277,10 @@ void spdm_attester_main(void *a, void *b, void *c)
 						afm_device->BindingSpec,
 						afm_device->Policy);
 
+				if (!(events & SPDM_REQ_EVT_T0_I3C) && afm_device->BindingSpec == SPDM_MEDIUM_I3C) {
+					LOG_WRN("I3C Discovery not done, skip attestation");
+					continue;
+				}
 
 				/* Create context */
 				struct spdm_context *context = NULL;
@@ -284,6 +305,9 @@ void spdm_attester_main(void *a, void *b, void *c)
 					switch (ret) {
 						case ATTEST_SUCCEEDED:
 							LOG_INF("ATTEST UUID[%04x] Succeeded", afm_device->UUID);
+							if (afm_device->BindingSpec == SPDM_MEDIUM_I3C) {
+								osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_ATTESTED_CPU);
+							}
 							break;
 						case ATTEST_FAILED_VCA:
 							/* Protocol Error */
@@ -346,6 +370,12 @@ void spdm_enable_attester()
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_ENABLE);
 }
 
+void spdm_run_attester_i3c()
+{
+	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0_I3C);
+	spdm_request_tick();
+}
+
 void spdm_run_attester()
 {
 	/* AFM Active is already verified during Tmin1, and the AFM structure are
@@ -355,58 +385,44 @@ void spdm_run_attester()
 	int ret;
 	int max_afm = CONFIG_PFR_SPDM_ATTESTATION_MAX_DEVICES;
 
-	ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &afm_flash);
-	if (ret) {
-		LOG_ERR("Failed to open AFM partition ret=%d", ret);
-		return;
-	}
-
-	/* First page is the block0/block1, start from page 1. */
-	for (uint8_t i = 1; i<max_afm; ++i) {
-		uint32_t magic_num;
-		ret = flash_area_read(afm_flash,
-				i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET,
-				&magic_num,
-				sizeof(magic_num));
+	uint32_t event = osEventFlagsGet(spdm_attester_event);
+	if (!(event & SPDM_REQ_EVT_ENABLE)) {
+		LOG_WRN("SPDM Requester not enabled");
+	} else if (!(event & SPDM_REQ_EVT_T0)) {
+		ret = flash_area_open(FLASH_AREA_ID(afm_act_1), &afm_flash);
 		if (ret) {
-			LOG_ERR("Failed to read AFM partition offset [%08x] ret=%d",
+			LOG_ERR("Failed to open AFM partition ret=%d", ret);
+			return;
+		}
+
+		/* First page is the block0/block1, start from page 1. */
+		for (uint8_t i = 1; i<max_afm; ++i) {
+			uint32_t magic_num;
+			ret = flash_area_read(afm_flash,
 					i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET,
-					ret);
-			afm_list[i] = 0x00000000;
-			continue;
+					&magic_num, sizeof(magic_num));
+			if (ret) {
+				LOG_ERR("Failed to read AFM partition offset [%08x] ret=%d",
+						i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET, ret);
+				afm_list[i] = 0x00000000;
+				continue;
+			}
+			if (magic_num == BLOCK0TAG) {
+				afm_list[i] = (i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET) + 0x400;
+				LOG_INF("Add afm device offset [%08x]", afm_list[i]);
+				} else {
+				/* Offset 0x0000 is block0/1 header not AFM device structure,
+				 * so use this value as an empty slot */
+				afm_list[i] = 0x00000000;
+			}
 		}
-		if (magic_num == BLOCK0TAG) {
-			afm_list[i] = (i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET) + 0x400;
-			LOG_INF("Add afm device offset [%08x]", afm_list[i]);
-		} else {
-			/* Offset 0x0000 is block0/1 header not AFM device structure,
-			 * so use this value as an empty slot */
-			afm_list[i] = 0x00000000;
-		}
+
+
+		osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0);
+
+		k_timer_start(&spdm_attester_timer,
+				K_SECONDS(CONFIG_PFR_SPDM_ATTESTATION_DURATION),
+				K_SECONDS(CONFIG_PFR_SPDM_ATTESTATION_PERIOD));
 	}
-
-
-	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0);
-
-	k_timer_start(&spdm_attester_timer,
-			K_SECONDS(CONFIG_PFR_SPDM_ATTESTATION_DURATION),
-			K_SECONDS(CONFIG_PFR_SPDM_ATTESTATION_PERIOD));
 }
 
-void spdm_stop_attester()
-{
-	k_timer_stop(&spdm_attester_timer);
-	osEventFlagsClear(spdm_attester_event, SPDM_REQ_EVT_T0);
-}
-
-#if defined(CONFIG_SHELL)
-uint32_t spdm_get_attester()
-{
-	return osEventFlagsGet(spdm_attester_event);
-}
-
-void spdm_request_tick()
-{
-	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_TICK);
-}
-#endif

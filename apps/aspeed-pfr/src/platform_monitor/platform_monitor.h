@@ -33,4 +33,5 @@ void bmc_reset_monitor_remove(void);
 void power_sequence(void);
 void platform_monitor_init(void);
 void platform_monitor_remove(void);
-
+void power_btn(bool enable);
+void pltrst_sync_monitor_init(void);

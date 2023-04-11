@@ -28,6 +28,7 @@
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "SPDM/SPDMRequester.h"
 
 #include "mctp/mctp_base_protocol.h"
 
@@ -156,15 +157,59 @@ void mctp_i3c_stop_discovery_notify(struct device_manager *mgr)
 void mctp_i3c_pre_attestation(struct device_manager *mgr, int *duration)
 {
 	uint8_t provision_state = GetUfmStatusValue();
-	if (!(provision_state & UFM_PROVISIONED) || !is_afm_ready()) {
-		*duration = 300;
-		return;
+
+	if (provision_state & UFM_PROVISIONED) {
+		if (is_afm_ready() && is_pltrst_sync()) {
+			LOG_WRN("Pre-attestation");
+			device_manager_update_device_state(mgr,
+				      DEVICE_MANAGER_SELF_DEVICE_NUM,
+				      DEVICE_MANAGER_ATTESTATION);
+		} 	
+		*duration = 1;
+	} else {
+		// Unprovisioned, Enter Runtime
+		LOG_DBG("Unprovisioned, skip attestation, wait for PLTRST_SYNC#");
+		if (is_pltrst_sync()) {
+			LOG_WRN("PLTRST_SYNC# Asserted, go next state");
+			device_manager_update_device_state(mgr,
+				      DEVICE_MANAGER_SELF_DEVICE_NUM,
+				      DEVICE_MANAGER_RUNTIME);
+			k_sem_give(&mctp_i3c_sem);
+			*duration = 0;
+		} else {
+			*duration = 1;
+		}
 	}
 
-	device_manager_update_device_state(mgr,
-			DEVICE_MANAGER_SELF_DEVICE_NUM,
-			DEVICE_MANAGER_ATTESTATION);
-	*duration = 2;
+}
+
+void mctp_i3c_attestation(struct device_manager *mgr, int *duration)
+{
+	uint32_t event = spdm_get_attester();
+	if (event & SPDM_REQ_EVT_ENABLE) {
+		if (!(event & SPDM_REQ_EVT_T0_I3C)) {
+			LOG_WRN("I3C Device Attestation start");
+			spdm_run_attester_i3c();
+			*duration = 10;
+		} else if (!(event & SPDM_REQ_EVT_ATTESTED_CPU)) {
+			LOG_WRN("I3C Device Attestation running");
+			*duration = 10;
+		} else {
+			LOG_WRN("I3C Device Attestation done");
+			device_manager_update_device_state(mgr,
+				      DEVICE_MANAGER_SELF_DEVICE_NUM,
+				      DEVICE_MANAGER_RUNTIME);
+			k_sem_give(&mctp_i3c_sem);
+		}
+	} else {
+
+		LOG_WRN("SPDM Not enabled, skip attestation");
+		device_manager_update_device_state(mgr,
+				     DEVICE_MANAGER_SELF_DEVICE_NUM,
+				     DEVICE_MANAGER_RUNTIME);
+		k_sem_give(&mctp_i3c_sem);
+
+	}
 }
 
 int mctp_i3c_send_discovery_notify(mctp *mctp_instance, int *duration)
@@ -239,12 +284,13 @@ void mctp_i3c_state_handler(void *a, void *b, void *c)
 		}
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 		else if (dev_state == DEVICE_MANAGER_PRE_ATTESTATION) {
-			LOG_DBG("Pre-attestation");
 			mctp_i3c_pre_attestation(device_mgr, &duration);
 		} else if (dev_state == DEVICE_MANAGER_ATTESTATION) {
-			LOG_DBG("Device Attestation start");
-			// TODO: perform bmc/cpu0/cpu1 attestation via mctp i3c
-			// attest_bmc_cpu0_and_cpu1();
+			/* Start S3M attestation then release PLTRST_CPU0_N */
+			mctp_i3c_attestation(device_mgr, &duration);
+		} else if (dev_state == DEVICE_MANAGER_RUNTIME) {
+			/* TODO: Start S3M attestation then release PLTRST_CPU0_N */
+			RSTPlatformReset(false);
 			duration = 0;
 		}
 #endif

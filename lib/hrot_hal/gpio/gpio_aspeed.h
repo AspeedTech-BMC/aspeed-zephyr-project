@@ -38,5 +38,6 @@ int PCHBootRelease(void);
 #define I3C_MNG_OWNER_ROT     1
 void switch_i3c_mng_owner(int owner);
 int get_i3c_mng_owner(void);
+void RSTPlatformReset(bool assert);
 #endif
 #endif

@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(monitor, CONFIG_LOG_DEFAULT_LEVEL);
 extern struct k_work log_bmc_rst_work;
 extern uint8_t gWdtBootStatus;
 static struct gpio_callback bmc_rstind_cb_data;
+static void platform_reset_monitor_remove(void);
 
 static void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -61,6 +62,16 @@ static struct gpio_callback rst_pltrst_cb_data;
  */
 static void platform_reset_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
+#ifdef INTEL_BHS
+	uint8_t gpio_pin = 31 - __builtin_clz(pins);
+	int ret = gpio_pin_get(dev, gpio_pin);
+	LOG_INF("[CPU->PFR] PLTRST_SYNC[%s %d] = %d", dev->name, gpio_pin, ret);
+
+	platform_reset_monitor_remove();
+	extern bool pltrst_sync;
+	pltrst_sync = true;
+
+#endif
 #ifdef INTEL_EGS
 	uint8_t gpio_pin = 31 - __builtin_clz(pins);
 	int ret = gpio_pin_get(dev, gpio_pin);
@@ -285,3 +296,48 @@ void power_sequence(void)
 	gpio_pin_interrupt_configure_dt(&rst_rsmrst, GPIO_INT_LEVEL_INACTIVE);
 }
 #endif
+
+struct k_work pwr_btn_work;
+static struct gpio_callback fp_pwr_btn_cb_data;
+
+static void power_btn_work_handler(struct k_work *item)
+{
+	struct gpio_dt_spec power_btn_in =
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), fp_pwr_btn_in_gpios, 0);
+	struct gpio_dt_spec power_btn_out =
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), bmc_pwr_btn_out_gpios, 0);
+	int ret = gpio_pin_get(power_btn_in.port, power_btn_in.pin);
+
+	LOG_INF("[FP->PFR] PWR_BTN[%s %d] = %d", power_btn_in.port->name, power_btn_in.pin, ret);
+	gpio_pin_set(power_btn_out.port, power_btn_out.pin, ret);
+	gpio_pin_configure_dt(&power_btn_out, GPIO_OUTPUT);
+	LOG_INF("[PFR->BMC] PWR_BTN[%s %d] = %d", power_btn_out.port->name, power_btn_out.pin, ret);
+}
+
+void power_btn_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+	LOG_INF("[FP->PFR] PWN_BTN Interrupt");
+	k_work_submit(&pwr_btn_work);
+}
+
+void power_btn(bool enable)
+{
+	k_work_init(&pwr_btn_work, power_btn_work_handler);
+	struct gpio_dt_spec power_btn_in =
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), fp_pwr_btn_in_gpios, 0);
+
+	LOG_INF("[FP->PFR] Monitor PWN_BTN[%s %d] %s",
+			power_btn_in.port->name, power_btn_in.pin, enable ? "registered" : "removed");
+	if (enable) {
+		/* Register input */
+		gpio_pin_configure_dt(&power_btn_in, GPIO_INPUT);
+		gpio_init_callback(&fp_pwr_btn_cb_data, power_btn_handler, BIT(power_btn_in.pin));
+		gpio_add_callback(power_btn_in.port, &fp_pwr_btn_cb_data);
+		gpio_pin_interrupt_configure_dt(&power_btn_in, GPIO_INT_EDGE_BOTH);
+	} else {
+		/* Remove the callback */
+		gpio_pin_interrupt_configure_dt(&power_btn_in, GPIO_INT_DISABLE);
+		gpio_remove_callback(power_btn_in.port, &fp_pwr_btn_cb_data);
+	}
+}
+

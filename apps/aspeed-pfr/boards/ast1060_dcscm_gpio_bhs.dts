@@ -17,6 +17,8 @@
 		scm-board-id5-in-gpios = <&sgpiom_a_d 0 0>;
 		scm-rsu-hide-done-in-gpios = <&sgpiom_a_d 6 0>;
 		scm-rsu-hide-out-gpios = <&sgpiom_a_d 8 0>;
+		fp-pwr-btn-in-gpios = <&gpio0_q_t 30 0>; /* GPI_T6 */
+		bmc-pwr-btn-out-gpios = <&gpio0_a_d 9 0>; /* GPIO_B1 */
 	};
 };
 
