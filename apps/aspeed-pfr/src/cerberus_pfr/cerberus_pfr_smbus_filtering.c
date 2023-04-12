@@ -37,10 +37,8 @@ void apply_pfm_smbus_protection(uint8_t spi_dev)
 
 	pfr_spi_read(spi_dev, i2c_filter_addr, sizeof(struct SMBUS_FILTER_RULE),
 			(uint8_t *)&i2c_rule);
-	if ((i2c_rule.magic_number != I2C_FILTER_SECTION_MAGIC) || (i2c_rule.filter_count == 0)) {
-		LOG_ERR("I2c Filtering rule is invalid");
+	if ((i2c_rule.magic_number != I2C_FILTER_SECTION_MAGIC) || (i2c_rule.filter_count == 0))
 		return;
-	}
 
 	for (int i = 0; i < 4; i++) {
 		bus_dev_name[11] = i + '0';

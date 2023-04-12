@@ -891,9 +891,11 @@ void handle_checkpoint(void *o)
 		}
 #endif
 		break;
+#if defined(CONFIG_INTEL_PFR)
 	case AcmCheckpoint:
 		UpdateAcmCheckpoint(evt_ctx->data.bit8[1]);
 		break;
+#endif
 	case BiosCheckpoint:
 		UpdateBiosCheckpoint(evt_ctx->data.bit8[1]);
 		break;
@@ -1214,8 +1216,14 @@ void enter_runtime(void *o)
 #endif
 			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_INTEL_PFR)
 #ifdef SUPPORT_ME
 				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
+#else
+				pfr_start_timer(ACM_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
+#endif
+#else
+				pfr_start_timer(BIOS_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
 #endif
 #endif
 			} else {
@@ -1223,8 +1231,14 @@ void enter_runtime(void *o)
 				pfr_start_timer(BMC_TIMER, WDT_BMC_TIMER_MAXTIMEOUT);
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_INTEL_PFR)
 #ifdef SUPPORT_ME
 				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
+#else
+				pfr_start_timer(ACM_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
+#endif
+#else
+				pfr_start_timer(BIOS_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
 #endif
 #endif
 			}

@@ -1136,6 +1136,7 @@ void UpdateBmcCheckpoint(byte Data)
 	bmc_wdt_handler(Data);
 }
 
+#if defined(CONFIG_INTEL_PFR)
 /**
  * Function to update the ACM Checkpoint
  *
@@ -1147,6 +1148,7 @@ void UpdateAcmCheckpoint(byte Data)
 	SetAcmCheckpoint(Data);
 	acm_wdt_handler(Data);
 }
+#endif
 
 /**
  * Function to update the BIOS Checkpoint

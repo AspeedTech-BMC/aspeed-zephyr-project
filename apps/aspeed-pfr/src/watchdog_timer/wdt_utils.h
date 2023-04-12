@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "platform_monitor/platform_monitor.h"
 
 static uint8_t gWdtBootStatus = 0;
 
@@ -28,8 +29,15 @@ static uint8_t gWdtBootStatus = 0;
 #define WDT_ACM_BOOT_DONE_MASK      0b00100
 #define WDT_IBB_BOOT_DONE_MASK      0b01000
 #define WDT_OBB_BOOT_DONE_MASK      0b10000
+#if defined(CONFIG_INTEL_PFR)
 #define WDT_ACM_BIOS_BOOT_DONE_MASK (WDT_ACM_BOOT_DONE_MASK | WDT_IBB_BOOT_DONE_MASK | WDT_OBB_BOOT_DONE_MASK)
-#define WDT_PCH_BOOT_DONE_MASK      (WDT_ME_BOOT_DONE_MASK | WDT_ACM_BOOT_DONE_MASK | WDT_IBB_BOOT_DONE_MASK | WDT_OBB_BOOT_DONE_MASK)
+#ifdef SUPPORT_ME
+#define WDT_PCH_BOOT_DONE_MASK      (WDT_ME_BOOT_DONE_MASK | WDT_ACM_BIOS_BOOT_DONE_MASK)
+#endif
+#define WDT_PCH_BOOT_DONE_MASK      (WDT_ACM_BIOS_BOOT_DONE_MASK)
+#else
+#define WDT_PCH_BOOT_DONE_MASK      (WDT_IBB_BOOT_DONE_MASK)
+#endif
 #define WDT_ALL_BOOT_DONE_MASK      (WDT_BMC_BOOT_DONE_MASK | WDT_PCH_BOOT_DONE_MASK)
 
 enum _pfr_timer {

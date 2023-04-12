@@ -54,6 +54,8 @@ void bmc_wdt_handler(uint8_t cmd)
 	}
 }
 
+#if defined(CONFIG_INTEL_PFR)
+#ifdef SUPPORT_ME
 /**
  * Monitor the boot progress for ME firmware with the ME GPIO
  */
@@ -86,6 +88,7 @@ void me_wdt_timer_handler(uint8_t cmd)
 		log_t0_timed_boot_complete_if_ready(T0_ME_BOOTED);
 	}
 }
+#endif
 
 /**
  * Monitor the boot progress of ACM firmware with the ACM checkpoint messages.
@@ -201,4 +204,30 @@ void bios_wdt_handler(uint8_t cmd)
 	else if (cmd == EXECUTION_BLOCK_RESUMED)
 		pfr_start_timer(type, ms_timeout);
 }
+#else
+void bios_wdt_handler(uint8_t cmd)
+{
+	uint32_t ms_timeout = WDT_BIOS_TIMER_MAXTIMEOUT;
+	union aspeed_event_data data = {0};
+	int type = BIOS_TIMER;
 
+	data.bit8[0] = PCH_EVENT;
+
+	if (cmd == ExecutionBlockStrat) {
+		pfr_start_timer(type, ms_timeout);
+	} else if (cmd == PausingExecutionBlock) {
+		pfr_stop_timer(type);
+	} else if (cmd == ResumedExecutionBlock) {
+		pfr_start_timer(type, ms_timeout);
+	} else if (cmd == NextExeBlockAuthenticationFail) {
+		pfr_stop_timer(type);
+		LogWatchdogRecovery(IBB_LAUNCH_FAIL, IBB_WDT_EXPIRE);
+		GenerateStateMachineEvent(WDT_TIMEOUT, data.ptr);
+	} else if (cmd == CompletingExecutionBlock || cmd == ReadyToBootOS) {
+		// BIOS has completed boot
+		pfr_stop_timer(type);
+		gWdtBootStatus |= WDT_PCH_BOOT_DONE_MASK;
+		log_t0_timed_boot_complete_if_ready(T0_BIOS_BOOTED);
+	}
+}
+#endif // CONFIG_INTEL_PFR
