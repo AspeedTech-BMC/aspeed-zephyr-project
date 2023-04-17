@@ -210,7 +210,6 @@ int pfr_recover_recovery_region(int image_type, uint32_t source_address, uint32_
 		return Failure;
 	}
 
-
 	// use read_write_between spi for supporting dual flash
 	if (pfr_spi_region_read_write_between_spi(image_type, source_address,
 				image_type, target_address, area_size)) {

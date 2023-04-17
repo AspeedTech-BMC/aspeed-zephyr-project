@@ -267,12 +267,12 @@ uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 			signed_region_id++) {
 		if (pfr_spi_read(manifest->image_type, read_address, sizeof(fw_ver_element_img),
 					(uint8_t *)&fw_ver_element_img)) {
-			LOG_ERR("Failed to get PFM firmware version element image header(%d)", signed_region_id);
+			LOG_ERR("Signed Region(%d): Failed to get PFM firmware version element image header", signed_region_id);
 			goto error;
 		}
 
 		if (fw_ver_element_img.region_count > 5) {
-			LOG_ERR("PFM firmware version element image(%d): image regions(%d) exceeds 5",
+			LOG_ERR("Signed Region(%d): PFM firmware version element image regions(%d) exceeds 5",
 				signed_region_id, fw_ver_element_img.region_count);
 			goto error;
 		}
@@ -289,7 +289,7 @@ uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
 		for (int count = 0; count < fw_ver_element_img.region_count; count++) {
 			if (pfr_spi_read(manifest->image_type, read_address, sizeof(struct pfm_flash_region),
 					(uint8_t *)&region)) {
-				LOG_ERR("PFM firmware version element image(%d): failed to get regions", signed_region_id);
+				LOG_ERR("Signed Region(%d): failed to get region (%d)", signed_region_id, count);
 				goto error;
 			}
 

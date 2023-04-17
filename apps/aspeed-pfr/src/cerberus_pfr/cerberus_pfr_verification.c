@@ -527,7 +527,7 @@ int cerberus_verify_regions(struct manifest *manifest)
 		read_address += sizeof(fw_ver_element_img);
 
 		// Image Signature
-		if (pfr_spi_read(pfr_manifest->image_type, read_address, sizeof(signature),
+		if (pfr_spi_read(pfr_manifest->image_type, read_address, manifest_flash->header.sig_length,
 					(uint8_t *)signature)) {
 			LOG_ERR("Signed Region(%d): Failed to get region signature", signed_region_id);
 			return Failure;
@@ -594,10 +594,10 @@ int cerberus_verify_regions(struct manifest *manifest)
 				manifest_flash->toc_hash_type,
 				&getRsaEngineInstance()->base,
 				signature,
-				manifest_flash->max_signature,
+				manifest_flash->header.sig_length,
 				&pub_key,
 				hashStorage,
-				manifest_flash->max_signature
+				manifest_flash->header.sig_length
 				)) {
 			LOG_ERR("Signed Region(%d): Digest verification failed", signed_region_id);
 			return Failure;
