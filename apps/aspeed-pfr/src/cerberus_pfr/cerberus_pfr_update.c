@@ -109,44 +109,52 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 
 int cerberus_hrot_update(struct pfr_manifest *manifest)
 {
-	int status = 0;
 	byte provision_state = GetUfmStatusValue();
+	struct recovery_header image_header;
+	int status = 0;
+
 	if (provision_state & UFM_PROVISIONED) {
-		struct recovery_header image_header;
-		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header),
-				(uint8_t *)&image_header);
+		if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+			LOG_ERR("Unable to get image header.");
+			return Failure;
+		}
+
+		if (image_header.format != UPDATE_FORMAT_TYPE_HROT &&
+		    image_header.format != UPDATE_FORMAT_TYPE_KCC &&
+		    image_header.format != UPDATE_FORMAT_TYPE_DCC &&
+		    image_header.format == UPDATE_FORMAT_TYPE_KEYM) {
+			LOG_ERR("Unsupported image format(%d)", image_header.format);
+			return Failure;
+		}
+
+		manifest->pc_type = PFR_CPLD_UPDATE_CAPSULE;
 		status =  cerberus_pfr_verify_image(manifest);
 		if (status != Success) {
-			LOG_ERR("HRoT update pfr verification failed");
+			LOG_ERR("HRoT Image Verify Failed");
 			return Failure;
 		}
 
 		if (image_header.format == UPDATE_FORMAT_TYPE_HROT) {
-			status = cerberus_update_rot_fw(manifest);
-			if (status != Success) {
+			if (cerberus_update_rot_fw(manifest)) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
 		} else if (image_header.format == UPDATE_FORMAT_TYPE_DCC) {
-			status = cerberus_pfr_decommission(manifest);
-			if (status != Success) {
-				LOG_ERR("HRoT decommission failed.");
+			if (cerberus_pfr_decommission(manifest)) {
+				LOG_ERR("Decommission failed.");
 				return Failure;
 			}
 		} else if (image_header.format == UPDATE_FORMAT_TYPE_KCC) {
-			status = cerberus_pfr_cancel_csk_keys(manifest);
-			if (status != Success) {
-				LOG_ERR("HRoT cancel CSK keys failed.");
+			if (cerberus_pfr_cancel_csk_keys(manifest)) {
+				LOG_ERR("Cancel CSK keys failed.");
 				return Failure;
 			}
-		} else {
-			LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "Incorrect image header:");
-			return Failure;
 		}
 	} else {
 		LOG_INF("Start HROT Provisioning %02x.", provision_state);
 		return cerberus_provisioning_root_key_action(manifest);
 	}
+
 	return Success;
 }
 
@@ -173,12 +181,6 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	if (pfr_spi_read(manifest->image_type, manifest->address, sizeof(image_header),
 			(uint8_t *)&image_header)) {
 		LOG_ERR("Failed to read image header");
-		return Failure;
-	}
-
-	if (image_header.format != UPDATE_FORMAT_TYPE_BMC &&
-	    image_header.format != UPDATE_FORMAT_TYPE_PCH) {
-		LOG_ERR("Unsupported image format(%d)", image_header.format);
 		return Failure;
 	}
 
@@ -247,13 +249,18 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 {
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
-
-	uint8_t status = Success;
-	uint32_t source_address, target_address, address, act_pfm_offset;
-	CPLD_STATUS cpld_update_status;
-	uint8_t flash_select = EventData->flash;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	uint8_t flash_select = EventData->flash;
+	struct recovery_header image_header;
+	CPLD_STATUS cpld_update_status;
 	bool erase_rw_regions = false;
+	uint8_t status = Success;
+	uint32_t source_address;
+	uint32_t target_address;
+	uint32_t act_pfm_offset;
+	uint32_t flash_id;
+	uint32_t pc_type;
+	uint32_t address;
 
 	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC)
 		erase_rw_regions = true;
@@ -263,6 +270,13 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	LOG_INF("Firmware Update Start.");
 
+	if (pfr_manifest->image_type != BMC_TYPE &&
+	    pfr_manifest->image_type != PCH_TYPE &&
+	    pfr_manifest->image_type != ROT_TYPE) {
+		LOG_ERR("Unsupported image type %d", pfr_manifest->image_type);
+		return Failure;
+	}
+
 	if (pfr_manifest->image_type == BMC_TYPE) {
 		// BMC Update/Provisioning
 		LOG_INF("BMC Update in Progress");
@@ -270,8 +284,12 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 				sizeof(pfr_manifest->address)))
 			return Failure;
 		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
-					sizeof(act_pfm_offset)))
+				sizeof(act_pfm_offset)))
 			return Failure;
+		flash_id = BMC_FLASH_ID;
+		pfr_manifest->flash_id = flash_id;
+		pc_type = PFR_BMC_UPDATE_CAPSULE;
+		pfr_manifest->pc_type = pc_type;
 	} else if (pfr_manifest->image_type == PCH_TYPE) {
 		// PCH Update
 		LOG_INF("PCH Update in Progress");
@@ -279,18 +297,22 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 				sizeof(pfr_manifest->address)))
 			return Failure;
 		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
-					sizeof(act_pfm_offset)))
+				sizeof(act_pfm_offset)))
 			return Failure;
+		flash_id = PCH_FLASH_ID;
+		pfr_manifest->flash_id = flash_id;
+		pc_type = PFR_PCH_UPDATE_CAPSULE;
+		pfr_manifest->pc_type = pc_type;
 	} else if (pfr_manifest->image_type == ROT_TYPE) {
-		//HROT Update/Decommisioning
+		// HROT Update/Decommisioning
 		LOG_INF("ROT Update in Progress");
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = BMC_CPLD_STAGING_ADDRESS;
-		pfr_manifest->flash_id = BMC_FLASH_ID;
+		flash_id = BMC_FLASH_ID;
+		pfr_manifest->flash_id = flash_id;
+		pc_type = PFR_CPLD_UPDATE_CAPSULE;
+		pfr_manifest->pc_type = pc_type;
 		return cerberus_hrot_update(pfr_manifest);
-	} else {
-		LOG_ERR("Unsupported image type %d", pfr_manifest->image_type);
-		return Failure;
 	}
 
 	pfr_manifest->staging_address = source_address;
@@ -322,8 +344,19 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	pfr_manifest->image_type = image_type;
 	pfr_manifest->address = source_address;
+	pfr_manifest->flash_id = flash_id;
+	pfr_manifest->pc_type = pc_type;
 
-	//BMC/PCH Firmware Update for Active/Recovery Region
+	// Checking for key cancellation
+	if (pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	if (image_header.format == UPDATE_FORMAT_TYPE_KCC)
+		return cerberus_pfr_cancel_csk_keys(pfr_manifest);
+
+	// BMC/PCH Firmware Update for Active/Recovery Region
 	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
 			NULL, NULL);
 	if (status != Success) {
@@ -364,6 +397,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		status = cerberus_update_recovery_region(image_type, source_address, target_address);
 	}
+
 	return status;
 }
 
@@ -398,22 +432,40 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->staging_address;
 	LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
-	if (cerberus_pfr_verify_image(manifest)) {
-		LOG_ERR("Stage Image Verify Failed");
-		return Failure;
-	}
-
 	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
 		LOG_ERR("Unable to get image header.");
 		return Failure;
 	}
 
-	// Find PFM in update image
+	if (((manifest->image_type == BMC_TYPE) && (image_header.format != UPDATE_FORMAT_TYPE_BMC)) ||
+	    ((manifest->image_type == PCH_TYPE) && (image_header.format != UPDATE_FORMAT_TYPE_PCH))) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Unsupported image format(%d) for manifest->image_type(%d)",
+			image_header.format, manifest->image_type);
+		return Failure;
+	}
+
+	if (cerberus_pfr_verify_image(manifest)) {
+		LOG_ERR("Stage Image Verify Failed");
+		return Failure;
+	}
+
+	// Find PFM in stage image
 	if (cerberus_get_image_pfm_addr(manifest, &image_header, &src_pfm_addr, &dest_pfm_addr)) {
 		LOG_ERR("PFM doesn't exist in stage image");
 		return Failure;
 	}
 
+	if (manifest->image_type == BMC_TYPE)
+		manifest->pc_type = PFR_BMC_PFM;
+	else if (manifest->image_type == PCH_TYPE)
+		manifest->pc_type = PFR_PCH_PFM;
+	else {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
+
+	// Stage region PFM verification
 	manifest->address = src_pfm_addr;
 	LOG_INF("Verifying PFM address=0x%08x", manifest->address);
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base,

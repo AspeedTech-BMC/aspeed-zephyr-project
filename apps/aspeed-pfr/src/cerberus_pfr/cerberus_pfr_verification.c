@@ -55,6 +55,7 @@ void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
 				(uint8_t *)&pfr_manifest->recovery_address,
 				sizeof(pfr_manifest->recovery_address));
 		pfr_manifest->flash_id = BMC_FLASH_ID;
+		pfr_manifest->pc_type = PFR_BMC_UPDATE_CAPSULE;
 	} else if (pfr_manifest->image_type == PCH_TYPE) {
 		get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET,
 				(uint8_t *)&pfr_manifest->staging_address, sizeof(pfr_manifest->address));
@@ -62,6 +63,7 @@ void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
 				(uint8_t *)&pfr_manifest->recovery_address,
 				sizeof(pfr_manifest->recovery_address));
 		pfr_manifest->flash_id = PCH_FLASH_ID;
+		pfr_manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 	}
 }
 
@@ -69,7 +71,7 @@ void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest)
  * Key Management images which are key cancellation image,
  * key manifest image and decommission image are signed by root key.
  * It should verify root public key and image signature.
- * The root public key hash is provisioned in UFM and it cannot be cancelled..
+ * The root public key hash is provisioned in UFM and it cannot be cancelled.
  *
  * Aspeed Cerberus key management image format:
  *
@@ -145,8 +147,7 @@ int cerberus_pfr_verify_key_management_image(struct pfr_manifest *manifest, stru
 		return Failure;
 	}
 
-	if (manifest->state == FIRMWARE_UPDATE)
-		LOG_INF("Stage Key Management Image Verify Success.");
+	LOG_INF("Key Management Image Verify Success.");
 
 	return Success;
 }

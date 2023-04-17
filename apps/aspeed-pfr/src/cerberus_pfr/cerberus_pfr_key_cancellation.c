@@ -19,24 +19,54 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
+/*
+ * So far, the design of cerberus-pfr key cancellation only supports 3 pc types which are BMC, PCH and ROT.
+ * Both pc type of update capsule and pfm use the same key cancellation policy.
+ * ex: Both BMC_PFM and BMC_UPDATE_CAPSULE use KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_PFM cancellation policy.
+ *
+ */
 int get_cancellation_policy_offset(uint32_t pc_type)
 {
-	if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PFR_CPLD_UPDATE_CAPSULE))
+	if ((pc_type == CPLD_CAPSULE_CANCELLATION) ||
+	    (pc_type == PFR_CPLD_UPDATE_CAPSULE))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_CPLD_UPDATE_CAPSULE;
-
-	else if ((pc_type == PCH_PFM_CANCELLATION) || (pc_type == PFR_PCH_PFM))
+	else if ((pc_type == PCH_PFM_CANCELLATION) ||
+		 (pc_type == PFR_PCH_PFM) ||
+		 (pc_type == PFR_PCH_UPDATE_CAPSULE))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_PFM;
-
-	else if ((pc_type == PCH_CAPSULE_CANCELLATION) || (pc_type == PFR_PCH_UPDATE_CAPSULE))
-		return KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_UPDATE_CAPSULE;
-
-	else if ((pc_type == BMC_PFM_CANCELLATION) || (pc_type == PFR_BMC_PFM))
+	else if ((pc_type == BMC_PFM_CANCELLATION) ||
+		 (pc_type == PFR_BMC_PFM) ||
+		 (pc_type == PFR_BMC_UPDATE_CAPSULE))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_PFM;
 
-	else if ((pc_type == BMC_CAPSULE_CANCELLATION) || (pc_type == PFR_BMC_UPDATE_CAPSULE))
-		return KEY_CANCELLATION_POLICY_FOR_SIGNING_BMC_UPDATE_CAPSULE;
-
 	return 0;
+}
+
+int check_cancellation_pc_type(struct pfr_manifest *manifest, uint32_t kc_pc_type)
+{
+	if (!manifest)
+		return Failure;
+
+	uint32_t expected_pc_type;
+
+	if (manifest->pc_type == PFR_CPLD_UPDATE_CAPSULE)
+		expected_pc_type = CPLD_CAPSULE_CANCELLATION;
+	else if (manifest->pc_type == PFR_BMC_PFM || manifest->pc_type == PFR_BMC_UPDATE_CAPSULE)
+		expected_pc_type = BMC_PFM_CANCELLATION;
+	else if (manifest->pc_type == PFR_PCH_PFM || manifest->pc_type == PFR_PCH_UPDATE_CAPSULE)
+		expected_pc_type = PCH_PFM_CANCELLATION;
+	else {
+		LOG_ERR("Unsupport manifest->pc_type(%x)", manifest->pc_type);
+		return Failure;
+	}
+
+	if (kc_pc_type != expected_pc_type) {
+		LOG_ERR("manifest->pc_type(%x), expected_pc_type(%x) and kc_pc_type(%x) mismatch",
+			manifest->pc_type, expected_pc_type, kc_pc_type);
+		return Failure;
+	}
+
+	return Success;
 }
 
 int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_manifest_id, uint8_t key_id)
@@ -137,6 +167,7 @@ int cerberus_pfr_get_key_cancellation_manifest(struct pfr_manifest *manifest,
 	read_address = manifest->address;
 
 	// read recovery header
+	LOG_INF("manifest->flash_id=%d kc_header_address=%x", manifest->flash_id, read_address);
 	if (pfr_spi_read(manifest->flash_id, read_address, sizeof(image_header),
 			(uint8_t *)&image_header)) {
 		LOG_ERR("Failed to read image header");
@@ -169,7 +200,7 @@ int cerberus_pfr_get_key_cancellation_manifest(struct pfr_manifest *manifest,
 
 	read_address += image_section.header_length;
 
-	LOG_INF("manifest->flash_id=%d kc manifest address=%x", manifest->flash_id, read_address);
+	LOG_INF("kc_manifest_address=%x", read_address);
 	if (pfr_spi_read(manifest->flash_id, read_address, sizeof(struct PFR_KEY_CANCELLATION_MANIFEST),
 			(uint8_t *)pfr_kc_manifest)) {
 		LOG_ERR("Failed to read key cancellation manifest");
@@ -222,6 +253,11 @@ int cerberus_pfr_cancel_csk_keys(struct pfr_manifest *manifest)
 
 	if (cerberus_pfr_get_key_cancellation_manifest(manifest, &kc_manifest, &hash_length)) {
 		LOG_ERR("Unable to get key cancellation manifest");
+		return Failure;
+	}
+
+	if (check_cancellation_pc_type(manifest, kc_manifest.key_policy)) {
+		LOG_ERR("Check cancellation pc type failed");
 		return Failure;
 	}
 
