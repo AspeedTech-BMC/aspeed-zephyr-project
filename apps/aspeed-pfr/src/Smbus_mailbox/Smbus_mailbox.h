@@ -234,3 +234,5 @@ bool IsSpdmAttestationEnabled();
 // If root key hash, pch and bmc offsets are provisioned, we say CPLD has been provisioned
 #define UFM_STATUS_PROVISIONED_BIT_MASK               0b000001110
 
+int swmbx_mctp_i3c_doe_msg_write_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data);
+int swmbx_mctp_i3c_doe_msg_read_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data);

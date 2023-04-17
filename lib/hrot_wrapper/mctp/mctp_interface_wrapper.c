@@ -9,6 +9,7 @@
 #include <logging/log.h>
 #include "cmd_interface/device_manager.h"
 #include "cmd_interface/cmd_interface.h"
+#include "cmd_interface/cmd_interface_system.h"
 #include "mctp/mctp_base_protocol.h"
 #include "mctp/cmd_interface_mctp_control.h"
 #include "mctp_interface_wrapper.h"
@@ -61,6 +62,7 @@ int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uin
 	// However, its code size is very large. Only support mctp control commands.
 	// mctp->cmd_cerberus.process_request = cmd_interface_system_process_request;
 	// mctp->cmd_cerberus.process_response = cmd_interface_system_process_response;
+	mctp_wrapper->cmd_cerberus.process_request = cmd_interface_system_process_request;
 	mctp_wrapper->cmd_cerberus.generate_error_packet = cmd_interface_generate_error_packet;
 
 	status = mctp_interface_init(&mctp_wrapper->mctp_interface, &mctp_wrapper->cmd_cerberus,

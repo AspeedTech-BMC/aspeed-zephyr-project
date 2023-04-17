@@ -11,6 +11,7 @@
 #include "watchdog_timer/wdt_utils.h"
 #include "watchdog_timer/wdt_handler.h"
 #include "platform_monitor.h"
+#include "mctp/mctp.h"
 
 LOG_MODULE_REGISTER(monitor, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -26,6 +27,13 @@ static void bmc_rstind_handler(const struct device *dev, struct gpio_callback *c
 
 	k_work_submit(&log_bmc_rst_work);
 	GenerateStateMachineEvent(RESET_DETECTED, NULL);
+
+#if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
+	if (mctp_i3c_dettach_slave_dev())
+		LOG_WRN("Failed to dettach i3c slave device");
+	else
+		LOG_INF("I3C slave device dettached");
+#endif
 }
 
 /* Monitor BMC Reset Status */

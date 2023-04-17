@@ -41,7 +41,11 @@ static mctp_smbus_port smbus_port[] = {
 
 #if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
 #define I3C_BUS_BMC          0x02
+#if defined(CONFIG_I3C_SLAVE)
 #define I3C_DEV_ADDR         0x09
+#else
+#define I3C_DEV_ADDR         0x08
+#endif
 
 typedef struct _mctp_i3c_dev {
 	mctp *mctp_inst;

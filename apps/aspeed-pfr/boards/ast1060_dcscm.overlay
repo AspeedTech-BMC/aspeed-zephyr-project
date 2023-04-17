@@ -63,14 +63,15 @@
 	status = "okay";
 };
 
-#if 0
 // For mctp over i3c
 // AST2600 i3c-1 -> AST1060 i3c-2
 &i3c2 {
 	status = "okay";
+	pinctrl-0 = <&pinctrl_i3c2_default>;
+#if 0
+	# For CONFIG_I3C_SLAVE=y
 	assigned-address = <0x9>;
 	pid-extra-info = <0x9>;
-	pinctrl-0 = <&pinctrl_i3c2_default>;
 	ibi-append-pec;
 	priv-xfer-pec;
 	secondary;
@@ -83,8 +84,8 @@
 		 label = "I3C_SMQ_2";
 		 status = "okay";
 	 };
-};
 #endif
+};
 
 &wdt0 {
 	status = "okay";

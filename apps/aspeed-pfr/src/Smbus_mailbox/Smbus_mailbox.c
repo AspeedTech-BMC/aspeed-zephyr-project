@@ -173,6 +173,96 @@ K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
 K_SEM_DEFINE(bmc_update_intent2_sem, 0, 1);
 K_SEM_DEFINE(pch_update_intent2_sem, 0, 1);
 
+struct k_mutex write_fifo_mutex;
+
+int swmbx_mctp_i3c_doe_msg_read_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data)
+{
+	if (data_len > sizeof(gReadFifoData))
+		return -1;
+
+	if (addr == UfmReadFIFO) {
+		for (int i = 0; i < data_len; i++) {
+			if (swmbx_read(gSwMbxDev, true, UfmReadFIFO, &swmbx_data[i]))
+				goto error;
+		}
+	} else {
+		if (swmbx_read(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+	}
+
+	return 0;
+
+error:
+	LOG_ERR("Failed to read mailbox");
+	return -1;
+}
+
+int swmbx_mctp_i3c_doe_msg_write_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data)
+{
+	int status;
+	union aspeed_event_data data = {0};
+	data.bit8[0] = addr;
+	data.bit8[1] = *swmbx_data;
+
+	switch(addr) {
+	case UfmCommand:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		break;
+	case UfmCmdTriggerValue:
+		data.bit8[0] = UfmCmdTriggerValue;
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(PROVISION_CMD, data.ptr);
+		break;
+	case UfmWriteFIFO:
+		status = k_mutex_lock(&write_fifo_mutex, K_MSEC(1000));
+		if (status) {
+			LOG_ERR("Get write_fifo_mutex timeout, ret %d", status);
+			return -1;
+		}
+		for (int i = 0; i < data_len; i++) {
+			if (swmbx_write(gSwMbxDev, true, addr, &swmbx_data[i]))
+				goto error;
+			gUfmFifoData[gFifoData++] = swmbx_data[i];
+		}
+		status = k_mutex_unlock(&write_fifo_mutex);
+		if (status) {
+			LOG_ERR("Release write_fifo_mutex failed, ret %d", status);
+			return -1;
+		}
+		break;
+	case BmcCheckpoint:
+	case AcmCheckpoint:
+	case BiosCheckpoint:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
+		break;
+	case BmcUpdateIntent:
+	case PchUpdateIntent:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
+		break;
+	case BmcUpdateIntent2:
+	case PchUpdateIntent2:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(UPDATE_INTENT_2_REQUESTED, data.ptr);
+		break;
+	default:
+		LOG_ERR("Unsupported mailbox command");
+		goto error;
+	}
+
+	return 0;
+
+error:
+	LOG_ERR("Failed to write mailbox");
+	return -1;
+}
+
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
 	struct k_poll_event events[TOTAL_MBOX_EVENT];
@@ -188,7 +278,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	k_poll_event_init(&events[8], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_update_intent2_sem);
 	k_poll_event_init(&events[9], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &pch_update_intent2_sem);
 
-	int ret;
+	int ret, status;
 
 	while (1) {
 		ret = k_poll(events, TOTAL_MBOX_EVENT, K_FOREVER);
@@ -202,7 +292,12 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Write FIFO from BMC/PCH */
 			k_sem_take(events[0].sem, K_NO_WAIT);
-			// TODO: race condition
+			status = k_mutex_lock(&write_fifo_mutex, K_MSEC(1000));
+			if (status) {
+				LOG_ERR("Get write_fifo_mutex timeout, ret %d", status);
+				continue;
+			}
+
 			do {
 				uint8_t c;
 
@@ -211,6 +306,11 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 					gUfmFifoData[gFifoData++] = c;
 				}
 			} while (!ret && (gFifoData < sizeof(gUfmFifoData)));
+			status = k_mutex_unlock(&write_fifo_mutex);
+			if (status) {
+				LOG_ERR("Release write_fifo_mutex failed, ret %d", status);
+				continue;
+			}
 		} else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Read FIFO empty prepare next data */
 			k_sem_take(events[1].sem, K_NO_WAIT);
@@ -284,12 +384,20 @@ void InitializeSoftwareMailbox(void)
 	/* Top level mailbox device driver */
 	const struct device *swmbx_dev = NULL;
 
+	int status;
+
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
 		LOG_ERR("%s: fail to bind %s", __func__, "SWMBX");
 		return;
 	}
 	gSwMbxDev = swmbx_dev;
+
+	status = k_mutex_init(&write_fifo_mutex);
+	if (status) {
+		LOG_ERR("%s: fail to init write fifo mutex", __func__);
+		return;
+	}
 
 	/* Enable mailbox read/write notifiaction and FIFO */
 	swmbx_enable_behavior(swmbx_dev, SWMBX_PROTECT | SWMBX_NOTIFY | SWMBX_FIFO, 1);

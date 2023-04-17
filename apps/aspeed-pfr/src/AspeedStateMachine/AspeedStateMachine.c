@@ -890,6 +890,11 @@ void handle_checkpoint(void *o)
 			}
 		}
 #endif
+#if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
+		if (evt_ctx->data.bit8[1] == CompletingExecutionBlock) {
+			mctp_i3c_attach_slave_dev();
+		}
+#endif
 		break;
 #if defined(CONFIG_INTEL_PFR)
 	case AcmCheckpoint:
@@ -1188,6 +1193,13 @@ void do_unprovisioned(void *o)
 		handle_provision_event(o);
 #if defined(CONFIG_PIT_PROTECTION)
 		handle_pit_event(o);
+#endif
+		break;
+	case WDT_CHECKPOINT:
+#if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
+		if (evt_ctx->data.bit8[1] == CompletingExecutionBlock) {
+			mctp_i3c_attach_slave_dev();
+		}
 #endif
 		break;
 	default:
@@ -1561,6 +1573,7 @@ void AspeedStateMachine(void)
 			switch (fifo_in->event) {
 			case PROVISION_CMD:
 				// Just run provision handling
+			case WDT_CHECKPOINT:
 				run_state = true;
 				break;
 #if defined(CONFIG_CERBERUS_PFR)
