@@ -35,4 +35,5 @@ int cerberus_pfr_verify_csk_key(struct pfr_manifest *manifest, struct rsa_public
 int cerberus_pfr_find_key_manifest_id(struct pfr_manifest *manifest, struct rsa_public_key *public_key, uint8_t key_id, uint8_t *get_keym_id);
 int cerberus_pfr_find_key_manifest_id_and_key_id(struct pfr_manifest *manifest, struct rsa_public_key *public_key,
 	uint8_t *get_key_manifest_id, uint8_t *get_key_id);
+int cerberus_pfr_get_key_manifest_append_addr(uint32_t *append_addr);
 

@@ -280,7 +280,7 @@ int cerberus_pfr_get_key_manifest(struct pfr_manifest *manifest, uint8_t keym_id
 	}
 
 	if (pfr_key_manifest->magic_number != KEY_MANIFEST_SECTION_MAGIC) {
-		LOG_ERR("Key Manifest Magic Number is not Matched.");
+		LOG_ERR("Key Manifest Magic Number is not Matched(%x).", pfr_key_manifest->magic_number);
 		return Failure;
 	}
 
@@ -368,6 +368,9 @@ int cerberus_pfr_find_key_manifest_id(struct pfr_manifest *manifest, struct rsa_
 	}
 
 	LOG_ERR("This CSK(%d) was not found in all key manifests", key_id);
+	LOG_DBG("CSK Key Exponent=%08x", public_key->exponent);
+	LOG_HEXDUMP_DBG(public_key->modulus, public_key->mod_length, "CSK Key Modulus:");
+
 	return Failure;
 }
 
@@ -429,8 +432,45 @@ int cerberus_pfr_find_key_manifest_id_and_key_id(struct pfr_manifest *manifest, 
 	}
 
 	LOG_ERR("This CSK was not found in all key manifests");
-	LOG_ERR("CSK Key Exponent=%08x", public_key->exponent);
-	LOG_HEXDUMP_ERR(public_key->modulus, public_key->mod_length, "CSK Key Modulus:");
+	LOG_DBG("CSK Key Exponent=%08x", public_key->exponent);
+	LOG_HEXDUMP_DBG(public_key->modulus, public_key->mod_length, "CSK Key Modulus:");
+
+	return Failure;
+}
+
+int cerberus_pfr_get_key_manifest_append_addr(uint32_t *append_addr)
+{
+	struct recovery_header image_header;
+	uint8_t key_manifest_id;
+	uint32_t keym_address;
+	uint32_t region_size;
+
+	if (!append_addr)
+		return Failure;
+
+	region_size = pfr_spi_get_device_size(ROT_INTERNAL_KEY);
+
+	// lookup all key manifests
+	for (key_manifest_id = 0; key_manifest_id <= MAX_KEY_MANIFEST_ID; key_manifest_id++) {
+		keym_address = key_manifest_id * KEY_MANIFEST_SIZE;
+		if (keym_address >= region_size)
+			break;
+
+		if (pfr_spi_read(ROT_INTERNAL_KEY, keym_address, sizeof(image_header), (uint8_t *)&image_header))
+			continue;
+
+		if (image_header.format == UPDATE_FORMAT_TYPE_KEYM && image_header.magic_number == KEY_MANAGEMENT_HEADER_MAGIC)
+			continue;
+
+		*append_addr = keym_address;
+		return Success;
+	}
+
+	if (keym_address >= region_size)
+		LOG_ERR("Key Manifest is full");
+
+	if (key_manifest_id > MAX_KEY_MANIFEST_ID)
+		LOG_ERR("Key Manifest exceed the maximum count(%d)", CONFIG_KEY_MANIFEST_MAX_COUNT);
 
 	return Failure;
 }

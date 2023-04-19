@@ -85,7 +85,7 @@ int cerberus_provisioning_root_key_action(struct pfr_manifest *manifest)
 						 PROVISIONING_ROOT_KEY_HASH_TYPE, rootkey_hash_buffer, sizeof(rootkey_hash_buffer)))
 			return Failure;
 
-		if (ProvisionRootKeyHash(rootkey_hash_buffer, sizeof(rootkey_hash_buffer)) != Success)
+		if (ProvisionRootKeyHash(rootkey_hash_buffer, PROVISIONING_ROOT_KEY_HASH_LENGTH) != Success)
 			return Failure;
 
 		pfr_spi_read(manifest->flash_id, manifest->address + CERBERUS_BMC_ACTIVE_OFFSET, 4, bmc_offsets_buffer);
