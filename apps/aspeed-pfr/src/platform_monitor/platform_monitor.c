@@ -15,6 +15,7 @@
 LOG_MODULE_REGISTER(monitor, CONFIG_LOG_DEFAULT_LEVEL);
 
 extern struct k_work log_bmc_rst_work;
+extern uint8_t gWdtBootStatus;
 static struct gpio_callback bmc_rstind_cb_data;
 
 static void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)

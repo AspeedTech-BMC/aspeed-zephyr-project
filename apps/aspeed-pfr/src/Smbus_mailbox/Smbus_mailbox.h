@@ -217,6 +217,7 @@ void UpdateBmcCheckpoint(byte Data);
 void UpdateAcmCheckpoint(byte Data);
 void initializeFPLEDs(void);
 void SetUfmFlashStatus(uint32_t UfmStatus, uint32_t UfmStatusBitMask);
+void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot_state);
 
 bool IsSpdmAttestationEnabled();
 

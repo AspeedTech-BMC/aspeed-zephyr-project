@@ -15,6 +15,7 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
+extern uint8_t gWdtBootStatus;
 /**
  * Monitor the boot progress for BMC firmware with the BMC checkpoint message.
  *

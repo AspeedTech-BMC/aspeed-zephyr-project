@@ -14,6 +14,7 @@
 #include "wdt_utils.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
+uint8_t gWdtBootStatus = 0;
 
 static void wdt_callback_bmc_timeout(struct k_timer *tmr)
 {

@@ -20,6 +20,7 @@
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_update.h"
 #include "intel_pfr/intel_pfr_verification.h"
+#include "intel_pfr/intel_pfr_spi_filtering.h"
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
@@ -55,6 +56,8 @@
 
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
 K_FIFO_DEFINE(aspeed_sm_fifo);
+extern uint8_t gWdtBootStatus;
+
 struct smf_context s_obj;
 static const struct smf_state state_table[];
 

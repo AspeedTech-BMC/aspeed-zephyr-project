@@ -336,7 +336,7 @@ int decompress_fvm_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 			(uint8_t *)&fvm))
 		return Failure;
 	fvm_body_offset = cap_fvm_offset + sizeof(FVM_STRUCTURE);
-	fvm_body_end_addr = fvm_body_offset + fvm.Length - sizeof(FVM_ADDR_DEF);
+	fvm_body_end_addr = fvm_body_offset + fvm.Length - sizeof(FVM_STRUCTURE);
 
 	while (fvm_body_offset < fvm_body_end_addr) {
 		pfr_spi_read(image_type, fvm_body_offset, sizeof(PFM_SPI_DEFINITION),
