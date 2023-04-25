@@ -889,8 +889,10 @@ void handle_checkpoint(void *o)
 	case BmcCheckpoint:
 		UpdateBmcCheckpoint(evt_ctx->data.bit8[1]);
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
-		if (state->afm_active_object.ActiveImageStatus == Success) {
-			spdm_run_attester();
+		if (evt_ctx->data.bit8[1] == CompletingExecutionBlock) {
+			if (state->afm_active_object.ActiveImageStatus == Success) {
+				spdm_run_attester();
+			}
 		}
 #endif
 		break;
