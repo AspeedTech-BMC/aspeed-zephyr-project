@@ -274,6 +274,7 @@ int rsa_verify_signature(struct signature_verification *verification,
 		return Failure;
 
 	struct rsa_engine_wrapper *rsa = getRsaEngineInstance();
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 	struct rsa_public_key rsa_public;
 	int status = Success;
 
@@ -287,6 +288,10 @@ int rsa_verify_signature(struct signature_verification *verification,
 		LOG_ERR("root key length(%d) and signature length (%d) mismatch", rsa_public.mod_length, sig_length);
 		return Failure;
 	}
+
+	// verify root key hash
+	if (cerberus_pfr_verify_root_key(pfr_manifest, &rsa_public))
+		return Failure;
 
 	status = rsa->base.sig_verify(&rsa->base, &rsa_public, signature, sig_length, digest, length);
 	if (status != Success) {
