@@ -106,11 +106,6 @@ void do_init(void *o)
 	debug_log_init();
 	spim_irq_init();
 
-#if 0
-	// Halting for JTAG debug
-	DEBUG_HALT();
-#endif
-
 	BMCBootHold();
 	PCHBootHold();
 

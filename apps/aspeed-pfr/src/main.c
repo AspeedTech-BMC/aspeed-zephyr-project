@@ -8,6 +8,7 @@
 #include <zephyr.h>
 #include <build_config.h>
 #include <drivers/led.h>
+#include <drivers/misc/aspeed/abr_aspeed.h>
 
 #include "common/common.h"
 #include "include/SmbusMailBoxCom.h"
@@ -66,6 +67,11 @@ void main(void)
 {
 	LOG_INF("*** ASPEED_PFR version v%02d.%02d-dev Board:%s ***",
 			PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, CONFIG_BOARD);
+#if 0
+	// Halting for JTAG debug
+	disable_abr_wdt();
+	DEBUG_HALT();
+#endif
 
 	aspeed_print_sysrst_info();
 
