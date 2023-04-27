@@ -41,6 +41,12 @@ west build -b ast1060_dcscm_amd -p auto aspeed-zephyr-project/apps/aspeed-pfr
 west build -b ast1060_dual_flash_amd -p auto aspeed-zephyr-project/apps/aspeed-pfr
 ```
 
+## PROT Module
+
+```
+west build -b ast1060_prot -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
 # Building Preload Firmware
 
 ```
