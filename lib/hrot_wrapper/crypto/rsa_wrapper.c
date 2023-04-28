@@ -48,7 +48,7 @@ int rsa_wrapper_decrypt(struct rsa_engine *engine, const struct rsa_private_key 
 			const uint8_t *encrypted, size_t in_length, const uint8_t *label, size_t label_length,
 			enum hash_type pad_hash, uint8_t *decrypted, size_t out_length)
 {
-	return decrypt_aspeed(key, encrypted, in_length, decrypted, out_length);
+	return decrypt_aspeed((struct rsa_key *)key, encrypted, in_length, decrypted, out_length);
 }
 
 int rsa_wrapper_sig_verify(struct rsa_engine *engine, const struct rsa_public_key *key,

@@ -25,7 +25,7 @@ enum SPDM_CONNECTION_STATE {
 
 struct spdm_version_info {
 	uint8_t version_number_entry_count;
-	uint16_t version_number_entry[3]; // Placeholder for SPDM 1.0 1.1 1.2
+	uint16_t version_number_entry[SPDM_MAX_VERSION]; // Placeholder for SPDM 1.0 1.1 1.2
 };
 
 struct spdm_capabilities_info {

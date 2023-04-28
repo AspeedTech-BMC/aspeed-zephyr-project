@@ -20,11 +20,13 @@
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_update.h"
 #include "intel_pfr/intel_pfr_verification.h"
+#include "intel_pfr/intel_pfr_spi_filtering.h"
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #include "cerberus_pfr/cerberus_pfr_update.h"
 #include "cerberus_pfr/cerberus_pfr_spi_filtering.h"
+#include "cerberus_pfr/cerberus_pfr_key_manifest.h"
 #endif
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "pfr/pfr_util.h"
@@ -54,6 +56,8 @@
 
 LOG_MODULE_REGISTER(aspeed_state_machine, LOG_LEVEL_DBG);
 K_FIFO_DEFINE(aspeed_sm_fifo);
+extern uint8_t gWdtBootStatus;
+
 struct smf_context s_obj;
 static const struct smf_state state_table[];
 
@@ -102,7 +106,6 @@ void do_init(void *o)
 	debug_log_init();
 	spim_irq_init();
 
-	// DEBUG_HALT();
 	BMCBootHold();
 	PCHBootHold();
 
@@ -122,12 +125,6 @@ void do_init(void *o)
 	state->afm_active_object.RecoveryImageStatus = Failure;
 	state->afm_active_object.RestrictActiveUpdate = 0;
 #endif
-
-	// I2c_slave_dev_debug+>
-	// struct i2c_slave_interface *I2CSlaveEngine = getI2CSlaveEngineInstance();
-	// struct I2CSlave_engine_wrapper *I2cSlaveEngineWrapper;
-
-	// I2C_Slave_wrapper_init(getI2CSlaveEngineInstance());
 
 	enum boot_indicator rot_boot_from = get_boot_indicator();
 
@@ -178,12 +175,12 @@ void enter_tmin1(void *o)
 	if (evt_ctx->data.bit8[0] == BmcUpdateIntent) {
 		LogLastPanic(BMC_UPDATE_INTENT);
 		if (!(update_region & ExceptBmcActiveUpdate) &&
-				update_region & BmcActiveUpdate)
+				(update_region & BmcActiveUpdate))
 			bmc_reset_only = true;
 	} else if (evt_ctx->data.bit8[0] == PchUpdateIntent) {
 		LogLastPanic(PCH_UPDATE_INTENT);
 		if (!(update_region & ExceptPchActiveUpdate) &&
-				update_region & PchActiveUpdate)
+				(update_region & PchActiveUpdate))
 			pch_reset_only = true;
 	} else if (evt_ctx->event == RESET_DETECTED) {
 		LogLastPanic(BMC_RESET_DETECT);
@@ -289,6 +286,28 @@ int handle_pit_verification(void *o)
 			return Failure;
 		}
 		if (intel_pfr_pit_level2_verify()) {
+			// lockdown
+			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
+			return Failure;
+		}
+	}
+
+	return Success;
+}
+#endif
+
+#if defined(CONFIG_CERBERUS_PFR)
+int handle_key_manifest_verification(void *o)
+{
+	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	byte provision_state = GetUfmStatusValue();
+
+	if (!(provision_state & UFM_PROVISIONED)) {
+		// Unprovisioned, populate INIT_UNPROVISIONED event will enter UNPROVISIONED state
+		GenerateStateMachineEvent(VERIFY_UNPROVISIONED, NULL);
+		return Failure;
+	} else {
+		if (cerberus_pfr_verify_all_key_manifests(pfr_manifest)) {
 			// lockdown
 			GenerateStateMachineEvent(RECOVERY_FAILED, NULL);
 			return Failure;
@@ -491,14 +510,17 @@ void handle_image_verification(void *o)
 
 void do_verify(void *o)
 {
-	int status = Success;
 	LOG_DBG("Start");
 #if defined(CONFIG_PIT_PROTECTION)
-	status = handle_pit_verification(o);
+	if (handle_pit_verification(o))
+		goto exit;
 #endif
-	if (status == Success)
-		handle_image_verification(o);
-
+#if defined(CONFIG_CERBERUS_PFR)
+	if (handle_key_manifest_verification(o))
+		goto exit;
+#endif
+	handle_image_verification(o);
+exit:
 	LOG_DBG("End");
 }
 
@@ -661,24 +683,27 @@ void enter_tzero(void *o)
 	if (state->ctx.current == &state_table[RUNTIME]) {
 		if (evt_ctx->data.bit8[2] == BmcOnlyReset) {
 			apply_pfm_protection(BMC_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(BMC_SPI);
+#endif
 			BMCBootRelease();
 			goto enter_tzero_end;
 		} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 			apply_pfm_protection(PCH_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(PCH_SPI);
+#endif
 			PCHBootRelease();
 			goto enter_tzero_end;
 		}
-#if defined(CONFIG_CERBERUS_PFR)
-		apply_pfm_smbus_protection(0);
-		apply_pfm_smbus_protection(1);
-		apply_pfm_smbus_protection(2);
-		apply_pfm_smbus_protection(3);
-#endif
 		/* Provisioned */
 		/* Releasing System Reset */
 		if (state->bmc_active_object.ActiveImageStatus == Success) {
 			/* Arm SPI/I2C Filter */
 			apply_pfm_protection(BMC_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(BMC_SPI);
+#endif
 			BMCBootRelease();
 		} else {
 			/* Should not enter here, redirect to LOCKDOWN */
@@ -688,6 +713,9 @@ void enter_tzero(void *o)
 		if (state->pch_active_object.ActiveImageStatus == Success) {
 			/* Arm SPI/I2C Filter */
 			apply_pfm_protection(PCH_SPI);
+#if defined(CONFIG_CERBERUS_PFR)
+			apply_pfm_smbus_protection(PCH_SPI);
+#endif
 			PCHBootRelease();
 		} else
 			LOG_ERR("Host firmware is invalid, host won't boot");
@@ -856,14 +884,18 @@ void handle_checkpoint(void *o)
 	case BmcCheckpoint:
 		UpdateBmcCheckpoint(evt_ctx->data.bit8[1]);
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
-		if (state->afm_active_object.ActiveImageStatus == Success) {
-			spdm_run_attester();
+		if (evt_ctx->data.bit8[1] == CompletingExecutionBlock) {
+			if (state->afm_active_object.ActiveImageStatus == Success) {
+				spdm_run_attester();
+			}
 		}
 #endif
 		break;
+#if defined(CONFIG_INTEL_PFR)
 	case AcmCheckpoint:
 		UpdateAcmCheckpoint(evt_ctx->data.bit8[1]);
 		break;
+#endif
 	case BiosCheckpoint:
 		UpdateBiosCheckpoint(evt_ctx->data.bit8[1]);
 		break;
@@ -878,7 +910,7 @@ void handle_update_requested(void *o)
 	struct event_context *evt_ctx = state->event_ctx;
 	AO_DATA *ao_data_wrap = NULL;
 	EVENT_CONTEXT evt_ctx_wrap;
-	int ret;
+	int ret = Success;
 	uint8_t update_region = evt_ctx->data.bit8[1] & PchBmcHROTActiveAndRecoveryUpdate;
 	CPLD_STATUS cpld_update_status;
 
@@ -1048,15 +1080,17 @@ void handle_seamless_update_requested(void *o)
 	uint8_t update_region = evt_ctx->data.bit8[1] & 0x3f;
 	CPLD_STATUS cpld_update_status;
 
+	evt_ctx_wrap.operation = NONE;
 	LOG_DBG("SEAMLESS_UPDATE Event Data %02x %02x", evt_ctx->data.bit8[0], evt_ctx->data.bit8[1]);
 
 	switch (evt_ctx->data.bit8[0]) {
-		case PchSeamlessUpdateIntent:
-			update_region &= PchFvSeamlessUpdate;
+		case PchUpdateIntent2:
+			if (evt_ctx->data.bit8[1] & BIT(0))
+				update_region &= SeamlessUpdate;
 			break;
 		case BmcUpdateIntent2:
 			if (evt_ctx->data.bit8[1] & BIT(0)) {
-				update_region &= PchFvSeamlessUpdate;
+				update_region &= SeamlessUpdate;
 				ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 				cpld_update_status.BmcToPchStatus = 1;
 				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
@@ -1073,13 +1107,13 @@ void handle_seamless_update_requested(void *o)
 		uint32_t image_type = 0xFFFFFFFF;
 		do {
 			/* PCH Seamless */
-			if (update_region & PchFvSeamlessUpdate) {
+			if (update_region & SeamlessUpdate) {
 				LOG_INF("PCH Seamless Update");
 				evt_ctx_wrap.operation = SEAMLESS_UPDATE_OP;
 				SetPlatformState(PCH_SEAMLESS_UPDATE);
 				image_type = PCH_TYPE;
-				update_region &= ~PchFvSeamlessUpdate;
-				handled_region |= PchFvSeamlessUpdate;
+				update_region &= ~SeamlessUpdate;
+				handled_region |= SeamlessUpdate;
 				break;
 			}
 		} while (0);
@@ -1182,8 +1216,14 @@ void enter_runtime(void *o)
 #endif
 			} else if (evt_ctx->data.bit8[2] == PchOnlyReset) {
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_INTEL_PFR)
 #ifdef SUPPORT_ME
 				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
+#else
+				pfr_start_timer(ACM_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
+#endif
+#else
+				pfr_start_timer(BIOS_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
 #endif
 #endif
 			} else {
@@ -1191,8 +1231,14 @@ void enter_runtime(void *o)
 				pfr_start_timer(BMC_TIMER, WDT_BMC_TIMER_MAXTIMEOUT);
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
+#if defined(CONFIG_INTEL_PFR)
 #ifdef SUPPORT_ME
 				pfr_start_timer(ME_TIMER, WDT_ME_TIMER_MAXTIMEOUT);
+#else
+				pfr_start_timer(ACM_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
+#endif
+#else
+				pfr_start_timer(BIOS_TIMER, WDT_BIOS_TIMER_MAXTIMEOUT);
 #endif
 #endif
 			}
@@ -1490,18 +1536,19 @@ void AspeedStateMachine(void)
 					next_state = &state_table[FIRMWARE_RECOVERY];
 #endif
 				break;
-#if defined(CONFIG_SEAMLESS_UPDATE)
-			case SEAMLESS_UPDATE_REQUESTED:
+			case UPDATE_INTENT_2_REQUESTED:
 				if (getFailedUpdateAttemptsCount() >= MAX_UPD_FAILED_ALLOWED) {
 					LogUpdateFailure(UPD_EXCEED_MAX_FAIL_ATTEMPT, 0);
 					break;
 				}
-				if (fifo_in->data.bit8[1] & AfmActiveAndRecoveryUpdate)
+				if (fifo_in->data.bit8[1] & AfmActiveAndRecoveryUpdate ||
+				    fifo_in->data.bit8[1] & CPLDUpdate)
 					next_state = &state_table[FIRMWARE_UPDATE];
-				else
+#if defined(CONFIG_SEAMLESS_UPDATE)
+				else if (fifo_in->data.bit8[1] & SeamlessUpdate)
 					next_state = &state_table[SEAMLESS_UPDATE];
-				break;
 #endif
+				break;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 			case ATTESTATION_FAILED:
 				next_state = &state_table[SYSTEM_LOCKDOWN];

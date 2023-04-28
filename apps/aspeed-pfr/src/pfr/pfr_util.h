@@ -32,15 +32,11 @@ uint32_t pfr_spi_get_device_size(uint8_t device_id);
 
 int pfr_spi_get_block_size(uint8_t device_id);
 
-int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out);
-
 int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t *hash_out,
 	     size_t hash_length);
-
-int compare_buffer(uint8_t *buffer1, uint8_t *buffer2, uint32_t length);
 
 int verify_signature(struct signature_verification *verification, const uint8_t *digest,
 		     size_t length, const uint8_t *signature, size_t sig_length);
 
-int pfr_cpld_update_reboot(void);
+void pfr_cpld_update_reboot(void);
 

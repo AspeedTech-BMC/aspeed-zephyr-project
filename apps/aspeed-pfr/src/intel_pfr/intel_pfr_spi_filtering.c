@@ -28,6 +28,18 @@ void apply_pfm_protection(int spi_device_id)
 
 	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
 	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
+	char bus_dev_name[] = "I2C_FILTER_x";
+	const struct device *flt_dev = NULL;
+
+	for (int i = 0; i < 4; i++) {
+		bus_dev_name[11] = i + '0';
+		flt_dev = device_get_binding(bus_dev_name);
+		if (flt_dev) {
+			ast_i2c_filter_init(flt_dev);
+			ast_i2c_filter_en(flt_dev, true, false, true, true);
+			ast_i2c_filter_default(flt_dev, 0);
+		}
+	}
 
 	// read PFR_Manifest
 	status = initializeEngines();
@@ -35,12 +47,16 @@ void apply_pfm_protection(int spi_device_id)
 
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	uint8_t pfm_length[4];
-	uint32_t pfm_read_address;
+	uint32_t pfm_read_address = 0;
 
 	if (spi_id == BMC_SPI)
 		get_provision_data_in_flash(BMC_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
 	else if (spi_id == PCH_SPI)
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_read_address, sizeof(pfm_read_address));
+	else {
+		LOG_ERR("Incorrect spi_id %d", spi_id);
+		return;
+	}
 
 	// Block 0 + Block 1 = 1024 (0x400); PFM data(PFM Body = 0x20)
 	uint32_t pfm_region_Start = pfm_read_address + 0x400 + 0x20;
@@ -165,9 +181,8 @@ void apply_pfm_protection(int spi_device_id)
 				// Valid Bus ID should be 1~5 and reflect to I2C_FILTER_0 ~ I2C_FILTER_4
 				// Valid Rule ID should be 1~16 and refect to I2C Filter Driver Rule 0~15
 
-				char bus_dev_name[] = "I2C_FILTER_x";
 				bus_dev_name[11] = (region_record[5] - 1) + '0';
-				const struct device *flt_dev = device_get_binding(bus_dev_name);
+				flt_dev = device_get_binding(bus_dev_name);
 				if (flt_dev) {
 					status = ast_i2c_filter_en(
 							flt_dev,
@@ -193,7 +208,7 @@ void apply_pfm_protection(int spi_device_id)
 				LOG_HEXDUMP_ERR(region_record, 40, "Invalid Bus ID or Rule ID");
 			}
 
-			pfm_region_Start += sizeof(PFM_SMBUS_RULE);;
+			pfm_region_Start += sizeof(PFM_SMBUS_RULE);
 			break;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 		case FVM_ADDR_DEF:

@@ -13,6 +13,8 @@
 
 int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_region_addr,
 		struct pfm_firmware_version_element *fw_ver_element);
+int cerberus_get_signed_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *signed_region_addr,
+		struct pfm_firmware_version_element *fw_ver_element);
 int cerberus_get_image_pfm_addr(struct pfr_manifest *manifest,
 		struct recovery_header *image_header, uint32_t *src_pfm_addr,
 		uint32_t *dest_pfm_addr);

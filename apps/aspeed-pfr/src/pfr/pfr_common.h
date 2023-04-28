@@ -44,7 +44,9 @@ struct pfr_manifest {
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	uint32_t target_fvm_addr;                               // fvm region for seamless update
 #endif
-
+#if defined(CONFIG_CERBERUS_PFR)
+	uint32_t i2c_filter_addr[2];                            // filter rule in BMC/PCH manifest
+#endif
 };
 
 struct active_image {
@@ -79,10 +81,14 @@ struct pfr_hash {
 };
 
 struct key_cancellation_flag {
+#if defined(CONFIG_INTEL_PFR)
 	int (*verify_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);           // verifies key id
-	int (*set_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);              // set key id
 	int (*cancel_kc_flag)(struct pfr_manifest *manifest, uint8_t key_id);           // cancel key id
-	int (*erase_all_flag)(struct pfr_manifest *manifest);
+#endif
+#if defined(CONFIG_CERBERUS_PFR)
+	int (*verify_kc_flag)(struct pfr_manifest *manifest, uint8_t key_manifest_id, uint8_t key_id);           // verifies key id
+	int (*cancel_kc_flag)(struct pfr_manifest *manifest, uint8_t key_manifest_id, uint8_t key_id);           // cancel key id
+#endif
 };
 
 struct pfr_keystore {

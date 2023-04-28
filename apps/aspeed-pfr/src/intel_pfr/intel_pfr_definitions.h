@@ -103,9 +103,6 @@
 #define PAGE_SIZE                       0x1000
 #define BLOCK_SIZE                      0x10000
 #define UFM_PAGE_SIZE                   16
-#define ROOT_KEY_SIZE                   64
-#define ROOT_KEY_X_Y_SIZE_256           32
-#define ROOT_KEY_X_Y_SIZE_384           48
 
 #define BLOCK_SUPPORT_1KB               1
 #define BLOCK_SUPPORT_3KB               0

@@ -174,6 +174,7 @@ int otp_prog(uint32_t addr)
 	//if (otp_rc)
 	//	goto out;
 
+#if defined(CONFIG_DEVID_CERT_PROVISIONING)
 	// Enable CDI
 	otp_rc = aspeed_otp_read_conf(OTP_CONF3, &otp_conf_val, 1);
 	if (otp_rc)
@@ -187,6 +188,8 @@ int otp_prog(uint32_t addr)
 
 	otp_conf_val |= OTP_CONF3_CDI_EN;
 	otp_rc = aspeed_otp_prog_conf(OTP_CONF3, &otp_conf_val, 1);
+#endif
+
 out:
 	memset(vault_key_buf, 0, sizeof(vault_key_buf));
 

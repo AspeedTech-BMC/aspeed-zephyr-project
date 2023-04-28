@@ -119,6 +119,10 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 		manifest->pc_type = PFR_AFM;
 	}
 #endif
+	else {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
 	manifest->address = read_address;
 
 	LOG_INF("Active Firmware Verification");

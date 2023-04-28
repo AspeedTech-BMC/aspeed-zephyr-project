@@ -20,35 +20,116 @@
 #include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_provision.h"
-#include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_recovery.h"
+#include "cerberus_pfr_key_cancellation.h"
+#include "cerberus_pfr_key_manifest.h"
 #include "flash/flash_aspeed.h"
 #include "common/common.h"
-#include "keystore/KeystoreManager.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
+static uint8_t gKeymPageBuffer[PAGE_SIZE] __aligned(16);
+
 int cerberus_pfr_decommission(struct pfr_manifest *manifest)
 {
+	CPLD_STATUS cpld_update_status;
 	int status = 0;
 
-	CPLD_STATUS cpld_update_status;
-
-	// Erasing provisioned data
-	status = ufm_erase(PROVISION_UFM);
-	if (status != Success)
+	if (erase_provision_flash())
 		return Failure;
 
-	LOG_INF("Decommission erasing the provisioned UFM data.");
+	LOG_INF("Decommission Success");
 
 	memset(&cpld_update_status, 0, sizeof(cpld_update_status));
-
 	cpld_update_status.DecommissionFlag = 1;
 	status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	if (status != Success) {
 		LOG_ERR("Update ROT status in UPDATE_STATUS_UFM failed");
 		return Failure;
 	}
+
+	return Success;
+}
+
+int cerberus_append_key_manifest(struct pfr_manifest *manifest)
+{
+	struct recovery_section *image_section;
+	struct PFR_KEY_MANIFEST *key_manifest;
+	struct recovery_header *image_header;
+	uint32_t target_page_align_address;
+	uint32_t target_append_address;
+	uint32_t last_keym_index;
+	uint32_t source_address;
+	uint32_t length;
+
+	last_keym_index = KEY_MANIFEST_SIZE;
+	source_address = manifest->address;
+	if (pfr_spi_read(manifest->image_type, source_address, KEY_MANIFEST_SIZE, gKeymPageBuffer)) {
+		LOG_ERR("Failed to read key manifest");
+		return Failure;
+	}
+
+	image_header = (struct recovery_header *)gKeymPageBuffer;
+	length = image_header->image_length + sizeof(struct rsa_public_key);
+	if (length > KEY_MANIFEST_SIZE) {
+		LOG_ERR("Key Manifest image length(%x) exceed the maximum size(%x)", length, KEY_MANIFEST_SIZE);
+		return Failure;
+	}
+
+	image_section = (struct recovery_section *)&gKeymPageBuffer[image_header->header_length];
+	if (image_section->magic_number != KEY_MANAGEMENT_SECTION_MAGIC ||
+	    image_section->header_length != sizeof(struct recovery_section) ||
+	    image_section->section_length != sizeof(struct PFR_KEY_MANIFEST)) {
+		LOG_HEXDUMP_ERR((uint8_t *)image_section, sizeof(struct recovery_section), "section_header:");
+		LOG_ERR("Failed to read image section.");
+		return Failure;
+	}
+
+	key_manifest = (struct PFR_KEY_MANIFEST *)&gKeymPageBuffer[image_header->header_length + image_section->header_length];
+	if (key_manifest->magic_number != KEY_MANIFEST_SECTION_MAGIC) {
+		LOG_ERR("Key Manifest Magic Number is not Matched(%x).", key_manifest->magic_number);
+		return Failure;
+	}
+
+	if (cerberus_pfr_get_key_manifest_append_addr(&target_append_address)) {
+		LOG_ERR("Failed to get key manifest append address");
+		return Failure;
+	}
+
+	target_page_align_address = target_append_address;
+	if (target_append_address & (PAGE_SIZE - 1)) {
+		target_page_align_address = target_append_address & ~(PAGE_SIZE - 1);
+		LOG_INF("Read last key manifest, device_id=%d, address=%x, length=%x",
+			ROT_INTERNAL_KEY, target_page_align_address, KEY_MANIFEST_SIZE);
+		if (pfr_spi_read(ROT_INTERNAL_KEY, target_page_align_address, KEY_MANIFEST_SIZE, &gKeymPageBuffer[last_keym_index])) {
+			LOG_ERR("Failed to read last key manifest");
+			return Failure;
+		}
+	}
+
+	if (pfr_spi_erase_4k(ROT_INTERNAL_KEY, target_page_align_address)) {
+		LOG_ERR("Erase failed, device_id=%d, address=%x, length=%x",
+			ROT_INTERNAL_KEY, target_page_align_address, PAGE_SIZE);
+		return Failure;
+	}
+
+	if (target_page_align_address != target_append_address) {
+		LOG_INF("Write last key manifest, device_id=%d, address=%x, length=%x",
+			ROT_INTERNAL_KEY, target_page_align_address, KEY_MANIFEST_SIZE);
+		if (pfr_spi_write(ROT_INTERNAL_KEY, target_page_align_address, KEY_MANIFEST_SIZE, &gKeymPageBuffer[last_keym_index])) {
+			LOG_ERR("Failed to write last key manifest");
+			return Failure;
+		}
+	}
+
+	LOG_INF("Write key manifest, device_id=%d, address=%x, length=%x",
+		ROT_INTERNAL_KEY, target_append_address, length);
+	if (pfr_spi_write(ROT_INTERNAL_KEY, target_append_address, length, gKeymPageBuffer)) {
+		LOG_ERR("Failed to write key manifest");
+		return Failure;
+	}
+
+	LOG_INF("Key Manifest append done");
 
 	return Success;
 }
@@ -114,103 +195,59 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 
 int cerberus_hrot_update(struct pfr_manifest *manifest)
 {
-	int status = 0;
 	byte provision_state = GetUfmStatusValue();
+	struct recovery_header image_header;
+	int status = 0;
+
 	if (provision_state & UFM_PROVISIONED) {
-		struct recovery_header image_header;
-		pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header),
-				(uint8_t *)&image_header);
-		status =  cerberus_pfr_verify_image(manifest);
-		if (status != Success) {
-			LOG_ERR("HRoT update pfr verification failed");
+		LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
+		if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+			LOG_ERR("Unable to get image header.");
 			return Failure;
 		}
 
-		if (image_header.format == UPDATE_FORMAT_TPYE_HROT) {
-			status = cerberus_update_rot_fw(manifest);
-			if (status != Success) {
+		if (image_header.format != UPDATE_FORMAT_TYPE_HROT &&
+		    image_header.format != UPDATE_FORMAT_TYPE_KCC &&
+		    image_header.format != UPDATE_FORMAT_TYPE_DCC &&
+		    image_header.format != UPDATE_FORMAT_TYPE_KEYM) {
+			LOG_ERR("Unsupported image format(%d)", image_header.format);
+			return Failure;
+		}
+
+		manifest->pc_type = PFR_CPLD_UPDATE_CAPSULE;
+		status =  cerberus_pfr_verify_image(manifest);
+		if (status != Success) {
+			LOG_ERR("HRoT Image Verify Failed");
+			return Failure;
+		}
+
+		if (image_header.format == UPDATE_FORMAT_TYPE_HROT) {
+			if (cerberus_update_rot_fw(manifest)) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
-		} else if (image_header.format == UPDATE_FORMAT_TPYE_DCC) {
-			status = cerberus_pfr_decommission(manifest);
-			if (status != Success) {
-				LOG_ERR("HRoT decommission failed.");
+		} else if (image_header.format == UPDATE_FORMAT_TYPE_DCC) {
+			if (cerberus_pfr_decommission(manifest)) {
+				LOG_ERR("Decommission failed.");
 				return Failure;
 			}
-		} else {
-			LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "Incorrect image header:");
-			return Failure;
+		} else if (image_header.format == UPDATE_FORMAT_TYPE_KCC) {
+			if (cerberus_pfr_cancel_csk_keys(manifest)) {
+				LOG_ERR("Cancel CSK keys failed.");
+				return Failure;
+			}
+		} else if (image_header.format == UPDATE_FORMAT_TYPE_KEYM) {
+			if (cerberus_append_key_manifest(manifest)) {
+				LOG_ERR("Key Manifest append failed");
+				return Failure;
+			}
 		}
 	} else {
 		LOG_INF("Start HROT Provisioning %02x.", provision_state);
 		return cerberus_provisioning_root_key_action(manifest);
 	}
+
 	return Success;
-}
-
-int cerberus_keystore_update(struct pfr_manifest *manifest, uint16_t image_format)
-{
-	int status = 0;
-	uint16_t header_length;
-	uint16_t capsule_type;
-	uint16_t section_header_length;
-
-	// Get the Header Length
-	status = pfr_spi_read(manifest->image_type, manifest->address, sizeof(header_length),
-			(uint8_t *)&header_length);
-	if (status != Success) {
-		LOG_ERR("%s: read header length failed", __func__);
-		return Failure;
-	}
-
-	status = pfr_spi_read(manifest->image_type, manifest->address + header_length,
-			sizeof(section_header_length), (uint8_t *)&section_header_length);
-	if (status != Success) {
-		LOG_ERR("%s: read header failed", __func__);
-		return Failure;
-	}
-
-	int get_key_id = 0xFF;
-	int last_key_id = 0xFF;
-	uint8_t pub_key[256];
-	struct Keystore_Manager keystore_manager;
-
-	keystoreManager_init(&keystore_manager);
-	status = pfr_spi_read(manifest->image_type,
-			      manifest->address + header_length + section_header_length - 2,
-			      sizeof(capsule_type),
-			      (uint8_t *)&capsule_type);
-	if (status != Success) {
-		LOG_ERR("%s: read capsule type failed", __func__);
-		return Failure;
-	}
-
-	if (capsule_type != BMC_PFM_CANCELLATION) {
-		LOG_ERR("%s: unsupported capsule type(0x%x)", __func__, capsule_type);
-		return Failure;
-	}
-
-	manifest->pc_type = capsule_type;
-	LOG_INF("capsule_type is %x", capsule_type);
-	status = pfr_spi_read(manifest->image_type,
-			      manifest->address + header_length + section_header_length,
-			      256,
-			      (uint8_t *)pub_key);
-	if (status != Success) {
-		LOG_ERR("%s: read cancel key failed", __func__);
-		return Failure;
-	}
-
-	status = keystore_get_key_id(&keystore_manager.base, pub_key, &get_key_id, &last_key_id);
-	if (status == Success) {
-		LOG_INF("Key Id %x should be cancelled", get_key_id);
-		status = manifest->keystore->kc_flag->cancel_kc_flag(manifest, get_key_id);
-		if (status == Success)
-			LOG_INF("Key cancellation success. Key Id :%d was cancelled", get_key_id);
-	}
-
-	return status;
 }
 
 int cerberus_update_recovery_region(int image_type, uint32_t source_address, uint32_t target_address)
@@ -229,7 +266,6 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	uint32_t start_address, erase_address, section_length;
 	uint32_t region_cnt;
 	uint32_t *update_regions = NULL;
-	uint8_t platform_length;
 	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
@@ -238,17 +274,6 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 			(uint8_t *)&image_header)) {
 		LOG_ERR("Failed to read image header");
 		return Failure;
-	}
-
-	if (image_header.format != UPDATE_FORMAT_TPYE_BMC &&
-	    image_header.format != UPDATE_FORMAT_TPYE_PCH &&
-	    image_header.format != UPDATE_FORMAT_TPYE_KCC) {
-		LOG_ERR("Unsupported image format(%d)", image_header.format);
-		return Failure;
-	}
-
-	if (image_header.format == UPDATE_FORMAT_TPYE_KCC) {
-		return cerberus_keystore_update(manifest, image_header.format);
 	}
 
 	if (!erase_rw_regions) {
@@ -261,10 +286,7 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 
 	sig_address = manifest->address + image_header.image_length -
 		image_header.sign_length;
-	recovery_offset = manifest->address + sizeof(image_header);
-	status = pfr_spi_read(manifest->image_type, recovery_offset,
-			sizeof(platform_length), &platform_length);
-	recovery_offset = recovery_offset + platform_length + 1;
+	recovery_offset = manifest->address + image_header.header_length;
 	bool should_update = false;
 
 	while (recovery_offset < sig_address) {
@@ -319,13 +341,18 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 {
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
-
-	uint8_t status = Success;
-	uint32_t source_address, target_address, address, act_pfm_offset;
-	CPLD_STATUS cpld_update_status;
-	uint8_t flash_select = EventData->flash;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	uint8_t flash_select = EventData->flash;
+	struct recovery_header image_header;
+	CPLD_STATUS cpld_update_status;
 	bool erase_rw_regions = false;
+	uint8_t status = Success;
+	uint32_t source_address;
+	uint32_t target_address;
+	uint32_t act_pfm_offset;
+	uint32_t flash_id;
+	uint32_t pc_type;
+	uint32_t address;
 
 	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC)
 		erase_rw_regions = true;
@@ -335,6 +362,13 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	LOG_INF("Firmware Update Start.");
 
+	if (pfr_manifest->image_type != BMC_TYPE &&
+	    pfr_manifest->image_type != PCH_TYPE &&
+	    pfr_manifest->image_type != ROT_TYPE) {
+		LOG_ERR("Unsupported image type %d", pfr_manifest->image_type);
+		return Failure;
+	}
+
 	if (pfr_manifest->image_type == BMC_TYPE) {
 		// BMC Update/Provisioning
 		LOG_INF("BMC Update in Progress");
@@ -342,8 +376,12 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 				sizeof(pfr_manifest->address)))
 			return Failure;
 		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
-					sizeof(act_pfm_offset)))
+				sizeof(act_pfm_offset)))
 			return Failure;
+		flash_id = BMC_FLASH_ID;
+		pfr_manifest->flash_id = flash_id;
+		pc_type = PFR_BMC_UPDATE_CAPSULE;
+		pfr_manifest->pc_type = pc_type;
 	} else if (pfr_manifest->image_type == PCH_TYPE) {
 		// PCH Update
 		LOG_INF("PCH Update in Progress");
@@ -351,14 +389,21 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 				sizeof(pfr_manifest->address)))
 			return Failure;
 		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset,
-					sizeof(act_pfm_offset)))
+				sizeof(act_pfm_offset)))
 			return Failure;
+		flash_id = PCH_FLASH_ID;
+		pfr_manifest->flash_id = flash_id;
+		pc_type = PFR_PCH_UPDATE_CAPSULE;
+		pfr_manifest->pc_type = pc_type;
 	} else if (pfr_manifest->image_type == ROT_TYPE) {
-		//HROT Update/Decommisioning
+		// HROT Update/Decommisioning
 		LOG_INF("ROT Update in Progress");
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = BMC_CPLD_STAGING_ADDRESS;
-		pfr_manifest->flash_id = BMC_FLASH_ID;
+		flash_id = BMC_FLASH_ID;
+		pfr_manifest->flash_id = flash_id;
+		pc_type = PFR_CPLD_UPDATE_CAPSULE;
+		pfr_manifest->pc_type = pc_type;
 		return cerberus_hrot_update(pfr_manifest);
 	}
 
@@ -391,8 +436,25 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 	pfr_manifest->image_type = image_type;
 	pfr_manifest->address = source_address;
+	pfr_manifest->flash_id = flash_id;
+	pfr_manifest->pc_type = pc_type;
 
-	//BMC/PCH Firmware Update for Active/Recovery Region
+	// Checking for key cancellation
+	if (pfr_spi_read(pfr_manifest->image_type, pfr_manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	if (image_header.format == UPDATE_FORMAT_TYPE_KCC) {
+		if (cerberus_pfr_verify_image(pfr_manifest)) {
+			LOG_ERR("Image Verify Failed");
+			return Failure;
+		}
+
+		return cerberus_pfr_cancel_csk_keys(pfr_manifest);
+	}
+
+	// BMC/PCH Firmware Update for Active/Recovery Region
 	status = pfr_manifest->update_fw->base->verify((struct firmware_image *)pfr_manifest,
 			NULL, NULL);
 	if (status != Success) {
@@ -433,23 +495,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 
 		status = cerberus_update_recovery_region(image_type, source_address, target_address);
 	}
-	return status;
-}
-
-void cerberus_watchdog_timer(uint32_t image_type)
-{
-#if 0
-	if (image_type == BMC_TYPE)
-		printk("Watchdog timer BMC TYPE\r\n");
-	else
-		printk("Watchdog timer PCH TYPE\r\n");
-#endif
-}
-
-int check_staging_area(void)
-{
-
-	int status = 0;
 
 	return status;
 }
@@ -468,11 +513,75 @@ int firmware_image_verify(struct firmware_image *fw, struct hash_engine *hash, s
 {
 	ARG_UNUSED(hash);
 	ARG_UNUSED(rsa);
-
 	struct pfr_manifest *manifest = (struct pfr_manifest *) fw;
+	struct recovery_header image_header;
+	uint32_t dest_pfm_addr;
+	uint32_t src_pfm_addr;
+	int status;
+
+	if (manifest->image_type != BMC_TYPE &&
+	    manifest->image_type != PCH_TYPE) {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
+
+	LOG_INF("Staging Region Verification");
 
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->staging_address;
-	return cerberus_pfr_verify_image(manifest);
+	LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
+	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	if (((manifest->image_type == BMC_TYPE) && (image_header.format != UPDATE_FORMAT_TYPE_BMC)) ||
+	    ((manifest->image_type == PCH_TYPE) && (image_header.format != UPDATE_FORMAT_TYPE_PCH))) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Unsupported image format(%d) for manifest->image_type(%d)",
+			image_header.format, manifest->image_type);
+		return Failure;
+	}
+
+	if (cerberus_pfr_verify_image(manifest)) {
+		LOG_ERR("Stage Image Verify Failed");
+		return Failure;
+	}
+
+	// Find PFM in stage image
+	if (cerberus_get_image_pfm_addr(manifest, &image_header, &src_pfm_addr, &dest_pfm_addr)) {
+		LOG_ERR("PFM doesn't exist in stage image");
+		return Failure;
+	}
+
+	if (manifest->image_type == BMC_TYPE)
+		manifest->pc_type = PFR_BMC_PFM;
+	else if (manifest->image_type == PCH_TYPE)
+		manifest->pc_type = PFR_PCH_PFM;
+	else {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
+
+	// Stage region PFM verification
+	manifest->address = src_pfm_addr;
+	LOG_INF("Verifying PFM address=0x%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base,
+			manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("Verify PFM failed");
+		return Failure;
+	}
+
+	status = cerberus_pfr_verify_pfm_csk_key(manifest);
+	if (status != Success) {
+		LOG_ERR("Verify PFM CSK key failed");
+		return Failure;
+	}
+
+	manifest->address = manifest->staging_address;
+	LOG_INF("Staging area verification successful");
+
+	return Success;
 }
 

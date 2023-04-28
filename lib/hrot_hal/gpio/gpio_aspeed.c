@@ -84,6 +84,7 @@ static void pch_rst_enable_ctrl(bool enable)
 int BMCBootHold(void)
 {
 	const struct device *dev_m = NULL;
+	const struct device *flash_dev = NULL;
 
 	/* Hold BMC Reset */
 	bmc_extrst_enable_ctrl(true);
@@ -92,57 +93,89 @@ int BMCBootHold(void)
 	if (first_time_boot)
 		bmc_srst_enable_ctrl(true);
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	flash_dev = device_get_binding("spi1_cs0");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi1_cs0");
+	}
 #if defined(CONFIG_DUAL_FLASH)
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	flash_dev = device_get_binding("spi1_cs1");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi1_cs1");
+	}
 #endif
-
+	LOG_INF("hold BMC");
 	return 0;
 }
 
 int PCHBootHold(void)
 {
 	const struct device *dev_m = NULL;
+	const struct device *flash_dev = NULL;
 
 	/* Hold PCH Reset */
 	pch_rst_enable_ctrl(true);
 
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	flash_dev = device_get_binding("spi2_cs0");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi2_cs0");
+	}
 #if defined(CONFIG_DUAL_FLASH)
 	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	flash_dev = device_get_binding("spi2_cs1");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi2_cs1");
+	}
 #endif
-
+	LOG_INF("hold PCH");
 	return 0;
 }
 
 int BMCBootRelease(void)
 {
 	const struct device *dev_m = NULL;
+	const struct device *flash_dev = NULL;
 
+	flash_dev = device_get_binding("spi1_cs0");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi1_cs0");
+	}
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_DUAL_FLASH)
+	flash_dev = device_get_binding("spi1_cs1");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi1_cs1");
+	}
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
@@ -162,16 +195,27 @@ int BMCBootRelease(void)
 int PCHBootRelease(void)
 {
 	const struct device *dev_m = NULL;
+	const struct device *flash_dev = NULL;
 
+	flash_dev = device_get_binding("spi2_cs0");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi2_cs0");
+	}
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_DUAL_FLASH)
+	flash_dev = device_get_binding("spi2_cs1");
+	if (flash_dev) {
+		spi_nor_rst_by_cmd(flash_dev);
+	} else {
+		LOG_ERR("Failed to bind spi2_cs1");
+	}
 	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
-	spim_rst_flash(dev_m, 10);
 	spim_passthrough_config(dev_m, 0, false);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */

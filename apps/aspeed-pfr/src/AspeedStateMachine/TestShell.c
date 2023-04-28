@@ -11,6 +11,7 @@
 #include <logging/log.h>
 #include <drivers/flash.h>
 #include <drivers/misc/aspeed/abr_aspeed.h>
+#include <drivers/i2c/pfr/i2c_filter.h>
 
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
@@ -1014,6 +1015,73 @@ static int cmd_heap(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
+struct ast_i2c_filter_child_data {
+	uint32_t        filter_dev_base;        /* i2c filter device base */
+	uint8_t filter_dev_en;  /* i2cflt04 : filter enable */
+	uint8_t filter_en;              /* i2cflt0c : white list */
+	uint8_t filter_idx[16];
+	uint8_t *filter_buf;
+};
+
+extern struct ast_i2c_f_tbl filter_tbl[5];
+
+static int cmd_i2c_filter_dump(const struct shell *shell, size_t argc, char **argv)
+{
+	const struct device *flt_dev = NULL;
+	struct ast_i2c_filter_child_data *data;
+	char bus_dev_name[] = "I2C_FILTER_x";
+
+	if (argc > 1) {
+		size_t filter_id = strtol(argv[1], NULL, 16);
+		bus_dev_name[11] = filter_id + '0';
+		flt_dev = device_get_binding(bus_dev_name);
+		if (!flt_dev || filter_id > 3) {
+			shell_print(shell, "Invalid filter id");
+			return 0;
+		}
+
+		data = (struct ast_i2c_filter_child_data *)flt_dev->data;
+
+		if (argc == 2) {
+			for (int devid = 0; devid < 16; devid++) {
+				shell_print(shell, "I2C_FILTER_%d Rule[%02d] Addr[%02x] :",
+						filter_id, devid, data->filter_idx[devid] << 1);
+				shell_hexdump(shell, &filter_tbl[filter_id].filter_tbl[devid + 1],
+						sizeof(struct ast_i2c_f_bitmap));
+				shell_print(shell,"\n");
+			}
+		} else if (argc == 3) {
+			size_t devid = strtol(argv[2], NULL, 16);
+			shell_print(shell, "I2C_FILTER_%d Rule[%02d] Addr[%02x] :",
+					filter_id, devid, data->filter_idx[devid] << 1);
+			shell_hexdump(shell, &filter_tbl[filter_id].filter_tbl[devid + 1],
+					sizeof(struct ast_i2c_f_bitmap));
+			shell_print(shell,"\n");
+		}
+
+
+		return 0;
+	}
+
+	for (int i = 0; i < 4; i++) {
+		bus_dev_name[11] = i + '0';
+		flt_dev = device_get_binding(bus_dev_name);
+		if (!flt_dev) {
+			continue;
+		}
+		data = (struct ast_i2c_filter_child_data *)flt_dev->data;
+		for (int devid = 0; devid < 16; devid++) {
+			shell_print(shell, "I2C_FILTER_%d Rule[%02d] Addr[%02x] :", i, devid,
+					data->filter_idx[devid] << 1);
+			shell_hexdump(shell, &filter_tbl[i].filter_tbl[devid + 1],
+					sizeof(struct ast_i2c_f_bitmap));
+			shell_print(shell,"\n");
+		}
+	}
+
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(log, NULL, "Show state machine event log", cmd_asm_log),
 	SHELL_CMD(event, &sub_event, "State Machine Event", NULL),
@@ -1032,6 +1100,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 	SHELL_CMD(dice, NULL, "Generate Cert Chain", cmd_dice),
 #endif
 	SHELL_CMD(heap, NULL, "Show system heap statistic", cmd_heap),
+	SHELL_CMD_ARG(flt_dump, NULL, "Dump i2c filter table\n"
+				       "Usage: asm flt_dump\n"
+				       "asm flt_dump <filter_id>\n"
+				       "asm flt_dump <filter_id> <rule_id>\n",
+		cmd_i2c_filter_dump, 0, 2),
 	SHELL_SUBCMD_SET_END
 );
 

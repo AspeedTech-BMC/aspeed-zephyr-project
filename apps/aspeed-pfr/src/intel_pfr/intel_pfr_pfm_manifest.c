@@ -139,7 +139,6 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest,
 		PFM_SPI_DEFINITION *PfmSpiDefinition, uint8_t *pfm_spi_Hash)
 {
 
-	int status = 0;
 	uint32_t region_length;
 
 	LOG_INF("RegionStartAddress: %x, RegionEndAddress: %x",
@@ -169,8 +168,7 @@ int spi_region_hash_verification(struct pfr_manifest *pfr_manifest,
 		pfr_manifest->base->get_hash((struct manifest *)pfr_manifest, pfr_manifest->hash,
 				sha_buffer, hash_length);
 
-		status = compare_buffer(pfm_spi_Hash, sha_buffer, hash_length);
-		if (status != Success) {
+		if (memcmp(pfm_spi_Hash, sha_buffer, hash_length)) {
 			LOG_ERR("Digest verification failed");
 			return Failure;
 		}
@@ -240,9 +238,9 @@ int fvm_spi_region_verification(struct pfr_manifest *manifest)
 		case SPI_REGION:
 			fvm_addr += sizeof(PFM_SPI_DEFINITION);
 			fvm_addr += get_spi_region_hash(manifest, fvm_addr, &spi_definition,
-					&pfm_spi_hash);
+					pfm_spi_hash);
 			if (spi_region_hash_verification(manifest, &spi_definition,
-							&pfm_spi_hash))
+							pfm_spi_hash))
 				return Failure;
 
 			memset(&spi_definition, 0, sizeof(PFM_SPI_DEFINITION));
@@ -292,9 +290,9 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 		case SPI_REGION:
 			pfm_addr += sizeof(PFM_SPI_DEFINITION);
 			pfm_addr += get_spi_region_hash(manifest, pfm_addr, &spi_definition,
-					&pfm_spi_hash);
+					pfm_spi_hash);
 			if (spi_region_hash_verification(manifest, &spi_definition,
-					&pfm_spi_hash))
+					pfm_spi_hash))
 				return Failure;
 
 			memset(&spi_definition, 0, sizeof(PFM_SPI_DEFINITION));

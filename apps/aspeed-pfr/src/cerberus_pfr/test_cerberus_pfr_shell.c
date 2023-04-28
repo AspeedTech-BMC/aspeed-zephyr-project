@@ -20,12 +20,14 @@
 static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **argv)
 {
 	struct pfr_manifest test_manifest;
+	uint8_t keym_id;
 	uint8_t key_id;
 
 	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
-	key_id = strtoul(argv[2], NULL, 10);
+	keym_id = strtoul(argv[2], NULL, 10);
+	key_id = strtoul(argv[3], NULL, 10);
 
-	cancel_csk_key_id(&test_manifest, key_id);
+	cancel_csk_key_id(&test_manifest, keym_id, key_id);
 
 	ARG_UNUSED(shell);
 	ARG_UNUSED(argc);
@@ -35,13 +37,15 @@ static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **
 static int cmd_verify_csk_key_id(const struct shell *shell, size_t argc, char **argv)
 {
 	struct pfr_manifest test_manifest;
+	uint8_t keym_id;
 	uint8_t key_id;
 
 	test_manifest.pc_type = strtoul(argv[1], NULL, 16);
-	key_id = strtoul(argv[2], NULL, 10);
+	keym_id = strtoul(argv[2], NULL, 10);
+	key_id = strtoul(argv[3], NULL, 10);
 
-	if (!verify_csk_key_id(&test_manifest, key_id))
-		shell_print(shell, "This CSK key is not cancelled.., PC type = 0x%x, Key Id = %d", test_manifest.pc_type, key_id);
+	if (!verify_csk_key_id(&test_manifest, keym_id, key_id))
+		shell_print(shell, "KEYM(%d): This CSK key is not cancelled.., PC type = 0x%x, Key Id = %d", keym_id, test_manifest.pc_type, key_id);
 
 	ARG_UNUSED(argc);
 	return 0;
@@ -49,7 +53,7 @@ static int cmd_verify_csk_key_id(const struct shell *shell, size_t argc, char **
 
 static int cmd_dump_key_cancellation_policy(const struct shell *shell, size_t argc, char **argv)
 {
-	uint32_t buffer[4] = { 0 };
+	uint8_t buffer[16] = { 0 };
 	uint32_t offset = 0;
 	uint32_t pc_type;
 
@@ -62,16 +66,16 @@ static int cmd_dump_key_cancellation_policy(const struct shell *shell, size_t ar
 	}
 
 	shell_print(shell, "UFM Offeset = %x", offset);
-	ufm_read(PROVISION_UFM, offset, (uint8_t *)buffer, sizeof(buffer));
-	shell_hexdump(shell, (uint8_t *)buffer, sizeof(buffer));
+	ufm_read(PROVISION_UFM, offset, buffer, sizeof(buffer));
+	shell_hexdump(shell, buffer, sizeof(buffer));
 
 	ARG_UNUSED(argc);
 	return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
-	SHELL_CMD_ARG(verify, NULL, "<pc_type> <key_id>", cmd_verify_csk_key_id, 3, 0),
-	SHELL_CMD_ARG(cancel, NULL, "<pc_type> <key_id>", cmd_cancel_csk_key_id, 3, 0),
+	SHELL_CMD_ARG(verify, NULL, "<pc_type> <keym_id> <key_id>", cmd_verify_csk_key_id, 4, 0),
+	SHELL_CMD_ARG(cancel, NULL, "<pc_type> <keym_id> <key_id>", cmd_cancel_csk_key_id, 4, 0),
 	SHELL_CMD_ARG(dump, NULL, "<pc_type>", cmd_dump_key_cancellation_policy, 2, 0),
 	SHELL_SUBCMD_SET_END
 );

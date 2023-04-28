@@ -35,7 +35,6 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	uint32_t section_length;
 	struct pfm_fw_version_element_rw_region *rw_region = NULL;
 	struct recovery_section recovery_section;
-	uint8_t platform_length;
 	uint32_t source_address;
 	uint32_t src_pfm_addr, dest_pfm_addr;
 	uint32_t manifest_addr = manifest->address;
@@ -113,10 +112,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	}
 
 	sig_address = source_address + recovery_header.image_length - recovery_header.sign_length;
-	recovery_offset = source_address + sizeof(recovery_header);
-	status = pfr_spi_read(manifest->image_type, recovery_offset, sizeof(platform_length),
-			(uint8_t *)&platform_length);
-	recovery_offset = recovery_offset + platform_length + 1;
+	recovery_offset = source_address + recovery_header.header_length;
 
 	bool is_rw_region_handled;
 
@@ -125,7 +121,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 		status = pfr_spi_read(manifest->image_type, recovery_offset,
 				sizeof(recovery_section), (uint8_t *)&recovery_section);
 		if (recovery_section.magic_number != RECOVERY_SECTION_MAGIC) {
-			LOG_ERR("Recovery Section not matched..\n");
+			LOG_ERR("Recovery Section not matched..");
 			break;
 		}
 		start_address = recovery_section.start_addr;
@@ -167,7 +163,8 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	time_end = k_uptime_get_32();
 	LOG_INF("Firmware recovery completed, elapsed time = %u milliseconds",
 			(time_end - time_start));
-	LOG_INF("Repair success\r\n");
+	LOG_INF("Active Updated!!");
+	LOG_INF("Repair success");
 	status = Success;
 
 recovery_failed:
@@ -192,6 +189,9 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	uint32_t target_address;
 	uint32_t image_type = manifest->image_type;
 	uint32_t flash_id = manifest->flash_id;
+	struct recovery_header image_header;
+	uint32_t dest_pfm_addr;
+	uint32_t src_pfm_addr;
 
 	status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address,
 			sizeof(source_address));
@@ -208,11 +208,48 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	manifest->image_type = BMC_TYPE;
 	manifest->address = source_address;
 	manifest->flash_id = BMC_FLASH_ID;
+	manifest->pc_type = PFR_PCH_UPDATE_CAPSULE;
 
 	LOG_INF("BMC's PCH Staging Area verification");
+	LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
+	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	if (image_header.format != UPDATE_FORMAT_TYPE_PCH) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Unsupported image format(%d)", image_header.format);
+		return Failure;
+	}
+
 	status = cerberus_pfr_verify_image(manifest);
 	if (status != Success) {
-		LOG_ERR("verify failed");
+		LOG_ERR("BMC's PCH Stage Image Verify Failed");
+		return Failure;
+	}
+
+	// Find PFM in BMC's PCH stage image
+	if (cerberus_get_image_pfm_addr(manifest, &image_header, &src_pfm_addr, &dest_pfm_addr)) {
+		LOG_ERR("PFM doesn't exist in BMC's PCH Stage Image");
+		return Failure;
+	}
+
+	manifest->pc_type = PFR_PCH_PFM;
+
+	// BMC's PCH Stage region PFM verification
+	manifest->address = src_pfm_addr;
+	LOG_INF("Verifying PFM address=0x%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base,
+			manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("Verify PFM failed");
+		return Failure;
+	}
+
+	status = cerberus_pfr_verify_pfm_csk_key(manifest);
+	if (status != Success) {
+		LOG_ERR("Verify PFM CSK key failed");
 		return Failure;
 	}
 
@@ -224,8 +261,8 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
-	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
-			source_address, target_address);
+	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x, length: 0x%08x",
+			source_address, target_address, CONFIG_PCH_STAGING_SIZE);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
 				CONFIG_PCH_STAGING_SIZE))
@@ -276,10 +313,74 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 	ARG_UNUSED(hash_length);
 	ARG_UNUSED(pfm);
 	struct pfr_manifest *manifest = (struct pfr_manifest *)image;
+	struct recovery_header image_header;
+	uint32_t dest_pfm_addr;
+	uint32_t src_pfm_addr;
+	int status;
+
+	LOG_INF("Verify recovery");
+
+	if (manifest->image_type != BMC_TYPE &&
+	    manifest->image_type != PCH_TYPE) {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
 
 	init_stage_and_recovery_offset(manifest);
 	manifest->address = manifest->recovery_address;
-	return cerberus_pfr_verify_image(manifest);
+	LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
+	if (pfr_spi_read(manifest->flash_id, manifest->address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	if (((manifest->image_type == BMC_TYPE) && (image_header.format != UPDATE_FORMAT_TYPE_BMC)) ||
+	    ((manifest->image_type == PCH_TYPE) && (image_header.format != UPDATE_FORMAT_TYPE_PCH))) {
+		LOG_HEXDUMP_ERR(&image_header, sizeof(image_header), "image_header:");
+		LOG_ERR("Unsupported image format(%d) for manifest->image_type(%d)",
+			image_header.format, manifest->image_type);
+		return Failure;
+	}
+
+	if (cerberus_pfr_verify_image(manifest)) {
+		LOG_ERR("Recovery Image Verify Failed");
+		return Failure;
+	}
+
+	// Find PFM in recovery image
+	if (cerberus_get_image_pfm_addr(manifest, &image_header, &src_pfm_addr, &dest_pfm_addr)) {
+		LOG_ERR("PFM doesn't exist in recovery image");
+		return Failure;
+	}
+
+	if (manifest->image_type == BMC_TYPE)
+		manifest->pc_type = PFR_BMC_PFM;
+	else if (manifest->image_type == PCH_TYPE)
+		manifest->pc_type = PFR_PCH_PFM;
+	else {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
+
+	// Recovery region PFM verification
+	manifest->address = src_pfm_addr;
+	LOG_INF("Verifying PFM address=0x%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash, manifest->verification->base,
+			manifest->pfr_hash->hash_out, manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("Verify PFM failed");
+		return Failure;
+	}
+
+	status = cerberus_pfr_verify_pfm_csk_key(manifest);
+	if (status != Success) {
+		LOG_ERR("Verify PFM CSK key failed");
+		return Failure;
+	}
+
+	LOG_INF("Recovery area verification successful");
+
+	return Success;
 }
 
 int recovery_apply_to_flash(struct recovery_image *image, struct spi_flash *flash)

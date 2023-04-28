@@ -15,6 +15,7 @@
 LOG_MODULE_REGISTER(monitor, CONFIG_LOG_DEFAULT_LEVEL);
 
 extern struct k_work log_bmc_rst_work;
+extern uint8_t gWdtBootStatus;
 static struct gpio_callback bmc_rstind_cb_data;
 
 static void bmc_rstind_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
@@ -59,6 +60,7 @@ static struct gpio_callback rst_pltrst_cb_data;
  */
 static void platform_reset_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
+#ifdef INTEL_EGS
 	uint8_t gpio_pin = 31 - __builtin_clz(pins);
 	int ret = gpio_pin_get(dev, gpio_pin);
 	uint32_t ms_timeout = WDT_ACM_TIMER_MAXTIMEOUT;
@@ -70,6 +72,13 @@ static void platform_reset_handler(const struct device *dev, struct gpio_callbac
 	gWdtBootStatus &= ~WDT_ACM_BIOS_BOOT_DONE_MASK;
 	// Start ACM watchdog timer
 	pfr_start_timer(type, ms_timeout);
+#endif
+#ifdef AMD_GENOA
+	uint8_t gpio_pin = 31 - __builtin_clz(pins);
+	int ret = gpio_pin_get(dev, gpio_pin);
+
+	LOG_INF("[Platform->PFR] PLTRST[%s %d] = %d", dev->name, gpio_pin, ret);
+#endif
 }
 
 /* Monitor Platform Reset Status */

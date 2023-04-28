@@ -16,7 +16,6 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-
 int verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *pubkey_x, uint8_t *pubkey_y)
 {
 	uint8_t root_public_key[SHA384_DIGEST_LENGTH * 2] = { 0 };
@@ -41,9 +40,14 @@ int verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *pubkey_x, uint8
 		root_public_key[i + digest_length] = pubkey_y[digest_length - 1 - i];
 	}
 
-	status = get_buffer_hash(manifest, root_public_key, digest_length * 2, sha_buffer);
-	if (status != Success) {
-		LOG_ERR("Block1 Root Entry: Get buffer hash failed");
+	if (manifest->hash_curve == secp256r1) {
+		manifest->hash->start_sha256(manifest->hash);
+		manifest->hash->calculate_sha256(manifest->hash, root_public_key, digest_length * 2, sha_buffer, digest_length);
+	} else if (manifest->hash_curve == secp384r1) {
+		manifest->hash->start_sha384(manifest->hash);
+		manifest->hash->calculate_sha384(manifest->hash, root_public_key, digest_length * 2, sha_buffer, digest_length);
+	} else {
+		LOG_ERR("Block1 Root Entry: Get hash failed, Unsupported hash curve, %x", manifest->hash_curve);
 		return Failure;
 	}
 
@@ -54,10 +58,9 @@ int verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *pubkey_x, uint8
 		return status;
 	}
 
-	status = compare_buffer(sha_buffer, ufm_sha_data, digest_length);
-	if (status != Success) {
+	if (memcmp(sha_buffer, ufm_sha_data, digest_length)) {
 		LOG_ERR("Block1 Root Entry: hash not matched");
-		LOG_HEXDUMP_INF(root_public_key, digest_length*2, "Public key:");
+		LOG_HEXDUMP_INF(root_public_key, digest_length * 2, "Public key:");
 		LOG_HEXDUMP_INF(sha_buffer, digest_length, "Calculated hash:");
 		LOG_HEXDUMP_INF(ufm_sha_data, digest_length, "Expected hash:");
 		return Failure;

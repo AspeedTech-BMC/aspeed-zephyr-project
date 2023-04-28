@@ -93,6 +93,10 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 		act_pfm_offset = 0;
 	}
 #endif
+	else {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
 
 	LOG_INF("Staging PFM signature, address=0x%08x, Active PFM signature, address=0x%08x", staging_address, act_pfm_offset);
 
@@ -302,8 +306,8 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE);
 
-	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x",
-			source_address, target_address);
+	LOG_INF("Copying staging region from BMC addr: 0x%08x to PCH addr: 0x%08x, length : 0x%08x",
+			source_address, target_address, CONFIG_PCH_STAGING_SIZE);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, target_address,
 			CONFIG_PCH_STAGING_SIZE))

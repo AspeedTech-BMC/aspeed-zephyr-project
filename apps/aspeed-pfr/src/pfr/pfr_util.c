@@ -52,12 +52,13 @@ int pfr_spi_read(uint8_t device_id, uint32_t address, uint32_t data_length, uint
 
 int pfr_spi_write(uint8_t device_id, uint32_t address, uint32_t data_length, uint8_t *data)
 {
-	int status = 0;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.state->device_id[0] = device_id; // assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
-	spi_flash->spi.base.write((struct flash *)&spi_flash->spi, address, data, data_length);
-	return status;
+	if (spi_flash->spi.base.write((struct flash *)&spi_flash->spi, address, data, data_length) != data_length)
+		return Failure;
+
+	return Success;
 }
 
 int pfr_spi_erase_4k(uint8_t device_id, uint32_t address)
@@ -176,22 +177,6 @@ int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 	return Success;
 }
 
-// calculates sha for dataBuffer
-int get_buffer_hash(struct pfr_manifest *manifest, uint8_t *data_buffer, uint8_t length, uint8_t *hash_out)
-{
-	if (manifest->hash_curve == secp256r1) {
-		manifest->hash->start_sha256(manifest->hash);
-		manifest->hash->calculate_sha256(manifest->hash, data_buffer, length, hash_out, SHA256_HASH_LENGTH);
-	} else if (manifest->hash_curve == secp384r1) {
-		manifest->hash->start_sha384(manifest->hash);
-		manifest->hash->calculate_sha384(manifest->hash, data_buffer, length, hash_out, SHA384_HASH_LENGTH);
-	} else  {
-		return Failure;
-	}
-
-	return Success;
-}
-
 // Calculate hash digest
 int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t *hash_out, size_t hash_length)
 {
@@ -204,12 +189,6 @@ int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t
 	}
 
 	return flash_hash_contents((struct flash *)pfr_manifest->flash, pfr_manifest->pfr_hash->start_address, pfr_manifest->pfr_hash->length, pfr_manifest->hash, pfr_manifest->pfr_hash->type, hash_out, hash_length);
-}
-
-// compare buffer
-int compare_buffer(uint8_t *buffer1, uint8_t *buffer2, uint32_t length)
-{
-	return memcmp(buffer1, buffer2, length);
 }
 
 static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
@@ -290,7 +269,7 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 	return status;
 }
 
-int pfr_cpld_update_reboot(void)
+void pfr_cpld_update_reboot(void)
 {
 	LOG_INF("system going reboot ...");
 
@@ -301,6 +280,4 @@ int pfr_cpld_update_reboot(void)
 	sys_reboot(SYS_REBOOT_COLD);
 
 	CODE_UNREACHABLE;
-
-	return -1;
 }

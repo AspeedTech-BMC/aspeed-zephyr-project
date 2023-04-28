@@ -130,10 +130,16 @@ config BMC_PCH_STAGING_SIZE
 	  The max size of PCH staging area for putting signed PCH capsule.
 
 config BMC_PFR_STAGING_SIZE
-	default 0x500000
+	default 0x100000
 	hex "PFR staging region size in BMC flash"
 	help
 	  The max size of PFR staging area for putting signed ROT capsule.
+
+config BMC_CPLD_STAGING_SIZE
+	default 0x400000
+	hex "Platform CPLD staging region size in BMC flash"
+	help
+	  The max size of platform CPLD staging area for putting signed CPLD capsule.
 
 config PCH_STAGING_SIZE
 	default 0x1000000
@@ -177,6 +183,13 @@ config PFR_SW_MAILBOX
         bool "SW mailbox solution"
         help
           Enable SW mailbox support.
+
+config KEY_MANIFEST_MAX_COUNT
+	depends on CERBERUS_PFR
+	default 0x10
+	hex "Key manifest max count"
+	help
+	  The max count of key manifest for Cerberus PFR.
 
 rsource "Kconfig.spdm"
 

@@ -12,7 +12,7 @@ manifest:
   projects:
     - name: zephyr
       remote: github
-      revision: 91c77fe34c457a617343c5b38895f40e153ecbac
+      revision: 9a1862443d1440e43f03384fe30c1ca48abd20ce
       import:
         name-whitelist:
           - mcumgr
@@ -21,7 +21,7 @@ manifest:
           - mbedtls
     - name: cerberus
       remote: github
-      revision: b6f68179e6aa15ce02ccfaff7dd8b9759867a940
+      revision: e6d0be29c417f5874dcba785f45cea38f4200701
       path: middlewares/cerberus
     - name: mcuboot
       remote: github
