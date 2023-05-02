@@ -728,7 +728,7 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 				+ read_address + PFM_SIG_BLOCK_SIZE;
 
 			manifest->address = fvm_addr;
-			if (manifest->base->verify((struct signature_verification *)manifest,
+			if (manifest->base->verify((struct manifest *)manifest,
 						NULL, NULL, NULL, 0)) {
 				LOG_ERR("Verify FVM failed");
 			}

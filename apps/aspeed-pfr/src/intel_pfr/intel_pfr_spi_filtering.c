@@ -5,8 +5,13 @@
  */
 
 #include <stdint.h>
+#include <device.h>
 #include <logging/log.h>
+#include <drivers/i2c/pfr/i2c_filter.h>
 #include "common/common.h"
+#include "engineManager/engine_manager.h"
+#include "manifestProcessor/manifestProcessor.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 
@@ -79,7 +84,7 @@ void apply_pfm_protection(int spi_device_id)
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.state->device_id[0] = spi_device_id;
-	spi_flash->spi.base.read(&spi_flash->spi, addr_size_of_pfm, pfm_length, 4);
+	spi_flash->spi.base.read((struct flash *)&spi_flash->spi, addr_size_of_pfm, pfm_length, 4);
 
 	int pfm_record_length = (pfm_length[0] & 0xff) | (pfm_length[1] << 8 & 0xff00) | (pfm_length[2] << 16 & 0xff0000) | (pfm_length[3] << 24 & 0xff000000);
 
@@ -88,7 +93,7 @@ void apply_pfm_protection(int spi_device_id)
 
 	while (!done) {
 		/* Read PFM Record */
-		spi_flash->spi.base.read(&spi_flash->spi, pfm_region_Start, region_record, default_region_length);
+		spi_flash->spi.base.read((struct flash *)&spi_flash->spi, pfm_region_Start, region_record, default_region_length);
 		switch(region_record[0]) {
 		case SPI_REGION:
 			/* SPI Region: 0x01 */
@@ -131,7 +136,7 @@ void apply_pfm_protection(int spi_device_id)
 			} else {
 				/* Write not allowed region */
 				// Cerberus did not support write not allowed setting
-				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
+				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
 						SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] write disable 0x%08x to 0x%08x",
@@ -141,7 +146,7 @@ void apply_pfm_protection(int spi_device_id)
 			if (region_record[1] & 0x01) {
 				/* Read allowed region */
 				// Cerberus did not support read disabled
-				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
+				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] read  enable  0x%08x to 0x%08x",
@@ -149,7 +154,7 @@ void apply_pfm_protection(int spi_device_id)
 			} else {
 				/* Read not allowed region */
 				// Cerberus did not support read disabled
-				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
+				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] read  disable 0x%08x to 0x%08x",
@@ -198,7 +203,7 @@ void apply_pfm_protection(int spi_device_id)
 							flt_dev,
 							region_record[6] - 1, // Rule ID
 							slave_addr,           // Device Address
-							&region_record[8]     // cmd_whitelist
+							(struct ast_i2c_f_bitmap *)&region_record[8]     // cmd_whitelist
 							);
 					LOG_DBG("ast_i2c_filter_update ret=%d", status);
 				} else {
@@ -225,6 +230,6 @@ void apply_pfm_protection(int spi_device_id)
 			break;
 	}
 
-	spi_filter->base.enable_filter(spi_filter, true);
+	spi_filter->base.enable_filter((struct spi_filter_interface *)spi_filter, true);
 }
 

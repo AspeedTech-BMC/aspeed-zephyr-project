@@ -54,7 +54,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	uint8_t DeviceId = flash->state->device_id[0];
 	int AdrOffset = xfer->address;
 	int Datalen = xfer->length;
-	uint32_t buf_addr = xfer->data;
+	uint8_t *buf_addr = xfer->data;
 	uint32_t FlashSize = 0;
 	int ret = 0;
 	int page_sz = 0;
@@ -97,7 +97,7 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 	case MIDLEY_FLASH_CMD_READ:
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
-	        if (buf_addr >= NON_CACHED_SRAM_START && buf_addr < NON_CACHED_SRAM_END) {
+	        if (buf_addr >= (uint8_t *)NON_CACHED_SRAM_START && buf_addr < (uint8_t *)NON_CACHED_SRAM_END) {
 			ret = flash_read(flash_device, AdrOffset, xfer->data, Datalen);
 		} else {
 			ret = flash_read(flash_device, AdrOffset, flash_rw_buf, Datalen);
@@ -149,7 +149,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 {
 	const struct device *flash_device;
 	const struct flash_area *partition_device;
-	uint32_t buf_addr = xfer->data;
+	uint8_t *buf_addr = xfer->data;
 	uint32_t FlashSize;
 	int AdrOffset;
 	int Datalen;
@@ -207,7 +207,7 @@ int FMC_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	break;
 	case MIDLEY_FLASH_CMD_READ:
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
-	        if (buf_addr >= NON_CACHED_SRAM_START && buf_addr < NON_CACHED_SRAM_END) {
+	        if (buf_addr >= (uint8_t *)NON_CACHED_SRAM_START && buf_addr < (uint8_t *)NON_CACHED_SRAM_END) {
 			ret = flash_area_read(partition_device, AdrOffset, xfer->data, Datalen);
 		} else {
 			ret = flash_area_read(partition_device, AdrOffset, flash_rw_buf, Datalen);

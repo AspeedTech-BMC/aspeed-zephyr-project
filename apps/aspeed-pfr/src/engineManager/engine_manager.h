@@ -7,6 +7,7 @@
 #pragma once
 
 #include <zephyr.h>
+#include "flash/flash_wrapper.h"
 
 
 struct engine_instances {
@@ -29,3 +30,4 @@ struct engine_instances {
 };
 
 int initializeEngines(void);
+void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm_addr);

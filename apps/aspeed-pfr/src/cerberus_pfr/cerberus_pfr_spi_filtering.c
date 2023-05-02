@@ -46,6 +46,8 @@ void apply_pfm_protection(int spi_dev)
 	else if (spi_dev == PCH_SPI)
 		get_provision_data_in_flash(PCH_ACTIVE_PFM_OFFSET, (uint8_t *)&pfm_addr,
 				sizeof(pfm_addr));
+	else
+		return;
 
 	if (cerberus_get_rw_region_info(spi_dev, pfm_addr, &rw_region_addr, &fw_ver_element)) {
 		LOG_ERR("Failed to get read write regions");

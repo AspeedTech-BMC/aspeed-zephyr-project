@@ -89,12 +89,13 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 	};
 
 	spi_flash->spi.state->device_id[0] = PCH_SPI;
-	spi_flash->spi.base.read(&spi_flash->spi, fvm_offset, &fvm, sizeof(FVM_STRUCTURE));
+	spi_flash->spi.base.read((struct flash *)&spi_flash->spi, fvm_offset, (uint8_t *)&fvm,
+			sizeof(FVM_STRUCTURE));
 	fvm_body_end_addr = fvm_offset + fvm.Length;
 
 	while(fvm_body_offset < fvm_body_end_addr) {
-		spi_flash->spi.base.read(&spi_flash->spi, fvm_body_offset, &spi_def,
-				sizeof(PFM_SPI_DEFINITION));
+		spi_flash->spi.base.read((struct flash *)&spi_flash->spi, fvm_body_offset,
+				(uint8_t *)&spi_def, sizeof(PFM_SPI_DEFINITION));
 		if (spi_def.PFMDefinitionType == SPI_REGION) {
 			region_start_address = spi_def.RegionStartAddress;
 			region_end_address = spi_def.RegionEndAddress;
