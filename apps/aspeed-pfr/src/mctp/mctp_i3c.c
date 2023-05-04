@@ -108,6 +108,7 @@ static struct i3c_ibi_payload i3c_payload;
 struct i3c_dev_desc mctp_i3c_slave;
 const struct device *mctp_i3c_master;
 static struct k_sem ibi_complete;
+bool i3c_dev_attached = false;
 
 static struct i3c_ibi_payload *ibi_write_requested(struct i3c_dev_desc *desc)
 {
@@ -180,8 +181,13 @@ static uint16_t mctp_i3c_write(void *mctp_p, void *msg_p)
 	return MCTP_SUCCESS;
 }
 
-int mctp_i3c_dettach_slave_dev(void)
+int mctp_i3c_detach_slave_dev(void)
 {
+	if (!i3c_dev_attached)
+		return 0;
+
+	i3c_dev_attached = false;
+
 	return i3c_aspeed_master_detach_device(mctp_i3c_master, &mctp_i3c_slave);
 }
 
@@ -194,6 +200,8 @@ int mctp_i3c_attach_slave_dev(void)
 	mctp_i3c_slave.info.i2c_mode = 0;
 	if (i3c_aspeed_master_attach_device(mctp_i3c_master, &mctp_i3c_slave))
 		goto error;
+
+	i3c_dev_attached = true;
 
 	if (i3c_master_send_rstdaa(mctp_i3c_master))
 		goto error;

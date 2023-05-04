@@ -197,6 +197,12 @@ void enter_tmin1(void *o)
 		BMCBootHold();
 		evt_ctx->data.bit8[2] = BmcOnlyReset;
 		gWdtBootStatus &= ~WDT_BMC_BOOT_DONE_MASK;
+#if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
+		if (mctp_i3c_detach_slave_dev())
+			LOG_WRN("Failed to dettach i3c slave device");
+		else
+			LOG_INF("I3C slave device detached");
+#endif
 	} else if (pch_reset_only) {
 		PCHBootHold();
 		evt_ctx->data.bit8[2] = PchOnlyReset;
@@ -206,6 +212,12 @@ void enter_tmin1(void *o)
 		BMCBootHold();
 		PCHBootHold();
 		gWdtBootStatus &= ~WDT_ALL_BOOT_DONE_MASK;
+#if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
+		if (mctp_i3c_detach_slave_dev())
+			LOG_WRN("Failed to dettach i3c slave device");
+		else
+			LOG_INF("I3C slave device detached");
+#endif
 	}
 
 	SetPlatformState(ENTER_T_MINUS_1);
