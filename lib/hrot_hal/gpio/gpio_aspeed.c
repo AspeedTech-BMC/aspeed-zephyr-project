@@ -227,3 +227,24 @@ int PCHBootRelease(void)
 	return 0;
 }
 
+#if defined(CONFIG_PFR_MCTP_I3C)
+#if !defined(CONFIG_I3C_SLAVE)
+static int i3c_mng_mux_owner = I3C_MNG_OWNER_BMC;
+void switch_i3c_mng_owner(int owner)
+{
+#if DT_NODE_HAS_STATUS(DT_INST(0, aspeed_pfr_gpio_bhs), okay)
+// BHS only
+	const struct gpio_dt_spec i3c_mng_owner =
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs),
+						i3c_mng_mux_sel_out_gpios, 0);
+	gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
+#endif
+	i3c_mng_mux_owner = owner;
+}
+
+int get_i3c_mng_owner(void)
+{
+	return i3c_mng_mux_owner;
+}
+#endif
+#endif

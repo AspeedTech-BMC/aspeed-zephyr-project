@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "kernel.h"
 #include "mctp.h"
 
 #include <stdlib.h>
@@ -22,7 +23,13 @@
 #include <sys/crc.h>
 #include <logging/log.h>
 #include "mctp_utils.h"
+#include "plat_mctp.h"
 #include "i3c/hal_i3c.h"
+#include "gpio/gpio_aspeed.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
+
+#include "mctp/mctp_base_protocol.h"
 
 LOG_MODULE_REGISTER(mctp_i3c);
 
@@ -102,13 +109,153 @@ static uint16_t mctp_i3c_write_smq(void *mctp_p, void *msg_p)
 	return MCTP_SUCCESS;
 }
 #else
+#define MCTP_DISCOVERY_NOTIFY_STACK_SIZE    1024
+#define MCTP_I3C_MSG_RETRY_INTERVAL         12
+
+#define MCTP_I3C_REGISTRATION_EID           0x1D
+#define MCTP_DOE_REGISTRATION_CMD           0x4
+
+
 static uint8_t i3c_data_in[256];
 static uint8_t i3c_data_rx[256];
 static struct i3c_ibi_payload i3c_payload;
 struct i3c_dev_desc mctp_i3c_slave;
 const struct device *mctp_i3c_master;
-static struct k_sem ibi_complete;
+struct k_thread mctp_i3c_discovery_notify_thread;
+K_THREAD_STACK_DEFINE(mctp_i3c_discovery_notify_stack, MCTP_DISCOVERY_NOTIFY_STACK_SIZE);
+
+static void mctp_i3c_req_timeout_callback(struct k_timer *tmr);
+K_TIMER_DEFINE(mctp_i3c_req_timer, mctp_i3c_req_timeout_callback, NULL);
+K_SEM_DEFINE(ibi_complete, 0, 1);
+K_SEM_DEFINE(mctp_i3c_sem, 0, 1);
+
 bool i3c_dev_attached = false;
+
+extern mctp_i3c_dev i3c_dev;
+
+void trigger_mctp_i3c_state_handler(void)
+{
+	k_sem_give(&mctp_i3c_sem);
+}
+
+void mctp_i3c_stop_discovery_notify(struct device_manager *mgr)
+{
+	int status;
+	k_timer_stop(&mctp_i3c_req_timer);
+	status = device_manager_update_device_state(mgr,
+			DEVICE_MANAGER_SELF_DEVICE_NUM,
+			DEVICE_MANAGER_EID_ANNOUNCEMENT);
+	if (status != 0)
+		LOG_ERR("update self device state failed");
+
+	// Start eid announcement
+	k_timer_start(&mctp_i3c_req_timer, K_SECONDS(2), K_NO_WAIT);
+}
+
+void mctp_i3c_pre_attestation(struct device_manager *mgr, int *duration)
+{
+	uint8_t provision_state = GetUfmStatusValue();
+	if (!(provision_state & UFM_PROVISIONED) || !is_afm_ready()) {
+		*duration = 300;
+		return;
+	}
+
+	device_manager_update_device_state(mgr,
+			DEVICE_MANAGER_SELF_DEVICE_NUM,
+			DEVICE_MANAGER_ATTESTATION);
+	*duration = 2;
+}
+
+int mctp_i3c_send_discovery_notify(mctp *mctp_instance, int *duration)
+{
+	struct mctp_interface_wrapper *mctp_wrapper = &mctp_instance->mctp_wrapper;
+	struct mctp_interface *mctp_interface = &mctp_wrapper->mctp_interface;
+	// { message_type, rq bit, command_code}
+	uint8_t req_buf[3] = {MCTP_BASE_PROTOCOL_MSG_TYPE_CONTROL_MSG, 0x81, 0x0d};
+	uint8_t msg_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN];
+
+	mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
+			BMC_I3C_SLAVE_ADDR, 0, req_buf, sizeof(req_buf), msg_buf,
+			sizeof(msg_buf), 1);
+
+	*duration = MCTP_I3C_MSG_RETRY_INTERVAL;
+
+	return 0;
+}
+
+int mctp_i3c_send_eid_announcement(mctp *mctp_instance, int *duration)
+{
+	int status;
+	struct mctp_interface_wrapper *mctp_wrapper = &mctp_instance->mctp_wrapper;
+	struct mctp_interface *mctp_interface = &mctp_wrapper->mctp_interface;
+	struct device_manager *device_mgr = mctp_interface->device_manager;
+	uint8_t src_eid = device_manager_get_device_eid(device_mgr,
+				DEVICE_MANAGER_SELF_DEVICE_NUM);
+	uint8_t req_buf[14] = {MCTP_BASE_PROTOCOL_MSG_TYPE_VENDOR_DEF, 0x80, 0x86, 0x80, 0x0a, 0x00,
+		0x00, 0x00, 0x00, MCTP_DOE_REGISTRATION_CMD, 0x00, 0x00, 0x01, src_eid};
+	uint8_t msg_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN];
+	if (get_i3c_mng_owner() == I3C_MNG_OWNER_BMC) {
+		status = mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
+				BMC_I3C_SLAVE_ADDR, MCTP_I3C_REGISTRATION_EID, req_buf,
+				sizeof(req_buf), msg_buf, sizeof(msg_buf), 12000);
+	} else {
+		uint8_t dest_eid = device_manager_get_device_eid(device_mgr,
+				DEVICE_MANAGER_MCTP_BRIDGE_DEVICE_NUM);
+		status = mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
+				CPU0_I3C_SLAVE_ADDR, dest_eid, req_buf,
+				sizeof(req_buf), msg_buf, sizeof(msg_buf), 12000);
+	}
+
+	if (status == 0) {
+		device_manager_update_device_state(device_mgr,
+				DEVICE_MANAGER_SELF_DEVICE_NUM,
+				DEVICE_MANAGER_PRE_ATTESTATION);
+	}
+
+	*duration = 2;
+
+	return status;
+}
+
+void mctp_i3c_state_handler(void *a, void *b, void *c)
+{
+	mctp_i3c_dev *i3c_dev_p = &i3c_dev;
+	mctp *mctp_instance = i3c_dev_p->mctp_inst;
+	struct mctp_interface_wrapper *mctp_wrapper = &mctp_instance->mctp_wrapper;
+	struct device_manager *device_mgr = mctp_wrapper->mctp_interface.device_manager;
+	int dev_state;
+	int duration = MCTP_I3C_MSG_RETRY_INTERVAL;
+
+	while (1) {
+		k_sem_take(&mctp_i3c_sem, K_FOREVER);
+		dev_state = device_manager_get_device_state(device_mgr,
+				DEVICE_MANAGER_SELF_DEVICE_NUM);
+		if (dev_state == DEVICE_MANAGER_SEND_DISCOVERY_NOTIFY) {
+			LOG_DBG("Send discovery notify");
+			mctp_i3c_send_discovery_notify( mctp_instance, &duration);
+		} else if (dev_state == DEVICE_MANAGER_EID_ANNOUNCEMENT) {
+			LOG_DBG("Announce EID");
+			mctp_i3c_send_eid_announcement(mctp_instance, &duration);
+		}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+		else if (dev_state == DEVICE_MANAGER_PRE_ATTESTATION) {
+			LOG_DBG("Pre-attestation");
+			mctp_i3c_pre_attestation(device_mgr, &duration);
+		} else if (dev_state == DEVICE_MANAGER_ATTESTATION) {
+			LOG_DBG("Device Attestation start");
+			// TODO: perform bmc/cpu0/cpu1 attestation via mctp i3c
+			// attest_bmc_cpu0_and_cpu1();
+			duration = 0;
+		}
+#endif
+		else {
+			duration = 0;
+		}
+
+		if (duration > 0)
+			k_timer_start(&mctp_i3c_req_timer, K_SECONDS(duration), K_NO_WAIT);
+	}
+}
 
 static struct i3c_ibi_payload *ibi_write_requested(struct i3c_dev_desc *desc)
 {
@@ -183,19 +330,33 @@ static uint16_t mctp_i3c_write(void *mctp_p, void *msg_p)
 
 int mctp_i3c_detach_slave_dev(void)
 {
+	mctp_i3c_dev *i3c_dev_p = &i3c_dev;
+	mctp *mctp_instance = i3c_dev_p->mctp_inst;
+	struct mctp_interface_wrapper *mctp_wrapper = &mctp_instance->mctp_wrapper;
+	struct device_manager *device_mgr = mctp_wrapper->mctp_interface.device_manager;
+
 	if (!i3c_dev_attached)
 		return 0;
 
 	i3c_dev_attached = false;
+	k_timer_stop(&mctp_i3c_req_timer);
+	device_manager_update_device_state(device_mgr,
+			DEVICE_MANAGER_SELF_DEVICE_NUM, DEVICE_MANAGER_SEND_DISCOVERY_NOTIFY);
 
 	return i3c_aspeed_master_detach_device(mctp_i3c_master, &mctp_i3c_slave);
 }
 
-int mctp_i3c_attach_slave_dev(void)
+static void mctp_i3c_req_timeout_callback(struct k_timer *tmr)
+{
+	trigger_mctp_i3c_state_handler();
+}
+
+int mctp_i3c_attach_slave_dev(uint8_t slave_addr)
 {
 	LOG_INF("BMC booted, attaching I3C");
+	switch_i3c_mng_owner(I3C_MNG_OWNER_BMC);
 	mctp_i3c_master = device_get_binding("I3C_2");
-	mctp_i3c_slave.info.static_addr = 0x08;
+	mctp_i3c_slave.info.static_addr = slave_addr;
 	mctp_i3c_slave.info.assigned_dynamic_addr = mctp_i3c_slave.info.static_addr;
 	mctp_i3c_slave.info.i2c_mode = 0;
 	if (i3c_aspeed_master_attach_device(mctp_i3c_master, &mctp_i3c_slave))
@@ -224,8 +385,8 @@ int mctp_i3c_attach_slave_dev(void)
 	if (i3c_master_enable_ibi(&mctp_i3c_slave))
 		goto error;
 
-
 	LOG_INF("I3C slave device attached");
+	k_timer_start(&mctp_i3c_req_timer, K_SECONDS(120), K_NO_WAIT);
 
 	return 0;
 error:
@@ -243,9 +404,13 @@ uint8_t mctp_i3c_init(mctp *mctp_instance, mctp_medium_conf medium_conf)
 	mctp_instance->read_data = mctp_i3c_read_smq;
 	mctp_instance->write_data = mctp_i3c_write_smq;
 #else
-	k_sem_init(&ibi_complete, 0, 1);
 	mctp_instance->read_data = mctp_i3c_read;
 	mctp_instance->write_data = mctp_i3c_write;
+	k_thread_create(&mctp_i3c_discovery_notify_thread,
+			mctp_i3c_discovery_notify_stack,
+			MCTP_DISCOVERY_NOTIFY_STACK_SIZE,
+			mctp_i3c_state_handler,
+			NULL, NULL, NULL, 5, 0, K_NO_WAIT);
 #endif
 
 	return MCTP_SUCCESS;

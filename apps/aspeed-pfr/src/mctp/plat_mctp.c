@@ -47,16 +47,9 @@ static mctp_smbus_port smbus_port[] = {
 #define I3C_DEV_ADDR         0x08
 #endif
 
-typedef struct _mctp_i3c_dev {
-	mctp *mctp_inst;
-	mctp_i3c_conf i3c_conf;
-} mctp_i3c_dev;
-
-mctp_i3c_dev i3c_devs[] = {
-	{
-		.i3c_conf.bus = I3C_BUS_BMC,
-		.i3c_conf.addr = I3C_DEV_ADDR,
-	},
+mctp_i3c_dev i3c_dev = {
+	.i3c_conf.bus = I3C_BUS_BMC,
+	.i3c_conf.addr = I3C_DEV_ADDR,
 };
 #endif
 
@@ -144,39 +137,43 @@ void plat_mctp_init(void)
 	mctp *mctp_instance;
 	int mctp_channel_id;
 
-	for (i = 0; i < ARRAY_SIZE(i3c_devs); i++) {
-		i3c_dev_p = &i3c_devs[i];
-		i3c_dev_p->mctp_inst = mctp_init();
-		mctp_instance = i3c_dev_p->mctp_inst;
-		if (!mctp_instance) {
-			LOG_ERR("Failed to allocate mctp instance for i3c");
-			return;
-		}
-		mctp_set_medium_configure(mctp_instance, MCTP_MEDIUM_TYPE_I3C,
-				mctp_instance->medium_conf);
-		mctp_instance->medium_conf.i3c_conf.bus = i3c_dev_p->i3c_conf.bus;
-		mctp_instance->medium_conf.i3c_conf.addr = i3c_dev_p->i3c_conf.addr;
-		mctp_channel_id = CMD_CHANNEL_I3C_BASE | mctp_instance->medium_conf.i3c_conf.bus;
-		rc = cmd_channel_mctp_init(&mctp_instance->mctp_cmd_channel,
-				mctp_channel_id);
-		if (rc != MCTP_SUCCESS) {
-			LOG_ERR("i3c mctp cmd channel init failed");
-			return;
-		}
-
-		rc = mctp_interface_wrapper_init(&mctp_instance->mctp_wrapper,
-				mctp_instance->medium_conf.i3c_conf.addr);
-		if (rc != MCTP_SUCCESS) {
-			LOG_ERR("i3c mctp interface wrapper init failed!!");
-			return;
-		}
-
-		mctp_interface_set_channel_id(&mctp_instance->mctp_wrapper.mctp_interface,
-				mctp_channel_id);
-
-		LOG_INF("MCTP over I3C start");
-		mctp_start(mctp_instance);
+	i3c_dev_p = &i3c_dev;
+	i3c_dev_p->mctp_inst = mctp_init();
+	mctp_instance = i3c_dev_p->mctp_inst;
+	if (!mctp_instance) {
+		LOG_ERR("Failed to allocate mctp instance for i3c");
+		return;
 	}
+	mctp_set_medium_configure(mctp_instance, MCTP_MEDIUM_TYPE_I3C,
+			mctp_instance->medium_conf);
+	mctp_instance->medium_conf.i3c_conf.bus = i3c_dev_p->i3c_conf.bus;
+	mctp_instance->medium_conf.i3c_conf.addr = i3c_dev_p->i3c_conf.addr;
+	mctp_channel_id = CMD_CHANNEL_I3C_BASE | mctp_instance->medium_conf.i3c_conf.bus;
+	rc = cmd_channel_mctp_init(&mctp_instance->mctp_cmd_channel,
+			mctp_channel_id);
+	if (rc != MCTP_SUCCESS) {
+		LOG_ERR("i3c mctp cmd channel init failed");
+		return;
+	}
+
+#if defined(CONFIG_I3C_SLAVE)
+	rc = mctp_interface_wrapper_init(&mctp_instance->mctp_wrapper,
+			mctp_instance->medium_conf.i3c_conf.addr);
+#else
+	rc = mctp_i3c_wrapper_init(&mctp_instance->mctp_wrapper,
+			mctp_instance->medium_conf.i3c_conf.addr);
+#endif
+	if (rc != MCTP_SUCCESS) {
+		LOG_ERR("i3c mctp interface wrapper init failed!!");
+		return;
+	}
+
+	mctp_interface_set_channel_id(&mctp_instance->mctp_wrapper.mctp_interface,
+			mctp_channel_id);
+	printk("mctp_intf = %p\n", &mctp_instance->mctp_wrapper.mctp_interface);
+
+	LOG_INF("MCTP over I3C start");
+	mctp_start(mctp_instance);
 #endif
 }
 

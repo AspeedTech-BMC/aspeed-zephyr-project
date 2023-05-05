@@ -71,6 +71,8 @@ enum {
 		PchOnlyReset,
 };
 
+uint8_t last_afm_active_verify_status = Failure;
+uint8_t last_afm_recovery_verify_status = Failure;
 static uint8_t last_bmc_active_verify_status = Failure;
 static uint8_t last_bmc_recovery_verify_status = Failure;
 static uint8_t last_pch_active_verify_status = Failure;
@@ -97,6 +99,11 @@ void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 	event->data.ptr = data;
 
 	k_fifo_put(&aspeed_sm_fifo, event);
+}
+
+int is_afm_ready(void)
+{
+	return (!last_afm_active_verify_status && !last_afm_recovery_verify_status);
 }
 
 void do_init(void *o)
@@ -516,6 +523,8 @@ void handle_image_verification(void *o)
 			if (state->afm_active_object.ActiveImageStatus || !state->afm_active_object.RecoveryImageStatus)
 				state->afm_active_object.RestrictActiveUpdate = 0;
 
+			last_afm_active_verify_status = state->afm_active_object.ActiveImageStatus;
+			last_afm_recovery_verify_status = state->afm_active_object.RecoveryImageStatus;
 			LOG_INF("AFM image verification recovery=%s active=%s",
 					state->afm_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->afm_active_object.ActiveImageStatus ? "Bad" : "Good");
@@ -968,7 +977,7 @@ void handle_checkpoint(void *o)
 #endif
 #if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
 		if (evt_ctx->data.bit8[1] == CompletingExecutionBlock) {
-			mctp_i3c_attach_slave_dev();
+			mctp_i3c_attach_slave_dev(BMC_I3C_SLAVE_ADDR);
 		}
 #endif
 		break;
@@ -1291,7 +1300,7 @@ void do_unprovisioned(void *o)
 	case WDT_CHECKPOINT:
 #if defined(CONFIG_PFR_MCTP_I3C) && !defined(CONFIG_I3C_SLAVE)
 		if (evt_ctx->data.bit8[1] == CompletingExecutionBlock) {
-			mctp_i3c_attach_slave_dev();
+			mctp_i3c_attach_slave_dev(BMC_I3C_SLAVE_ADDR);
 		}
 #endif
 		break;

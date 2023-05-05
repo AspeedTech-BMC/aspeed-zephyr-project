@@ -159,3 +159,4 @@ extern size_t event_log_idx;
 
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data);
 void AspeedStateMachine(void);
+int is_afm_ready(void);

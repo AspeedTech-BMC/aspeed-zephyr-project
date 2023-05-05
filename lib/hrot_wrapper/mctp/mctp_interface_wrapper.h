@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <stdio.h>
 #if defined(CONFIG_PFR_MCTP)
 #include "cmd_interface/device_manager.h"
 #include "cmd_interface/cmd_interface.h"
@@ -24,5 +25,8 @@ struct mctp_interface_wrapper {
 
 int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uint8_t rot_addr);
 void mctp_interface_wrapper_deinit(struct mctp_interface_wrapper *mctp_wrapper);
+#if defined(CONFIG_PFR_MCTP_I3C)
+int mctp_i3c_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uint8_t rot_addr);
+#endif
 
 #endif // CONFIG_PFR_MCTP
