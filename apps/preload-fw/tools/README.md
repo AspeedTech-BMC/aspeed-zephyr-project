@@ -7,11 +7,20 @@ Python tool for generating full mp binary(mcuboot + preload firmware + otp image
    ```
    west init -m https://github.com/AspeedTech-BMC/aspeed-zephyr-project --mr aspeed-master workspace
    ```
-2. Download socsec in workspace
+2. Run west update in workspace folder
    ```
-   https://github.com/AspeedTech-BMC/socsec workspace/socsec
+   west update
    ```
-3. Setup socsec in workspace/socsec
+3. Install python modules for signing device firmware
+   ```
+   pip3 install imgtool
+   pip3 install --user -r workspace/bootloader/mcuboot/scripts/requirements.txt
+   ```
+4. Download socsec in workspace
+   ```
+   git clone https://github.com/AspeedTech-BMC/socsec workspace/socsec
+   ```
+5. Setup socsec in workspace/socsec
    Refer to README.md of socsec
    ```
    sudo apt-get install python3 python3-pip python3-virtualenv
