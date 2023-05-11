@@ -12,12 +12,8 @@ set(PROJECT_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
 configure_file(build_config.h.in build_config.h)
 set(PRELOAD_FW_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
-FILE(GLOB_RECURSE app_sources src/*.c)
-target_sources(app PRIVATE ${app_sources})
+add_subdirectory(src)
 
-# target_sources(app PRIVATE src/test.c)
-
-#message(STATUS "Printing app_sources - ${app_sources}")
 zephyr_link_libraries(mbedTLS)
 zephyr_include_directories(.)
 target_include_directories(

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include "otp/otp_utils.h"
 #include "otp/otp_sim.h"
+#include "mp/mp_util.h"
 
 #define shell_printf(_sh, _ft, ...) \
 	shell_fprintf(_sh, SHELL_NORMAL, _ft, ##__VA_ARGS__)
@@ -419,6 +420,11 @@ static int do_otpinfof(const struct shell *shell, size_t argc, char **argv)
 
 	return ret;
 }
+static int do_mp_test(const struct shell *shell, size_t argc, char **argv)
+{
+	prog_otp_and_rot();
+	return 0;
+}
 
 #define SHELL_HELP_OTPREAD	\
 	"Read OTP(in flash) conf/data/strap cmds\n"			\
@@ -432,6 +438,7 @@ static int do_otpinfof(const struct shell *shell, size_t argc, char **argv)
 SHELL_STATIC_SUBCMD_SET_CREATE(optf_cmds,
 		SHELL_CMD_ARG(read, NULL, SHELL_HELP_OTPREAD, do_otpreadf, 3, 1),
 		SHELL_CMD_ARG(info, NULL, SHELL_HELP_OTPINFO, do_otpinfof, 2, 1),
+		SHELL_CMD_ARG(mpt, NULL, SHELL_HELP_OTPINFO, do_mp_test, 1, 1),
 		//SHELL_CMD_ARG(pb, NULL, SHELL_HELP_OTPPB, do_otppb, 4, 2),
 		SHELL_SUBCMD_SET_END);
 
