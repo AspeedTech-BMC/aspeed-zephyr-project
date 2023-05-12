@@ -33,9 +33,13 @@ Python tool for generating full mp binary(mcuboot + preload firmware + otp image
 ## Usage
 1. Modify config file to change path(optional)
 
-2. Run python script
+2. Run python script to genrate preload binary with DICE support
    ```
    python3 mp-binary-generator.py
+   ```
+   or run the following script to generate preload binary without DICE support
+   ```
+   python3 programmer_preload_gen.py
    ```
    Result:
 
@@ -52,5 +56,5 @@ Python tool for generating full mp binary(mcuboot + preload firmware + otp image
    Image Path     : /home/aspeed-pfr/workspace/build/mp_imgs/
    
    ```
-   MP image `ast1060-mp-all.bin` will be stored in Image Path
+   MP binary `ast1060-mp-odm-all.bin` will be stored in Image Path
 

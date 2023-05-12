@@ -50,12 +50,25 @@ static uint32_t otp_header_buf[OTP_HEADER_LENGTH];
 
 bool is_otp_secureboot_en(enum otp_status *otp_rc)
 {
+#if defined(CONFIG_OTP_SIM)
+	bool is_secureboot_en = false;
+	uint32_t otp_conf_val;
+
+	*otp_rc = aspeed_otp_read_conf(OTP_CONF0, &otp_conf_val, 1);
+	if (*otp_rc) {
+		LOG_ERR("Failed to get secure boot status");
+		return is_secureboot_en;
+	}
+
+	return (otp_conf_val & OTP_CONF0_SECURE_BOOT_EN) ? true :  false;
+#else
 	uint32_t val;
 
 	val = sys_read32(SEC_STATUS);
 	*otp_rc = 0;
 
 	return (val & SEC_STATUS_SECURE_BOOT_EN) ? true : false;
+#endif
 }
 
 int otp_append_vault_key(uint32_t *vault_key)
