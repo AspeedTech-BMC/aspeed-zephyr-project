@@ -66,7 +66,7 @@ config MP_ROT_IMAGE_SIZE
 
 config MP_OTP_IMAGE_OFFSET
 	depends on AST1060_PROGRAMMER_MP
-	default 0xe0000
+	default 0x40000
 	hex "OTP image start address"
 
 config MP_OTP_IMAGE_SIZE

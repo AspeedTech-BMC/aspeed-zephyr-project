@@ -77,10 +77,10 @@ def gen_preload_bin_odm():
         f.write(b'\xff' * 1024 * 1024)
         f.seek(0)
         f.write(preload_content)
+        f.seek(0x40000)
+        f.write(otp_content)
         f.seek(0x60000)
         f.write(rot_content)
-        f.seek(0xe0000)
-        f.write(otp_content)
 
     return
 
