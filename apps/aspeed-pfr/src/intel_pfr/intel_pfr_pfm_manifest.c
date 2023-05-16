@@ -137,6 +137,9 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 		SetAfmRecoverSvn(recovery_svn);
 		SetAfmRecoverMajorVersion(recovery_major_version);
 		SetAfmRecoverMinorVersion(recovery_minor_version);
+		policy_svn = get_ufm_svn(SVN_POLICY_FOR_AFM);
+		if (recovery_svn > policy_svn)
+			status = set_ufm_svn(SVN_POLICY_FOR_AFM, recovery_svn);
 	}
 #endif
 	else {
