@@ -11,6 +11,7 @@
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_authentication.h"
+#include "cerberus_pfr_svn.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -37,8 +38,12 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	status = cerberus_verify_regions((struct manifest *)manifest);
-	if (status != Success) {
+	if (get_active_pfm_version_details(manifest)) {
+		LOG_ERR("Get active pfm version failed");
+		return Failure;
+	}
+
+	if (cerberus_verify_regions(manifest)) {
 		LOG_ERR("Verify active SPI region failed");
 		return Failure;
 	}

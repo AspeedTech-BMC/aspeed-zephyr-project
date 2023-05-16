@@ -22,6 +22,7 @@
 #if defined(CONFIG_CERBERUS_PFR)
 #include "cerberus_pfr/cerberus_pfr_definitions.h"
 #include "cerberus_pfr/cerberus_pfr_recovery.h"
+#include "cerberus_pfr/cerberus_pfr_svn.h"
 #endif
 
 #include "include/SmbusMailBoxCom.h"

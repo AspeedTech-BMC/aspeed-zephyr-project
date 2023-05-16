@@ -14,7 +14,7 @@
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_verification.h"
 #include "cerberus_pfr_key_cancellation.h"
-#include "AspeedStateMachine/common_smc.h"
+#include "cerberus_pfr_svn.h"
 
 // key cancellation
 static int cmd_cancel_csk_key_id(const struct shell *shell, size_t argc, char **argv)
@@ -73,6 +73,59 @@ static int cmd_dump_key_cancellation_policy(const struct shell *shell, size_t ar
 	return 0;
 }
 
+// svn
+static int cmd_get_svn(const struct shell *shell, size_t argc, char **argv)
+{
+	uint32_t svn_policy[2];
+	uint32_t offset;
+	uint8_t svn;
+
+	if (strncmp(argv[1], "rot", 3) == 0)
+		offset = SVN_POLICY_FOR_CPLD_UPDATE;
+	else if (strncmp(argv[1], "pch", 3) == 0)
+		offset = SVN_POLICY_FOR_PCH_FW_UPDATE;
+	else if (strncmp(argv[1], "bmc", 3) == 0)
+		offset = SVN_POLICY_FOR_BMC_FW_UPDATE;
+	else {
+		shell_error(shell, "unsupported svn policy");
+		return 0;
+	}
+
+	shell_print(shell, "svn policy offset = 0x%x", offset);
+	ufm_read(PROVISION_UFM, offset, (uint8_t *)svn_policy, sizeof(svn_policy));
+	shell_hexdump(shell, (uint8_t *)svn_policy, sizeof(svn_policy));
+	svn = get_ufm_svn(offset);
+	shell_print(shell, "svn policy for %s is %d", argv[1], svn);
+
+	ARG_UNUSED(argc);
+	return 0;
+}
+
+static int cmd_set_svn(const struct shell *shell, size_t argc, char **argv)
+{
+	uint32_t offset;
+	uint8_t svn;
+
+	if (strncmp(argv[1], "rot", 3) == 0)
+		offset = SVN_POLICY_FOR_CPLD_UPDATE;
+	else if (strncmp(argv[1], "pch", 3) == 0)
+		offset = SVN_POLICY_FOR_PCH_FW_UPDATE;
+	else if (strncmp(argv[1], "bmc", 3) == 0)
+		offset = SVN_POLICY_FOR_BMC_FW_UPDATE;
+	else {
+		shell_error(shell, "unsupported svn policy");
+		return 0;
+	}
+
+	svn = strtoul(argv[2], NULL, 10);
+
+	if (set_ufm_svn(offset, svn) != 0)
+		shell_error(shell, "set svn policy for %s to %d failed", argv[1], svn);
+
+	ARG_UNUSED(argc);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
 	SHELL_CMD_ARG(verify, NULL, "<pc_type> <keym_id> <key_id>", cmd_verify_csk_key_id, 4, 0),
 	SHELL_CMD_ARG(cancel, NULL, "<pc_type> <keym_id> <key_id>", cmd_cancel_csk_key_id, 4, 0),
@@ -80,8 +133,15 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_kc_cmds,
 	SHELL_SUBCMD_SET_END
 );
 
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_svn_cmds,
+	SHELL_CMD_ARG(get, NULL, "<svn policy>: rot, pch, bmc", cmd_get_svn, 2, 0),
+	SHELL_CMD_ARG(set, NULL, "<svn policy>: rot, pch, bmc", cmd_set_svn, 3, 0),
+	SHELL_SUBCMD_SET_END
+);
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_cerberus_pfr_cmds,
 	SHELL_CMD(kc, &sub_kc_cmds, "Key Cancellation Commands", NULL),
+	SHELL_CMD(svn, &sub_svn_cmds, "SVN Commands", NULL),
 	SHELL_SUBCMD_SET_END
 );
 
