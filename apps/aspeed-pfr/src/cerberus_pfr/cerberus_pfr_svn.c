@@ -97,7 +97,7 @@ int get_active_pfm_version_details(struct pfr_manifest *pfr_manifest)
 		return Failure;
 
 	struct pfm_firmware_version_element fw_ver_element;
-	struct PFR_PFM_VERSION *pfm_version;
+	struct PFR_VERSION *pfm_version;
 	uint32_t fw_ver_element_addr;
 	uint8_t active_major_version;
 	uint8_t active_minor_version;
@@ -117,12 +117,12 @@ int get_active_pfm_version_details(struct pfr_manifest *pfr_manifest)
 		return Failure;
 	}
 
-	if (fw_ver_element.version_length != sizeof(struct PFR_PFM_VERSION)) {
+	if (fw_ver_element.version_length != sizeof(struct PFR_VERSION)) {
 		LOG_ERR("Invalid version length(%d)", fw_ver_element.version_length);
 		return Failure;
 	}
 
-	pfm_version = (struct PFR_PFM_VERSION *)fw_ver_element.version;
+	pfm_version = (struct PFR_VERSION *)fw_ver_element.version;
 
 	if (pfm_version->reserved1 != 0 ||
 	    pfm_version->reserved2 != 0 ||
@@ -154,7 +154,7 @@ int get_recover_pfm_version_details(struct pfr_manifest *pfr_manifest)
 		return Failure;
 
 	struct pfm_firmware_version_element fw_ver_element;
-	struct PFR_PFM_VERSION *pfm_version;
+	struct PFR_VERSION *pfm_version;
 	uint8_t recovery_major_version;
 	uint8_t recovery_minor_version;
 	uint32_t fw_ver_element_addr;
@@ -176,12 +176,12 @@ int get_recover_pfm_version_details(struct pfr_manifest *pfr_manifest)
 		return Failure;
 	}
 
-	if (fw_ver_element.version_length != sizeof(struct PFR_PFM_VERSION)) {
+	if (fw_ver_element.version_length != sizeof(struct PFR_VERSION)) {
 		LOG_ERR("Invalid version length(%d)", fw_ver_element.version_length);
 		return Failure;
 	}
 
-	pfm_version = (struct PFR_PFM_VERSION *)fw_ver_element.version;
+	pfm_version = (struct PFR_VERSION *)fw_ver_element.version;
 
 	if (pfm_version->reserved1 != 0 ||
 	    pfm_version->reserved2 != 0 ||
@@ -219,7 +219,7 @@ int read_statging_area_pfm_svn(struct pfr_manifest *pfr_manifest, struct recover
 		return Failure;
 
 	struct pfm_firmware_version_element fw_ver_element;
-	struct PFR_PFM_VERSION *pfm_version;
+	struct PFR_VERSION *pfm_version;
 	uint32_t fw_ver_element_addr;
 	uint32_t dest_pfm_addr;
 	uint32_t src_pfm_addr;
@@ -243,12 +243,12 @@ int read_statging_area_pfm_svn(struct pfr_manifest *pfr_manifest, struct recover
 		return Failure;
 	}
 
-	if (fw_ver_element.version_length != sizeof(struct PFR_PFM_VERSION)) {
+	if (fw_ver_element.version_length != sizeof(struct PFR_VERSION)) {
 		LOG_ERR("Invalid version length(%d)", fw_ver_element.version_length);
 		return Failure;
 	}
 
-	pfm_version = (struct PFR_PFM_VERSION *)fw_ver_element.version;
+	pfm_version = (struct PFR_VERSION *)fw_ver_element.version;
 
 	if (pfm_version->reserved1 != 0 ||
 	    pfm_version->reserved2 != 0 ||

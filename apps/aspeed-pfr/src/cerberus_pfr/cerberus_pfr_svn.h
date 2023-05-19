@@ -11,7 +11,7 @@
 #include "cerberus_pfr_recovery.h"
 
 #pragma pack(1)
-struct PFR_PFM_VERSION {
+struct PFR_VERSION {
 	uint8_t svn;
 	uint8_t reserved1;
 	uint8_t major;

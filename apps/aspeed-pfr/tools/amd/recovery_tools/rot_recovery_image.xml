@@ -1,4 +1,5 @@
-<RecoveryImage version="01.03.00" platform="rot" type="2">
+<!-- Version Format SVN(XX).Major(XX).Minor(XX) -->
+<RecoveryImage version="00.01.06" platform="rot" type="2">
   <RecoverySection>
     <WriteAddress>0x00000000</WriteAddress>
     <Region>

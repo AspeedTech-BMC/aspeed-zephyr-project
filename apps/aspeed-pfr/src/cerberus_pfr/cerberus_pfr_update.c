@@ -189,6 +189,7 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 				source_address, rot_active_address, length_page_align);
 		return Failure;
 	}
+
 	LOG_INF("ROT Firmware update done");
 
 	return Success;
@@ -198,7 +199,8 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 {
 	byte provision_state = GetUfmStatusValue();
 	struct recovery_header image_header;
-	int status = 0;
+	struct PFR_VERSION *hrot_version;
+	uint8_t hrot_svn = 0;
 
 	if (provision_state & UFM_PROVISIONED) {
 		LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
@@ -216,17 +218,36 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 		}
 
 		manifest->pc_type = PFR_CPLD_UPDATE_CAPSULE;
-		status =  cerberus_pfr_verify_image(manifest);
-		if (status != Success) {
+		if (cerberus_pfr_verify_image(manifest)) {
 			LOG_ERR("HRoT Image Verify Failed");
 			return Failure;
 		}
 
 		if (image_header.format == UPDATE_FORMAT_TYPE_HROT) {
+			LOG_INF("HRoT update start");
+			hrot_version = (struct PFR_VERSION *)image_header.version_id;
+			if (hrot_version->reserved1 != 0 ||
+			    hrot_version->reserved2 != 0 ||
+			    hrot_version->reserved3 != 0) {
+				LOG_ERR("Invalid reserved data");
+				return Failure;
+			}
+
+			hrot_svn = hrot_version->svn;
+			if (svn_policy_verify(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn)) {
+				LOG_ERR("HRoT verify svn failed");
+				LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+				return Failure;
+			}
+
 			if (cerberus_update_rot_fw(manifest)) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
+
+			set_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
+			SetCpldRotSvn(hrot_svn);
+			LOG_INF("HRoT update end");
 		} else if (image_header.format == UPDATE_FORMAT_TYPE_DCC) {
 			if (cerberus_pfr_decommission(manifest)) {
 				LOG_ERR("Decommission failed.");
