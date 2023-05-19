@@ -23,6 +23,7 @@
 #include "cerberus_pfr_recovery.h"
 #include "cerberus_pfr_key_cancellation.h"
 #include "cerberus_pfr_key_manifest.h"
+#include "cerberus_pfr_svn.h"
 #include "flash/flash_aspeed.h"
 #include "common/common.h"
 
@@ -346,13 +347,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	struct recovery_header image_header;
 	CPLD_STATUS cpld_update_status;
 	bool erase_rw_regions = false;
-	uint8_t status = Success;
 	uint32_t source_address;
 	uint32_t target_address;
 	uint32_t act_pfm_offset;
 	uint32_t flash_id;
 	uint32_t pc_type;
 	uint32_t address;
+	uint8_t status = Success;
+	uint8_t staging_svn = 0;
 
 	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC)
 		erase_rw_regions = true;
@@ -467,8 +469,27 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return Failure;
 	}
 
+	// SVN number validation
+	status = read_statging_area_pfm_svn(pfr_manifest, &image_header, &staging_svn);
+	if (status != Success) {
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		LOG_ERR("Get staging svn failed");
+		return Failure;
+	}
+
+	if (pfr_manifest->image_type == BMC_TYPE)
+		status = svn_policy_verify(SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn);
+	else
+		status = svn_policy_verify(SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn);
+
+	if (status != Success) {
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		LOG_ERR("Anti rollback");
+		return Failure;
+	}
+
 	if (flash_select == PRIMARY_FLASH_REGION) {
-		//Update Active
+		// Update Active
 		LOG_INF("Update Type: Active Update.");
 		uint32_t time_start, time_end;
 
@@ -481,19 +502,29 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
 				(time_end - time_start));
 	} else {
-		//Update Recovery
+		// Update Recovery
 		LOG_INF("Update Type: Recovery Update.");
 		if (image_type == BMC_TYPE) {
-			//BMC Update/Provisioning
+			// BMC Update/Provisioning
 			get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 		} else if (image_type == PCH_TYPE) {
-			//PCH Update
+			// PCH Update
 			get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 		}
 
 		status = cerberus_update_recovery_region(image_type, source_address, target_address);
+		if (status != Success) {
+			LOG_ERR("Recovery region update failed");
+			return Failure;
+		}
+
+		// update svn
+		if (pfr_manifest->image_type == BMC_TYPE)
+			status = set_ufm_svn(SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn);
+		else
+			status = set_ufm_svn(SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn);
 	}
 
 	return status;

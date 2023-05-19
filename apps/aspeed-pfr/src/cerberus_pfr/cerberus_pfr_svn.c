@@ -12,6 +12,7 @@
 #include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_svn.h"
 #include "cerberus_pfr_provision.h"
+#include "cerberus_pfr_recovery.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -210,5 +211,55 @@ int get_recover_pfm_version_details(struct pfr_manifest *pfr_manifest)
 	}
 
 	return status;
+}
+
+int read_statging_area_pfm_svn(struct pfr_manifest *pfr_manifest, struct recovery_header *image_header, uint8_t *svn_version)
+{
+	if (!pfr_manifest || !image_header || !svn_version)
+		return Failure;
+
+	struct pfm_firmware_version_element fw_ver_element;
+	struct PFR_PFM_VERSION *pfm_version;
+	uint32_t fw_ver_element_addr;
+	uint32_t dest_pfm_addr;
+	uint32_t src_pfm_addr;
+
+	if (pfr_manifest->image_type != BMC_TYPE &&
+	    pfr_manifest->image_type != PCH_TYPE) {
+		LOG_ERR("Unsupported image type %d", pfr_manifest->image_type);
+		return Failure;
+	}
+
+	// Find PFM in stage image
+	LOG_INF("Find staging pfm, image_type=%d address=%08x", pfr_manifest->image_type, pfr_manifest->address);
+	if (cerberus_get_image_pfm_addr(pfr_manifest, image_header, &src_pfm_addr, &dest_pfm_addr)) {
+		LOG_ERR("PFM doesn't exist in stage image");
+		return Failure;
+	}
+
+	LOG_INF("Get pfm version, manifest->image_type=%d address=%08x", pfr_manifest->image_type, src_pfm_addr);
+	if (cerberus_get_version_info(pfr_manifest->image_type, src_pfm_addr, &fw_ver_element_addr, &fw_ver_element)) {
+		LOG_ERR("Failed to get version info");
+		return Failure;
+	}
+
+	if (fw_ver_element.version_length != sizeof(struct PFR_PFM_VERSION)) {
+		LOG_ERR("Invalid version length(%d)", fw_ver_element.version_length);
+		return Failure;
+	}
+
+	pfm_version = (struct PFR_PFM_VERSION *)fw_ver_element.version;
+
+	if (pfm_version->reserved1 != 0 ||
+	    pfm_version->reserved2 != 0 ||
+	    pfm_version->reserved3 != 0) {
+		LOG_ERR("Invalid reserved data");
+		return Failure;
+	}
+
+	*svn_version = pfm_version->svn;
+	LOG_HEXDUMP_DBG(fw_ver_element.version, fw_ver_element.version_length, "PFM:");
+
+	return Success;
 }
 
