@@ -1,0 +1,19 @@
+# Copyright (c) 2023 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+description: |
+    This binding provides gpio required to support mp.
+
+compatible: "aspeed,pfr-gpio-mp"
+
+properties:
+    mp-status1-out-gpios:
+        type: phandle-array
+        required: true
+        description: MP status bit.
+
+    mp-status2-out-gpios:
+        type: phandle-array
+        required: true
+        description: MP status bit.
+
