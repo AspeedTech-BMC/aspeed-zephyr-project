@@ -153,12 +153,13 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 	// If the hashes of PFM or AFM match, the active image and staging image must be the same firmware.
 	if (memcmp(act_pfm_hash, staging_pfm_hash, digest_length)) {
 		LOG_ERR("Staged firmware does not match active firmware");
-		LOG_HEXDUMP_INF(act_pfm_hash, digest_length, "act_pfm_hash:");
-		LOG_HEXDUMP_INF(staging_pfm_hash, digest_length, "staging_pfm_hash:");
+		LOG_HEXDUMP_ERR(act_pfm_hash, digest_length, "act_pfm_hash:");
+		LOG_HEXDUMP_ERR(staging_pfm_hash, digest_length, "staging_pfm_hash:");
 		return Failure;
 	}
 
 	manifest->image_type = backup_image_type;
+	LOG_INF("Staged firmware and active firmware match");
 
 	return Success;
 }

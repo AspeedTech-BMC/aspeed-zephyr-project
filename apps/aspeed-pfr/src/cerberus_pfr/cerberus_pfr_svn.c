@@ -7,6 +7,7 @@
 #include <logging/log.h>
 #include "pfr/pfr_common.h"
 #include "pfr/pfr_ufm.h"
+#include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "cerberus_pfr_common.h"
 #include "cerberus_pfr_definitions.h"
@@ -88,6 +89,113 @@ int svn_policy_verify(uint32_t offset, uint32_t svn)
 
 int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 {
+	if (!manifest)
+		return Failure;
+
+	struct pfm_firmware_version_element staging_fw_ver_element;
+	struct pfm_firmware_version_element act_fw_ver_element;
+	struct PFR_VERSION *staging_pfm_version;
+	struct PFR_VERSION *act_pfm_version;
+	struct recovery_header image_header;
+	uint32_t fw_ver_element_addr;
+	uint32_t staging_address;
+	uint32_t act_pfm_offset;
+	uint32_t dest_pfm_addr;
+	uint32_t src_pfm_addr;
+	uint8_t ver_len;
+
+	if (manifest->image_type != BMC_TYPE &&
+	    manifest->image_type != PCH_TYPE) {
+		LOG_ERR("Unsupported image type %d", manifest->image_type);
+		return Failure;
+	}
+
+	if (manifest->image_type == BMC_TYPE) {
+		if (ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&staging_address, sizeof(staging_address)))
+			return Failure;
+
+		if (ufm_read(PROVISION_UFM, BMC_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset, sizeof(act_pfm_offset)))
+			return Failure;
+	} else if (manifest->image_type == PCH_TYPE) {
+		if (ufm_read(PROVISION_UFM, PCH_STAGING_REGION_OFFSET, (uint8_t *)&staging_address, sizeof(staging_address)))
+			return Failure;
+
+		if (ufm_read(PROVISION_UFM, PCH_ACTIVE_PFM_OFFSET, (uint8_t *) &act_pfm_offset, sizeof(act_pfm_offset)))
+			return Failure;
+	}
+
+	ver_len = sizeof(struct PFR_VERSION);
+
+	// Staging
+	LOG_INF("Staging image_type=%d address=%08x", manifest->image_type, staging_address);
+	if (pfr_spi_read(manifest->image_type, staging_address, sizeof(image_header), (uint8_t *)&image_header)) {
+		LOG_ERR("Unable to get image header.");
+		return Failure;
+	}
+
+	// Find PFM in stage image
+	if (cerberus_get_image_pfm_addr(manifest, &image_header, &src_pfm_addr, &dest_pfm_addr)) {
+		LOG_ERR("PFM doesn't exist in stage image");
+		return Failure;
+	}
+
+	if (dest_pfm_addr != act_pfm_offset) {
+		LOG_ERR("Staged firmware dest pfm addr(%08x) does not match active firmware pfm addr(%08x)",
+			dest_pfm_addr, act_pfm_offset);
+		return Failure;
+	}
+
+	// Staging PFM start address
+	LOG_INF("Get pfm version image_type=%d address=%08x", manifest->image_type, src_pfm_addr);
+	if (cerberus_get_version_info(manifest->image_type, src_pfm_addr, &fw_ver_element_addr, &staging_fw_ver_element)) {
+		LOG_ERR("Failed to get version info");
+		return Failure;
+	}
+
+	if (staging_fw_ver_element.version_length != ver_len) {
+		LOG_ERR("Invalid version length(%d)", staging_fw_ver_element.version_length);
+		return Failure;
+	}
+
+	staging_pfm_version = (struct PFR_VERSION *)staging_fw_ver_element.version;
+
+	if (staging_pfm_version->reserved1 != 0 ||
+	    staging_pfm_version->reserved2 != 0 ||
+	    staging_pfm_version->reserved3 != 0) {
+		LOG_ERR("Invalid reserved data");
+		return Failure;
+	}
+
+	// Active PFM start address
+	LOG_INF("Active image_type=%d address=%08x", manifest->image_type, act_pfm_offset);
+	if (cerberus_get_version_info(manifest->image_type, act_pfm_offset, &fw_ver_element_addr, &act_fw_ver_element)) {
+		LOG_ERR("Failed to get version info");
+		return Failure;
+	}
+
+	if (act_fw_ver_element.version_length != ver_len) {
+		LOG_ERR("Invalid version length(%d)", act_fw_ver_element.version_length);
+		return Failure;
+	}
+
+	act_pfm_version = (struct PFR_VERSION *)act_fw_ver_element.version;
+
+	if (act_pfm_version->reserved1 != 0 ||
+	    act_pfm_version->reserved2 != 0 ||
+	    act_pfm_version->reserved3 != 0) {
+		LOG_ERR("Invalid reserved data");
+		return Failure;
+	}
+
+	if (memcmp(act_pfm_version, staging_pfm_version, ver_len)) {
+		LOG_ERR("Staged firmware does not match active firmware");
+		LOG_HEXDUMP_ERR(act_pfm_version, ver_len, "act_pfm_version:");
+		LOG_HEXDUMP_ERR(staging_pfm_version, ver_len, "staging_pfm_version:");
+		return Failure;
+	}
+
+	LOG_INF("Staged firmware and active firmware match");
+
 	return Success;
 }
 

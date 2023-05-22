@@ -364,6 +364,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 {
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	uint8_t flash_select = EventData->flash;
 	struct recovery_header image_header;
 	CPLD_STATUS cpld_update_status;
@@ -512,6 +513,13 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	if (flash_select == PRIMARY_FLASH_REGION) {
 		// Update Active
 		LOG_INF("Update Type: Active Update.");
+
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			LOG_ERR("Restrict Active Update");
+			LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+			return Failure;
+		}
+
 		uint32_t time_start, time_end;
 
 		time_start = k_uptime_get_32();
@@ -533,6 +541,14 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 			// PCH Update
 			get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
+		}
+
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			status = does_staged_fw_image_match_active_fw_image(pfr_manifest);
+			if (status != Success) {
+				LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+				return Failure;
+			}
 		}
 
 		status = cerberus_update_recovery_region(image_type, source_address, target_address);
