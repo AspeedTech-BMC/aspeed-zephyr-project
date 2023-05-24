@@ -35,6 +35,9 @@ Please note that **DO NOT** put vault key in the configuration, besides, `ecc_re
         }
     ]
 }
+"config_region": {
+    "Signature Scheme": "ECDSA384"
+}
 ```
 
 ## Key
@@ -53,6 +56,6 @@ socsec make_secure_bl1_image --soc 1060 --algorithm ECDSA384 --bl1_image ./zephy
 Command for generating otp image:
 
 ```
-$ otptool make_otp_image ./otp/config/1060A1_ECDSA_MP.json --no_last_bit --key_folder ./otp/key/ --output_folder ./otp/image/
+$ otptool make_otp_image ./otp/config/1060A2_ECDSA_MP.json --no_last_bit --key_folder ./otp/key/ --output_folder ./otp/image/
 ```
 `--no_last_bit` should be added since preload firmware will generate vault key and append vault key header.

@@ -47,7 +47,7 @@ Python tool for generating full mp binary(mcuboot + preload firmware + otp image
    workspace      : /home/aspeed-pfr/workspace
    build path     : /home/aspeed-pfr/workspace/build/
    socsec path    : /home/aspeed-pfr/workspace/socsec/
-   OTP config     : /home/aspeed-pfr/workspace/aspeed-zephyr-project/apps/preload-fw/sample/otp/config/1060A1_ECDSA_MP.json
+   OTP config     : /home/aspeed-pfr/workspace/aspeed-zephyr-project/apps/preload-fw/sample/otp/config/1060A2_ECDSA_MP.json
    OTP key        : /home/aspeed-pfr/workspace/aspeed-zephyr-project/apps/preload-fw/sample/otp/key
    MCUBoot key    : /home/aspeed-pfr/workspace/aspeed-zephyr-project/apps/preload-fw/sample/otp/key/rk384_prv.pem
    Preload FW key : /home/aspeed-pfr/workspace/aspeed-zephyr-project/apps/preload-fw/sample/mp/key/root-rsa-2048.pem
