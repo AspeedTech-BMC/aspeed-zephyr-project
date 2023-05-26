@@ -109,7 +109,7 @@ static uint16_t mctp_i3c_write_smq(void *mctp_p, void *msg_p)
 	return MCTP_SUCCESS;
 }
 #else
-#define MCTP_DISCOVERY_NOTIFY_STACK_SIZE    1024
+#define MCTP_DISCOVERY_NOTIFY_STACK_SIZE    4096
 #define MCTP_I3C_MSG_RETRY_INTERVAL         12
 
 #define MCTP_I3C_REGISTRATION_EID           0x1D
@@ -118,6 +118,7 @@ static uint16_t mctp_i3c_write_smq(void *mctp_p, void *msg_p)
 
 static uint8_t i3c_data_in[256];
 static uint8_t i3c_data_rx[256];
+static uint8_t mctp_msg_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN];
 static struct i3c_ibi_payload i3c_payload;
 struct i3c_dev_desc mctp_i3c_slave;
 const struct device *mctp_i3c_master;
@@ -172,11 +173,10 @@ int mctp_i3c_send_discovery_notify(mctp *mctp_instance, int *duration)
 	struct mctp_interface *mctp_interface = &mctp_wrapper->mctp_interface;
 	// { message_type, rq bit, command_code}
 	uint8_t req_buf[3] = {MCTP_BASE_PROTOCOL_MSG_TYPE_CONTROL_MSG, 0x81, 0x0d};
-	uint8_t msg_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN];
 
 	mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
-			BMC_I3C_SLAVE_ADDR, 0, req_buf, sizeof(req_buf), msg_buf,
-			sizeof(msg_buf), 1);
+			BMC_I3C_SLAVE_ADDR, 0, req_buf, sizeof(req_buf), mctp_msg_buf,
+			sizeof(mctp_msg_buf), 1);
 
 	*duration = MCTP_I3C_MSG_RETRY_INTERVAL;
 
@@ -193,17 +193,17 @@ int mctp_i3c_send_eid_announcement(mctp *mctp_instance, int *duration)
 				DEVICE_MANAGER_SELF_DEVICE_NUM);
 	uint8_t req_buf[14] = {MCTP_BASE_PROTOCOL_MSG_TYPE_VENDOR_DEF, 0x80, 0x86, 0x80, 0x0a, 0x00,
 		0x00, 0x00, 0x00, MCTP_DOE_REGISTRATION_CMD, 0x00, 0x00, 0x01, src_eid};
-	uint8_t msg_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN];
+
 	if (get_i3c_mng_owner() == I3C_MNG_OWNER_BMC) {
 		status = mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
 				BMC_I3C_SLAVE_ADDR, MCTP_I3C_REGISTRATION_EID, req_buf,
-				sizeof(req_buf), msg_buf, sizeof(msg_buf), 12000);
+				sizeof(req_buf), mctp_msg_buf, sizeof(mctp_msg_buf), 12000);
 	} else {
 		uint8_t dest_eid = device_manager_get_device_eid(device_mgr,
 				DEVICE_MANAGER_MCTP_BRIDGE_DEVICE_NUM);
 		status = mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
 				CPU0_I3C_SLAVE_ADDR, dest_eid, req_buf,
-				sizeof(req_buf), msg_buf, sizeof(msg_buf), 12000);
+				sizeof(req_buf), mctp_msg_buf, sizeof(mctp_msg_buf), 12000);
 	}
 
 	if (status == 0) {
@@ -252,8 +252,9 @@ void mctp_i3c_state_handler(void *a, void *b, void *c)
 			duration = 0;
 		}
 
-		if (duration > 0)
+		if (duration > 0 && i3c_dev_attached) {
 			k_timer_start(&mctp_i3c_req_timer, K_SECONDS(duration), K_NO_WAIT);
+		}
 	}
 }
 
@@ -386,7 +387,7 @@ int mctp_i3c_attach_slave_dev(uint8_t slave_addr)
 		goto error;
 
 	LOG_INF("I3C slave device attached");
-	k_timer_start(&mctp_i3c_req_timer, K_SECONDS(120), K_NO_WAIT);
+	k_timer_start(&mctp_i3c_req_timer, K_SECONDS(12), K_NO_WAIT);
 
 	return 0;
 error:
@@ -406,11 +407,12 @@ uint8_t mctp_i3c_init(mctp *mctp_instance, mctp_medium_conf medium_conf)
 #else
 	mctp_instance->read_data = mctp_i3c_read;
 	mctp_instance->write_data = mctp_i3c_write;
-	k_thread_create(&mctp_i3c_discovery_notify_thread,
+	k_tid_t mctp_i3c_state_tid = k_thread_create(&mctp_i3c_discovery_notify_thread,
 			mctp_i3c_discovery_notify_stack,
 			MCTP_DISCOVERY_NOTIFY_STACK_SIZE,
 			mctp_i3c_state_handler,
 			NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+	k_thread_name_set(mctp_i3c_state_tid, "MCTP I3C State Handler");
 #endif
 
 	return MCTP_SUCCESS;
