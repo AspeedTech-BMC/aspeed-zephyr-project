@@ -59,6 +59,7 @@ int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t 
 
 	/* Lookup Context by bus/src_eid */
 	context = find_spdm_context(bus, src_eid);
+	LOG_DBG("Incoming SPMD request");
 
 	if (context) {
 		/* Execute the message */
@@ -70,7 +71,9 @@ int handle_spdm_mctp_message(uint8_t bus, uint8_t src_eid, void *buffer, size_t 
 		spdm_buffer_append_array(&req_msg.buffer,
 				(uint8_t *)buffer+1+sizeof(req_msg.header),
 				*length-1-sizeof(req_msg.header));
+		LOG_DBG("Before handler");
 		handler(context, &req_msg, &rsp_msg);
+		LOG_DBG("After handler");
 
 		/* Fill-in the response */
 		*(uint8_t *)buffer = 0x05;
@@ -109,7 +112,10 @@ static void handler(void *ctx, void *req, void *rsp)
 	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
 	int ret;
 
-	if (req_msg->header.spdm_version != SPDM_VERSION) {
+	if (req_msg->header.spdm_version != SPDM_VERSION_10 &&
+			req_msg->header.spdm_version != SPDM_VERSION_11 &&
+			req_msg->header.spdm_version != SPDM_VERSION_12) {
+		LOG_ERR("Unsupported SPDM_VERSION=%02x", req_msg->header.spdm_version);
 		return;
 	}
 
@@ -124,6 +130,9 @@ static void handler(void *ctx, void *req, void *rsp)
 		 *      to null.
 		 */
 		spdm_context_reset_l1l2_hash(context);
+		if (req_msg->header.spdm_version == SPDM_VERSION_12) {
+			spdm_context_update_l1l2_hash_buffer(context, &context->message_a);
+		}
 	}
 
 	switch (context->connection_state) {

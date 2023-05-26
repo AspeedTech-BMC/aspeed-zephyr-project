@@ -17,7 +17,9 @@ int spdm_handle_get_digests(void *ctx, void *req, void *rsp)
 	int ret;
 	/* Deserialize */
 	LOG_HEXDUMP_INF(&req_msg->header, sizeof(req_msg->header), "GET_DIGESTS HEADER:");
-	if (req_msg->header.spdm_version != SPDM_VERSION) {
+	if ((req_msg->header.spdm_version != SPDM_VERSION_10) &&
+			(req_msg->header.spdm_version != SPDM_VERSION_11) &&
+			(req_msg->header.spdm_version != SPDM_VERSION_12)) {
 		LOG_ERR("Unsupported header SPDM_VERSION %x", req_msg->header.spdm_version);
 		rsp_msg->header.param1 = SPDM_ERROR_CODE_MAJOR_VERSION_MISMATCH;
 		ret = -1;
@@ -25,6 +27,7 @@ int spdm_handle_get_digests(void *ctx, void *req, void *rsp)
 	}
 
 	/* Serialize the result */
+	rsp_msg->header.spdm_version = req_msg->header.spdm_version;
 	rsp_msg->header.request_response_code = SPDM_RSP_DIGESTS;
 	rsp_msg->header.param1 = 0;
 	rsp_msg->header.param2 = context->local.certificate.slot_mask;

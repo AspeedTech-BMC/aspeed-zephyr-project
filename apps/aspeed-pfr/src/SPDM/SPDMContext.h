@@ -25,6 +25,7 @@ enum SPDM_CONNECTION_STATE {
 
 struct spdm_version_info {
 	uint8_t version_number_entry_count;
+	uint8_t version_number_selected;
 	uint16_t version_number_entry[SPDM_MAX_VERSION]; // Placeholder for SPDM 1.0 1.1 1.2
 };
 
@@ -42,7 +43,7 @@ struct spdm_algorithms_info {
 	uint32_t measurement_hash_algo;
 	uint32_t base_asym_sel;
 	uint32_t base_hash_sel;
-#if 0
+#if 1
 	uint8_t ext_asym_sel_count; // A'
 	uint8_t ext_hash_sel_count; // E'
 	uint32_t ext_asym_sel[SPDM_EXT_ASYM_SEL_COUNT];
@@ -89,9 +90,10 @@ struct spdm_context {
 	/* Measurement Callback */
 	int (*get_measurement)(void *context, uint8_t measurement_index, uint8_t* measurement_count, uint8_t* measurement, size_t* measurement_size);
 
+	/* VCA transcript */
+	struct spdm_buffer message_a;
 #if defined(SPDM_TRANSCRIPT)
 	/* Message Transcript */
-	struct spdm_buffer message_a;
 	struct spdm_buffer message_b;
 	struct spdm_buffer message_c;
 #endif
@@ -130,4 +132,5 @@ size_t spdm_context_measurement_hash_size(void *context);
 void spdm_context_reset_m1m2_hash(void *ctx);
 void spdm_context_update_m1m2_hash(void *ctx, void *req, void *rsp);
 void spdm_context_reset_l1l2_hash(void *ctx);
+void spdm_context_update_l1l2_hash_buffer(void *ctx, void *buf);
 void spdm_context_update_l1l2_hash(void *ctx, void *req, void *rsp);

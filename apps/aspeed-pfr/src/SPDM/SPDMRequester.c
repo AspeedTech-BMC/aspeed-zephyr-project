@@ -130,6 +130,10 @@ static int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 		bool signature_verified = false;
 
 		spdm_context_reset_l1l2_hash(context);
+		if (context->local.version.version_number_selected == SPDM_VERSION_12) {
+			LOG_HEXDUMP_INF(context->message_a.data, context->message_a.write_ptr, "VCA");
+			spdm_context_update_l1l2_hash_buffer(context, &context->message_a);
+		}
 		ret = spdm_get_measurements(context, 0,
 				SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER, &number_of_blocks, NULL);
 
@@ -164,6 +168,7 @@ static int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 
 			ret = spdm_get_measurements(context, request_attribute, meas_index,
 					&measurement_block, possible_measure);
+			LOG_DBG("spdm_get_measurements idx=%d ret=%d", meas_index, ret);
 			if (ret == 0) {
 				/* Measurement and signature matched */
 				LOG_INF("AFM[%02x] measured at measurement block [%02x]", afm_index, meas_index);
@@ -389,5 +394,10 @@ void spdm_stop_attester()
 uint32_t spdm_get_attester()
 {
 	return osEventFlagsGet(spdm_attester_event);
+}
+
+void spdm_request_tick()
+{
+	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_TICK);
 }
 #endif

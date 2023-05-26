@@ -287,11 +287,18 @@ static int cmd_spdm_get(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_spdm_tick(const struct shell *shell, size_t argc, char **argv)
+{
+	spdm_request_tick();
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_spdm_cmds,
 	SHELL_CMD(enable, NULL, "Stop attestation", cmd_spdm_enable),
 	SHELL_CMD(run, NULL, "Run attestation", cmd_spdm_run),
 	SHELL_CMD(stop, NULL, "Stop attestation", cmd_spdm_stop),
 	SHELL_CMD(get, NULL, "Stop attestation", cmd_spdm_get),
+	SHELL_CMD(tick, NULL, "Tick", cmd_spdm_tick),
 	SHELL_SUBCMD_SET_END
 );
 

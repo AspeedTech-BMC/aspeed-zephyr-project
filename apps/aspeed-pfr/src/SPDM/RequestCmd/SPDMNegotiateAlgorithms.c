@@ -13,7 +13,7 @@ int spdm_negotiate_algorithms(void *ctx)
 	struct spdm_message req_msg, rsp_msg;
 	int ret;
 
-	req_msg.header.spdm_version = SPDM_VERSION;
+	req_msg.header.spdm_version = context->local.version.version_number_selected;
 	req_msg.header.request_response_code = SPDM_REQ_NEGOTIATE_ALGORITHMS;
 	req_msg.header.param1 = 0; /* N: Number of algorithms in ReqAlgStruct */
 	req_msg.header.param2 = 0; /* Reserved */
@@ -23,6 +23,7 @@ int spdm_negotiate_algorithms(void *ctx)
 			32
 			+ 4 * 0 /* context->local.algorithms.ext_asym_sel_count A */
 			+ 4 * 0 /* context->local.algorithms.ext_hash_sel_count E */
+			+ 4
 			);
 	spdm_buffer_init(&rsp_msg.buffer, 0);
 
@@ -58,7 +59,7 @@ int spdm_negotiate_algorithms(void *ctx)
 		LOG_ERR("NEGOTIATE_ALGORITHMS failed %x", ret);
 		ret = -1;
 		goto cleanup;
-	} else if (rsp_msg.header.spdm_version != SPDM_VERSION) {
+	} else if (rsp_msg.header.spdm_version != req_msg.header.spdm_version) {
 		LOG_ERR("Unsupported header SPDM_VERSION %x", rsp_msg.header.spdm_version);
 		ret = -1;
 		goto cleanup;
@@ -143,19 +144,17 @@ int spdm_negotiate_algorithms(void *ctx)
 #endif
 	ret = 0;
 
-#if defined(SPDM_TRANSCRIPT)
 	/* Construct transcript for challenge */
 	spdm_buffer_resize(&context->message_a,
 			context->message_a.size + 
-			req_msg.buffer.size + sizeof(req_msg.header) +
-			rsp_msg.buffer.size + sizeof(rsp_msg.header));
+			req_msg.buffer.write_ptr + sizeof(req_msg.header) +
+			rsp_msg.buffer.write_ptr + sizeof(rsp_msg.header));
 	spdm_buffer_append_array(&context->message_a, &req_msg.header, sizeof(req_msg.header));
-	spdm_buffer_append_array(&context->message_a, req_msg.buffer.data, req_msg.buffer.size);
+	spdm_buffer_append_array(&context->message_a, req_msg.buffer.data, req_msg.buffer.write_ptr);
 	spdm_buffer_append_array(&context->message_a, &rsp_msg.header, sizeof(rsp_msg.header));
-	spdm_buffer_append_array(&context->message_a, rsp_msg.buffer.data, rsp_msg.buffer.size);
-#else
+	spdm_buffer_append_array(&context->message_a, rsp_msg.buffer.data, rsp_msg.buffer.write_ptr);
+
 	spdm_context_update_m1m2_hash(context, &req_msg, &rsp_msg);
-#endif
 
 cleanup:
 

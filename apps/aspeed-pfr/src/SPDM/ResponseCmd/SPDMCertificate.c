@@ -18,7 +18,9 @@ int spdm_handle_get_certificate(void *ctx, void *req, void *rsp)
 	uint16_t offset, length;
 	slot_id = req_msg->header.param1; // Slot Id should be 0~7
 
-	if (req_msg->header.spdm_version != SPDM_VERSION) {
+	if ((req_msg->header.spdm_version != SPDM_VERSION_10) &&
+			(req_msg->header.spdm_version != SPDM_VERSION_11) &&
+			(req_msg->header.spdm_version != SPDM_VERSION_12)) {
 		LOG_ERR("Unsupported header SPDM_VERSION %x", req_msg->header.spdm_version);
 		rsp_msg->header.param1 = SPDM_ERROR_CODE_MAJOR_VERSION_MISMATCH;
 		ret = -1;
@@ -40,6 +42,7 @@ int spdm_handle_get_certificate(void *ctx, void *req, void *rsp)
 	spdm_buffer_get_u16(&req_msg->buffer, &offset);
 	spdm_buffer_get_u16(&req_msg->buffer, &length);
 
+	rsp_msg->header.spdm_version = req_msg->header.spdm_version;
 	rsp_msg->header.request_response_code = SPDM_RSP_CERTIFICATE;
 	rsp_msg->header.param1 = slot_id;
 	rsp_msg->header.param2 = slot_id;

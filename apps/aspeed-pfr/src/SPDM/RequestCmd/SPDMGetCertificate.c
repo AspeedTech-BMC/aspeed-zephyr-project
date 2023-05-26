@@ -23,7 +23,7 @@ int spdm_get_certificate(void *ctx, uint8_t slot_id)
 	do {
 		struct spdm_message req_msg, rsp_msg;
 
-		req_msg.header.spdm_version = SPDM_VERSION;
+		req_msg.header.spdm_version = context->local.version.version_number_selected;
 		req_msg.header.request_response_code = SPDM_REQ_GET_CERTIFICATE;
 		req_msg.header.param1 = slot_id & 0x0F;
 		req_msg.header.param2 = 0;
@@ -37,8 +37,9 @@ int spdm_get_certificate(void *ctx, uint8_t slot_id)
 		if (ret != 0) {
 			ret = -1;
 			goto cleanup;
-		} else if (rsp_msg.header.spdm_version != SPDM_VERSION) {
-			LOG_ERR("Unsupported header SPDM_VERSION %x", rsp_msg.header.spdm_version);
+		} else if (rsp_msg.header.spdm_version != req_msg.header.spdm_version) {
+			LOG_ERR("Unsupported header SPDM_VERSION Req %x Rsp",
+					req_msg.header.spdm_version, rsp_msg.header.spdm_version);
 			ret = -1;
 			goto cleanup;
 		} else if (rsp_msg.header.request_response_code != SPDM_RSP_CERTIFICATE) {

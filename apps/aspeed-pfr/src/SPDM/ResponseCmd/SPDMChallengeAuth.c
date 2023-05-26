@@ -22,7 +22,9 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	uint8_t slot_id = req_msg->header.param1;
 	uint8_t measurmenent_summary_hash = req_msg->header.param2;
 
-	if (req_msg->header.spdm_version != SPDM_VERSION) {
+	if ((req_msg->header.spdm_version != SPDM_VERSION_10) &&
+			(req_msg->header.spdm_version != SPDM_VERSION_11) &&
+			(req_msg->header.spdm_version != SPDM_VERSION_12)) {
 		LOG_ERR("Unsupported header SPDM_VERSION %x", req_msg->header.spdm_version);
 		rsp_msg->header.param1 = SPDM_ERROR_CODE_MAJOR_VERSION_MISMATCH;
 		ret = -1;
@@ -53,6 +55,8 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	uint32_t opaque_length = 0;
 	uint32_t signature_length = MBEDTLS_ECDSA_MAX_LEN;
 	spdm_buffer_init(&rsp_msg->buffer, hash_length + 32 + hash_length + 2 + opaque_length + signature_length);
+
+	rsp_msg->header.spdm_version = req_msg->header.spdm_version;
 	rsp_msg->header.request_response_code = SPDM_RSP_CHALLENGE_AUTH;
 	rsp_msg->header.param1 = slot_id; // SlotID for request
 	rsp_msg->header.param2 = context->local.certificate.slot_mask; // SlotMask
@@ -100,7 +104,9 @@ int spdm_handle_challenge(void *ctx, void *req, void *rsp)
 	mbedtls_sha512_finish(&context->m1m2_context, hash);
 	spdm_context_reset_m1m2_hash(context);
 
-	ret = spdm_crypto_sign(context, hash, hash_length, sig, &sig_len);
+	ret = spdm_crypto_sign(context, hash, hash_length, sig, &sig_len,
+			req_msg->header.spdm_version == SPDM_VERSION_12,
+			SPDM_SIGN_CONTEXT_M1M2_RSP, strlen(SPDM_SIGN_CONTEXT_M1M2_RSP));
 	if (ret == 0) {
 		LOG_HEXDUMP_INF(sig, sig_len, "Signature:");
 		spdm_buffer_append_array(&rsp_msg->buffer, sig, sig_len);

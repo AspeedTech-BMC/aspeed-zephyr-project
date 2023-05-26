@@ -21,31 +21,34 @@ int spdm_get_measurements(void *ctx,
 
 	AFM_DEVICE_MEASUREMENT_VALUE *possible_measurement = possible_measure;
 
-	req_msg.header.spdm_version = SPDM_VERSION;
+	req_msg.header.spdm_version = context->local.version.version_number_selected;
 	req_msg.header.request_response_code = SPDM_REQ_GET_MEASUREMENTS;
 	req_msg.header.param1 = request_attribute; // GET_MEASUREMENTS request attributes : NL
 	req_msg.header.param2 = measurement_operation;
 
-	spdm_buffer_init(&req_msg.buffer, (req_msg.header.param1 ? 32 : 0) /* SPDM 1.2: + 1*/);
+	spdm_buffer_init(&req_msg.buffer, 33 /* NONCE + SPDM 1.2: + 1*/);
 	spdm_buffer_init(&rsp_msg.buffer, 0);
 
 	if (req_msg.header.param1) {
 		// nonce(32)
 		spdm_buffer_append_nonce(&req_msg.buffer);
+
+		// SPDM 1.2 Requested Slot ID
+		if (req_msg.header.spdm_version == SPDM_VERSION_12) {
+			spdm_buffer_append_u8(&req_msg.buffer, 0x01);
+		}
 	}
 
-#if 0
-	// TODO: SPDM 1.2 Requested Slot ID
-	spdm_buffer_append_u8(&req_msg.buffer, 0);
-#endif
+
 	ret = spdm_send_request(context, &req_msg, &rsp_msg);
 
 	if (ret != 0) {
 		LOG_ERR("GET_MEASUREMENTS failed %x", ret);
 		ret = -3;
 		goto cleanup;
-	} else if (rsp_msg.header.spdm_version != SPDM_VERSION) {
-		LOG_ERR("Unsupported header SPDM_VERSION %x", rsp_msg.header.spdm_version);
+	} else if (rsp_msg.header.spdm_version != req_msg.header.spdm_version) {
+		LOG_ERR("Unsupported header SPDM_VERSION Req %x Rsp %x",
+				req_msg.header.spdm_version, rsp_msg.header.spdm_version);
 		ret = -1;
 		goto cleanup;
 	} else if (rsp_msg.header.request_response_code != SPDM_RSP_MEASUREMENTS) {
@@ -88,12 +91,18 @@ int spdm_get_measurements(void *ctx,
 
 		mbedtls_sha512_finish(&context->l1l2_context, hash);
 		spdm_context_reset_l1l2_hash(context);
+		if (req_msg.header.spdm_version == SPDM_VERSION_12) {
+			/* Append VCA to L1L2 for SPDM 1.2 */
+			spdm_context_update_l1l2_hash_buffer(context, &context->message_a);
+		}
 
 		/* DSP0274_1.0.1: 
 		 * 310: Public key associated with the slot 0 certificate of the Responder.
 		 */
 		ret = spdm_crypto_verify(context, 0, hash, 48,
-				(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 96);
+				(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 96,
+				req_msg.header.spdm_version == SPDM_VERSION_12,
+				SPDM_SIGN_CONTEXT_L1L2_RSP, strlen(SPDM_SIGN_CONTEXT_L1L2_RSP));
 		LOG_INF("GET_MEASUREMENT SIGNATURE VERIFY ret=%x", -ret);
 		if (ret < 0) {
 			LOG_HEXDUMP_ERR(hash, 48, "Requester L2 hash:");
@@ -113,6 +122,7 @@ int spdm_get_measurements(void *ctx,
 
 		spdm_buffer_get_u8(&rsp_msg.buffer, &number_of_blocks);
 		if (number_of_blocks != 1) {
+			LOG_ERR("number_of_blocks %d", number_of_blocks);
 			ret = -1;
 			goto cleanup;
 		}
@@ -148,6 +158,7 @@ int spdm_get_measurements(void *ctx,
 			}
 
 			// Not matching any measurement.
+			LOG_ERR("Not matching any measurement");
 			ret = -1;
 		}
 	}

@@ -13,7 +13,7 @@ int spdm_get_digests(void *ctx)
 	struct spdm_message req_msg, rsp_msg;
 	int ret;
 
-	req_msg.header.spdm_version = SPDM_VERSION;
+	req_msg.header.spdm_version = context->local.version.version_number_selected;
 	req_msg.header.request_response_code = SPDM_REQ_GET_DIGESTS;
 	req_msg.header.param1 = 0;
 	req_msg.header.param2 = 0;
@@ -26,8 +26,9 @@ int spdm_get_digests(void *ctx)
 		LOG_ERR("GET_DIGEST failed %x", ret);
 		ret = -1;
 		goto cleanup;
-	} else if (rsp_msg.header.spdm_version != SPDM_VERSION) {
-		LOG_ERR("Unsupported header SPDM_VERSION %x", rsp_msg.header.spdm_version);
+	} else if (rsp_msg.header.spdm_version != req_msg.header.spdm_version) {
+		LOG_ERR("Unsupported header SPDM_VERSION Req %x Rsp",
+				req_msg.header.spdm_version, rsp_msg.header.spdm_version);
 		ret = -1;
 		goto cleanup;
 	} else if (rsp_msg.header.request_response_code != SPDM_RSP_DIGESTS) {
