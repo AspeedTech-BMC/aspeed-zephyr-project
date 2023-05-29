@@ -40,7 +40,9 @@ void bmc_wdt_handler(uint8_t cmd)
 		pfr_stop_timer(type);
 		// BMC stays in uboot or in FFUJ(Force Firmware Update Jumper (FFUJ)) mode
 		// Take over i3c MNG
+#if defined(CONFIG_PFR_MCTP_I3C)
 		switch_i3c_mng_owner(I3C_MNG_OWNER_ROT);
+#endif
 	} else if (cmd == ResumedExecutionBlock) {
 		pfr_start_timer(type, ms_timeout);
 	} else if (cmd == NextExeBlockAuthenticationFail) {
