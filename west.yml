@@ -14,7 +14,7 @@ manifest:
   projects:
     - name: zephyr
       remote: gerrit
-      revision: 0a81d4b043e8af8e73e1036838ad5008c5db89ae
+      revision: 3e0c1402e3afc42f9054edd2ef2787b4b6b4cc62
       import:
         name-whitelist:
           - mcumgr
