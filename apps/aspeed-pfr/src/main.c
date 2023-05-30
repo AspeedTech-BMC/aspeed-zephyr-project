@@ -74,15 +74,6 @@ void main(void)
 	DEBUG_HALT();
 #endif
 
-// Workaround to enable CPLD vcc by pullup GPIOH3
-// It should be done in board init stage.
-// Remove it when board level init is ready.
-#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
-         const struct device *dev;
-         dev = device_get_binding("GPIO0_E_H");
-         gpio_pin_configure(dev, 27, GPIO_OUTPUT_ACTIVE);
-#endif
-
 	aspeed_print_sysrst_info();
 
 #if DT_NODE_EXISTS(DT_NODELABEL(pfr_hb_led_out))
