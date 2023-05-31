@@ -15,6 +15,7 @@ static int ast1060_dcscm_post_init(const struct device *arg)
 	dev = device_get_binding("GPIO0_I_L");
 	gpio_pin_configure(dev, 26, GPIO_OUTPUT_ACTIVE);
 	gpio_pin_configure(dev, 27, GPIO_OUTPUT_ACTIVE);
+	k_busy_wait(10000);
 	return 0;
 }
 
