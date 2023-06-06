@@ -614,7 +614,8 @@ int update_recovery_region(int image_type, uint32_t source_address, uint32_t tar
 	return pfr_recover_recovery_region(image_type, source_address, target_address);
 }
 
-int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
+int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext,
+		CPLD_STATUS *cpld_update_status)
 {
 	int status = 0;
 	uint32_t source_address, target_address, area_size;
@@ -622,7 +623,6 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	uint32_t address = 0;
 	uint32_t pc_type_status = 0;
 	uint8_t staging_svn = 0;
-	CPLD_STATUS cpld_update_status;
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	DECOMPRESSION_TYPE_MASK_ENUM decomp_event;
 	uint32_t flash_select = ((EVENT_CONTEXT *)EventContext)->flash;
@@ -692,37 +692,29 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	pfr_manifest->staging_address = source_address;
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status,
-			sizeof(CPLD_STATUS));
-	LOG_HEXDUMP_INF(&cpld_update_status, sizeof(cpld_update_status), "CPLD Status");
-	if (status != Success)
-		return status;
+	if (image_type == PCH_TYPE && cpld_update_status->BmcToPchStatus == 1) {
+		cpld_update_status->BmcToPchStatus = 0;
+		// It is not necessary to copy image from bmc's staging to pch's staging again
+		// for handling the pending recovery update.
+		if (cpld_update_status->Region[PCH_REGION].Recoveryregion != RECOVERY_PENDING_REQUEST_HANDLED) {
+			status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+					(uint8_t *)&address, sizeof(address));
+			if (status != Success)
+				return Failure;
 
-	if (cpld_update_status.BmcToPchStatus == 1) {
+			// PFR Staging - PCH Staging offset after BMC staging offset
+			address += CONFIG_BMC_STAGING_SIZE;
+			pfr_manifest->address = address;
 
-		cpld_update_status.BmcToPchStatus = 0;
-		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		if (status != Success)
-			return Failure;
+			// Checking for key cancellation
+			pfr_manifest->image_type = BMC_TYPE;
+			pc_type_status = check_rot_capsule_type(pfr_manifest);
+			pfr_manifest->image_type = image_type;
 
-		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
-				(uint8_t *)&address, sizeof(address));
-		if (status != Success)
-			return Failure;
-
-		// PFR Staging - PCH Staging offset after BMC staging offset
-		address += CONFIG_BMC_STAGING_SIZE;
-		pfr_manifest->address = address;
-
-		// Checking for key cancellation
-		pfr_manifest->image_type = BMC_TYPE;
-		pc_type_status = check_rot_capsule_type(pfr_manifest);
-		pfr_manifest->image_type = image_type;
-
-		status = pfr_staging_pch_staging(pfr_manifest);
-		if (status != Success)
-			return Failure;
+			status = pfr_staging_pch_staging(pfr_manifest);
+			if (status != Success)
+				return Failure;
+		}
 	}
 
 	pfr_manifest->address = source_address;

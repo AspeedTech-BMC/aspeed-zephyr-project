@@ -819,12 +819,36 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
  */
 void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot_state)
 {
-	if (is_timed_boot_done())
+	CPLD_STATUS cpld_update_status;
+	union aspeed_event_data data = {0};
+	uint8_t intent = 0;
+	uint8_t update_intent_src = BmcUpdateIntent;
+
+	if (is_timed_boot_done()) {
 		// If other components have finished booting, log timed boot complete status.
 		SetPlatformState(T0_BOOT_COMPLETED);
-	else
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+		if (cpld_update_status.Region[BMC_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING)
+			intent |= BmcRecoveryUpdate;
+
+		if (cpld_update_status.Region[PCH_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING)
+			intent |= PchRecoveryUpdate;
+		else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_RECOVERY_PENDING) {
+			intent |= PchRecoveryUpdate;
+			update_intent_src = PchUpdateIntent;
+		}
+
+		if (intent) {
+			data.bit8[0] = update_intent_src;
+			data.bit8[1] = intent;
+			data.bit8[2] |= BootDoneRecovery;
+			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
+		}
+	} else {
 		// Otherwise, just log the this boot complete status
 		SetPlatformState(current_boot_state);
+	}
 }
 
 // UFM Status

@@ -360,14 +360,13 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	return status;
 }
 
-int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
+int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext, CPLD_STATUS *cpld_update_status)
 {
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
 	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	uint8_t flash_select = EventData->flash;
 	struct recovery_header image_header;
-	CPLD_STATUS cpld_update_status;
 	bool erase_rw_regions = false;
 	uint32_t source_address;
 	uint32_t target_address;
@@ -434,28 +433,23 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 	pfr_manifest->staging_address = source_address;
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-	if (status != Success)
-		return status;
-	if (cpld_update_status.BmcToPchStatus == 1) {
-		cpld_update_status.BmcToPchStatus = 0;
-		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		if (status != Success)
-			return Failure;
+	if (image_type == PCH_TYPE && cpld_update_status->BmcToPchStatus == 1) {
+		cpld_update_status->BmcToPchStatus = 0;
+		if (cpld_update_status->Region[PCH_REGION].Recoveryregion != RECOVERY_PENDING_REQUEST_HANDLED) {
+			status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+					(uint8_t *)&address, sizeof(address));
+			if (status != Success)
+				return Failure;
 
-		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&address, sizeof(address));
-		if (status != Success)
-			return Failure;
+			address += CONFIG_BMC_STAGING_SIZE;
 
-		address += CONFIG_BMC_STAGING_SIZE;
+			// Checking for key cancellation
+			pfr_manifest->address = address;
 
-		// Checking for key cancellation
-		pfr_manifest->address = address;
-
-		status = pfr_staging_pch_staging(pfr_manifest);
-		if (status != Success)
-			return Failure;
+			status = pfr_staging_pch_staging(pfr_manifest);
+			if (status != Success)
+				return Failure;
+		}
 	}
 
 	pfr_manifest->image_type = image_type;

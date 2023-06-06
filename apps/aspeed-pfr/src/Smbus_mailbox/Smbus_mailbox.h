@@ -13,8 +13,6 @@
 
 #pragma pack(1)
 
-typedef char byte;
-
 typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	CpldIdentifier = 0x00,
 	CpldReleaseVersion = 0x01,
@@ -105,6 +103,7 @@ typedef enum _UPDATE_INTENT {
 	PchActiveAndRecoveryUpdateAtReset       = 0x83,
 	PchActiveDynamicUpdate                  = 0x41,
 	PchActiveAndDynamicUpdateAtReset        = 0xc1,
+	PchActiveRecoveryDynamicUpdateAtReset   = 0xc3,
 	HROTActiveAndRecoveryUpdate             = 0x24,
 	BmcActiveAndRecoveryUpdate              = 0x18,
 	PchActiveAndBmcActiveUpdate             = 0x09,
@@ -123,6 +122,15 @@ typedef enum _UPDATE_INTENT_2 {
 	AfmActiveAndRecoveryUpdate              = 0x06,
 	CPLDUpdate                              = 0x10,
 } UPDATE_INTENT_2;
+
+// EVT_DATA_0 : Update Intent(e.g. PchUpdateIntent)
+// EVT_DATA_1 : Value of Update Intent(e.g. BmcActiveUpdate)
+// EVT_DATA_2 : Other information
+typedef enum _EVT_DATA_2 {
+	BmcOnlyReset                            = 0x01,
+	PchOnlyReset                            = 0x02,
+	BootDoneRecovery                        = 0x04,
+} EVT_DATA_2;
 
 #pragma pack()
 

@@ -14,6 +14,7 @@
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "pfr/pfr_util.h"
+#include "pfr/pfr_ufm.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_pfm_manifest.h"
@@ -84,7 +85,7 @@ int intel_pfr_pit_level2_verify(void)
 	}
 
 	if (pfr_spi_read(BMC_TYPE, act_pfm_offset + sizeof(PFR_AUTHENTICATION_BLOCK0),
-				sizeof(PFR_AUTHENTICATION_BLOCK1), &block1)) {
+				sizeof(PFR_AUTHENTICATION_BLOCK1), (uint8_t *)&block1)) {
 		LOG_ERR("Failed to get block1");
 		return Failure;
 	}

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <string.h>
 #include "common/common.h"
 #include "flash/flash_wrapper.h"
 #include "AspeedStateMachine/common_smc.h"
@@ -16,27 +17,44 @@
 #include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(ufm, CONFIG_LOG_DEFAULT_LEVEL);
 
-int get_cpld_status(uint8_t *data, uint32_t data_length)
+int get_cpld_status(uint32_t offset, uint8_t *data, uint32_t data_length)
 {
 	int status;
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
 	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
-	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, data, data_length);
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, offset, data, data_length);
 
 	return Success;
 }
 
-int set_cpld_status(uint8_t *data, uint32_t data_length)
+int set_cpld_status(uint32_t offset, uint8_t *data, uint32_t data_length)
 {
-
 	int status;
+	uint8_t buffer[256] = {0};
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 
+	if (offset + data_length > sizeof(buffer))
+		return Failure;
+
 	spi_flash->spi.state->device_id[0] = ROT_INTERNAL_STATE; // Internal UFM SPI
+	status = spi_flash->spi.base.read((struct flash *)&spi_flash->spi, 0, buffer,
+			sizeof(buffer));
+	if (status != Success)
+		return Failure;
+
+	memcpy(buffer + offset, data, data_length);
 	status = pfr_spi_erase_4k(ROT_INTERNAL_STATE, 0);
-	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, 0, data, data_length);
+	if (status != Success)
+		return Failure;
+
+	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, 0, buffer,
+			sizeof(buffer));
+	if (status != Success)
+		return Failure;
 
 	return Success;
 }
@@ -47,7 +65,7 @@ int ufm_read(uint32_t ufm_id, uint32_t offset, uint8_t *data, uint32_t data_leng
 	if (ufm_id == PROVISION_UFM)
 		return get_provision_data_in_flash(offset, data, data_length);
 	else if (ufm_id == UPDATE_STATUS_UFM)
-		return get_cpld_status(data, data_length);
+		return get_cpld_status(offset, data, data_length);
 	else
 		return Failure;
 }
@@ -58,7 +76,7 @@ int ufm_write(uint32_t ufm_id, uint32_t offset, uint8_t *data, uint32_t data_len
 	if (ufm_id == PROVISION_UFM)
 		return set_provision_data_in_flash(offset, data, data_length);
 	else if (ufm_id == UPDATE_STATUS_UFM)
-		return set_cpld_status(data, data_length);
+		return set_cpld_status(offset, data, data_length);
 	else
 		return Failure;
 }

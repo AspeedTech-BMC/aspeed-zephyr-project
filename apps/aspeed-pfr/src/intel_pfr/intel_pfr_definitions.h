@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <stdint.h>
 
 #define BMC_FLASH_ID                    0
 #define PCH_FLASH_ID                    1
@@ -36,6 +37,8 @@
 
 #define UPDATE_STATUS_UFM               UFM1
 #define UPDATE_STATUS_ADDRESS           0x00
+#define UPDATE_STATUS_BMC_HASH_ADDR     0x40
+#define UPDATE_STATUS_PCH_HASH_ADDR     0x80
 
 // BIOS/BMC SPI Region information
 #define PCH_ACTIVE_FW_UPDATE_ADDRESS    0x00000000
@@ -122,6 +125,21 @@ typedef enum {
 	DECOMPRESSION_DYNAMIC_REGIONS_MASK            = 0b10,
 	DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK = 0b11,
 } DECOMPRESSION_TYPE_MASK_ENUM;
+
+typedef enum {
+	ROT_REGION = 0,
+	BMC_REGION,
+	PCH_REGION,
+} REGION_DEF;
+
+typedef enum {
+	BMC_INTENT_UPDATE_AT_RESET = 1,
+	BMC_INTENT_RECOVERY_PENDING,
+	PCH_INTENT_UPDATE_AT_RESET,
+	PCH_INTENT_RECOVERY_PENDING,
+	RECOVERY_PENDING_REQUEST_HANDLED,
+	MAX_INTENT_TYPE_DEF,
+} REGION_UPDATE_INTENT_TYPE_DEF;
 
 typedef struct {
 	uint8_t ActiveRegion;
