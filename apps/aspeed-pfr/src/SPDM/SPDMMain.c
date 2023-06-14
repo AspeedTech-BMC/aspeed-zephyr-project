@@ -166,13 +166,17 @@ int get_measurement(void *context,
 	return ret;
 }
 
-void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid)
+bool init_requester_context(struct spdm_context *context, SPDM_MEDIUM medium, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid)
 {
-	spdm_mctp_init_req(context, bus, dst_sa, dst_eid);
+	int ret;
+	ret = spdm_mctp_init_req(context, medium, bus, dst_sa, dst_eid);
+	if (ret == 0) {
+		return false;
+	}
+
 	context->release_connection_data = spdm_mctp_release_req;
 
 	/* Set private/public key pair for signing */
-	int ret;
 	ret = mbedtls_ecp_group_load(&context->key_pair.MBEDTLS_PRIVATE(grp),
 			MBEDTLS_ECP_DP_SECP384R1);
 	LOG_INF("mbedtls_ecp_group_load ret=%x", -ret);
@@ -190,6 +194,8 @@ void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t d
 			context->random_callback,
 			context);
 	LOG_INF("mbedtls_ecp_check_pub_priv ret=%x", -ret);
+
+	return true;
 }
 
 void init_responder_context(struct spdm_context *context)

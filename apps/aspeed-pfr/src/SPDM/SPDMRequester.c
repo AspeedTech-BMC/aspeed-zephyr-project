@@ -253,7 +253,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 
 				LOG_INF("Attestation device[%d][%08x] events=%08x",
 						device, afm_list[device], events);
-				LOG_INF("UUID=%04x, BusId=%02x, DeviceAddress=%02x, BindingSped=%02x, Policy=%02x",
+				LOG_INF("UUID=%04x, BusId=%02x, DeviceAddress=%02x, BindingSpec=%02x, Policy=%02x",
 						afm_device->UUID,
 						afm_device->BusID,
 						afm_device->DeviceAddress,
@@ -262,69 +262,78 @@ void spdm_attester_main(void *a, void *b, void *c)
 
 
 				/* Create context */
-				struct spdm_context *context = spdm_context_create();
+				struct spdm_context *context = NULL;
+				int ret;
 
 				/* DEST_EID using NULL EID due to AFM device structure design */
-				init_requester_context(context,
+				context = spdm_context_create();
+				if (context == NULL) {
+					LOG_ERR("Failed to allocate SPDM Context");
+					continue;
+				}
+				ret = init_requester_context(context,
+						afm_device->BindingSpec,
 						afm_device->BusID,
 						afm_device->DeviceAddress,
 						MCTP_BASE_PROTOCOL_NULL_EID);
+				if (ret) {
+					/* Attested the device */
+					ret = spdm_attest_device(context, afm_device);
 
-				/* Attested the device */
-				int ret = spdm_attest_device(context, afm_device);
-
-				/* Check Policy */
-				switch (ret) {
-				case ATTEST_SUCCEEDED:
-					LOG_INF("ATTEST UUID[%04x] Succeeded", afm_device->UUID);
-					break;
-				case ATTEST_FAILED_VCA:
-					/* Protocol Error */
-					LOG_ERR("ATTEST UUID[%04x] Protocol Error", afm_device->UUID);
-					LogErrorCodes(SPDM_PROTOCOL_ERROR_FAIL, SPDM_CONNECTION_FAIL);
-					if (afm_device->Policy & BIT(2)) {
-						/* Lock down in reset */
-						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+					/* Check Policy */
+					switch (ret) {
+						case ATTEST_SUCCEEDED:
+							LOG_INF("ATTEST UUID[%04x] Succeeded", afm_device->UUID);
+							break;
+						case ATTEST_FAILED_VCA:
+							/* Protocol Error */
+							LOG_ERR("ATTEST UUID[%04x] Protocol Error", afm_device->UUID);
+							LogErrorCodes(SPDM_PROTOCOL_ERROR_FAIL, SPDM_CONNECTION_FAIL);
+							if (afm_device->Policy & BIT(2)) {
+								/* Lock down in reset */
+								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+							}
+							break;
+						case ATTEST_FAILED_DIGEST:
+							LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
+							LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_DIGEST_FAIL);
+							if (afm_device->Policy & BIT(1)) {
+								/* Lock down in reset */
+								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+							}
+							break;
+						case ATTEST_FAILED_CERTIFICATE:
+							LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
+							LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CERTIFICATE_FAIL);
+							if (afm_device->Policy & BIT(1)) {
+								/* Lock down in reset */
+								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+							}
+							break;
+						case ATTEST_FAILED_CHALLENGE_AUTH:
+							/* Challenge Error */
+							LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
+							LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CHALLENGE_FAIL);
+							if (afm_device->Policy & BIT(1)) {
+								/* Lock down in reset */
+								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+							}
+							break;
+						case ATTEST_FAILED_MEASUREMENTS_MISMATCH:
+							/* Measurement unexpected or mismatch */
+							LOG_ERR("ATTEST UUID[%04x] Measurement Error", afm_device->UUID);
+							LogErrorCodes(ATTESTATION_MEASUREMENT_FAIL, SPDM_MEASUREMENT_FAIL);
+							if (afm_device->Policy & BIT(0)) {
+								/* Lock down in reset */
+								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+							}
+							break;
+						default:
+							break;
 					}
-					break;
-				case ATTEST_FAILED_DIGEST:
-					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
-					LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_DIGEST_FAIL);
-					if (afm_device->Policy & BIT(1)) {
-						/* Lock down in reset */
-						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
-					}
-					break;
-				case ATTEST_FAILED_CERTIFICATE:
-					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
-					LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CERTIFICATE_FAIL);
-					if (afm_device->Policy & BIT(1)) {
-						/* Lock down in reset */
-						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
-					}
-					break;
-				case ATTEST_FAILED_CHALLENGE_AUTH:
-					/* Challenge Error */
-					LOG_ERR("ATTEST UUID[%04x] Challenge Error", afm_device->UUID);
-					LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CHALLENGE_FAIL);
-					if (afm_device->Policy & BIT(1)) {
-						/* Lock down in reset */
-						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
-					}
-					break;
-				case ATTEST_FAILED_MEASUREMENTS_MISMATCH:
-					/* Measurement unexpected or mismatch */
-					LOG_ERR("ATTEST UUID[%04x] Measurement Error", afm_device->UUID);
-					LogErrorCodes(ATTESTATION_MEASUREMENT_FAIL, SPDM_MEASUREMENT_FAIL);
-					if (afm_device->Policy & BIT(0)) {
-						/* Lock down in reset */
-						GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
-					}
-					break;
-				default:
-					break;
+				} else {
+					LOG_ERR("Failed to initiate SPDM connection context");
 				}
-
 				spdm_context_release(context);
 			}
 		}

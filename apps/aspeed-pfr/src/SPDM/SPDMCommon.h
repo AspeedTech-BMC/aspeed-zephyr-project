@@ -58,6 +58,11 @@ struct spdm_message_header {
 	uint8_t param1;
 	uint8_t param2;
 };
+
+typedef enum SPDM_MEDIUM {
+	SPDM_MEDIUM_SMBUS = 0x01,
+	SPDM_MEDIUM_I3C = 0x06,
+} SPDM_MEDIUM;
 #pragma pack()
 
 struct spdm_message {
@@ -73,4 +78,4 @@ typedef struct {
 } spdm_request_data;
 
 void init_spdm();
-void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid);
+bool init_requester_context(struct spdm_context *context, SPDM_MEDIUM medium, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid);

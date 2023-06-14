@@ -21,4 +21,5 @@ typedef struct _mctp_i3c_dev {
 /* init the mctp moduel for platform */
 void plat_mctp_init(void);
 mctp *find_mctp_by_smbus(uint8_t bus);
+mctp *find_mctp_by_i3c(uint8_t bus);
 

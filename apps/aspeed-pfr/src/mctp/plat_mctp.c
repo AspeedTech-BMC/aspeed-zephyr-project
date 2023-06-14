@@ -69,6 +69,16 @@ mctp *find_mctp_by_smbus(uint8_t bus)
 	return NULL;
 }
 
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+mctp *find_mctp_by_i3c(uint8_t bus)
+{
+	if (bus == 2)
+		return i3c_dev.mctp_inst;
+	else
+		return NULL;
+}
+#endif
+
 void plat_mctp_init(void)
 {
 	LOG_INF("plat_mctp_init");
