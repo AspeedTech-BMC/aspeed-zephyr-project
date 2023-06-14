@@ -293,6 +293,16 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 	xfer.data.in = i3c_data_in;
 	ret = i3c_master_priv_xfer(&mctp_i3c_slave, &xfer, 1);
 
+	/* Workaround: extra bye appeded after PEC */
+	uint8_t pec = 0x08 << 1;
+	pec = crc8(&pec, 1, 0x07, 0x00, 0);
+	pec = crc8(xfer.data.in, xfer.len, 0x07, pec, 0);
+	if (pec != 0) {
+		LOG_HEXDUMP_WRN(xfer.data.in, xfer.len, "I3C Workaround");
+		xfer.len -= 1;
+	}
+	/* Workaround: extra bye appeded after PEC end */
+
 	packet->dest_addr = mctp_inst->medium_conf.i3c_conf.addr;
 	packet->pkt_size = xfer.len;
 	packet->timeout_valid = 0;
