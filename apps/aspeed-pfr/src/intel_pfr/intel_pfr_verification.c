@@ -102,7 +102,7 @@ int intel_pfr_pit_level2_verify(void)
 	pfr_manifest->pfr_hash->start_address = 0;
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH)
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
@@ -131,7 +131,7 @@ int intel_pfr_pit_level2_verify(void)
 
 	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_CPU_DUAL_FLASH)
 	flash_dev = device_get_binding(flash_devices[PCH_TYPE + 1]);
 	flash_size += flash_get_flash_size(flash_dev);
 #endif

@@ -7,11 +7,17 @@ config ASPEED_DC_SCM
 	help
 	  Enable ASPEED DC-SCM board basic settings.
 
-config DUAL_FLASH
+config BMC_DUAL_FLASH
 	default n
-	bool "Enable dual flash support"
+	bool "Enable BMC dual flash support"
 	help
-	  Enable if BMC and/or PCH has dual flash
+	  Enable if BMC has dual flash
+
+config CPU_DUAL_FLASH
+	default n
+	bool "Enable CPU dual flash support"
+	help
+	  Enable if CPU has dual flash
 
 config SPI_MUX_INVERSE
 	default n

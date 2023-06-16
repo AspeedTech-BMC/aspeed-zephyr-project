@@ -66,12 +66,25 @@ int BMC_PCH_SPI_Command(struct pspi_flash *flash, struct pflash_xfer *xfer)
 		return -1;
 	}
 
-#if defined(CONFIG_DUAL_FLASH)
-	FlashSize = flash_get_flash_size(flash_device);
-	if (AdrOffset >= FlashSize) {
-		DeviceId += 1;
-		AdrOffset -= FlashSize;
-		flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	if (DeviceId == BMC_SPI) {
+		FlashSize = flash_get_flash_size(flash_device);
+		if (AdrOffset >= FlashSize) {
+			DeviceId += 1;
+			AdrOffset -= FlashSize;
+			flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
+		}
+	}
+#endif
+
+#if defined(CONFIG_CPU_DUAL_FLASH)
+	if (DeviceId == PCH_SPI) {
+		FlashSize = flash_get_flash_size(flash_device);
+		if (AdrOffset >= FlashSize) {
+			DeviceId += 1;
+			AdrOffset -= FlashSize;
+			flash_device = device_get_binding(Flash_Devices_List[DeviceId]);
+		}
 	}
 #endif
 

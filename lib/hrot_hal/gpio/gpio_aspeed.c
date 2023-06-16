@@ -102,7 +102,7 @@ int BMCBootHold(void)
 	} else {
 		LOG_ERR("Failed to bind spi1_cs0");
 	}
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH)
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
@@ -136,7 +136,8 @@ int PCHBootHold(void)
 	} else {
 		LOG_ERR("Failed to bind spi2_cs0");
 	}
-#if defined(CONFIG_DUAL_FLASH)
+
+#if defined(CONFIG_CPU_DUAL_FLASH)
 	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
 	spim_passthrough_config(dev_m, 0, false);
 	/* config spi monitor as master mode */
@@ -168,7 +169,7 @@ int BMCBootRelease(void)
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH)
 	flash_dev = device_get_binding("spi1_cs1");
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
@@ -208,7 +209,8 @@ int PCHBootRelease(void)
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
-#if defined(CONFIG_DUAL_FLASH)
+
+#if defined(CONFIG_CPU_DUAL_FLASH)
 	flash_dev = device_get_binding("spi2_cs1");
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);

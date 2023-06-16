@@ -78,7 +78,7 @@ void apply_pfm_protection(int spi_device_id)
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
 #endif
 
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH) || defined(CONFIG_CPU_DUAL_FLASH)
 	int flash_size;
 #endif
 
@@ -111,19 +111,38 @@ void apply_pfm_protection(int spi_device_id)
 			region_end_address = (region_record[12] & 0xff) | (region_record[13] << 8 & 0xff00) |
 				(region_record[14] << 16 & 0xff0000) | (region_record[15] << 24 & 0xff000000);
 
-#if defined(CONFIG_DUAL_FLASH)
-			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
-			if (region_start_address >= flash_size && region_end_address >= flash_size) {
-				region_start_address -= flash_size;
-				region_end_address -= flash_size;
-				spi_id = spi_device_id + 1;
-			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
-				LOG_ERR("ERROR: region start and end address should be in the same flash");
-				return;
-			} else {
-				spi_id = spi_device_id;
+#if defined(CONFIG_BMC_DUAL_FLASH)
+			if (spi_device_id == BMC_SPI) {
+				spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+				if (region_start_address >= flash_size && region_end_address >= flash_size) {
+					region_start_address -= flash_size;
+					region_end_address -= flash_size;
+					spi_id = spi_device_id + 1;
+				} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+					LOG_ERR("ERROR: region start and end address should be in the same flash");
+					return;
+				} else {
+					spi_id = spi_device_id;
+				}
 			}
 #endif
+
+#if defined(CONFIG_CPU_DUAL_FLASH)
+			if (spi_device_id == PCH_SPI) {
+				spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+				if (region_start_address >= flash_size && region_end_address >= flash_size) {
+					region_start_address -= flash_size;
+					region_end_address -= flash_size;
+					spi_id = spi_device_id + 1;
+				} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+					LOG_ERR("ERROR: region start and end address should be in the same flash");
+					return;
+				} else {
+					spi_id = spi_device_id;
+				}
+			}
+#endif
+
 			spi_filter->dev_id = spi_id;
 			region_length = region_end_address - region_start_address;
 			if (region_record[1] & 0x02) {

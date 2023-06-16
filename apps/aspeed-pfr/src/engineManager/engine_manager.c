@@ -79,7 +79,7 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 	uint32_t region_start_address;
 	uint32_t region_end_address;
 	int region_length;
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_CPU_DUAL_FLASH)
 	int flash_size;
 #endif
 	int spi_id = 0;
@@ -100,7 +100,7 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 			region_start_address = spi_def.RegionStartAddress;
 			region_end_address = spi_def.RegionEndAddress;
 			region_length = region_end_address - region_start_address;
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_CPU_DUAL_FLASH)
 			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
 			if (region_start_address >= flash_size && region_end_address >= flash_size) {
 				region_start_address -= flash_size;

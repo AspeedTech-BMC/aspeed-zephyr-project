@@ -35,7 +35,7 @@ void apply_pfm_protection(int spi_dev)
 	int region_length;
 	int spi_id = spi_dev;
 
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH) || defined(CONFIG_CPU_DUAL_FLASH)
 	struct spi_engine_wrapper *spi_flash = getSpiEngineWrapper();
 	int flash_size;
 #endif
@@ -65,19 +65,38 @@ void apply_pfm_protection(int spi_dev)
 		region_end_address = rw_region.region.end_addr;
 		region_length = region_end_address - region_start_address + 1;
 
-#if defined(CONFIG_DUAL_FLASH)
-		spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
-		if (region_start_address >= flash_size && region_end_address >= flash_size) {
-			region_start_address -= flash_size;
-			region_end_address -= flash_size;
-			spi_id = spi_dev + 1;
-		} else if (region_start_address < flash_size && region_end_address >= flash_size) {
-			LOG_ERR("ERROR: region start and end address should be in the same flash");
-			return;
-		} else {
-			spi_id = spi_dev;
+#if defined(CONFIG_BMC_DUAL_FLASH)
+		if (spi_dev == BMC_SPI) {
+			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+			if (region_start_address >= flash_size && region_end_address >= flash_size) {
+				region_start_address -= flash_size;
+				region_end_address -= flash_size;
+				spi_id = spi_dev + 1;
+			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+				LOG_ERR("ERROR: region start and end address should be in the same flash");
+				return;
+			} else {
+				spi_id = spi_dev;
+			}
 		}
 #endif
+
+#if defined(CONFIG_CPU_DUAL_FLASH)
+		if (spi_dev == PCH_SPI) {
+			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+			if (region_start_address >= flash_size && region_end_address >= flash_size) {
+				region_start_address -= flash_size;
+				region_end_address -= flash_size;
+				spi_id = spi_dev + 1;
+			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+				LOG_ERR("ERROR: region start and end address should be in the same flash");
+				return;
+			} else {
+				spi_id = spi_dev;
+			}
+		}
+#endif
+
 		Set_SPI_Filter_RW_Region(spim_devs[spi_id],
 				SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_ENABLE,
 				region_start_address, region_length);
