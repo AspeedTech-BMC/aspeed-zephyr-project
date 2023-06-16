@@ -38,7 +38,7 @@ int spdm_get_certificate(void *ctx, uint8_t slot_id)
 			ret = -1;
 			goto cleanup;
 		} else if (rsp_msg.header.spdm_version != req_msg.header.spdm_version) {
-			LOG_ERR("Unsupported header SPDM_VERSION Req %x Rsp",
+			LOG_ERR("Unsupported header SPDM_VERSION Req %02x Rsp %02x",
 					req_msg.header.spdm_version, rsp_msg.header.spdm_version);
 			ret = -1;
 			goto cleanup;

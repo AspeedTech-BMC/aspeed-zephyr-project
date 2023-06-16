@@ -66,6 +66,7 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 	return 0;
 }
 
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
 static int cmd_mctp_send_msg_i3c(const struct shell *shell, size_t argc, char **argv)
 {
 	struct mctp_interface *mctp_interface = NULL;
@@ -114,6 +115,7 @@ static int cmd_mctp_send_msg_i3c(const struct shell *shell, size_t argc, char **
 
 	return 0;
 }
+#endif
 
 static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **argv)
 {
@@ -275,7 +277,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_log_cmds,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 	SHELL_CMD_ARG(send, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <option:payload>", cmd_mctp_send_msg, 7, 255),
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
 	SHELL_CMD_ARG(send_i3c, NULL, "<bus> <dest_addr> <dest_eid> <payload>", cmd_mctp_send_msg_i3c, 4, 255),
+#endif
 	SHELL_CMD_ARG(echo, NULL, "<bus> <dest_addr> <dest_eid> <payload_length> <option:default 1 time>", cmd_mctp_echo_test, 5, 1),
 	SHELL_CMD_ARG(device, NULL, "<bus>", cmd_mctp_show_device, 2, 0),
 	SHELL_CMD(log, &sub_mctp_log_cmds, "Log Commands", NULL),

@@ -75,9 +75,11 @@ bool spdm_mctp_init_req(void *ctx, SPDM_MEDIUM medium, uint8_t bus, uint8_t dst_
 	case SPDM_MEDIUM_SMBUS:
 		mctp_inst = find_mctp_by_smbus(bus);
 		break;
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
 	case SPDM_MEDIUM_I3C:
 		mctp_inst = find_mctp_by_i3c(bus);
 		break;
+#endif
 	default:
 		LOG_ERR("Unsupported Binding Spec 0x%02x", medium);
 		return;

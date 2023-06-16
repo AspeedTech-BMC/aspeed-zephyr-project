@@ -42,6 +42,7 @@ void main(void)
 		LOG_ERR("Failed to update OTP and firmware image");
 	}
 #else
+#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE)
 	PROV_STATUS ret;
 	ret = cert_provision();
 
@@ -50,8 +51,10 @@ void main(void)
 		PCHBootRelease();
 	}
 #endif
+#endif
 }
 
+#if defined(CONFIG_AST1060_PROGRAMMER_MP)
 static int do_mp_inject(const struct shell *shell, size_t argc, char **argv)
 {
 	const struct gpio_dt_spec mp_status1 = GPIO_DT_SPEC_GET_BY_IDX(
@@ -78,3 +81,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(mp_cmds,
 		SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(mp, &mp_cmds, "Test MP flow Commands", NULL);
+#endif
