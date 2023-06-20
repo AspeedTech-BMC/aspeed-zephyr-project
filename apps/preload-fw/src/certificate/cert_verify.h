@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <zephyr.h>
 
 #define CERT_INFO_MAGIC_NUM               0x43455254    // hex of 'CERT'
 #define ECDSA384_PUBLIC_KEY_SIZE          SHA384_HASH_LENGTH * 2 + 1

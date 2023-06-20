@@ -16,6 +16,9 @@
 
 #define OTPTOOL_VERSION_MAJOR(x) (((x) >> 24) & 0xff)
 
+#define ASPEED_REVISION_ID0             0x7e6e2004
+#define ASPEED_REVISION_ID1             0x7e6e2014
+
 static struct otp_info_cb info_cb;
 struct otpstrap_status strap_status[64];
 
@@ -23,6 +26,30 @@ static uint32_t otp_data_buf[OTP_DATA_DW_SIZE];
 static uint32_t otp_conf_buf[OTP_CONF_DW_SIZE];
 const struct device *otp_sim_dev;
 const struct flash_area *otp_sim_fa;
+
+static uint32_t chip_version(void)
+{
+	uint32_t revid0, revid1;
+
+	revid0 = sys_read32(ASPEED_REVISION_ID0);
+	revid1 = sys_read32(ASPEED_REVISION_ID1);
+
+	if (revid0 == ID0_AST1030A0 && revid1 == ID1_AST1030A0) {
+		/* AST1030-A0 */
+		return OTP_AST1030A0;
+	} else if (revid0 == ID0_AST1030A1 && revid1 == ID1_AST1030A1) {
+		/* AST1030-A1 */
+		return OTP_AST1030A1;
+	} else if (revid0 == ID0_AST1060A1 && revid1 == ID1_AST1060A1) {
+		/* AST1060-A1 */
+		return OTP_AST1060A1;
+	} else if ((revid0 == ID0_AST1060A2 && revid1 == ID1_AST1060A2) ||
+			(revid0 == ID0_AST1060A2_ENG && revid1 == ID1_AST1060A2_ENG)) {
+		/* AST1060-A1 */
+		return OTP_AST1060A2;
+	}
+	return OTP_FAILURE;
+}
 
 void init_otp_sim_region(void)
 {
@@ -308,8 +335,19 @@ void aspeed_otp_flash_init(void)
 {
 	struct otp_pro_sts *pro_sts;
 	uint32_t otp_conf0;
+	uint32_t chip_ver = chip_version();
 
-	info_cb.version = OTP_AST1060A1;
+	switch(chip_ver) {
+	case OTP_AST1060A1:
+		info_cb.version = OTP_AST1060A1;
+		sprintf(info_cb.ver_name, "AST1060A1");
+		break;
+	case OTP_AST1060A2:
+		info_cb.version = OTP_AST1060A2;
+		sprintf(info_cb.ver_name, "AST1060A2");
+		break;
+	}
+
 	info_cb.conf_info = ast1030a1_conf_info;
 	info_cb.conf_info_len = ARRAY_SIZE(ast1030a1_conf_info);
 	info_cb.strap_info = ast1030a0_strap_info;
@@ -318,7 +356,6 @@ void aspeed_otp_flash_init(void)
 	info_cb.scu_info_len = ARRAY_SIZE(ast1030a0_scu_info);
 	info_cb.key_info = ast10xxa1_key_type;
 	info_cb.key_info_len = ARRAY_SIZE(ast10xxa1_key_type);
-	sprintf(info_cb.ver_name, "AST1060A1");
 
 	init_otp_sim_region();
 	aspeed_otp_read_conf(0, &otp_conf0, 1);
@@ -514,6 +551,8 @@ int aspeed_otp_prog_image(uint32_t addr)
 
 	if (otp_header->soc_ver == SOC_AST1060A1)
 		image_soc_ver = OTP_AST1060A1;
+	else if (otp_header->soc_ver == SOC_AST1060A2)
+		image_soc_ver = OTP_AST1060A2;
 	else
 		return OTP_INVALID_SOC;
 

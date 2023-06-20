@@ -9,6 +9,7 @@
 #include <zephyr.h>
 #include <drivers/entropy.h>
 #include "otp_utils.h"
+#include "gpio/gpio_ctrl.h"
 #if defined(CONFIG_OTP_SIM)
 #include "otp_sim.h"
 #else
@@ -182,7 +183,6 @@ int otp_prog(uint32_t addr)
 	//if (otp_rc)
 	//	goto out;
 
-#if defined(CONFIG_DEVID_CERT_PROVISIONING)
 	// Enable CDI
 	otp_rc = aspeed_otp_read_conf(OTP_CONF3, &otp_conf_val, 1);
 	if (otp_rc)
@@ -196,10 +196,11 @@ int otp_prog(uint32_t addr)
 
 	otp_conf_val |= OTP_CONF3_CDI_EN;
 	otp_rc = aspeed_otp_prog_conf(OTP_CONF3, &otp_conf_val, 1);
-#endif
 
 out:
 	memset(vault_key_buf, 0, sizeof(vault_key_buf));
+	if (otp_rc)
+		set_mp_status(0, 1);
 
 	switch (otp_rc) {
 	case OTP_INVALID_HEADER:
@@ -219,15 +220,21 @@ out:
 		break;
 	case OTP_FAILURE:
 	case OTP_PROG_FAILED:
+	case OTP_INVALID_PARAM:
 		LOG_ERR("Failed to program OTP memory");
 		break;
 	case OTP_SUCCESS:
 		// OTP image update successfully, erase OTP image in AST1060 internal flash
 		if (flash_area_open(FLASH_AREA_ID(otp_img), &fa)) {
 			LOG_ERR("OTP partition not found");
+			set_mp_status(1, 0);
 			return -1;
 		}
-		flash_area_erase(fa, 0, fa->fa_size);
+		if (flash_area_erase(fa, 0, fa->fa_size)) {
+			LOG_ERR("Failed to erase OTP image");
+			set_mp_status(1, 0);
+			return -1;
+		}
 		LOG_INF("Secureboot is enabled successfully");
 		LOG_INF("CDI is enabled successfully");
 		LOG_INF("OTP image is erased");

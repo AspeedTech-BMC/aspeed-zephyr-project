@@ -12,6 +12,8 @@
 #include <drivers/misc/aspeed/otp_aspeed.h>
 #include <logging/log.h>
 
+#include "gpio/gpio_ctrl.h"
+
 #define FLASH_ADDR_BASE  0x80000000
 #define SECTOR_SIZE 0x1000
 #define BLOCK_SIZE  0x10000
@@ -85,30 +87,13 @@ int prog_otp_and_rot(void)
 	uint32_t otp_image_offset = CONFIG_MP_OTP_IMAGE_OFFSET;
 	uint32_t otp_image_size = CONFIG_MP_OTP_IMAGE_SIZE;
 	uint32_t otp_image_addr;
-	const struct gpio_dt_spec mp_status1 = GPIO_DT_SPEC_GET_BY_IDX(
-			DT_INST(0, aspeed_pfr_gpio_mp), mp_status1_out_gpios, 0);
-	const struct gpio_dt_spec mp_status2 = GPIO_DT_SPEC_GET_BY_IDX(
-			DT_INST(0, aspeed_pfr_gpio_mp), mp_status2_out_gpios, 0);
-
-	if (gpio_pin_configure_dt(&mp_status1, GPIO_OUTPUT)) {
-		LOG_ERR("Can't config mp status1 gpio as output");
-		goto error;
-	}
-
-	if (gpio_pin_configure_dt(&mp_status2, GPIO_OUTPUT)) {
-		LOG_ERR("Can't config mp status2 gpio as output");
-		goto error;
-	}
-
-	gpio_pin_set(mp_status1.port, mp_status1.pin, 0);
-	gpio_pin_set(mp_status2.port, mp_status2.pin, 0);
 
 	// get flash address of otp image
 	otp_image_addr = FLASH_ADDR_BASE | CONFIG_MP_OTP_IMAGE_OFFSET;
 	// prog otp
 	otp_rc = aspeed_otp_prog_image(otp_image_addr);
 	if (otp_rc) {
-		gpio_pin_set(mp_status1.port, mp_status1.pin, 1);
+		set_mp_status(0, 1);
 		LOG_ERR("Failed to program OTP image");
 		goto error;
 	}
@@ -117,25 +102,24 @@ int prog_otp_and_rot(void)
 	// erase otp image
 	if (mp_erase_spi_region(flash_dev, otp_image_offset, otp_image_size)) {
 		LOG_ERR("Failed to erase otp image");
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 1);
+		set_mp_status(1, 0);
 		goto error;
 	}
 
 	// prog rot firmware
 	if (mp_erase_spi_region(flash_dev, 0, rot_fw_size)) {
 		LOG_ERR("Failed to erase active region");
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 1);
+		set_mp_status(1, 0);
 		goto error;
 	}
 
 	if (mp_replace_rot_fw(flash_dev, 0, rot_fw_addr, rot_fw_size)) {
 		LOG_ERR("Failed to update ROT firmware");
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 1);
+		set_mp_status(1, 0);
 		goto error;
 	}
 
-	gpio_pin_set(mp_status1.port, mp_status1.pin, 1);
-	gpio_pin_set(mp_status2.port, mp_status2.pin, 1);
+	set_mp_status(1, 1);
 
 	return 0;
 error:

@@ -39,21 +39,13 @@ config OTP_SIM_SHELL
 	help
 	  Enable OTP commands for read otp data from flash
 
-config DEVID_CERT_PROVISIONING
-	default y
-	bool "Device ID provisioning"
-	help
-	  Enable device id certificate provisioning flow
-
 config ODM_ROT_REPLACEMENT
-	depends on DEVID_CERT_PROVISIONING
-	default n
+	default y
 	bool "ODM ROT replacement"
 	help
 	  Replace ROT firmware by mcuboot recovery mechanism after devid provisioned
 
 config AST1060_PROGRAMMER_MP
-	depends on !DEVID_CERT_PROVISIONING
 	depends on BOARD_AST1060_MP
 	default n
 	bool "MP via programmer"

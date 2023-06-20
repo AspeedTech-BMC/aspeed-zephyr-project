@@ -11,6 +11,7 @@
 #include <drivers/misc/aspeed/abr_aspeed.h>
 #include "cert_verify.h"
 #include "cert_prov.h"
+#include "gpio/gpio_ctrl.h"
 #include "otp/otp_utils.h"
 #include "sw_mailbox/sw_mailbox.h"
 
@@ -20,13 +21,11 @@ uint8_t cert_chain[CERT_CHAIN_SIZE];
 
 PROV_STATUS cert_provision(void)
 {
-	uint32_t cert_chain_len;
 	enum otp_status otp_rc;
 	bool is_secureboot_en;
 
 	is_secureboot_en = is_otp_secureboot_en(&otp_rc);
 	if (otp_rc) {
-		//DEBUG_HALT();
 		goto out;
 	}
 
@@ -37,60 +36,51 @@ PROV_STATUS cert_provision(void)
 		if (get_certificate_info(&devid_cert_info, sizeof(devid_cert_info))) {
 			//DEBUG_HALT();
 			LOG_ERR("Failed to get certificate!");
+			set_mp_status(0, 1);
 			goto out;
 		}
 
-		// If certificate type is CSR, it means device id is not provisioned.
-		// Preload firmware should send CSR to HSM for provisioning.
-		// Once preload firmware received signed certificate chain from HSM,
-		// it should verify certificate chain and replace CSR by certificate
-		// chain to complete device id provisioning.
-		// If certificate type is certificate, verify the certificate chain.
-		// Enable firmware update mailbox commands if certificate chain is
-		// verified successfully.
-		if (IS_CSR(devid_cert_info)) {
-			LOG_INF("Sending DeviceID certificate request to HSM...");
-			// TODO:
-			// 1. handshake with HSM
-			// 2. send CSR to HSM
-			// 3. receive certificate chain from HSM
-			//
-			// DONE:
-			// 4. verify certificate chain
-			// 5. replace CSR by singed certificate chain
-			get_certificate_chain(cert_chain, &cert_chain_len);
-			LOG_INF("Received certificate chain from HSM, verifying");
-			if (verify_certificate(cert_chain, cert_chain_len)) {
-				LOG_ERR("Invalid certificate chain");
-				cleanup_cert_info();
-				//DEBUG_HALT();
-				goto out;
-			}
-			LOG_INF("Replace CSR by certificate chain");
-			if (write_cert_chain(cert_chain, cert_chain_len)) {
-				LOG_ERR("Certificate chain replacement failed");
-				cleanup_cert_info();
-				//DEBUG_HALT();
-				goto out;
-			}
-			LOG_INF("Certificate chain is updated successfully");
+		LOG_INF("Certificate verified successfully");
 #if defined(CONFIG_ODM_ROT_REPLACEMENT)
-			// Erase aspeed preload firmware
-			// 1st-slot firmware will be replaced by 2nd-slot firmeware in mcuboot
-			const struct flash_area *fa;
-			if (flash_area_open(FLASH_AREA_ID(active), &fa)) {
-				LOG_ERR("Failed to find active fw region");
-				goto out;
-			}
-			flash_area_erase(fa, 0, fa->fa_size);
-#endif
+		// 2nd bootup
+		// Erase the 1st slot firmware, the 1st slot firmware will be replaced by
+		// the 2nd slot firmeware(customer's firmware) by mcuboot's recovery mechanism
+		// in the next bootup.
+
+		const struct flash_area *fa;
+		if (flash_area_open(FLASH_AREA_ID(active), &fa)) {
+			LOG_ERR("Failed to find active fw region");
+			set_mp_status(1, 0);
+			goto out;
+		}
+		if (flash_area_erase(fa, 0, fa->fa_size)) {
+			set_mp_status(1, 0);
+			goto out;
+		}
+
+		// *** IMPORTANT ***
+		// DevID certificate can be a self-signed certificate or CSR after 2nd bootup.
+		// If the generated DevID certificate is CSR,
+		// programmer MUST do the following actions BEFORE next bootup:
+		//   1. hold GPIOR6
+		//   2. get DevID CSR from certificate partition
+		//   3. send the CSR to HSM for signing
+		//   4. put the signed certificate chain to fmc_cs0's certificate partition.
+		LOG_INF("Preload fw is erased");
+		set_mp_status(1, 1);
+		return PROV_DONE;
+#else
+		if (IS_CSR(devid_cert_info)) {
+			// 2nd bootup, CSR is generated and waiting for signing by HSM
+			LOG_WRN("Certificate is not signed");
 		} else {
+			// 3rd bootup, certificate chain is generated and waiting for
+			// firmware replacement
 			LOG_INF("Verify certificate chain...");
 			if (verify_certificate(devid_cert_info.cert.data,
 						devid_cert_info.cert.length)) {
 				LOG_ERR("Invalid certificate chain");
 				cleanup_cert_info();
-				//DEBUG_HALT();
 				goto out;
 			}
 
@@ -101,7 +91,9 @@ PROV_STATUS cert_provision(void)
 			LOG_INF("Ready for ROT firmware replacement");
 			return PROV_ROT_UPDATE;
 		}
+#endif
 	} else {
+		// 1st bootup:
 		// Secure Boot is not enabled
 		// Write necessary info to OTP memory
 		//
@@ -113,20 +105,14 @@ PROV_STATUS cert_provision(void)
 		//   5. Erase OTP image in flash
 		if (otp_prog(OTP_IMAGE_ADDR)) {
 			LOG_ERR("OTP image update failed");
+			set_mp_status(0, 1);
 			goto out;
+		} else {
+			set_mp_status(1, 1);
 		}
 	}
 
-#if !defined(CONFIG_DEVID_CERT_PROVISIONING)
-	// Erase aspeed preload firmware
-	// 1st-slot firmware will be replaced by 2nd-slot firmeware in mcuboot
-	const struct flash_area *fa;
-	if (flash_area_open(FLASH_AREA_ID(active), &fa)) {
-	}
-	flash_area_erase(fa, 0, fa->fa_size);
-#endif
 	return PROV_DONE;
-
 out:
 	memset(cert_chain, 0, sizeof(cert_chain));
 	memset(&devid_cert_info, 0, sizeof(devid_cert_info));

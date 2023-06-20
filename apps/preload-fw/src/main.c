@@ -22,9 +22,10 @@ extern void aspeed_print_sysrst_info(void);
 
 void main(void)
 {
-
 	BMCBootHold();
 	PCHBootHold();
+
+	init_mp_status_gpios();
 
 	LOG_INF("*** ASPEED Preload FW version v%02d.%02d Board:%s ***", PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, CONFIG_BOARD);
 	aspeed_print_sysrst_info();
@@ -54,26 +55,19 @@ void main(void)
 #endif
 }
 
-#if defined(CONFIG_AST1060_PROGRAMMER_MP)
 static int do_mp_inject(const struct shell *shell, size_t argc, char **argv)
 {
-	const struct gpio_dt_spec mp_status1 = GPIO_DT_SPEC_GET_BY_IDX(
-			DT_INST(0, aspeed_pfr_gpio_mp), mp_status1_out_gpios, 0);
-	const struct gpio_dt_spec mp_status2 = GPIO_DT_SPEC_GET_BY_IDX(
-			DT_INST(0, aspeed_pfr_gpio_mp), mp_status2_out_gpios, 0);
-	if (!strcmp(argv[1], "inprog")) {
-		gpio_pin_set(mp_status1.port, mp_status1.pin, 0);
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 0);
-	} else if (!strcmp(argv[1], "otp")) {
-		gpio_pin_set(mp_status1.port, mp_status1.pin, 0);
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 1);
-	} else if (!strcmp(argv[1], "fw")) {
-		gpio_pin_set(mp_status1.port, mp_status1.pin, 1);
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 0);
-	} else if (!strcmp(argv[1], "done")) {
-		gpio_pin_set(mp_status1.port, mp_status1.pin, 1);
-		gpio_pin_set(mp_status2.port, mp_status2.pin, 1);
-	}
+	init_mp_status_gpios();
+	if (!strcmp(argv[1], "inprog"))
+		set_mp_status(0, 0);
+	else if (!strcmp(argv[1], "otp"))
+		set_mp_status(0, 1);
+	else if (!strcmp(argv[1], "fw"))
+		set_mp_status(1, 0);
+	else if (!strcmp(argv[1], "done"))
+		set_mp_status(1, 1);
+
+	return 0;
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(mp_cmds,
@@ -81,4 +75,3 @@ SHELL_STATIC_SUBCMD_SET_CREATE(mp_cmds,
 		SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(mp, &mp_cmds, "Test MP flow Commands", NULL);
-#endif

@@ -16,7 +16,8 @@ otp_key_path = config['PATH'].get('OTPKeyPath', sample_path + '/otp/key')
 
 mcuboot_key = config['KEY'].get('MCUBootKey', sample_path + '/otp/key/rk384_prv.pem')
 preload_fw_key = config['KEY'].get('PreloadFWKey', sample_path + '/mp/key/root-rsa-2048.pem')
-rot_fw_key = config['KEY'].get('RoTFWKey', sample_path + '/mp/key/rot_image_sign.pem')
+#rot_fw_key = config['KEY'].get('RoTFWKey', sample_path + '/mp/key/rot_image_sign.pem')
+rot_fw_key = config['KEY'].get('RoTFWKey', sample_path + '/mp/key/root-rsa-2048.pem')
 
 pristine = config['BUILD_OPTION'].get('Pristine', 'always')
 
