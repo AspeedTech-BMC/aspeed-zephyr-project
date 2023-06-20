@@ -114,11 +114,11 @@ void apply_pfm_protection(int spi_device_id)
 #if defined(CONFIG_BMC_DUAL_FLASH)
 			if (spi_device_id == BMC_SPI) {
 				spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
-				if (region_start_address >= flash_size && region_end_address >= flash_size) {
+				if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
 					region_start_address -= flash_size;
 					region_end_address -= flash_size;
 					spi_id = spi_device_id + 1;
-				} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+				} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
 					LOG_ERR("ERROR: region start and end address should be in the same flash");
 					return;
 				} else {
@@ -130,11 +130,11 @@ void apply_pfm_protection(int spi_device_id)
 #if defined(CONFIG_CPU_DUAL_FLASH)
 			if (spi_device_id == PCH_SPI) {
 				spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
-				if (region_start_address >= flash_size && region_end_address >= flash_size) {
+				if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
 					region_start_address -= flash_size;
 					region_end_address -= flash_size;
 					spi_id = spi_device_id + 1;
-				} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+				} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
 					LOG_ERR("ERROR: region start and end address should be in the same flash");
 					return;
 				} else {
