@@ -110,15 +110,21 @@ int get_staging_hash(uint8_t image_type, CPLD_STATUS *cpld_status, uint8_t *hash
 			ufm_staging_offset = PCH_STAGING_REGION_OFFSET;
 		}
 		staging_size = CONFIG_PCH_STAGING_SIZE;
+	} else if (image_type == AFM_TYPE) {
+		address = CONFIG_BMC_AFM_STAGING_OFFSET;
+		staging_size = CONFIG_BMC_AFM_STAGING_RECOVERY_SIZE;
 	} else {
 		return -1;
 	}
 
-	if (ufm_read(PROVISION_UFM, ufm_staging_offset, (uint8_t *)&address, sizeof(address)))
-		return -1;
+	if (image_type != AFM_TYPE) {
+		if (ufm_read(PROVISION_UFM, ufm_staging_offset, (uint8_t *)&address,
+					sizeof(address)))
+			return -1;
 
-	if (image_type == PCH_TYPE && cpld_status->BmcStatus == 1)
-		address += CONFIG_BMC_STAGING_SIZE;
+		if (image_type == PCH_TYPE && cpld_status->BmcStatus == 1)
+			address += CONFIG_BMC_STAGING_SIZE;
+	}
 
 	pfr_manifest->flash->state->device_id[0] = flash_type;
 	pfr_manifest->pfr_hash->type = HASH_TYPE_SHA384;
@@ -1103,6 +1109,10 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 		region = PCH_REGION;
 		update_type = PchRecoveryUpdate;
 		ufm_hash_addr = UPDATE_STATUS_PCH_HASH_ADDR;
+	} else if (*image_type == AFM_TYPE) {
+		region = AFM_REGION;
+		update_type = AfmRecoveryUpdate;
+		ufm_hash_addr = UPDATE_STATUS_AFM_HASH_ADDR;
 	} else {
 		LOG_ERR("Invalid image type");
 		*image_type = 0xFFFFFFFF;
@@ -1112,7 +1122,8 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 	*update_region &= ~update_type;
 
 	if (cpld_status->Region[region].Recoveryregion == BMC_INTENT_RECOVERY_PENDING ||
-			cpld_status->Region[region].Recoveryregion == PCH_INTENT_RECOVERY_PENDING) {
+			cpld_status->Region[region].Recoveryregion == PCH_INTENT_RECOVERY_PENDING ||
+			cpld_status->Region[region].Recoveryregion == BMC_INTENT2_AFM_RECOVERY_PENDING) {
 		if (!(evt_ctx->data.bit8[2] & BootDoneRecovery)) {
 			LOG_WRN("System is booting, bypass pending revcovery update");
 			*image_type = 0xFFFFFFFF;
@@ -1126,7 +1137,12 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 		// Compare the calculated hash with cached hash of staging region.
 		if (!memcmp(cached_hash, calculated_hash, sizeof(calculated_hash))) {
 			LOG_INF("Hash matched and active firmware bootup successfully");
-			LOG_INF("%s Recovery Firmware Update", (*image_type == BMC_TYPE) ? "BMC" : "PCH");
+			if (*image_type == BMC_TYPE)
+				LOG_INF("BMC Recovery Firmware Update");
+			else if (*image_type == PCH_TYPE)
+				LOG_INF("PCH Recovery Firmware Update");
+			else if (*image_type == AFM_TYPE)
+				LOG_INF("AFM Recovery Firmware Update");
 			evt_ctx_wrap->flag = evt_ctx->data.bit8[1] & UPDATE_DYNAMIC;
 			evt_ctx_wrap->flash = SECONDARY_FLASH_REGION;
 			ao_data_wrap = &state->bmc_active_object;
@@ -1143,8 +1159,10 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 	// can bootup successfully
 	if (evt_ctx->data.bit8[0] == BmcUpdateIntent)
 		cpld_status->Region[region].Recoveryregion = BMC_INTENT_RECOVERY_PENDING;
-	else
+	else if (evt_ctx->data.bit8[0] == PchUpdateIntent)
 		cpld_status->Region[region].Recoveryregion = PCH_INTENT_RECOVERY_PENDING;
+	else if (evt_ctx->data.bit8[0] == BmcUpdateIntent2)
+		cpld_status->Region[region].Recoveryregion = BMC_INTENT2_AFM_RECOVERY_PENDING;
 	*handled_region |= update_type;
 	// Calculate and cache the hash of current staging region.
 	// During recovery update, hash will be calculated again.
@@ -1281,22 +1299,23 @@ void handle_update_requested(void *o)
 			}
 			else if (evt_ctx->data.bit8[0] == BmcUpdateIntent2) {
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
-				if (update_region & AfmActiveUpdate) {
-					LOG_INF("AFM Active Firmware Update");
+				if (update_region & AfmActiveAndRecoveryUpdate) {
 					image_type = AFM_TYPE;
+					if (update_region & AfmRecoveryUpdate) {
+						if (handle_recovery_requested(&cpld_update_status,
+									&evt_ctx_wrap,
+									ao_data_wrap,
+									state,
+									evt_ctx,
+									&image_type,
+									&handled_region,
+									&update_region))
+							break;
+					}
+					LOG_INF("AFM Active Firmware Update");
 					evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 					update_region &= ~AfmActiveUpdate;
 					handled_region |= AfmActiveUpdate;
-					ao_data_wrap = &state->afm_active_object;
-					break;
-				}
-
-				if (update_region & AfmRecoveryUpdate) {
-					LOG_INF("AFM Recovery Firmware Update");
-					image_type = AFM_TYPE;
-					evt_ctx_wrap.flash = SECONDARY_FLASH_REGION;
-					update_region &= ~AfmRecoveryUpdate;
-					handled_region |= AfmRecoveryUpdate;
 					ao_data_wrap = &state->afm_active_object;
 					break;
 				}

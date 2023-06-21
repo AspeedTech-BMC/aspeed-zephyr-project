@@ -39,6 +39,7 @@
 #define UPDATE_STATUS_ADDRESS           0x00
 #define UPDATE_STATUS_BMC_HASH_ADDR     0x40
 #define UPDATE_STATUS_PCH_HASH_ADDR     0x80
+#define UPDATE_STATUS_AFM_HASH_ADDR     0xC0
 
 // BIOS/BMC SPI Region information
 #define PCH_ACTIVE_FW_UPDATE_ADDRESS    0x00000000
@@ -130,6 +131,7 @@ typedef enum {
 	ROT_REGION = 0,
 	BMC_REGION,
 	PCH_REGION,
+	AFM_REGION,
 } REGION_DEF;
 
 typedef enum {
@@ -137,6 +139,7 @@ typedef enum {
 	BMC_INTENT_RECOVERY_PENDING,
 	PCH_INTENT_UPDATE_AT_RESET,
 	PCH_INTENT_RECOVERY_PENDING,
+	BMC_INTENT2_AFM_RECOVERY_PENDING,
 	RECOVERY_PENDING_REQUEST_HANDLED,
 	MAX_INTENT_TYPE_DEF,
 } REGION_UPDATE_INTENT_TYPE_DEF;
@@ -150,7 +153,8 @@ typedef struct {
 	uint8_t CpldStatus;
 	uint8_t BmcStatus;
 	uint8_t PchStatus;
-	UPD_REGION Region[3];
+	uint8_t AfmStatus;
+	UPD_REGION Region[4];
 	uint8_t DecommissionFlag;
 	uint8_t CpldRecovery;
 	uint8_t BmcToPchStatus;
