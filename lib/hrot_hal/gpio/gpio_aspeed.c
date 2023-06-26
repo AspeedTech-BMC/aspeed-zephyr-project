@@ -21,6 +21,10 @@
 #error "no correct pfr gpio device"
 #endif
 
+#if DT_NODE_HAS_STATUS(DT_INST(0, aspeed_pfr_gpio_bhs), okay)
+#define INTEL_BHS
+#endif
+
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 static bool first_time_boot = true;
 
@@ -272,6 +276,7 @@ int get_i3c_mng_owner(void)
 #define AUX_PWRGD_CPU1 1
 void AUXPowerGoodControl(bool assert)
 {
+#ifdef INTEL_BHS
 	const struct gpio_dt_spec aux_pwrgd_cpu0 =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), pwrgd_cpu0_out_gpios, 0);
 #if AUX_PWRGD_CPU1
@@ -299,10 +304,12 @@ void AUXPowerGoodControl(bool assert)
 #if AUX_PWRGD_CPU1
 	gpio_pin_configure_dt(&aux_pwrgd_cpu1, GPIO_OUTPUT);
 #endif
+#endif
 }
 
 void RTCRSTControl(bool assert)
 {
+#ifdef INTEL_BHS
 	const struct gpio_dt_spec rtc_rst_cpu0 =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), rst_rtcrst_cpu0_out_gpios, 0);
 #if AUX_PWRGD_CPU1
@@ -330,10 +337,12 @@ void RTCRSTControl(bool assert)
 #if AUX_PWRGD_CPU1
 	gpio_pin_configure_dt(&rtc_rst_cpu1, GPIO_OUTPUT);
 #endif
+#endif
 }
 
 void RSTPlatformReset(bool assert)
 {
+#ifdef INTEL_BHS
 	const struct gpio_dt_spec rst_pltrst_cpu0 =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), rst_pltrst_cpu0_out_gpios, 0);
 #if AUX_PWRGD_CPU1
@@ -360,6 +369,7 @@ void RSTPlatformReset(bool assert)
 	gpio_pin_configure_dt(&rst_pltrst_cpu0, GPIO_OUTPUT);
 #if AUX_PWRGD_CPU1
 	gpio_pin_configure_dt(&rst_pltrst_cpu1, GPIO_OUTPUT);
+#endif
 #endif
 }
 

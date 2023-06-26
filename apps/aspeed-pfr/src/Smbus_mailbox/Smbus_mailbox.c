@@ -845,13 +845,14 @@ void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot
 			data.bit8[2] |= BootDoneRecovery;
 			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 		}
-
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 		if (cpld_update_status.Region[AFM_REGION].Recoveryregion == BMC_INTENT2_AFM_RECOVERY_PENDING) {
 			data.bit8[0] = BmcUpdateIntent2;
 			data.bit8[1] = AfmRecoveryUpdate;
 			data.bit8[2] |= BootDoneRecovery;
 			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 		}
+#endif
 	} else {
 		// Otherwise, just log the this boot complete status
 		SetPlatformState(current_boot_state);

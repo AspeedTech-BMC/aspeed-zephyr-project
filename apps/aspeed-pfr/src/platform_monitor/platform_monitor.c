@@ -302,6 +302,7 @@ static struct gpio_callback fp_pwr_btn_cb_data;
 
 static void power_btn_work_handler(struct k_work *item)
 {
+#ifdef INTEL_BHS
 	struct gpio_dt_spec power_btn_in =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), fp_pwr_btn_in_gpios, 0);
 	struct gpio_dt_spec power_btn_out =
@@ -312,16 +313,20 @@ static void power_btn_work_handler(struct k_work *item)
 	gpio_pin_set(power_btn_out.port, power_btn_out.pin, ret);
 	gpio_pin_configure_dt(&power_btn_out, GPIO_OUTPUT);
 	LOG_INF("[PFR->BMC] PWR_BTN[%s %d] = %d", power_btn_out.port->name, power_btn_out.pin, ret);
+#endif
 }
 
 void power_btn_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
+#ifdef INTEL_BHS
 	LOG_INF("[FP->PFR] PWN_BTN Interrupt");
 	k_work_submit(&pwr_btn_work);
+#endif
 }
 
 void power_btn(bool enable)
 {
+#ifdef INTEL_BHS
 	k_work_init(&pwr_btn_work, power_btn_work_handler);
 	struct gpio_dt_spec power_btn_in =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), fp_pwr_btn_in_gpios, 0);
@@ -339,5 +344,6 @@ void power_btn(bool enable)
 		gpio_pin_interrupt_configure_dt(&power_btn_in, GPIO_INT_DISABLE);
 		gpio_remove_callback(power_btn_in.port, &fp_pwr_btn_cb_data);
 	}
+#endif
 }
 
