@@ -7,10 +7,10 @@
 		pch-rst-ctrl-out-gpios = <&gpio0_m_p 4 0>; /* GPIO_M4 */
 
 		platform-state-out-gpios =
-			<&sgpiom_a_d 0 0>, <&sgpiom_a_d 1 0>,
-			<&sgpiom_a_d 2 0>, <&sgpiom_a_d 3 0>,
-			<&sgpiom_a_d 4 0>, <&sgpiom_a_d 5 0>,
-			<&sgpiom_a_d 6 0>, <&sgpiom_a_d 7 0>;
+			<&sgpiom_m_p 24 0>, <&sgpiom_m_p 25 0>,
+			<&sgpiom_m_p 26 0>, <&sgpiom_m_p 27 0>,
+			<&sgpiom_m_p 28 0>, <&sgpiom_m_p 29 0>,
+			<&sgpiom_m_p 30 0>, <&sgpiom_m_p 31 0>;
 
 		/* NOTICE:
 		 * Normally, these two pin should be GPIO_ACTIVE_LOW, but currently this EVB
