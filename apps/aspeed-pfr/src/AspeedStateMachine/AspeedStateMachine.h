@@ -58,6 +58,7 @@ enum aspeed_pfr_event {
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	ATTESTATION_FAILED,
 #endif
+	HANDSHAKE_FAILED,
 };
 
 enum OPERATIONS {

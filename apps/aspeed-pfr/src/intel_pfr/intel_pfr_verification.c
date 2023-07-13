@@ -19,7 +19,7 @@
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_verification.h"
-#include "intel_pfr_rsu_utils.h"
+#include "intel_pfr_cpld_utils.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);

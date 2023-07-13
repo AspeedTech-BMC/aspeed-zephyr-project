@@ -26,7 +26,7 @@
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_spi_filtering.h"
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
-#include "intel_pfr/intel_pfr_rsu_utils.h"
+#include "intel_pfr/intel_pfr_cpld_utils.h"
 #endif
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
@@ -679,6 +679,10 @@ void do_verify(void *o)
 #endif
 #if defined(CONFIG_CERBERUS_PFR)
 	if (handle_key_manifest_verification(o))
+		goto exit;
+#endif
+#if defined(CONFIG_BOARD_AST1060_PROT) && defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	if (intel_plat_cpld_handshake())
 		goto exit;
 #endif
 	handle_image_verification(o);
@@ -1843,6 +1847,7 @@ void AspeedStateMachine(void)
 				next_state = &state_table[RUNTIME];
 				break;
 			case RECOVERY_FAILED:
+			case HANDSHAKE_FAILED:
 				/* Recovery -> Verify(BMC Failed) -> Lockdown */
 				next_state = &state_table[SYSTEM_LOCKDOWN];
 				break;

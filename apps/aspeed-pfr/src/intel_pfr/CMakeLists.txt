@@ -14,7 +14,7 @@ target_sources(app PRIVATE
 	)
 
 if(CONFIG_INTEL_PFR_CPLD_UPDATE)
-        target_sources(app PRIVATE intel_pfr_rsu_utils.c)
+        target_sources(app PRIVATE intel_pfr_cpld_utils.c)
 endif()
 
 if(CONFIG_SHELL)

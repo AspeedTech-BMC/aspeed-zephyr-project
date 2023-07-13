@@ -28,7 +28,7 @@
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "gpio/gpio_aspeed.h"
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
-#include "intel_pfr_rsu_utils.h"
+#include "intel_pfr_cpld_utils.h"
 #endif
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);

@@ -19,7 +19,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_verification.h"
 #include "intel_pfr_authentication.h"
-#include "intel_pfr_rsu_utils.h"
+#include "intel_pfr_cpld_utils.h"
 #include "flash/flash_wrapper.h"
 #include "flash/flash_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"

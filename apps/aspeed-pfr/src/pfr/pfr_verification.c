@@ -10,7 +10,7 @@
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_definitions.h"
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
-#include "intel_pfr/intel_pfr_rsu_utils.h"
+#include "intel_pfr/intel_pfr_cpld_utils.h"
 #endif
 #endif
 #if defined(CONFIG_CERBERUS_PFR)

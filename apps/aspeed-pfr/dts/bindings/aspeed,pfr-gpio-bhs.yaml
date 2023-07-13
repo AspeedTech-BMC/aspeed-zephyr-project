@@ -96,3 +96,48 @@ properties:
         type: phandle-array
         required: false
         description: GPIO to hide RSU IP.
+
+    mb-board-id0-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID0.
+
+    mb-board-id1-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID1.
+
+    mb-board-id2-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID2.
+
+    mb-board-id3-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID3.
+
+    mb-board-id4-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID4.
+
+    mb-board-id5-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID5.
+
+    mb-board-revid0-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board REVID0.
+
+    mb-board-revid1-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board REVID1.
+
+    mb-board-revid2-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board REVID2.

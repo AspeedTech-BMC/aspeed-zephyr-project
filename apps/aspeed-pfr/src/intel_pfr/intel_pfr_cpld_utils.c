@@ -11,9 +11,10 @@
 #include <sys/crc.h>
 #include <zephyr.h>
 #include "AspeedStateMachine/common_smc.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "include/SmbusMailBoxCom.h"
-#include "intel_pfr_rsu_utils.h"
+#include "intel_pfr_cpld_utils.h"
 #include "gpio/gpio_aspeed.h"
 #include "pfr/pfr_util.h"
 
@@ -24,6 +25,8 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 #define RSU_CTRL_REG_RES_LEN       3
 
 #define CHK(_X)     if(_X & RSU_ERROR) {goto error;}
+#define CHK_HS(_X)  if(_X) {goto error;}
+
 
 uint8_t rsu_data_buf[512] __aligned(16);
 
@@ -263,7 +266,7 @@ int intel_rsu_hide_rsu(void)
 			GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs),
 					scm_rsu_hide_out_gpios, 0);
 	gpio_pin_set(hide_rsu_dt_spec.port, hide_rsu_dt_spec.pin, 1);
-	LOG_INF("Hide RSU IP");
+	LOG_DBG("Hide RSU IP");
 	return 0;
 }
 
@@ -273,7 +276,7 @@ int intel_rsu_unhide_rsu(void)
 			GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs),
 					scm_rsu_hide_out_gpios, 0);
 	gpio_pin_set(hide_rsu_dt_spec.port, hide_rsu_dt_spec.pin, 0);
-	LOG_INF("Unhide RSU IP");
+	LOG_DBG("Unhide RSU IP");
 	return 0;
 }
 
@@ -458,3 +461,204 @@ error:
 	LOG_ERR("CPLD firmware update failed");
 	return -1;
 }
+
+int intel_cpld_read_hs_reg(uint8_t reg, uint16_t *val)
+{
+	const struct device *dev;
+	struct i2c_msg msg[2];
+	RSU_CTRL_REG_READ rsu_msg;
+	uint8_t reg_addr[RSU_CTRL_REG_REQ_LEN];
+	uint8_t response[RSU_CTRL_REG_RES_LEN];
+	uint8_t slave_addr;
+	uint8_t crc_res;
+	uint8_t *res = (uint8_t *)val;
+
+	if (get_rsu_dev(SCM_CPLD, &dev, &slave_addr))
+		return -1;
+
+	reg_addr[0] = CPLD_HS_REG;
+	reg_addr[1] = reg;
+
+	msg[0].buf = reg_addr;
+	msg[0].len = sizeof(reg_addr);
+	msg[0].flags = I2C_MSG_WRITE;
+	msg[1].buf = response;
+	msg[1].len = sizeof(response);
+	msg[1].flags = I2C_MSG_RESTART | I2C_MSG_READ | I2C_MSG_STOP;
+
+	if (i2c_transfer(dev, msg, 2, slave_addr))
+		return -1;
+
+	// Verify CRC
+	rsu_msg.write_addr = slave_addr << 1;
+	rsu_msg.reg_type = msg[0].buf[0];
+	rsu_msg.reg_addr = msg[0].buf[1];
+	rsu_msg.read_addr = rsu_msg.write_addr | 1;
+	rsu_msg.read_data[0] = msg[1].buf[0];
+	rsu_msg.read_data[1] = msg[1].buf[1];
+	crc_res = crc8((uint8_t *)&rsu_msg, sizeof(rsu_msg), 7, 0, false);
+	// The last byte of response is crc.
+	if (response[RSU_CTRL_REG_RES_LEN - 1] != crc_res) {
+		LOG_ERR("CRC mismatch (0x%02x vs. 0x%02x)", response[RSU_CTRL_REG_RES_LEN - 1],
+				crc_res);
+		return -1;
+	}
+
+	res[0] = response[1];
+	res[1] = response[0];
+
+	return 0;
+}
+
+int intel_cpld_write_hs_reg(uint8_t reg, uint8_t wdata_h, uint8_t wdata_l)
+{
+	const struct device *dev;
+	struct i2c_msg msg[2];
+	uint8_t slave_addr;
+	RSU_CTRL_REG_WRITE rsu_msg;
+
+	if (get_rsu_dev(SCM_CPLD, &dev, &slave_addr))
+		return -1;
+
+	rsu_msg.write_addr = slave_addr << 1;
+	rsu_msg.reg_type = CPLD_HS_REG;
+	rsu_msg.reg_addr = reg;
+	rsu_msg.zero = 0;
+	rsu_msg.one = 1;
+	rsu_msg.write_data[0] = wdata_h;
+	rsu_msg.write_data[1] = wdata_l;
+	rsu_msg.crc = crc8((uint8_t *)&rsu_msg, sizeof(rsu_msg) - 1, 7, 0, false);
+
+	// exclude write_addr
+	msg[0].buf = &rsu_msg.reg_type;
+	msg[0].len = RSU_CTRL_REG_WRITE_LEN;
+	msg[0].flags = I2C_MSG_WRITE | I2C_MSG_STOP;
+
+	return i2c_transfer(dev, msg, 1, slave_addr);
+}
+
+int prot_sts_match(uint8_t sts, uint8_t *match)
+{
+	uint16_t reg_val;
+	CHK_HS(intel_cpld_read_hs_reg(INTEL_HS_REG_HS_STS, &reg_val));
+	reg_val >>=4;
+	*match = ((reg_val & sts) == sts) ? 1 : 0;
+
+	return 0;
+error:
+	return -1;
+}
+
+int update_prot_sts(uint8_t sts)
+{
+	uint16_t reg_val;
+
+	CHK_HS(intel_cpld_read_hs_reg(INTEL_HS_REG_HS_STS, &reg_val));
+	reg_val |= (sts << 4);
+	CHK_HS(intel_cpld_write_hs_reg(INTEL_HS_REG_HS_STS, 0, reg_val));
+
+	return 0;
+error:
+	return -1;
+}
+
+#define CPLD_DEBUG_FW
+uint8_t intel_hs_get_mb_board_id(void)
+{
+#ifdef CPLD_DEBUG_FW
+	return 0x01;
+#else
+	uint8_t id;
+	const struct gpio_dt_spec board_id[] = {
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_id0_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_id1_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_id2_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_id3_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_id4_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_id5_in_gpios, 0),
+	};
+	for (uint8_t bit = 0; bit < 6; ++bit) {
+		gpio_pin_configure_dt(&board_id[bit], GPIO_INPUT);
+		id = gpio_pin_get(board_id[bit].port, board_id[bit].pin) << bit;
+	}
+
+	return id;
+#endif
+}
+
+uint8_t intel_hs_get_mb_revid(void)
+{
+#ifdef CPLD_DEBUG_FW
+	return 0x02;
+#else
+	uint8_t id;
+	const struct gpio_dt_spec board_id[] = {
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_revid0_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_revid1_in_gpios, 0),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), mb_board_revid2_in_gpios, 0),
+	};
+	for (uint8_t bit = 0; bit < 3; ++bit) {
+		gpio_pin_configure_dt(&board_id[bit], GPIO_INPUT);
+		id = gpio_pin_get(board_id[bit].port, board_id[bit].pin) << bit;
+	}
+
+	return id;
+#endif
+}
+uint16_t intel_hs_get_mb_id(void)
+{
+	return (intel_hs_get_mb_revid() << 8) | intel_hs_get_mb_board_id();
+}
+
+int intel_plat_cpld_handshake(void)
+{
+	uint16_t reg_val;
+	uint8_t match = 0, cnt = 0;
+
+	// Check handshake status
+	CHK_HS(prot_sts_match(PROT_HS_STS_HANDSHAKE_DONE, &match))
+	if (match)
+		return 0;
+
+	// Read MB ID and REVID
+	CHK_HS(intel_cpld_read_hs_reg(INTEL_HS_REG_MB_ID, &reg_val));
+	if (reg_val != intel_hs_get_mb_id()) {
+		// Write unknown id to PROT STS
+		CHK_HS(update_prot_sts(PROT_HS_STS_UNKNOWN_ID));
+		goto error;
+	}
+
+	// Read MB CAPID
+	CHK_HS(intel_cpld_read_hs_reg(INTEL_HS_REG_MB_CAPID0, &reg_val));
+	if (reg_val != HS_MB_CAP_L) {
+		goto error;
+	}
+
+	// Write PROT ID and PROT_REVID
+	CHK_HS(intel_cpld_write_hs_reg(INTEL_HS_REG_PROT_ID, HS_PROT_REV_ID, HS_PROT_ID));
+	CHK_HS(intel_cpld_write_hs_reg(INTEL_HS_REG_CFG0_PROT, HS_MB_CAP_H, HS_MB_CAP_L));
+	do {
+		// Wait for CPLD Ack
+		if (cnt > 3) {
+			// Write ACK timeout to PROT STS
+			CHK_HS(update_prot_sts(PROT_HS_STS_MB_ACK_TIMEOUT));
+			goto error;
+		}
+		cnt++;
+		k_msleep(1000);
+		CHK_HS(intel_cpld_read_hs_reg(INTEL_HS_REG_CFG0_MB, &reg_val));
+	} while(reg_val != 0xffff);
+
+	// Write handshake done to PROT STS
+	CHK_HS(update_prot_sts(PROT_HS_STS_HANDSHAKE_DONE));
+	// Check MB STS
+	CHK_HS(intel_cpld_read_hs_reg(INTEL_HS_REG_HS_STS, &reg_val));
+	if ((reg_val & MB_HS_STS_READY_TO_PROCEED_PROT) == MB_HS_STS_READY_TO_PROCEED_PROT)
+		return 0;
+
+error:
+	LOG_ERR("Failed to handshake with Platform CPLD");
+	GenerateStateMachineEvent(HANDSHAKE_FAILED, NULL);
+	return -1;
+}
+
