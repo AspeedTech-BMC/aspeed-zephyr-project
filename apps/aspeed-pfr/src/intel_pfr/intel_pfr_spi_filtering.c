@@ -19,20 +19,8 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-void apply_pfm_protection(int spi_device_id)
+void init_i2c_filters(void)
 {
-
-	int status = 0;
-	int spi_id = spi_device_id;
-	const char *spim_devs[SPIM_NUM] = {
-		"spi_m1",
-		"spi_m2",
-		"spi_m3",
-		"spi_m4"
-	};
-
-	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
-	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
 	char bus_dev_name[] = "I2C_FILTER_x";
 	const struct device *flt_dev = NULL;
 
@@ -45,6 +33,25 @@ void apply_pfm_protection(int spi_device_id)
 			ast_i2c_filter_default(flt_dev, 0);
 		}
 	}
+}
+
+void apply_pfm_protection(int spi_device_id)
+{
+
+	int status = 0;
+	bool i2c_flt_init = false;
+	int spi_id = spi_device_id;
+	const char *spim_devs[SPIM_NUM] = {
+		"spi_m1",
+		"spi_m2",
+		"spi_m3",
+		"spi_m4"
+	};
+
+	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
+	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
+	char bus_dev_name[] = "I2C_FILTER_x";
+	const struct device *flt_dev = NULL;
 
 	// read PFR_Manifest
 	status = initializeEngines();
@@ -196,6 +203,10 @@ void apply_pfm_protection(int spi_device_id)
 				pfm_region_Start = pfm_region_Start + 16;
 			break;
 		case SMBUS_RULE:
+			if (!i2c_flt_init) {
+				init_i2c_filters();
+				i2c_flt_init = true;
+			}
 			/* SMBus Rule Definition: 0x02 */
 			LOG_INF("SMBus Rule Bus[%d] RuleId[%d] DeviceAddr[%x]",
 					region_record[5], region_record[6], region_record[7]);
