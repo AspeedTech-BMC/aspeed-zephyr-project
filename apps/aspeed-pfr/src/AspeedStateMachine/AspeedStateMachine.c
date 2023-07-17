@@ -1124,7 +1124,7 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 	}
 
 	*update_region &= ~update_type;
-	
+
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	if (cpld_status->Region[region].Recoveryregion == BMC_INTENT_RECOVERY_PENDING ||
 			cpld_status->Region[region].Recoveryregion == PCH_INTENT_RECOVERY_PENDING ||
