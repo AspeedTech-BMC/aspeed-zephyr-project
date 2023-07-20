@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.13.1)
 
 find_package(Zephyr HINTS $ENV{ZEPHYR_BASE})
-project(aspeed-pfr VERSION 01.05 LANGUAGES C)
+project(aspeed-pfr VERSION 01.06 LANGUAGES C)
 
 set(PROJECT_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
 set(PROJECT_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
@@ -13,8 +13,6 @@ configure_file(build_config.h.in build_config.h)
 set(ASPEED_PFR_ROOT ${CMAKE_CURRENT_LIST_DIR})
 
 add_subdirectory(src)
-
-# target_sources(app PRIVATE src/test.c)
 
 set(CERBERUS_ROOT $ENV{ZEPHYR_BASE}/../middlewares/cerberus)
 
