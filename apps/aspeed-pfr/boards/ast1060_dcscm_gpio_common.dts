@@ -57,7 +57,7 @@
 		};
 
 		pfr_hb_led_out: hb_led {
-			gpios = <&gpio0_i_l 12 1>; /* GPIO_J4 */
+			gpios = <&gpio0_m_p 3 1>; /* GPIO_M3 */
 			label = "PFR_HB_LED";
 		};
 	};
