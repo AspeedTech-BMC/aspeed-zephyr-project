@@ -829,14 +829,15 @@ void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot
 		SetPlatformState(T0_BOOT_COMPLETED);
 		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
 				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		if (cpld_update_status.Region[BMC_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING)
-			intent |= BmcRecoveryUpdate;
-
-		if (cpld_update_status.Region[PCH_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING)
-			intent |= PchRecoveryUpdate;
-		else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_RECOVERY_PENDING) {
-			intent |= PchRecoveryUpdate;
+		if (cpld_update_status.Region[BMC_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
+			intent = BmcRecoveryUpdate;
+		} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
+			intent = PchRecoveryUpdate;
+		} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_RECOVERY_PENDING) {
+			intent = PchRecoveryUpdate;
 			update_intent_src = PchUpdateIntent;
+		} else if (cpld_update_status.Region[ROT_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
+			intent = HROTRecoveryUpdate;
 		}
 
 		if (intent) {

@@ -51,8 +51,9 @@
 #define ROT_TYPE                    3
 
 #define UPDATE_STATUS_ADDRESS           0x00
-#define UPDATE_STATUS_BMC_HASH_ADDR     0x40
-#define UPDATE_STATUS_PCH_HASH_ADDR     0x80
+#define UPDATE_STATUS_ROT_HASH_ADDR     0x40
+#define UPDATE_STATUS_BMC_HASH_ADDR     0x80
+#define UPDATE_STATUS_PCH_HASH_ADDR     0xC0
 
 #define SHA256_DIGEST_LENGTH        32
 #define SHA384_DIGEST_LENGTH        48

@@ -135,16 +135,23 @@ int cerberus_append_key_manifest(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int cerberus_update_rot_fw(struct pfr_manifest *manifest)
+int cerberus_update_rot_fw(struct pfr_manifest *manifest, uint32_t flash_select)
 {
-	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
+	uint32_t region_size;
 	uint32_t source_address = manifest->address;
-	uint32_t rot_recovery_address = 0;
-	uint32_t rot_active_address = 0;
 	uint32_t length_page_align;
+	uint8_t region_type;
 
 	struct recovery_header image_header;
 	struct recovery_section image_section;
+
+	if (flash_select == PRIMARY_FLASH_REGION) {
+		region_type = ROT_INTERNAL_ACTIVE;
+	} else if (flash_select == SECONDARY_FLASH_REGION) {
+		region_type = ROT_INTERNAL_RECOVERY;
+	} else {
+		return Failure;
+	}
 
 	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_header),
 			(uint8_t *)&image_header);
@@ -153,6 +160,7 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 			(uint8_t *)&image_section);
 	source_address = source_address + image_section.header_length;
 
+	region_size = pfr_spi_get_device_size(region_type);
 	length_page_align =
 		(image_section.section_length % PAGE_SIZE)
 		? (image_section.section_length + (PAGE_SIZE - (image_section.section_length % PAGE_SIZE))) : image_section.section_length;
@@ -162,31 +170,16 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
-				region_size)) {
-		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x",
-				rot_recovery_address, region_size);
-		return Failure;
-	}
-
-	if (pfr_spi_region_read_write_between_spi(ROT_INTERNAL_ACTIVE, rot_active_address,
-				ROT_INTERNAL_RECOVERY, rot_recovery_address, region_size)) {
-		LOG_ERR("read(ROT_INTERNAL_ACTIVE) address =%x, write(ROT_INTERNAL_RECOVERY) address = %x, length = %x",
-				rot_active_address, rot_recovery_address, region_size);
-		return Failure;
-	}
-
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
-				region_size)) {
-		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x",
-				rot_active_address, region_size);
+	if (pfr_spi_erase_region(region_type, true, 0, region_size)) {
+		LOG_ERR("Erase PFR flash region failed, region id = %x, address = 0, length = %x",
+				region_type, region_size);
 		return Failure;
 	}
 
 	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
-				ROT_INTERNAL_ACTIVE, rot_active_address, length_page_align)) {
-		LOG_ERR("read(BMC_SPI) address =%x, write(ROT_INTERNAL_ACTIVE) address = %x, length = %x",
-				source_address, rot_active_address, length_page_align);
+				region_type, 0, length_page_align)) {
+		LOG_ERR("read(BMC_SPI) address =%x, write(PFR_SPI) region id = %x, address = 0, length = %x",
+				source_address, region_type, length_page_align);
 		return Failure;
 	}
 
@@ -195,7 +188,7 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int cerberus_hrot_update(struct pfr_manifest *manifest)
+int cerberus_hrot_update(struct pfr_manifest *manifest, uint32_t flash_select)
 {
 	byte provision_state = GetUfmStatusValue();
 	struct recovery_header image_header;
@@ -224,7 +217,7 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 		}
 
 		if (image_header.format == UPDATE_FORMAT_TYPE_HROT) {
-			LOG_INF("HRoT update start");
+			LOG_INF("HRoT %s update start", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
 			hrot_version = (struct PFR_VERSION *)image_header.version_id;
 			if (hrot_version->reserved1 != 0 ||
 			    hrot_version->reserved2 != 0 ||
@@ -240,14 +233,14 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 				return Failure;
 			}
 
-			if (cerberus_update_rot_fw(manifest)) {
+			if (cerberus_update_rot_fw(manifest, flash_select)) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
 
 			set_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
 			SetCpldRotSvn(hrot_svn);
-			LOG_INF("HRoT update end");
+			LOG_INF("HRoT %s update end", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
 		} else if (image_header.format == UPDATE_FORMAT_TYPE_DCC) {
 			if (cerberus_pfr_decommission(manifest)) {
 				LOG_ERR("Decommission failed.");
@@ -427,7 +420,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext,
 		pfr_manifest->flash_id = flash_id;
 		pc_type = PFR_CPLD_UPDATE_CAPSULE;
 		pfr_manifest->pc_type = pc_type;
-		return cerberus_hrot_update(pfr_manifest);
+		return cerberus_hrot_update(pfr_manifest, flash_select);
 	}
 
 	pfr_manifest->staging_address = source_address;

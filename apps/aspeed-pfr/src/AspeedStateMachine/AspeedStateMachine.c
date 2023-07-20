@@ -89,6 +89,15 @@ static bool reset_from_unprovision_state = false;
 size_t event_log_idx = 0;
 
 extern enum boot_indicator get_boot_indicator(void);
+void clear_pending_recovery_update(CPLD_STATUS *cpld_update_status)
+{
+	cpld_update_status->Region[ROT_REGION].Recoveryregion = 0;
+	cpld_update_status->Region[BMC_REGION].Recoveryregion = 0;
+	cpld_update_status->Region[PCH_REGION].Recoveryregion = 0;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	cpld_update_status->Region[AFM_REGION].Recoveryregion = 0;
+#endif
+}
 
 int get_staging_hash(uint8_t image_type, CPLD_STATUS *cpld_status, uint8_t *hash_buf,
 		uint32_t hash_len)
@@ -110,6 +119,9 @@ int get_staging_hash(uint8_t image_type, CPLD_STATUS *cpld_status, uint8_t *hash
 			ufm_staging_offset = PCH_STAGING_REGION_OFFSET;
 		}
 		staging_size = CONFIG_PCH_STAGING_SIZE;
+	} else if (image_type == ROT_TYPE) {
+		address = CONFIG_BMC_PFR_STAGING_OFFSET;
+		staging_size = CONFIG_BMC_PFR_STAGING_SIZE;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	} else if (image_type == AFM_TYPE) {
 		address = CONFIG_BMC_AFM_STAGING_OFFSET;
@@ -684,10 +696,19 @@ void handle_recovery(void *o)
 	bool recovery_done = 0;
 	int ret;
 	EVENT_CONTEXT evt_wrap;
+	CPLD_STATUS cpld_update_status, cached_status;
 
 	initializeEngines();
 	initializeManifestProcessor();
 	SetPlatformState(T_MINUS_1_FW_RECOVERY);
+
+	// Clear all pending update as active firmware is invalid or bootup failed.
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	cached_status = cpld_update_status;
+	clear_pending_recovery_update(&cpld_update_status);
+	if (memcmp(&cached_status, &cpld_update_status, sizeof(CPLD_STATUS))) {
+		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	}
 
 	switch (evt_ctx->event) {
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
@@ -808,6 +829,15 @@ void do_rot_recovery(void *o)
 	LOG_DBG("Start");
 	uint8_t status;
 	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_RECOVERY);
+	CPLD_STATUS cpld_update_status, cached_status;
+
+	// Clear all pending update as active firmware is invalid or bootup failed.
+	ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	cached_status = cpld_update_status;
+	clear_pending_recovery_update(&cpld_update_status);
+	if (memcmp(&cached_status, &cpld_update_status, sizeof(CPLD_STATUS))) {
+		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+	}
 
 	clear_abr_indicator();
 
@@ -1111,6 +1141,10 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 		region = PCH_REGION;
 		update_type = PchRecoveryUpdate;
 		ufm_hash_addr = UPDATE_STATUS_PCH_HASH_ADDR;
+	} else if (*image_type == ROT_TYPE) {
+		region = ROT_REGION;
+		update_type = HROTRecoveryUpdate;
+		ufm_hash_addr = UPDATE_STATUS_ROT_HASH_ADDR;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	} else if (*image_type == AFM_TYPE) {
 		region = AFM_REGION;
@@ -1150,6 +1184,8 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 				LOG_INF("BMC Recovery Firmware Update");
 			else if (*image_type == PCH_TYPE)
 				LOG_INF("PCH Recovery Firmware Update");
+			else if (*image_type == ROT_TYPE)
+				LOG_INF("ROT Recovery Firmware Update");
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 			else if (*image_type == AFM_TYPE)
 				LOG_INF("AFM Recovery Firmware Update");
@@ -1290,23 +1326,25 @@ void handle_update_requested(void *o)
 					break;
 				}
 
-				/* ROT Active */
-				if (update_region & HROTActiveUpdate) {
+				if (update_region & HROTActiveAndRecoveryUpdate) {
 					SetPlatformState(CPLD_FW_UPDATE);
+					image_type = ROT_TYPE;
+					if (update_region & HROTRecoveryUpdate) {
+						if (handle_recovery_requested(&cpld_update_status,
+									&evt_ctx_wrap,
+									ao_data_wrap,
+									state,
+									evt_ctx,
+									&image_type,
+									&handled_region,
+									&update_region))
+							break;
+					}
 					LOG_INF("ROT Active Firmware Update");
 					image_type = ROT_TYPE;
+					evt_ctx_wrap.flash = PRIMARY_FLASH_REGION;
 					update_region &= ~HROTActiveUpdate;
 					handled_region |= HROTActiveUpdate;
-					break;
-				}
-
-				/* ROT Recovery */
-				if (update_region & HROTRecoveryUpdate) {
-					SetPlatformState(CPLD_FW_UPDATE);
-					LOG_INF("ROT Recovery Firmware Update");
-					image_type = ROT_TYPE;
-					update_region &= ~HROTRecoveryUpdate;
-					handled_region |= HROTRecoveryUpdate;
 					break;
 				}
 			}
@@ -1358,11 +1396,7 @@ void handle_update_requested(void *o)
 
 		if (ret != Success) {
 			/* TODO: Log failed reason and handle it properly */
-			if (image_type == BMC_TYPE)
-				cpld_update_status.Region[BMC_REGION].Recoveryregion = 0;
-			else if (image_type == PCH_TYPE)
-				cpld_update_status.Region[PCH_REGION].Recoveryregion = 0;
-
+			clear_pending_recovery_update(&cpld_update_status);
 			GenerateStateMachineEvent(UPDATE_FAILED, evt_ctx->data.ptr);
 			break;
 		}
@@ -1584,10 +1618,15 @@ void init_cpld_region_update_status(CPLD_STATUS *cpld_update_status)
 	cpld_update_status->BmcStatus = 0;
 	cpld_update_status->PchStatus = 0;
 	cpld_update_status->Region[ROT_REGION].ActiveRegion = 0;
+	cpld_update_status->Region[ROT_REGION].Recoveryregion = 0;
 	cpld_update_status->Region[BMC_REGION].ActiveRegion = 0;
 	cpld_update_status->Region[BMC_REGION].Recoveryregion = 0;
 	cpld_update_status->Region[PCH_REGION].ActiveRegion = 0;
 	cpld_update_status->Region[PCH_REGION].Recoveryregion = 0;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	cpld_update_status->Region[AFM_REGION].ActiveRegion = 0;
+	cpld_update_status->Region[AFM_REGION].Recoveryregion = 0;
+#endif
 	cpld_update_status->CpldRecovery = 0;
 }
 

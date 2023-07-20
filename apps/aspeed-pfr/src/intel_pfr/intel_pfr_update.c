@@ -232,14 +232,23 @@ int pfr_decommission(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int update_rot_fw(uint32_t address, uint32_t length)
+int update_rot_fw(uint32_t address, uint32_t length, uint32_t flash_select)
 {
-	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
+	uint32_t region_size;
 	uint32_t source_address = address;
-	uint32_t rot_recovery_address = 0;
-	uint32_t rot_active_address = 0;
 	uint32_t length_page_align;
+	uint8_t region_type;
 
+	if (flash_select == PRIMARY_FLASH_REGION) {
+		region_type = ROT_INTERNAL_ACTIVE;
+	} else if (flash_select == SECONDARY_FLASH_REGION) {
+		region_type = ROT_INTERNAL_RECOVERY;
+	} else {
+		LOG_ERR("Unknown flash region, Region = %x", flash_select);
+		return Failure;
+	}
+
+	region_size = pfr_spi_get_device_size(region_type);
 	length_page_align =
 		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
 
@@ -248,31 +257,15 @@ int update_rot_fw(uint32_t address, uint32_t length)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
-			region_size)) {
-		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x",
-			rot_recovery_address, region_size);
+	if (pfr_spi_erase_region(region_type, true, 0, region_size)) {
+		LOG_ERR("Erase PFR flash region failed, region id = %x, address = 0, length = %x",
+				region_type, region_size);
 		return Failure;
 	}
 
-	if (pfr_spi_region_read_write_between_spi(ROT_INTERNAL_ACTIVE, rot_active_address,
-				ROT_INTERNAL_RECOVERY, rot_recovery_address, region_size)) {
-		LOG_ERR("read(ROT_INTERNAL_ACTIVE) address =%x, write(ROT_INTERNAL_RECOVERY) address = %x, length = %x",
-			rot_active_address, rot_recovery_address, region_size);
-		return Failure;
-	}
-
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
-				region_size)) {
-		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x",
-			rot_active_address, region_size);
-		return Failure;
-	}
-
-	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
-			ROT_INTERNAL_ACTIVE, rot_active_address, length_page_align)) {
-		LOG_ERR("read(BMC_SPI) address =%x, write(ROT_INTERNAL_ACTIVE) address = %x, length = %x",
-			source_address, rot_active_address, length_page_align);
+	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address, region_type, 0, length_page_align)) {
+		LOG_ERR("read(BMC_SPI) address = %x, write(PFR_SPI) region id = %x, address = 0, length = %x",
+			source_address, region_type, length_page_align);
 		return Failure;
 	}
 
@@ -579,7 +572,7 @@ int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
 
 		return status;
 	} else if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE) {
-		LOG_INF("ROT update start");
+		LOG_INF("ROT %s update start", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
 		status = pfr_spi_read(manifest->image_type, payload_address, sizeof(uint32_t),
 				(uint8_t *)&hrot_svn);
 		if (status != Success) {
@@ -596,15 +589,15 @@ int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select)
 		pc_length = manifest->pc_length - sizeof(uint32_t);
 		payload_address = payload_address + sizeof(uint32_t);
 
-		status = update_rot_fw(payload_address, pc_length);
+		status = update_rot_fw(payload_address, pc_length, flash_select);
 		if (status != Success) {
-			LOG_ERR("ROT update failed");
+			LOG_ERR("ROT %s update failed", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
 			return Failure;
 		}
 
 		set_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
 		SetCpldRotSvn(hrot_svn);
-		LOG_INF("ROT update end");
+		LOG_INF("ROT %s update end", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
 	}
 	return Success;
 }
@@ -649,7 +642,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext,
 		source_address += CONFIG_BMC_STAGING_SIZE;
 		source_address += CONFIG_BMC_PCH_STAGING_SIZE;
 		pfr_manifest->address = source_address;
-		return ast1060_update(pfr_manifest, PRIMARY_FLASH_REGION);
+		return ast1060_update(pfr_manifest, flash_select);
 	}
 	else if (pfr_manifest->image_type == BMC_TYPE) {
 		LOG_INF("BMC Update in progress");
