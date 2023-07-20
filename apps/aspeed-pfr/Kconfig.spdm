@@ -9,6 +9,7 @@ config PFR_MCTP
 
 config PFR_MCTP_I3C
 	depends on PFR_MCTP
+	depends on I3C
 	default n
 	bool "PFR MCTP over I3C support"
 	help

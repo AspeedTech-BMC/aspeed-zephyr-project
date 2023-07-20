@@ -33,11 +33,11 @@ static off_t afm_list[CONFIG_PFR_SPDM_ATTESTATION_MAX_DEVICES] = {0};
 
 enum ATTEST_RESULT {
 	ATTEST_SUCCEEDED,
-	ATTEST_FAILED_VCA = -1,
-	ATTEST_FAILED_DIGEST = -2,
-	ATTEST_FAILED_CERTIFICATE = -3,
-	ATTEST_FAILED_CHALLENGE_AUTH = -4,
-	ATTEST_FAILED_MEASUREMENTS_MISMATCH = -5,
+	ATTEST_FAILED_VCA = 1,
+	ATTEST_FAILED_DIGEST = 2,
+	ATTEST_FAILED_CERTIFICATE = 3,
+	ATTEST_FAILED_CHALLENGE_AUTH = 4,
+	ATTEST_FAILED_MEASUREMENTS_MISMATCH = 5,
 };
 
 void spdm_stop_attester()
@@ -154,7 +154,7 @@ static int spdm_attest_device(void *ctx, AFM_DEVICE_STRUCTURE *afm_body) {
 		ret = spdm_get_measurements(context, 0,
 				SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER, &number_of_blocks, NULL);
 
-		if (ret != 0 || number_of_blocks != afm_body->TotalMeasurements) {
+		if (ret != 0 || number_of_blocks < afm_body->TotalMeasurements) {
 			LOG_ERR("AFM expecting %d but got %d measurements",
 					afm_body->TotalMeasurements, number_of_blocks);
 
@@ -300,14 +300,32 @@ void spdm_attester_main(void *a, void *b, void *c)
 				if (ret) {
 					/* Attested the device */
 					ret = spdm_attest_device(context, afm_device);
+					union aspeed_event_data event;
+					/* Defined in Intel SPEC
+					 * AFM1: CPU0 (1-based, but device in 0-based)
+					 * AFM2: CPU1
+					 * AFM3: BMC
+					 * afmn: Devices 
+					 */
+					event.bit8[0] = device;
+					event.bit8[1] = afm_device->BindingSpec; 
+					event.bit8[2] = afm_device->Policy;
+					event.bit8[3] = ret;
 
 					/* Check Policy */
+#if defined(CONFIG_PFR_MCTP_I3C)
+					if (afm_device->BindingSpec == SPDM_MEDIUM_I3C) {
+						if (ret == ATTEST_SUCCEEDED) {
+							osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_ATTESTED_CPU);
+						} else {
+							osEventFlagsClear(spdm_attester_event, SPDM_REQ_EVT_ATTESTED_CPU);
+						}
+					}
+#endif
+
 					switch (ret) {
 						case ATTEST_SUCCEEDED:
 							LOG_INF("ATTEST UUID[%04x] Succeeded", afm_device->UUID);
-							if (afm_device->BindingSpec == SPDM_MEDIUM_I3C) {
-								osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_ATTESTED_CPU);
-							}
 							break;
 						case ATTEST_FAILED_VCA:
 							/* Protocol Error */
@@ -315,7 +333,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 							LogErrorCodes(SPDM_PROTOCOL_ERROR_FAIL, SPDM_CONNECTION_FAIL);
 							if (afm_device->Policy & BIT(2)) {
 								/* Lock down in reset */
-								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+								GenerateStateMachineEvent(ATTESTATION_FAILED, event.ptr);
 							}
 							break;
 						case ATTEST_FAILED_DIGEST:
@@ -323,7 +341,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 							LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_DIGEST_FAIL);
 							if (afm_device->Policy & BIT(1)) {
 								/* Lock down in reset */
-								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+								GenerateStateMachineEvent(ATTESTATION_FAILED, event.ptr);
 							}
 							break;
 						case ATTEST_FAILED_CERTIFICATE:
@@ -331,7 +349,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 							LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CERTIFICATE_FAIL);
 							if (afm_device->Policy & BIT(1)) {
 								/* Lock down in reset */
-								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+								GenerateStateMachineEvent(ATTESTATION_FAILED, event.ptr);
 							}
 							break;
 						case ATTEST_FAILED_CHALLENGE_AUTH:
@@ -340,7 +358,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 							LogErrorCodes(ATTESTATION_CHALLENGE_FAIL, SPDM_CHALLENGE_FAIL);
 							if (afm_device->Policy & BIT(1)) {
 								/* Lock down in reset */
-								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+								GenerateStateMachineEvent(ATTESTATION_FAILED, event.ptr);
 							}
 							break;
 						case ATTEST_FAILED_MEASUREMENTS_MISMATCH:
@@ -349,7 +367,7 @@ void spdm_attester_main(void *a, void *b, void *c)
 							LogErrorCodes(ATTESTATION_MEASUREMENT_FAIL, SPDM_MEASUREMENT_FAIL);
 							if (afm_device->Policy & BIT(0)) {
 								/* Lock down in reset */
-								GenerateStateMachineEvent(ATTESTATION_FAILED, 0);
+								GenerateStateMachineEvent(ATTESTATION_FAILED, event.ptr);
 							}
 							break;
 						default:
@@ -372,6 +390,7 @@ void spdm_enable_attester()
 
 void spdm_run_attester_i3c()
 {
+	LOG_WRN("Ready to run I3C Attestation");
 	osEventFlagsSet(spdm_attester_event, SPDM_REQ_EVT_T0_I3C);
 	spdm_request_tick();
 }

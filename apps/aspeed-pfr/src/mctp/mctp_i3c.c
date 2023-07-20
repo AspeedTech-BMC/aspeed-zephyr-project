@@ -159,7 +159,7 @@ void mctp_i3c_pre_attestation(struct device_manager *mgr, int *duration)
 	uint8_t provision_state = GetUfmStatusValue();
 
 	if (provision_state & UFM_PROVISIONED) {
-		if (is_afm_ready() && is_pltrst_sync()) {
+		if (is_pltrst_sync()) {
 			LOG_WRN("Pre-attestation");
 			device_manager_update_device_state(mgr,
 				      DEVICE_MANAGER_SELF_DEVICE_NUM,

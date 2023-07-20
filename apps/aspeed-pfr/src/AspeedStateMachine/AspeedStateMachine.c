@@ -715,18 +715,29 @@ void handle_recovery(void *o)
 	}
 
 	switch (evt_ctx->event) {
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+	case ATTESTATION_FAILED:
+		if (evt_ctx->data.bit8[0] == 0 || evt_ctx->data.bit8[0] == 1) {
+			state->pch_active_object.ActiveImageStatus = Failure;
+		} else if (evt_ctx->data.bit8[0] == 2) {
+			state->bmc_active_object.ActiveImageStatus = Failure;
+		}
+		__attribute__((fallthrough));
+#endif
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY) || defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
 	case WDT_TIMEOUT:
-		// WDT Checkpoint Timeout
-		SetPlatformState(WDT_TIMEOUT_RECOVERY);
+		if (evt_ctx->event == WDT_TIMEOUT) {
+			// WDT Checkpoint Timeout
+			SetPlatformState(WDT_TIMEOUT_RECOVERY);
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
-		if (evt_ctx->data.bit8[0] == BMC_EVENT)
-			state->bmc_active_object.ActiveImageStatus = Failure;
+			if (evt_ctx->data.bit8[0] == BMC_EVENT)
+				state->bmc_active_object.ActiveImageStatus = Failure;
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
-		if (evt_ctx->data.bit8[0] == PCH_EVENT)
-			state->pch_active_object.ActiveImageStatus = Failure;
+			if (evt_ctx->data.bit8[0] == PCH_EVENT)
+				state->pch_active_object.ActiveImageStatus = Failure;
 #endif
+		}
 		__attribute__ ((fallthrough));
 #endif
 	case VERIFY_FAILED:
@@ -1793,7 +1804,7 @@ void AspeedStateMachine(void)
 
 		s_obj.event_ctx = fifo_in;
 
-		LOG_INF("EVENT IN [%p] EVT=%d DATA=%p", fifo_in, fifo_in->event, fifo_in->data.ptr);
+		LOG_INF("EVENT IN [%p] EVT=%d DATA=%p", (void *)fifo_in, fifo_in->event, fifo_in->data.ptr);
 		const struct smf_state *current_state = SMF_CTX(&s_obj)->current;
 		const struct smf_state *next_state = NULL;
 		bool run_state = false;
@@ -1942,7 +1953,30 @@ void AspeedStateMachine(void)
 				break;
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 			case ATTESTATION_FAILED:
-				next_state = &state_table[SYSTEM_LOCKDOWN];
+				/* Note:
+				 * This event will be generate only if the police bits are set to 1
+				 * AFM1/AFM2 failed recovery HOST Firmware
+				 * AFM3 failed recovery BMC Firmware
+				 * 
+				 * TODO:
+				 * AFMn failed customization... only generate log for now.
+				 *
+				 * Event data:
+				 * bit8[0] -> device in AFM (0-based)
+				 * bit8[1] -> binding spec (0x01 SMBus, 0x06 I3C)
+				 * bit8[2] -> policy
+				 * bit8[3] -> result
+				 */
+				if (fifo_in->data.bit8[0] == 0 || fifo_in->data.bit8[0] == 1) {
+					LOG_ERR("CPU/HOST attestation failed, do recovery");
+					next_state = &state_table[FIRMWARE_RECOVERY];
+				} else if (fifo_in->data.bit8[0] == 2) {
+					LOG_ERR("BMC attestation failed, do recovery");
+					next_state = &state_table[FIRMWARE_RECOVERY];
+				} else {
+					LOG_ERR("TODO: AFM device %d Policy %02x attestation failed, customization needed!",
+						fifo_in->data.bit8[0], fifo_in->data.bit8[2]);
+				}
 				break;
 #endif
 			default:
