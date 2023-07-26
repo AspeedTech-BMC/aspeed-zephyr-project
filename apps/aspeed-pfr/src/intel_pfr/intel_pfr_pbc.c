@@ -57,11 +57,9 @@ void reset_recovery_level(uint32_t image_type)
 }
 #endif
 
-int update_active_pfm(struct pfr_manifest *manifest)
+int update_active_pfm(struct pfr_manifest *manifest, uint32_t pfm_size)
 {
 	int sector_sz = pfr_spi_get_block_size(manifest->image_type);
-	uint8_t buffer[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
-	PFR_AUTHENTICATION_BLOCK0 *block0_buffer;
 	bool support_block_erase = false;
 	uint32_t length_page_align;
 	uint32_t capsule_offset;
@@ -77,22 +75,12 @@ int update_active_pfm(struct pfr_manifest *manifest)
 	// Adjusting capsule offset size to PFM Signing chain
 	capsule_offset += PFM_SIG_BLOCK_SIZE;
 
-	if (pfr_spi_read(manifest->image_type, capsule_offset,
-		sizeof(PFR_AUTHENTICATION_BLOCK0), buffer)) {
-		LOG_ERR("Block0: Flash read data failed");
-		return Failure;
-	}
-
-	block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)buffer;
-		manifest->pc_length = block0_buffer->PcLength;
-	manifest->pc_length = block0_buffer->PcLength;
-
 	// Updating PFM from capsule to active region
 	length_page_align =
-		(manifest->pc_length % PAGE_SIZE) ? (manifest->pc_length + (PAGE_SIZE - (manifest->pc_length % PAGE_SIZE))) : manifest->pc_length;
+		(pfm_size % PAGE_SIZE) ? (pfm_size + (PAGE_SIZE - (pfm_size % PAGE_SIZE))) : pfm_size;
 
 	LOG_INF("manifest->image_type=%d, source_address=%x, target_address=%x, length=%x, length_page_align=%x",
-		manifest->image_type, capsule_offset, manifest->active_pfm_addr, manifest->pc_length, length_page_align);
+		manifest->image_type, capsule_offset, manifest->active_pfm_addr, pfm_size, length_page_align);
 
 	if (pfr_spi_erase_region(manifest->image_type, support_block_erase, manifest->active_pfm_addr, length_page_align)) {
 		LOG_ERR("Failed to erase Active PFM");
@@ -531,7 +519,7 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	}
 
 	if (decomp_type & DECOMPRESSION_STATIC_REGIONS_MASK) {
-		if (update_active_pfm(manifest))
+		if (update_active_pfm(manifest, pfm_size))
 			return Failure;
 	}
 

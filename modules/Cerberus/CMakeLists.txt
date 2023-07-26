@@ -44,7 +44,7 @@ if (CONFIG_CERBERUS)
 		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface.c
 		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_dual_cmd_set.c
 		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_slave.c
-		# ${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_system.c
+		${CERBERUS_CORE_DIR}/cmd_interface/cmd_interface_system.c
 		# ${CERBERUS_CORE_DIR}/cmd_interface/config_reset.c
 		# ${CERBERUS_CORE_DIR}/cmd_interface/counter_manager_registers.c
 		# ${CERBERUS_CORE_DIR}/cmd_interface/device_manager.c

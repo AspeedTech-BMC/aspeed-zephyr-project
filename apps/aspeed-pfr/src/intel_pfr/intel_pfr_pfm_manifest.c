@@ -50,6 +50,13 @@ int get_active_pfm_version_details(struct pfr_manifest *manifest, uint32_t addre
 			SetBmcPfmActiveMajorVersion(active_major_version);
 			SetBmcPfmActiveMinorVersion(active_minor_version);
 		}
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		else if (manifest->image_type == ROT_EXT_CPLD_ACT) {
+			SetIntelCpldActiveSvn(active_svn);
+			SetIntelCpldActiveMajorVersion(active_major_version);
+			SetIntelCpldActiveMinorVersion(active_minor_version);
+		}
+#endif
 	}
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	else if (((PFM_STRUCTURE *)buffer)->PfmTag == AFM_TAG) {
@@ -114,6 +121,12 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 			if (recovery_svn > policy_svn)
 				status = set_ufm_svn(SVN_POLICY_FOR_BMC_FW_UPDATE, recovery_svn);
 		}
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+		else if (manifest->image_type == ROT_EXT_CPLD_RC) {
+			// TODO: Recovery CPLD SVN is not defined in the specification.
+			return Success;
+		}
+#endif
 	}
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	else if (pfm_data->PfmTag == AFM_TAG) {
@@ -124,6 +137,9 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 		SetAfmRecoverSvn(recovery_svn);
 		SetAfmRecoverMajorVersion(recovery_major_version);
 		SetAfmRecoverMinorVersion(recovery_minor_version);
+		policy_svn = get_ufm_svn(SVN_POLICY_FOR_AFM);
+		if (recovery_svn > policy_svn)
+			status = set_ufm_svn(SVN_POLICY_FOR_AFM, recovery_svn);
 	}
 #endif
 	else {

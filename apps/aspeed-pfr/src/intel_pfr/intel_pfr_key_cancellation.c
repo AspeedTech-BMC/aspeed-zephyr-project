@@ -18,7 +18,8 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 int get_cancellation_policy_offset(uint32_t pc_type)
 {
-	if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PFR_CPLD_UPDATE_CAPSULE) || (pc_type == DECOMMISSION_CAPSULE))
+	if ((pc_type == CPLD_CAPSULE_CANCELLATION) || (pc_type == PFR_CPLD_UPDATE_CAPSULE) ||
+			(pc_type == PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_CPLD_UPDATE_CAPSULE;
 	else if ((pc_type == PCH_PFM_CANCELLATION) || (pc_type == PFR_PCH_PFM))
 		return KEY_CANCELLATION_POLICY_FOR_SIGNING_PCH_PFM;
@@ -92,6 +93,11 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	if (manifest->pc_type == PFR_PCH_SEAMLESS_UPDATE_CAPSULE)
+		return Success;
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	// Remove the following code when Intel CPLD key cancellation policy is defined.
+	if (manifest->pc_type == PFR_INTEL_CPLD_UPDATE_CAPSULE)
 		return Success;
 #endif
 

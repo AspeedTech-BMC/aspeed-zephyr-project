@@ -8,10 +8,7 @@ SPDX-License-Identifier: MIT
 
 import os
 import sys
-import xml.etree.ElementTree as et
 import xmltodict
-import json
-import ecdsa
 import ctypes
 
 from Crypto.PublicKey import ECC
@@ -67,9 +64,10 @@ PROP_IMAGE_TYPE = "type"
 # Start address of CPLD images
 # Capsule Signature(1KB)
 # PFM Signature(1KB)
-# PFM (4KB)
-# Reserved(2KB) for making image start address be 4kb aligned
-CPLD_IMAGE_START_ADDRESS = 8192
+# PFM (32 byte + CPLD FM Address Definition Size(12 byte) * count of CPLDs)
+# Reserved(4KB - Cap signature - PFM signature - PFM) for making image start address be 4kb aligned
+SIGNATURE_SIZE = 1024
+CPLD_IMAGE_START_ADDRESS = 4096
 
 # Block 0
 class b0_struct(ctypes.LittleEndianStructure):
@@ -281,8 +279,9 @@ def sign_image(xml_dict, image):
     rk_pubkey = cfg_b1_rk[XML_PUB_KEY]
     try:
         rkey = ECC.import_key(open(rk_pubkey).read())
-    except Exception:
-        print(exception)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 
     point = rkey.pointQ
     rk_pubkey_x = long_to_bytes(point.x)
@@ -304,8 +303,9 @@ def sign_image(xml_dict, image):
 
     try:
         cskey = ECC.import_key(open(csk_pubkey).read())
-    except Exception:
-        print(exception)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 
     point = cskey.pointQ
     csk_pubkey_x = long_to_bytes(point.x)
@@ -314,16 +314,20 @@ def sign_image(xml_dict, image):
             csk_pubkey_x, csk_pubkey_y)
 
     if csk_hash_alg == "sha256" or csk_hash_alg == "SHA256":
-        h256 = SHA256.new(bytearray(csk_pubkey_info))
+        h256 = SHA256.new(bytearray(csk_pubkey_inst))
         csk_hash_buf = h256
     elif csk_hash_alg == "sha384" or csk_hash_alg == "SHA384":
         h384 = SHA384.new(bytearray(csk_pubkey_inst))
         csk_hash_buf = h384
+    else:
+        print("Unknown algorithm : " + csk_hash_alg)
+        sys.exit(1)
 
     try:
         csk_signing_key = ECC.import_key(open(csk_sign_key).read())
-    except Exception:
-        print(exception)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 
     signer = DSS.new(csk_signing_key, 'fips-186-3')
     signature = signer.sign(csk_hash_buf)
@@ -336,7 +340,6 @@ def sign_image(xml_dict, image):
     cfg_b1_b0 = cfg_b1[XML_B0_SIG]
     b1_b0_magic = int(cfg_b1_b0[XML_MAGIC], 16)
     b1_b0_sig_magic = int(cfg_b1_b0[XML_SIG_MAGIC], 16)
-    b1_b0_hash_alg = cfg_b1_b0[XML_HASH_ALG]
     b1_b0_sign_key = cfg_b1_b0[XML_SIGN_KEY]
 
     if csk_hash_alg == "sha256" or csk_hash_alg == "SHA256":
@@ -345,11 +348,15 @@ def sign_image(xml_dict, image):
     elif csk_hash_alg == "sha384" or csk_hash_alg == "SHA384":
         h384 = SHA384.new(bytearray(b0_inst))
         b0_hash_buf = h384
+    else:
+        print("Unknown algorithm : " + csk_hash_alg)
+        sys.exit(1)
 
     try:
         b0_signing_key = ECC.import_key(open(b1_b0_sign_key).read())
-    except Exception:
-        print(exception)
+    except Exception as e:
+        print(e)
+        sys.exit(1)
 
     signer = DSS.new(b0_signing_key, 'fips-186-3')
     signature = signer.sign(b0_hash_buf)
@@ -378,9 +385,9 @@ def gen_indv_cpld_images(xml_dict):
         raise ValueError("Invalid CFM definition in xml, expect list or dict got {0}".format(type(cfg_cfms)))
 
     signed_cpld_imgs = []
-    signed_cpld_img = {}
 
     for cfm in cfms:
+        signed_cpld_img = {}
         svn = int(cfm[XML_SVN])
         maj_ver = int(cfm[XML_MAJ_VER])
         min_ver = int(cfm[XML_MIN_VER])
@@ -459,9 +466,9 @@ def gen_pfm_image(xml_dict, cpld_imgs):
 
     pfm_inst = pfm_stuct(pfm_svn, pfm_bkc, pfm_maj, pfm_min, pfm_devid, oem_data, pfm_body)
     pfm_size = ctypes.sizeof(pfm_inst)
-    pfm_padding_size = 4096 - (pfm_size % 4096)
+    pfm_inst.length = pfm_size
+    pfm_padding_size = 4096 - (SIGNATURE_SIZE * 2) - (pfm_size % 4096)
     padding_data = bytearray([0xff] * pfm_padding_size)
-    pfm_inst.length = pfm_size + pfm_padding_size
     full_pfm_inst = bytearray(pfm_inst) + padding_data
     signed_pfm = sign_image(xml_dict, full_pfm_inst)
 
@@ -471,12 +478,9 @@ def main():
     if len(sys.argv) < 2:
         print_usage()
     xml_dict = load_xml(sys.argv[1])
-    cpld_imgs, total_image_size = gen_indv_cpld_images(xml_dict)
+    cpld_imgs, _ = gen_indv_cpld_images(xml_dict)
     pfm_img = gen_pfm_image(xml_dict, cpld_imgs)
-    reserved = bytearray([0xff] * 2048)
-    print(total_image_size)
     unsigned_full_image = pfm_img
-    unsigned_full_image += reserved
     for img in cpld_imgs:
         unsigned_full_image += img[PROP_IMAGE]
 

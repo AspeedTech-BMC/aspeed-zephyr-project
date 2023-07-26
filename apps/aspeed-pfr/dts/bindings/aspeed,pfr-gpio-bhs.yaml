@@ -11,3 +11,133 @@ properties:
         type: phandle-array
         required: false
         description: Detect platform reset indicator.
+
+    i3c-mng-mux-sel-out-gpios:
+        type: phandle-array
+        required: false
+        description: I3C MNG Mux select.
+
+    fp-pwr-btn-in-gpios:
+        type: phandle-array
+        required: true
+        description: Power button gate/passthrough input.
+
+    bmc-pwr-btn-out-gpios:
+        type: phandle-array
+        required: true
+        description: Power button gate/passthrough output.
+
+    rst-rtcrst-cpu0-out-gpios:
+        type: phandle-array
+        required: false
+        description: Control CPU0 RTCRST signal.
+
+    rst-rtcrst-cpu1-out-gpios:
+        type: phandle-array
+        required: false
+        description: Control CPU1 RTCRST signal.
+
+    rst-pltrst-cpu0-out-gpios:
+        type: phandle-array
+        required: false
+        description: Control CPU0 PLTRST signal.
+
+    rst-pltrst-cpu1-out-gpios:
+        type: phandle-array
+        required: false
+        description: Control CPU1 PLTRST signal.
+
+    pwrgd-cpu0-out-gpios:
+        type: phandle-array
+        required: false
+        description: Control CPU0 PWRGD signal.
+
+    pwrgd-cpu1-out-gpios:
+        type: phandle-array
+        required: false
+        description: Control CPU1 PWRGD signal.
+
+    scm-board-id0-in-gpios:
+        type: phandle-array
+        required: false
+        description: SCM board ID0.
+
+    scm-board-id1-in-gpios:
+        type: phandle-array
+        required: false
+        description: SCM board ID1.
+
+    scm-board-id2-in-gpios:
+        type: phandle-array
+        required: false
+        description: SCM board ID2.
+
+    scm-board-id3-in-gpios:
+        type: phandle-array
+        required: false
+        description: SCM board ID3.
+
+    scm-board-id4-in-gpios:
+        type: phandle-array
+        required: false
+        description: SCM board ID4.
+
+    scm-board-id5-in-gpios:
+        type: phandle-array
+        required: false
+        description: SCM board ID5.
+
+    scm-rsu-hide-done-in-gpios:
+        type: phandle-array
+        required: false
+        description: RSU hide done indicator.
+
+    scm-rsu-hide-out-gpios:
+        type: phandle-array
+        required: false
+        description: GPIO to hide RSU IP.
+
+    mb-board-id0-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID0.
+
+    mb-board-id1-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID1.
+
+    mb-board-id2-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID2.
+
+    mb-board-id3-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID3.
+
+    mb-board-id4-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID4.
+
+    mb-board-id5-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board ID5.
+
+    mb-board-revid0-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board REVID0.
+
+    mb-board-revid1-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board REVID1.
+
+    mb-board-revid2-in-gpios:
+        type: phandle-array
+        required: false
+        description: MB board REVID2.

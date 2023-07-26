@@ -28,3 +28,5 @@ int PCHBootRelease(void);
 
 void BMCSPIHold(uint8_t ext_mux_level);
 void BMCSPIRelease(uint8_t ext_mux_level);
+void init_mp_status_gpios(void);
+void set_mp_status(uint8_t status1, uint8_t status2);

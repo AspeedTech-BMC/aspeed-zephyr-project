@@ -1,6 +1,6 @@
 {
-    "name": "ast1060a1_mp",
-    "version": "1060A1",
+    "name": "ast1060a2_mp",
+    "version": "1060A2",
     "data_region": {
         "ecc_region": false,
         "key": [
@@ -11,5 +11,8 @@
                 "number_id": 0
             }
         ]
+    },
+    "config_region": {
+	    "Signature Scheme": "ECDSA384"
     }
 }

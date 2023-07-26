@@ -38,8 +38,8 @@ ST: Power On
 ```
 
 ### Second Bootup
-First mutable code check secure boot is enabled, it generates alias and device id certificate.
-Preload firmware sends device id certificate signing request to HSM and waiting for HSM to
+First mutable code check secure boot is enabled, it generates alias and device id certificate.  
+Preload firmware sends device id certificate signing request to HSM and waiting for HSM to  
 generate signed certificate chain. The signed certificate chain will be stored in ast1060 internal flash
 
 ```

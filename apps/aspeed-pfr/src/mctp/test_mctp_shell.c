@@ -12,6 +12,7 @@
 #include "plat_mctp.h"
 #include "cmd_interface/device_manager.h"
 #include "logging/logging_wrapper.h"
+#include "mctp.h"
 
 // #define MCTP_TEST_DEBUG
 static uint8_t request_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_BODY] = {0};
@@ -64,6 +65,57 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 
 	return 0;
 }
+
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+static int cmd_mctp_send_msg_i3c(const struct shell *shell, size_t argc, char **argv)
+{
+	struct mctp_interface *mctp_interface = NULL;
+	extern mctp_i3c_dev i3c_dev;
+	mctp *mctp_inst = NULL;
+	int req_len = argc - 4;
+	int argc_req_idx = 4;
+	uint8_t dst_addr;
+	uint8_t dst_eid;
+	uint8_t bus_num;
+	int status;
+	int i;
+
+	bus_num = strtol(argv[1], NULL, 16);
+	dst_addr = strtol(argv[2], NULL, 16);
+	dst_eid = strtol(argv[3], NULL, 16);
+
+	mctp_inst = i3c_dev.mctp_inst;
+	if (mctp_inst == NULL) {
+		shell_error(shell, "mctp instance not fould");
+		return 0;
+	}
+
+	mctp_interface = &mctp_inst->mctp_wrapper.mctp_interface;
+	// request
+	// request_buf[0] = message type
+	// request_buf[1] = rq
+	// request_buf[2] = command code
+	memset(request_buf, 0, sizeof(request_buf));
+	for (i = 0; i < req_len; i++)
+		request_buf[i] = strtol(argv[argc_req_idx++], NULL, 16);
+
+#if 1 || MCTP_TEST_DEBUG
+	shell_print(shell, "request:");
+	shell_hexdump(shell, request_buf, req_len);
+#endif
+	status = mctp_interface_issue_request(mctp_interface, &mctp_inst->mctp_cmd_channel,
+		dst_addr, dst_eid, request_buf, req_len, message_buf, sizeof(message_buf), 1000);
+
+	if (status != 0)
+		shell_print(shell, "mctp issue request failed(%x)", status);
+	else {
+		shell_print(shell, "response:");
+		shell_hexdump(shell, mctp_interface->req_buffer.data, mctp_interface->req_buffer.length);
+	}
+
+	return 0;
+}
+#endif
 
 static int cmd_mctp_echo_test(const struct shell *shell, size_t argc, char **argv)
 {
@@ -225,6 +277,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_log_cmds,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 	SHELL_CMD_ARG(send, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <option:payload>", cmd_mctp_send_msg, 7, 255),
+#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+	SHELL_CMD_ARG(send_i3c, NULL, "<bus> <dest_addr> <dest_eid> <payload>", cmd_mctp_send_msg_i3c, 4, 255),
+#endif
 	SHELL_CMD_ARG(echo, NULL, "<bus> <dest_addr> <dest_eid> <payload_length> <option:default 1 time>", cmd_mctp_echo_test, 5, 1),
 	SHELL_CMD_ARG(device, NULL, "<bus>", cmd_mctp_show_device, 2, 0),
 	SHELL_CMD(log, &sub_mctp_log_cmds, "Log Commands", NULL),

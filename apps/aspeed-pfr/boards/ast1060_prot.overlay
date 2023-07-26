@@ -1,0 +1,320 @@
+#include "ast1060_prot_gpio_common.dts"
+#include "ast1060_prot_gpio_bhs.dts"
+
+&i2cfilter {
+	pinctrl-0 = <&pinctrl_smbflt_default>;
+	status = "okay";
+};
+
+&mbxctrl {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&pinctrl_i2c0_default>;
+
+	swmbx0: swmbx0@38 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x38>;
+		label = "SWMBX_SLAVE_BMC";
+		size = <256>;
+		port = <0>;
+		status = "okay";
+	};
+};
+
+&i2c1 {
+	pinctrl-0 = <&pinctrl_i2c1_default>;
+	status = "okay";
+};
+
+&i2c2 {
+	pinctrl-0 = <&pinctrl_i2c2_default>;
+	status = "okay";
+
+	swmbx1: swmbx1@70 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x70>;
+		label = "SWMBX_SLAVE_CPU";
+		size = <256>;
+		port = <1>;
+		status = "okay";
+	};
+};
+
+&i2c4 {
+	pinctrl-0 = <&pinctrl_i2c4_default>;
+	status = "okay";
+};
+
+&i2c5 {
+	pinctrl-0 = <&pinctrl_i2c5_default>;
+	status = "okay";
+};
+
+&i2c7 {
+	pinctrl-0 = <&pinctrl_i2c7_default>;
+	status = "okay";
+};
+
+// For mctp over i3c
+// BMC i3c-5 -> AST1060 i3c-2
+&i3c2 {
+	status = "okay";
+	pinctrl-0 = <&pinctrl_hvi3c2_default>;
+
+#if 0
+	// For CONFIG_I3C_SLAVE=y
+	assigned-address = <0x9>;
+	pid-extra-info = <0x9>;
+	ibi-append-pec;
+	priv-xfer-pec;
+	secondary;
+	i3c2_smq:i3c-slave-mqueue@9 {
+		compatible = "aspeed,i3c-slave-mqueue";
+		reg = <0x9>;
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xbf>;
+		label = "I3C_SMQ_2";
+		status = "okay";
+	 };
+#endif
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&wdt1 {
+	status = "okay";
+};
+
+&wdt2 {
+	status = "okay";
+};
+
+&wdt3 {
+	status = "okay";
+};
+
+&wdt4 {
+	status = "okay";
+};
+
+&fmc {
+	status = "okay";
+};
+
+&fmc_cs0 {
+	/delete-property/ broken-sfdp;
+	/delete-property/ write-block-size;
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		active_partition: partition@0 {
+			label = "active";
+			reg = <0x0 0x60000>;
+		};
+
+		recovery_partition: partition@1 {
+			label = "recovery";
+			reg = <0x60000 0x60000>;
+		};
+
+		state_partition: partition@2 {
+			label = "state";
+			reg = <0xC0000 0x10000>;
+		};
+
+		intel_state_partition: partition@3 {
+			label = "intel_state";
+			reg = <0xD0000 0x10000>;
+		};
+
+		key_partition: partition@4 {
+			label = "key";
+			reg = <0xE0000 0x10000>;
+		};
+
+		/* For Intel-PFR 3.0 */
+		afm_act_1_partition: partition@5 {
+			label = "afm_act_1";
+			reg = <0xF0000 0x10000>;
+		};
+	};
+};
+
+&fmc_cs1 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+#if 0
+		/* Reserved for Intel-PFR 4.0 */
+		afm_act_1_partition: partition@0 {
+			label = "afm_active_1";
+			reg = <0x0 0x80000>;
+		};
+
+		afm_act_2_partition: partition@1 {
+			label = "afm_active_2";
+		}
+			reg = <0x80000 0x80000>;
+
+		afm_rcv_1_partition: partition@2 {
+			label = "afm_recovery_1";
+			reg = <0x100000 0x80000>;
+		};
+
+		afm_rcv_2_partition: partition@3 {
+			label = "afm_recovery_2";
+			reg = <0x180000 0x80000>;
+		};
+#endif
+		cpld_act_partition: partition@0 {
+			label = "intel_cpld_act";
+			reg = <0x000000 0x200000>;
+		};
+		cpld_rcv_partition: partition@1 {
+			label = "intel_cpld_rc";
+			reg = <0x200000 0x200000>;
+		};
+	};
+};
+
+&spi1 {
+	num-cs = <2>;
+	status = "okay";
+};
+
+/* "SPI1_CS0" is used to access flash connected to SPI_Monitor_1,
+ * "SPI1_CS1" is used to access flash connected to SPI_Monitor_2,
+ * "SPI2_CS0" is used to access flash connected to SPI_Monitor_3,
+ * "SPI2_CS1" is used to access flash connected to SPI_Monitor_4,
+ */
+
+&spi1_cs0 {
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	status = "okay";
+};
+
+&spi1_cs1 {
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	status = "okay";
+};
+
+&spi2_cs0 {
+	spi-max-buswidth = <1>;
+	spi-max-frequency = <40000000>;
+	status = "okay";
+};
+
+&spi2_cs1 {
+	spi-max-buswidth = <1>;
+	spi-max-frequency = <40000000>;
+	status = "okay";
+};
+
+&spi2 {
+	internal-mux-master = <2>;
+	spi-monitor-output-base = <3>;
+	spi-monitor-common-ctrl = <&spim0>;
+	pinctrl-0 = <>;
+
+	num-cs = <2>;
+	status = "okay";
+
+	spim-proprietary-config-enable;
+};
+
+&spim0 {
+	status = "okay";
+};
+
+&spim1 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pinctrl_spim1_cs &pinctrl_spim1_in_default &pinctrl_spim1_qspi_in_default>;
+
+	flash-device = <&spi1_cs0>;
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_a_d 12 0>;
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+&spim2 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pinctrl_spim2_cs &pinctrl_spim2_in_default &pinctrl_spim2_qspi_in_default>;
+
+	flash-device = <&spi1_cs1>;
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_a_d 12 0>;
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+
+&spim3 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pinctrl_spim3_cs &pinctrl_spim3_in_default &pinctrl_spim3_out_default
+		&pinctrl_spim3_qspi_in_default>;
+
+	flash-device = <&spi2_cs0>;
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_e_h 8 0>;
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+&spim4 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pinctrl_spim4_cs &pinctrl_spim4_in_default &pinctrl_spim4_out_default
+		&pinctrl_spim4_qspi_in_default>;
+
+	flash-device = <&spi2_cs1>;
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_e_h 8 0>;
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+&sgpiom {
+	status = "okay";
+};
+
+&timer0 {
+	status = "okay";
+};
+

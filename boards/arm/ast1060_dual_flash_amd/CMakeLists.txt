@@ -4,3 +4,4 @@
 if(CONFIG_PINMUX_ASPEED)
     zephyr_include_directories(.)
 endif()
+zephyr_library_sources(board.c)

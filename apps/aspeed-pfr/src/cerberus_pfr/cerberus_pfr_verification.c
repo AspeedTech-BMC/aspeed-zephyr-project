@@ -415,12 +415,11 @@ free_manifest:
  * }
  *
  */
-int cerberus_pfr_verify_pfm_csk_key(struct pfr_manifest *manifest)
+int cerberus_pfr_verify_pfm_csk_key(struct pfr_manifest *pfr_manifest)
 {
-	if (!manifest)
+	if (!pfr_manifest)
 		return Failure;
 
-	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 	struct pfm_fw_version_element_image fw_ver_element_img;
 	struct pfm_firmware_version_element fw_ver_element;
@@ -487,12 +486,11 @@ int cerberus_pfr_verify_pfm_csk_key(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int cerberus_verify_regions(struct manifest *manifest)
+int cerberus_verify_regions(struct pfr_manifest *pfr_manifest)
 {
-	if (!manifest)
+	if (!pfr_manifest)
 		return Failure;
 
-	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	struct manifest_flash *manifest_flash = getManifestFlashInstance();
 	struct pfm_firmware_version_element fw_ver_element;
 	uint8_t signature[RSA_MAX_KEY_LENGTH];

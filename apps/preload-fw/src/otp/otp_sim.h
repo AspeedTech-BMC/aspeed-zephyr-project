@@ -34,7 +34,9 @@
 #define OTP_IMAGE_SIZE(info)	((info) & 0xffff)
 
 #define OTP_AST1060A1	3
+#define OTP_AST1060A2	4
 #define SOC_AST1060A1	6
+#define SOC_AST1060A2	7
 
 #define OTP_REG_RESERVED	-1
 #define OTP_REG_VALUE		-2

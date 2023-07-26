@@ -23,6 +23,7 @@
 #include "cerberus_pfr_recovery.h"
 #include "cerberus_pfr_key_cancellation.h"
 #include "cerberus_pfr_key_manifest.h"
+#include "cerberus_pfr_svn.h"
 #include "flash/flash_aspeed.h"
 #include "common/common.h"
 
@@ -134,16 +135,23 @@ int cerberus_append_key_manifest(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int cerberus_update_rot_fw(struct pfr_manifest *manifest)
+int cerberus_update_rot_fw(struct pfr_manifest *manifest, uint32_t flash_select)
 {
-	uint32_t region_size = pfr_spi_get_device_size(ROT_INTERNAL_ACTIVE);
+	uint32_t region_size;
 	uint32_t source_address = manifest->address;
-	uint32_t rot_recovery_address = 0;
-	uint32_t rot_active_address = 0;
 	uint32_t length_page_align;
+	uint8_t region_type;
 
 	struct recovery_header image_header;
 	struct recovery_section image_section;
+
+	if (flash_select == PRIMARY_FLASH_REGION) {
+		region_type = ROT_INTERNAL_ACTIVE;
+	} else if (flash_select == SECONDARY_FLASH_REGION) {
+		region_type = ROT_INTERNAL_RECOVERY;
+	} else {
+		return Failure;
+	}
 
 	pfr_spi_read(manifest->flash_id, source_address, sizeof(image_header),
 			(uint8_t *)&image_header);
@@ -152,6 +160,7 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 			(uint8_t *)&image_section);
 	source_address = source_address + image_section.header_length;
 
+	region_size = pfr_spi_get_device_size(region_type);
 	length_page_align =
 		(image_section.section_length % PAGE_SIZE)
 		? (image_section.section_length + (PAGE_SIZE - (image_section.section_length % PAGE_SIZE))) : image_section.section_length;
@@ -161,43 +170,30 @@ int cerberus_update_rot_fw(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
-	if (pfr_spi_erase_region(ROT_INTERNAL_RECOVERY, true, rot_recovery_address,
-				region_size)) {
-		LOG_ERR("Erase PFR Recovery region failed, address = %x, length = %x",
-				rot_recovery_address, region_size);
-		return Failure;
-	}
-
-	if (pfr_spi_region_read_write_between_spi(ROT_INTERNAL_ACTIVE, rot_active_address,
-				ROT_INTERNAL_RECOVERY, rot_recovery_address, region_size)) {
-		LOG_ERR("read(ROT_INTERNAL_ACTIVE) address =%x, write(ROT_INTERNAL_RECOVERY) address = %x, length = %x",
-				rot_active_address, rot_recovery_address, region_size);
-		return Failure;
-	}
-
-	if (pfr_spi_erase_region(ROT_INTERNAL_ACTIVE, true, rot_active_address,
-				region_size)) {
-		LOG_ERR("Erase PFR Active region failed, address = %x, length = %x",
-				rot_active_address, region_size);
+	if (pfr_spi_erase_region(region_type, true, 0, region_size)) {
+		LOG_ERR("Erase PFR flash region failed, region id = %x, address = 0, length = %x",
+				region_type, region_size);
 		return Failure;
 	}
 
 	if (pfr_spi_region_read_write_between_spi(BMC_SPI, source_address,
-				ROT_INTERNAL_ACTIVE, rot_active_address, length_page_align)) {
-		LOG_ERR("read(BMC_SPI) address =%x, write(ROT_INTERNAL_ACTIVE) address = %x, length = %x",
-				source_address, rot_active_address, length_page_align);
+				region_type, 0, length_page_align)) {
+		LOG_ERR("read(BMC_SPI) address =%x, write(PFR_SPI) region id = %x, address = 0, length = %x",
+				source_address, region_type, length_page_align);
 		return Failure;
 	}
+
 	LOG_INF("ROT Firmware update done");
 
 	return Success;
 }
 
-int cerberus_hrot_update(struct pfr_manifest *manifest)
+int cerberus_hrot_update(struct pfr_manifest *manifest, uint32_t flash_select)
 {
 	byte provision_state = GetUfmStatusValue();
 	struct recovery_header image_header;
-	int status = 0;
+	struct PFR_VERSION *hrot_version;
+	uint8_t hrot_svn = 0;
 
 	if (provision_state & UFM_PROVISIONED) {
 		LOG_INF("Verifying image, manifest->flash_id=%d address=%08x", manifest->flash_id, manifest->address);
@@ -215,17 +211,36 @@ int cerberus_hrot_update(struct pfr_manifest *manifest)
 		}
 
 		manifest->pc_type = PFR_CPLD_UPDATE_CAPSULE;
-		status =  cerberus_pfr_verify_image(manifest);
-		if (status != Success) {
+		if (cerberus_pfr_verify_image(manifest)) {
 			LOG_ERR("HRoT Image Verify Failed");
 			return Failure;
 		}
 
 		if (image_header.format == UPDATE_FORMAT_TYPE_HROT) {
-			if (cerberus_update_rot_fw(manifest)) {
+			LOG_INF("HRoT %s update start", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
+			hrot_version = (struct PFR_VERSION *)image_header.version_id;
+			if (hrot_version->reserved1 != 0 ||
+			    hrot_version->reserved2 != 0 ||
+			    hrot_version->reserved3 != 0) {
+				LOG_ERR("Invalid reserved data");
+				return Failure;
+			}
+
+			hrot_svn = hrot_version->svn;
+			if (svn_policy_verify(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn)) {
+				LOG_ERR("HRoT verify svn failed");
+				LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+				return Failure;
+			}
+
+			if (cerberus_update_rot_fw(manifest, flash_select)) {
 				LOG_ERR("HRoT update failed.");
 				return Failure;
 			}
+
+			set_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE, hrot_svn);
+			SetCpldRotSvn(hrot_svn);
+			LOG_INF("HRoT %s update end", (flash_select == PRIMARY_FLASH_REGION)? "Active" : "Recovery");
 		} else if (image_header.format == UPDATE_FORMAT_TYPE_DCC) {
 			if (cerberus_pfr_decommission(manifest)) {
 				LOG_ERR("Decommission failed.");
@@ -338,21 +353,22 @@ int cerberus_update_active_region(struct pfr_manifest *manifest, bool erase_rw_r
 	return status;
 }
 
-int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
+int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext, CPLD_STATUS *cpld_update_status)
 {
 	EVENT_CONTEXT *EventData = (EVENT_CONTEXT *) EventContext;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
+	AO_DATA *ActiveObjectData = (AO_DATA *) AoData;
 	uint8_t flash_select = EventData->flash;
 	struct recovery_header image_header;
-	CPLD_STATUS cpld_update_status;
 	bool erase_rw_regions = false;
-	uint8_t status = Success;
 	uint32_t source_address;
 	uint32_t target_address;
 	uint32_t act_pfm_offset;
 	uint32_t flash_id;
 	uint32_t pc_type;
 	uint32_t address;
+	uint8_t status = Success;
+	uint8_t staging_svn = 0;
 
 	if (((EVENT_CONTEXT *)EventContext)->flag & UPDATE_DYNAMIC)
 		erase_rw_regions = true;
@@ -404,34 +420,29 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		pfr_manifest->flash_id = flash_id;
 		pc_type = PFR_CPLD_UPDATE_CAPSULE;
 		pfr_manifest->pc_type = pc_type;
-		return cerberus_hrot_update(pfr_manifest);
+		return cerberus_hrot_update(pfr_manifest, flash_select);
 	}
 
 	pfr_manifest->staging_address = source_address;
 	pfr_manifest->active_pfm_addr = act_pfm_offset;
 
-	status = ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-	if (status != Success)
-		return status;
-	if (cpld_update_status.BmcToPchStatus == 1) {
-		cpld_update_status.BmcToPchStatus = 0;
-		status = ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
-				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		if (status != Success)
-			return Failure;
+	if (image_type == PCH_TYPE && cpld_update_status->BmcToPchStatus == 1) {
+		cpld_update_status->BmcToPchStatus = 0;
+		if (cpld_update_status->Region[PCH_REGION].Recoveryregion != RECOVERY_PENDING_REQUEST_HANDLED) {
+			status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET,
+					(uint8_t *)&address, sizeof(address));
+			if (status != Success)
+				return Failure;
 
-		status = ufm_read(PROVISION_UFM, BMC_STAGING_REGION_OFFSET, (uint8_t *)&address, sizeof(address));
-		if (status != Success)
-			return Failure;
+			address += CONFIG_BMC_STAGING_SIZE;
 
-		address += CONFIG_BMC_STAGING_SIZE;
+			// Checking for key cancellation
+			pfr_manifest->address = address;
 
-		// Checking for key cancellation
-		pfr_manifest->address = address;
-
-		status = pfr_staging_pch_staging(pfr_manifest);
-		if (status != Success)
-			return Failure;
+			status = pfr_staging_pch_staging(pfr_manifest);
+			if (status != Success)
+				return Failure;
+		}
 	}
 
 	pfr_manifest->image_type = image_type;
@@ -467,9 +478,35 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		return Failure;
 	}
 
+	// SVN number validation
+	status = read_statging_area_pfm_svn(pfr_manifest, &image_header, &staging_svn);
+	if (status != Success) {
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		LOG_ERR("Get staging svn failed");
+		return Failure;
+	}
+
+	if (pfr_manifest->image_type == BMC_TYPE)
+		status = svn_policy_verify(SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn);
+	else
+		status = svn_policy_verify(SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn);
+
+	if (status != Success) {
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		LOG_ERR("Anti rollback");
+		return Failure;
+	}
+
 	if (flash_select == PRIMARY_FLASH_REGION) {
-		//Update Active
+		// Update Active
 		LOG_INF("Update Type: Active Update.");
+
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			LOG_ERR("Restrict Active Update");
+			LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+			return Failure;
+		}
+
 		uint32_t time_start, time_end;
 
 		time_start = k_uptime_get_32();
@@ -481,19 +518,37 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext)
 		LOG_INF("Firmware update completed, elapsed time = %u milliseconds",
 				(time_end - time_start));
 	} else {
-		//Update Recovery
+		// Update Recovery
 		LOG_INF("Update Type: Recovery Update.");
 		if (image_type == BMC_TYPE) {
-			//BMC Update/Provisioning
+			// BMC Update/Provisioning
 			get_provision_data_in_flash(BMC_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(BMC_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 		} else if (image_type == PCH_TYPE) {
-			//PCH Update
+			// PCH Update
 			get_provision_data_in_flash(PCH_STAGING_REGION_OFFSET, (uint8_t *)&source_address, sizeof(source_address));
 			get_provision_data_in_flash(PCH_RECOVERY_REGION_OFFSET, (uint8_t *)&target_address, sizeof(target_address));
 		}
 
+		if (ActiveObjectData->RestrictActiveUpdate == 1) {
+			status = does_staged_fw_image_match_active_fw_image(pfr_manifest);
+			if (status != Success) {
+				LogUpdateFailure(UPD_NOT_ALLOWED, 0);
+				return Failure;
+			}
+		}
+
 		status = cerberus_update_recovery_region(image_type, source_address, target_address);
+		if (status != Success) {
+			LOG_ERR("Recovery region update failed");
+			return Failure;
+		}
+
+		// update svn
+		if (pfr_manifest->image_type == BMC_TYPE)
+			status = set_ufm_svn(SVN_POLICY_FOR_BMC_FW_UPDATE, staging_svn);
+		else
+			status = set_ufm_svn(SVN_POLICY_FOR_PCH_FW_UPDATE, staging_svn);
 	}
 
 	return status;

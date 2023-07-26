@@ -58,6 +58,7 @@ enum aspeed_pfr_event {
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	ATTESTATION_FAILED,
 #endif
+	HANDSHAKE_FAILED,
 };
 
 enum OPERATIONS {
@@ -148,6 +149,9 @@ struct smf_context {
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	AO_DATA afm_active_object;
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	AO_DATA cpld_active_object;
+#endif
 };
 
 extern struct k_fifo aspeed_sm_fifo;
@@ -156,3 +160,4 @@ extern size_t event_log_idx;
 
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data);
 void AspeedStateMachine(void);
+int is_afm_ready(void);

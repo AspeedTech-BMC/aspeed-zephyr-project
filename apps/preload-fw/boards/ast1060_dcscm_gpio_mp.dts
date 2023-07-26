@@ -1,0 +1,8 @@
+/ {
+	pfr_gpio_mp {
+		compatible = "aspeed,pfr-gpio-mp";
+		mp-status1-out-gpios = <&gpio0_i_l 24 0>; /* GPIO_L0 */
+		mp-status2-out-gpios = <&gpio0_i_l 2 0>;  /* GPIO_I2 */
+	};
+};
+

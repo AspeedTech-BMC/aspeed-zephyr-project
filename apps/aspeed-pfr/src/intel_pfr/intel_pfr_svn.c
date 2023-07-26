@@ -26,7 +26,7 @@ int set_ufm_svn(uint32_t offset, uint8_t svn)
 	int status = 0;
 
 	if (svn > SVN_MAX) {
-		LOG_ERR("SVN number(%02x) exceed SVN max(%02x)", svn, SVN_MAX);
+		LOG_ERR("SVN number(%d) exceed SVN max(%d)", svn, SVN_MAX);
 		return Failure;
 	}
 
@@ -77,10 +77,10 @@ int svn_policy_verify(uint32_t offset, uint32_t svn)
 	current_svn = get_ufm_svn(offset);
 
 	if (svn > SVN_MAX) {
-		LOG_ERR("Invalid SVN Number, %02x", svn);
+		LOG_ERR("Invalid SVN Number(%d)", svn);
 		return Failure;
 	} else if (svn < current_svn) {
-		LOG_ERR("Invalid SVN number, current=%02x verify_svn=%02x",
+		LOG_ERR("Invalid SVN number, current=%d verify_svn=%d",
 				current_svn, svn);
 		return Failure;
 	}

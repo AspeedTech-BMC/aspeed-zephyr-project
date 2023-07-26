@@ -47,10 +47,10 @@ LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
  * }
  *
  */
-int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_region_addr,
-		struct pfm_firmware_version_element *fw_ver_element)
+int cerberus_get_version_info(int spi_dev, uint32_t pfm_addr, uint32_t *fw_ver_element_addr,
+	struct pfm_firmware_version_element *fw_ver_element)
 {
-	if (!rw_region_addr || !fw_ver_element)
+	if (!fw_ver_element_addr || !fw_ver_element)
 		return Failure;
 
 	struct manifest_platform_id plat_id_header;
@@ -60,7 +60,6 @@ int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_reg
 	uint32_t read_address;
 	uint32_t hash_length;
 	uint16_t id_length;
-	uint8_t ver_length;
 	uint8_t alignment;
 
 	read_address = pfm_addr + sizeof(struct manifest_header);
@@ -132,14 +131,34 @@ int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_reg
 		return Failure;
 	}
 
+	*fw_ver_element_addr = read_address;
+
+	return Success;
+}
+
+int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_region_addr,
+		struct pfm_firmware_version_element *fw_ver_element)
+{
+	if (!rw_region_addr || !fw_ver_element)
+		return Failure;
+
+	uint32_t fw_ver_element_addr;
+	uint8_t ver_length;
+	uint8_t alignment;
+
+	if (cerberus_get_version_info(spi_dev, pfm_addr, &fw_ver_element_addr, fw_ver_element)) {
+		LOG_ERR("Failed to get version info");
+		return Failure;
+	}
+
 	// version length should be 4 byte aligned
 	alignment = (fw_ver_element->version_length % 4) ?
 		(4 - (fw_ver_element->version_length % 4)) : 0;
 	ver_length = fw_ver_element->version_length + alignment;
-	read_address += sizeof(struct pfm_firmware_version_element) -
-		sizeof(fw_ver_element->version) + ver_length;
 
-	*rw_region_addr = read_address;
+	// PFM Firmware Version Element RW Region Offset
+	*rw_region_addr = fw_ver_element_addr + sizeof(struct pfm_firmware_version_element)
+		- sizeof(fw_ver_element->version) + ver_length;
 
 	return Success;
 }

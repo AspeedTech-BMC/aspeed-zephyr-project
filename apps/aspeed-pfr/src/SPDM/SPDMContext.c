@@ -25,10 +25,14 @@ void *spdm_context_create()
 	context->release_connection_data = NULL;
 	context->connection_state = SPDM_STATE_NOT_READY;
 
-	context->local.version.version_number_entry_count = 1;
-	context->local.version.version_number_entry[0] = SPDM_VERSION << SPDM_VERSION_NUMBER_ENTRY_SHIFT_BIT;
+	context->local.version.version_number_entry_count = 3;
+	context->local.version.version_number_selected = SPDM_VERSION_10;
+	context->local.version.version_number_entry[0] = SPDM_VERSION_12 << SPDM_VERSION_NUMBER_ENTRY_SHIFT_BIT;
+	context->local.version.version_number_entry[1] = SPDM_VERSION_11 << SPDM_VERSION_NUMBER_ENTRY_SHIFT_BIT;
+	context->local.version.version_number_entry[2] = SPDM_VERSION_10 << SPDM_VERSION_NUMBER_ENTRY_SHIFT_BIT;
 
 	context->remote.version.version_number_entry_count = 0;
+	context->remote.version.version_number_selected = SPDM_VERSION_10;
 	context->remote.version.version_number_entry[0] = 0;
 	context->remote.version.version_number_entry[1] = 0;
 	context->remote.version.version_number_entry[2] = 0;
@@ -36,8 +40,8 @@ void *spdm_context_create()
 	/* Set CT to 32768us due to mbedtls ecdsa */
 	context->local.capabilities.ct_exponent = 15;
 	context->local.capabilities.flags = SPDM_CHAL_CAP | SPDM_CERT_CAP | SPDM_MEAS_CAP_SIG;
-	context->local.capabilities.data_transfer_size = 32;
-	context->local.capabilities.max_spdm_msg_size = 32;
+	context->local.capabilities.data_transfer_size = 256;
+	context->local.capabilities.max_spdm_msg_size = 256;
 
 	context->local.algorithms.length = 0;
 	context->local.algorithms.measurement_spec_sel = SPDM_MEASUREMENT_BLOCK_DMTF_SPEC;
@@ -45,7 +49,7 @@ void *spdm_context_create()
 	context->local.algorithms.measurement_hash_algo = SPDM_ALGORITHMS_MEAS_HASH_TPM_ALG_SHA_384;
 	context->local.algorithms.base_asym_sel =SPDM_ALGORITHMS_BASE_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384;
 	context->local.algorithms.base_hash_sel = SPDM_ALGORITHMS_BASE_HASH_TPM_ALG_SHA_384;
-#if 0
+#if 1
 	context->local.algorithms.ext_asym_sel_count = 0;
 	context->local.algorithms.ext_hash_sel_count = 0;
 	context->local.algorithms.ext_asym_sel[0] = 0;
@@ -66,8 +70,8 @@ void *spdm_context_create()
 
 	context->get_measurement = NULL;
 
-#if defined(SPDM_TRANSCRIPT)
 	spdm_buffer_init(&context->message_a, 0);
+#if defined(SPDM_TRANSCRIPT)
 	spdm_buffer_init(&context->message_b, 0);
 	spdm_buffer_init(&context->message_c, 0);
 #else
@@ -104,8 +108,8 @@ void spdm_context_release(void *ctx)
 	}
 
 	mbedtls_ecp_keypair_free(&context->key_pair);
-#if defined(SPDM_TRANSCRIPT)
 	spdm_buffer_release(&context->message_a);
+#if defined(SPDM_TRANSCRIPT)
 	spdm_buffer_release(&context->message_b);
 	spdm_buffer_release(&context->message_c);
 #else
@@ -257,6 +261,17 @@ void spdm_context_reset_l1l2_hash(void *ctx)
 	mbedtls_sha512_free(&context->l1l2_context);
 	mbedtls_sha512_init(&context->l1l2_context);
 	mbedtls_sha512_starts(&context->l1l2_context, /* is384 */ 1);
+
+	LOG_DBG("RESET L1L2 BUFFER");
+}
+
+void spdm_context_update_l1l2_hash_buffer(void *ctx, void *buf)
+{
+	struct spdm_context *context = (struct spdm_context *)ctx;
+	struct spdm_buffer *buffer = (struct spdm_buffer *)buf;
+	LOG_HEXDUMP_DBG(buffer->data, buffer->write_ptr, "UPDATE L1L2 BUFFER VCA");
+
+	mbedtls_sha512_update(&context->l1l2_context, buffer->data, buffer->write_ptr);
 }
 
 void spdm_context_update_l1l2_hash(void *ctx, void *req, void *rsp)
@@ -265,6 +280,14 @@ void spdm_context_update_l1l2_hash(void *ctx, void *req, void *rsp)
 	struct spdm_message *req_msg = (struct spdm_message *)req;
 	struct spdm_message *rsp_msg = (struct spdm_message *)rsp;
 
+	LOG_HEXDUMP_DBG(&req_msg->header, sizeof(req_msg->header),
+			"UPDATE L1L2 req_msg->header");
+	LOG_HEXDUMP_DBG((const unsigned char *)req_msg->buffer.data, req_msg->buffer.write_ptr,
+			"UPDATE L1L2 req_msg->buffer");
+	LOG_HEXDUMP_DBG(&rsp_msg->header, sizeof(rsp_msg->header),
+			"UPDATE L1L2 rsp_msg->header");
+	LOG_HEXDUMP_DBG((const unsigned char *)rsp_msg->buffer.data, rsp_msg->buffer.write_ptr,
+			"UPDATE L1L2 rsp_msg->buffer");
 	mbedtls_sha512_update(&context->l1l2_context,
 			(const unsigned char *)&req_msg->header,
 			sizeof(req_msg->header));

@@ -8,6 +8,7 @@
 #include <kernel.h>
 #include <logging/log.h>
 #include "flash/flash_aspeed.h"
+#include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "wdt_utils.h"
@@ -37,6 +38,11 @@ void bmc_wdt_handler(uint8_t cmd)
 		pfr_start_timer(type, ms_timeout);
 	} else if (cmd == PausingExecutionBlock) {
 		pfr_stop_timer(type);
+		// BMC stays in uboot or in FFUJ(Force Firmware Update Jumper (FFUJ)) mode
+		// Take over i3c MNG
+#if defined(CONFIG_PFR_MCTP_I3C)
+		switch_i3c_mng_owner(I3C_MNG_OWNER_ROT);
+#endif
 	} else if (cmd == ResumedExecutionBlock) {
 		pfr_start_timer(type, ms_timeout);
 	} else if (cmd == NextExeBlockAuthenticationFail) {

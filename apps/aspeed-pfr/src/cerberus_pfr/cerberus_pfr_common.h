@@ -11,13 +11,15 @@
 #include "pfr/pfr_common.h"
 #include "manifest/pfm/pfm_format.h"
 
+int cerberus_get_version_info(int spi_dev, uint32_t pfm_addr, uint32_t *fw_ver_element_addr,
+	struct pfm_firmware_version_element *fw_ver_element);
 int cerberus_get_rw_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *rw_region_addr,
-		struct pfm_firmware_version_element *fw_ver_element);
+	struct pfm_firmware_version_element *fw_ver_element);
 int cerberus_get_signed_region_info(int spi_dev, uint32_t pfm_addr, uint32_t *signed_region_addr,
-		struct pfm_firmware_version_element *fw_ver_element);
+	struct pfm_firmware_version_element *fw_ver_element);
 int cerberus_get_image_pfm_addr(struct pfr_manifest *manifest,
-		struct recovery_header *image_header, uint32_t *src_pfm_addr,
-		uint32_t *dest_pfm_addr);
+	struct recovery_header *image_header, uint32_t *src_pfm_addr,
+	uint32_t *dest_pfm_addr);
 uint32_t *cerberus_get_update_regions(struct pfr_manifest *manifest,
-		struct recovery_header *image_header, uint32_t *region_cnt);
+	struct recovery_header *image_header, uint32_t *region_cnt);
 

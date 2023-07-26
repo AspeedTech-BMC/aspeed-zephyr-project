@@ -27,8 +27,6 @@ LOG_MODULE_REGISTER(hal_i3c);
 
 static const struct device *dev_i3c[I3C_MAX_NUM];
 static const struct device *dev_i3c_smq[I3C_MAX_NUM];
-static struct i3c_dev_desc i3c_desc_table[I3C_MAX_NUM];
-static int i3c_desc_count = 0;
 
 int i3c_slave_mqueue_read(const struct device *dev, uint8_t *dest, int budget);
 int i3c_slave_mqueue_write(const struct device *dev, uint8_t *src, int size);

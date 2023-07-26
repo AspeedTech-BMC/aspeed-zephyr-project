@@ -18,8 +18,13 @@
 #pragma pack(1)
 
 #define SPDM_MAJOR_VERSION 1
-#define SPDM_MINOR_VERSION 0
-#define SPDM_VERSION ((SPDM_MAJOR_VERSION << 4) | SPDM_MINOR_VERSION)
+#define SPDM_MINOR_VERSION_0 0
+#define SPDM_MINOR_VERSION_1 1
+#define SPDM_MINOR_VERSION_2 2
+#define SPDM_VERSION_10 ((SPDM_MAJOR_VERSION << 4) | SPDM_MINOR_VERSION_0)
+#define SPDM_VERSION_11 ((SPDM_MAJOR_VERSION << 4) | SPDM_MINOR_VERSION_1)
+#define SPDM_VERSION_12 ((SPDM_MAJOR_VERSION << 4) | SPDM_MINOR_VERSION_2)
+#define SPDM_VERSION SPDM_VERSION_12
 
 typedef enum {
 	/* SPDM 1.0 */
@@ -53,6 +58,11 @@ struct spdm_message_header {
 	uint8_t param1;
 	uint8_t param2;
 };
+
+typedef enum SPDM_MEDIUM {
+	SPDM_MEDIUM_SMBUS = 0x01,
+	SPDM_MEDIUM_I3C = 0x06,
+} SPDM_MEDIUM;
 #pragma pack()
 
 struct spdm_message {
@@ -68,4 +78,4 @@ typedef struct {
 } spdm_request_data;
 
 void init_spdm();
-void init_requester_context(struct spdm_context *context, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid);
+bool init_requester_context(struct spdm_context *context, SPDM_MEDIUM medium, uint8_t bus, uint8_t dst_sa, uint8_t dst_eid);

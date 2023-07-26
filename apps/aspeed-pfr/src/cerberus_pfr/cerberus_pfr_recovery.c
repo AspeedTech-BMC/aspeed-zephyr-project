@@ -20,6 +20,7 @@
 #include "cerberus_pfr_definitions.h"
 #include "cerberus_pfr_provision.h"
 #include "cerberus_pfr_verification.h"
+#include "cerberus_pfr_svn.h"
 #include "flash/flash_util.h"
 #include "flash/flash_aspeed.h"
 #include "pfr/pfr_util.h"
@@ -375,6 +376,12 @@ int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
 	status = cerberus_pfr_verify_pfm_csk_key(manifest);
 	if (status != Success) {
 		LOG_ERR("Verify PFM CSK key failed");
+		return Failure;
+	}
+
+	status = get_recover_pfm_version_details(manifest);
+	if (status != Success) {
+		LOG_ERR("Get recovery pfm version failed");
 		return Failure;
 	}
 

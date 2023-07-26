@@ -5,8 +5,13 @@
  */
 
 #include <stdint.h>
+#include <device.h>
 #include <logging/log.h>
+#include <drivers/i2c/pfr/i2c_filter.h>
 #include "common/common.h"
+#include "engineManager/engine_manager.h"
+#include "manifestProcessor/manifestProcessor.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr/intel_pfr_provision.h"
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 
@@ -14,20 +19,8 @@
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
-void apply_pfm_protection(int spi_device_id)
+void init_i2c_filters(void)
 {
-
-	int status = 0;
-	int spi_id = spi_device_id;
-	const char *spim_devs[SPIM_NUM] = {
-		"spi_m1",
-		"spi_m2",
-		"spi_m3",
-		"spi_m4"
-	};
-
-	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
-	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
 	char bus_dev_name[] = "I2C_FILTER_x";
 	const struct device *flt_dev = NULL;
 
@@ -40,6 +33,25 @@ void apply_pfm_protection(int spi_device_id)
 			ast_i2c_filter_default(flt_dev, 0);
 		}
 	}
+}
+
+void apply_pfm_protection(int spi_device_id)
+{
+
+	int status = 0;
+	bool i2c_flt_init = false;
+	int spi_id = spi_device_id;
+	const char *spim_devs[SPIM_NUM] = {
+		"spi_m1",
+		"spi_m2",
+		"spi_m3",
+		"spi_m4"
+	};
+
+	status = spi_filter_wrapper_init(getSpiFilterEngineWrapper());
+	struct spi_filter_engine_wrapper *spi_filter = getSpiFilterEngineWrapper();
+	char bus_dev_name[] = "I2C_FILTER_x";
+	const struct device *flt_dev = NULL;
 
 	// read PFR_Manifest
 	status = initializeEngines();
@@ -73,13 +85,13 @@ void apply_pfm_protection(int spi_device_id)
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
 #endif
 
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH) || defined(CONFIG_CPU_DUAL_FLASH)
 	int flash_size;
 #endif
 
 	// assign the flash device id,  0:spi1_cs0, 1:spi2_cs0 , 2:spi2_cs1, 3:spi2_cs2, 4:fmc_cs0, 5:fmc_cs1
 	spi_flash->spi.state->device_id[0] = spi_device_id;
-	spi_flash->spi.base.read(&spi_flash->spi, addr_size_of_pfm, pfm_length, 4);
+	spi_flash->spi.base.read((struct flash *)&spi_flash->spi, addr_size_of_pfm, pfm_length, 4);
 
 	int pfm_record_length = (pfm_length[0] & 0xff) | (pfm_length[1] << 8 & 0xff00) | (pfm_length[2] << 16 & 0xff0000) | (pfm_length[3] << 24 & 0xff000000);
 
@@ -88,7 +100,7 @@ void apply_pfm_protection(int spi_device_id)
 
 	while (!done) {
 		/* Read PFM Record */
-		spi_flash->spi.base.read(&spi_flash->spi, pfm_region_Start, region_record, default_region_length);
+		spi_flash->spi.base.read((struct flash *)&spi_flash->spi, pfm_region_Start, region_record, default_region_length);
 		switch(region_record[0]) {
 		case SPI_REGION:
 			/* SPI Region: 0x01 */
@@ -106,19 +118,38 @@ void apply_pfm_protection(int spi_device_id)
 			region_end_address = (region_record[12] & 0xff) | (region_record[13] << 8 & 0xff00) |
 				(region_record[14] << 16 & 0xff0000) | (region_record[15] << 24 & 0xff000000);
 
-#if defined(CONFIG_DUAL_FLASH)
-			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
-			if (region_start_address >= flash_size && region_end_address >= flash_size) {
-				region_start_address -= flash_size;
-				region_end_address -= flash_size;
-				spi_id = spi_device_id + 1;
-			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
-				LOG_ERR("ERROR: region start and end address should be in the same flash");
-				return;
-			} else {
-				spi_id = spi_device_id;
+#if defined(CONFIG_BMC_DUAL_FLASH)
+			if (spi_device_id == BMC_SPI) {
+				spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+				if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
+					region_start_address -= flash_size;
+					region_end_address -= flash_size;
+					spi_id = spi_device_id + 1;
+				} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
+					LOG_ERR("ERROR: region start and end address should be in the same flash");
+					return;
+				} else {
+					spi_id = spi_device_id;
+				}
 			}
 #endif
+
+#if defined(CONFIG_CPU_DUAL_FLASH)
+			if (spi_device_id == PCH_SPI) {
+				spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
+				if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
+					region_start_address -= flash_size;
+					region_end_address -= flash_size;
+					spi_id = spi_device_id + 1;
+				} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
+					LOG_ERR("ERROR: region start and end address should be in the same flash");
+					return;
+				} else {
+					spi_id = spi_device_id;
+				}
+			}
+#endif
+
 			spi_filter->dev_id = spi_id;
 			region_length = region_end_address - region_start_address;
 			if (region_record[1] & 0x02) {
@@ -131,7 +162,7 @@ void apply_pfm_protection(int spi_device_id)
 			} else {
 				/* Write not allowed region */
 				// Cerberus did not support write not allowed setting
-				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
+				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
 						SPI_FILTER_WRITE_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] write disable 0x%08x to 0x%08x",
@@ -141,7 +172,7 @@ void apply_pfm_protection(int spi_device_id)
 			if (region_record[1] & 0x01) {
 				/* Read allowed region */
 				// Cerberus did not support read disabled
-				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
+				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_ENABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] read  enable  0x%08x to 0x%08x",
@@ -149,7 +180,7 @@ void apply_pfm_protection(int spi_device_id)
 			} else {
 				/* Read not allowed region */
 				// Cerberus did not support read disabled
-				Set_SPI_Filter_RW_Region(spim_devs[spi_id],
+				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
 						SPI_FILTER_READ_PRIV, SPI_FILTER_PRIV_DISABLE,
 						region_start_address, region_length);
 				LOG_INF("SPI_ID[%d] read  disable 0x%08x to 0x%08x",
@@ -172,6 +203,10 @@ void apply_pfm_protection(int spi_device_id)
 				pfm_region_Start = pfm_region_Start + 16;
 			break;
 		case SMBUS_RULE:
+			if (!i2c_flt_init) {
+				init_i2c_filters();
+				i2c_flt_init = true;
+			}
 			/* SMBus Rule Definition: 0x02 */
 			LOG_INF("SMBus Rule Bus[%d] RuleId[%d] DeviceAddr[%x]",
 					region_record[5], region_record[6], region_record[7]);
@@ -198,7 +233,7 @@ void apply_pfm_protection(int spi_device_id)
 							flt_dev,
 							region_record[6] - 1, // Rule ID
 							slave_addr,           // Device Address
-							&region_record[8]     // cmd_whitelist
+							(struct ast_i2c_f_bitmap *)&region_record[8]     // cmd_whitelist
 							);
 					LOG_DBG("ast_i2c_filter_update ret=%d", status);
 				} else {
@@ -225,6 +260,6 @@ void apply_pfm_protection(int spi_device_id)
 			break;
 	}
 
-	spi_filter->base.enable_filter(spi_filter, true);
+	spi_filter->base.enable_filter((struct spi_filter_interface *)spi_filter, true);
 }
 

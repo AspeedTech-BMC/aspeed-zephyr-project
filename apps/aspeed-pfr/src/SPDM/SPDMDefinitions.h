@@ -87,3 +87,12 @@
 
 #define SPDM_MEASUREMENT_OPERATION_TOTAL_NUMBER 0x00
 #define SPDM_MEASUREMENT_OPERATION_ALL_MEASUREMENTS 0xFF
+
+/* SPDM Version String */
+#define SPDM_PREFIX_VERSION_12 "dmtf-spdm-v1.2.*dmtf-spdm-v1.2.*dmtf-spdm-v1.2.*dmtf-spdm-v1.2.*"
+
+/* Signature Generation Context */
+#define SPDM_SIGN_CONTEXT_M1M2_RSP "responder-challenge_auth signing"
+#define SPDM_SIGN_CONTEXT_M1M2_REQ "requester-challenge_auth signing"
+#define SPDM_SIGN_CONTEXT_L1L2_RSP "responder-measurements signing"
+#define SPDM_SIGN_CONTEXT_L1L2_REQ "responder-measurements signing"

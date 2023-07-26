@@ -11,6 +11,7 @@
 #include "include/SmbusMailBoxCom.h"
 #include "AspeedStateMachine/common_smc.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "Smbus_mailbox/Smbus_mailbox.h"
 #include "wdt_utils.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);

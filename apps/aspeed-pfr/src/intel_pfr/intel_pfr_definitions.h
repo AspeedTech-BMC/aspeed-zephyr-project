@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <stdint.h>
 
 #define BMC_FLASH_ID                    0
 #define PCH_FLASH_ID                    1
@@ -20,6 +21,8 @@
 #define AFM_TYPE                        5
 #endif
 
+#define CPLD_TYPE                       6
+
 #define UFM0                            4
 #define UFM0_SIZE                       512
 
@@ -34,6 +37,10 @@
 
 #define UPDATE_STATUS_UFM               UFM1
 #define UPDATE_STATUS_ADDRESS           0x00
+#define UPDATE_STATUS_ROT_HASH_ADDR     0x40
+#define UPDATE_STATUS_BMC_HASH_ADDR     0x80
+#define UPDATE_STATUS_PCH_HASH_ADDR     0xC0
+#define UPDATE_STATUS_AFM_HASH_ADDR     0x100
 
 // BIOS/BMC SPI Region information
 #define PCH_ACTIVE_FW_UPDATE_ADDRESS    0x00000000
@@ -89,6 +96,9 @@
 #define SIGN_BMC_UPDATE_BIT3            0x00000008
 #define SIGN_CPLD_UPDATE_BIT4           0x00000010
 #define SIGN_AFM_UPDATE_BIT5            0x00000020
+// Intel CPU/SCM/Debug CPLD capsule
+#define SIGN_INTEL_CPLD_UPDATE_BIT6     0x00000040
+
 #define SIGN_CPLD_UPDATE_BIT9           0x00000200
 
 #define SHA384_SIZE                     48
@@ -118,6 +128,23 @@ typedef enum {
 	DECOMPRESSION_STATIC_AND_DYNAMIC_REGIONS_MASK = 0b11,
 } DECOMPRESSION_TYPE_MASK_ENUM;
 
+typedef enum {
+	ROT_REGION = 0,
+	BMC_REGION,
+	PCH_REGION,
+	AFM_REGION,
+} REGION_DEF;
+
+typedef enum {
+	BMC_INTENT_UPDATE_AT_RESET = 1,
+	BMC_INTENT_RECOVERY_PENDING,
+	PCH_INTENT_UPDATE_AT_RESET,
+	PCH_INTENT_RECOVERY_PENDING,
+	BMC_INTENT2_AFM_RECOVERY_PENDING,
+	RECOVERY_PENDING_REQUEST_HANDLED,
+	MAX_INTENT_TYPE_DEF,
+} REGION_UPDATE_INTENT_TYPE_DEF;
+
 typedef struct {
 	uint8_t ActiveRegion;
 	uint8_t Recoveryregion;
@@ -127,7 +154,8 @@ typedef struct {
 	uint8_t CpldStatus;
 	uint8_t BmcStatus;
 	uint8_t PchStatus;
-	UPD_REGION Region[3];
+	uint8_t AfmStatus;
+	UPD_REGION Region[4];
 	uint8_t DecommissionFlag;
 	uint8_t CpldRecovery;
 	uint8_t BmcToPchStatus;

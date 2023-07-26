@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include "otp/otp_utils.h"
 #include "otp/otp_sim.h"
+#include "mp/mp_util.h"
 
 #define shell_printf(_sh, _ft, ...) \
 	shell_fprintf(_sh, SHELL_NORMAL, _ft, ##__VA_ARGS__)

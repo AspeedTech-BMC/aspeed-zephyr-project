@@ -1,5 +1,5 @@
 #include "ast1060_dcscm_gpio_common.dts"
-#include "ast1060_dcscm_gpio_egs.dts"
+#include "ast1060_dcscm_gpio_bhs.dts"
 
 &i2cfilter {
 	pinctrl-0 = <&pinctrl_smbflt_default>;
@@ -63,14 +63,15 @@
 	status = "okay";
 };
 
-#if 0
 // For mctp over i3c
 // AST2600 i3c-1 -> AST1060 i3c-2
 &i3c2 {
 	status = "okay";
+	pinctrl-0 = <&pinctrl_i3c2_default>;
+#if 0
+	# For CONFIG_I3C_SLAVE=y
 	assigned-address = <0x9>;
 	pid-extra-info = <0x9>;
-	pinctrl-0 = <&pinctrl_i3c2_default>;
 	ibi-append-pec;
 	priv-xfer-pec;
 	secondary;
@@ -83,8 +84,8 @@
 		 label = "I3C_SMQ_2";
 		 status = "okay";
 	 };
-};
 #endif
+};
 
 &wdt0 {
 	status = "okay";
@@ -184,6 +185,14 @@
 			reg = <0x180000 0x80000>;
 		};
 #endif
+		cpld_act_partition: partition@0 {
+			label = "intel_cpld_act";
+			reg = <0x000000 0x200000>;
+		};
+		cpld_rcv_partition: partition@1 {
+			label = "intel_cpld_rc";
+			reg = <0x200000 0x200000>;
+		};
 	};
 };
 

@@ -1,4 +1,5 @@
 #include "ast1060_dcscm_gpio_common.dts"
+#include "ast1060_dcscm_gpio_mp.dts"
 
 &i2cfilter {
 	pinctrl-0 = <&pinctrl_smbflt_default>;
@@ -166,13 +167,13 @@
 #endif
 
 &spi2_cs0 {
-	spi-max-buswidth = <4>;
+	spi-max-buswidth = <1>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
 };
 
 &spi2_cs1 {
-	spi-max-buswidth = <4>;
+	spi-max-buswidth = <1>;
 	spi-max-frequency = <50000000>;
 	status = "okay";
 };
@@ -220,7 +221,7 @@
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pinctrl_spim3_cs &pinctrl_spim3_in_default &pinctrl_spim3_out_default
 		&pinctrl_spim3_qspi_in_default &pinctrl_spim3_qspi_out_default
-		&pinctrl_spim3_muxsel &pinctrl_spim3_rst_out>;
+		&pinctrl_spim3_muxsel>;
 
 	flash-device = <&spi2_cs0>;
 	ext-mux-sel = <1>;
@@ -232,7 +233,7 @@
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pinctrl_spim4_cs &pinctrl_spim4_in_default &pinctrl_spim4_out_default
 		&pinctrl_spim4_qspi_in_default &pinctrl_spim4_qspi_out_default
-		&pinctrl_spim4_muxsel &pinctrl_spim4_rst_out>;
+		&pinctrl_spim4_muxsel>;
 
 	flash-device = <&spi2_cs1>;
 	ext-mux-sel = <1>;

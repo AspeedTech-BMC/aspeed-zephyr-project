@@ -79,7 +79,7 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 	uint32_t region_start_address;
 	uint32_t region_end_address;
 	int region_length;
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_CPU_DUAL_FLASH)
 	int flash_size;
 #endif
 	int spi_id = 0;
@@ -89,23 +89,24 @@ void apply_fvm_spi_protection(struct spi_engine_wrapper *spi_flash, uint32_t fvm
 	};
 
 	spi_flash->spi.state->device_id[0] = PCH_SPI;
-	spi_flash->spi.base.read(&spi_flash->spi, fvm_offset, &fvm, sizeof(FVM_STRUCTURE));
+	spi_flash->spi.base.read((struct flash *)&spi_flash->spi, fvm_offset, (uint8_t *)&fvm,
+			sizeof(FVM_STRUCTURE));
 	fvm_body_end_addr = fvm_offset + fvm.Length;
 
-	while(fvm_body_offset < fvm_body_end_addr) {
-		spi_flash->spi.base.read(&spi_flash->spi, fvm_body_offset, &spi_def,
-				sizeof(PFM_SPI_DEFINITION));
+	while (fvm_body_offset < fvm_body_end_addr) {
+		spi_flash->spi.base.read((struct flash *)&spi_flash->spi, fvm_body_offset,
+				(uint8_t *)&spi_def, sizeof(PFM_SPI_DEFINITION));
 		if (spi_def.PFMDefinitionType == SPI_REGION) {
 			region_start_address = spi_def.RegionStartAddress;
 			region_end_address = spi_def.RegionEndAddress;
 			region_length = region_end_address - region_start_address;
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_CPU_DUAL_FLASH)
 			spi_flash->spi.base.get_device_size((struct flash *)&spi_flash->spi, &flash_size);
-			if (region_start_address >= flash_size && region_end_address >= flash_size) {
+			if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
 				region_start_address -= flash_size;
 				region_end_address -= flash_size;
 				spi_id = 1;
-			} else if (region_start_address < flash_size && region_end_address >= flash_size) {
+			} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
 				LOG_ERR("ERROR: region start and end address should be in the same flash");
 				return;
 			} else {

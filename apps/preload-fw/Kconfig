@@ -7,11 +7,17 @@ config ASPEED_DC_SCM
 	help
 	  Enable ASPEED DC-SCM board basic settings.
 
-config DUAL_FLASH
+config BMC_DUAL_FLASH
 	default n
-	bool "Enable dual flash support"
+	bool "Enable BMC dual flash support"
 	help
-	  Enable if BMC and/or PCH has dual flash
+	  Enable if BMC has dual flash
+
+config CPU_DUAL_FLASH
+	default n
+	bool "Enable CPU dual flash support"
+	help
+	  Enable if CPU has dual flash
 
 config SPI_MUX_INVERSE
 	default n
@@ -33,17 +39,37 @@ config OTP_SIM_SHELL
 	help
 	  Enable OTP commands for read otp data from flash
 
-config DEVID_CERT_PROVISIONING
-	default y
-	bool "Device ID provisioning"
-	help
-	  Enable device id certificate provisioning flow
-
 config ODM_ROT_REPLACEMENT
-        depends on DEVID_CERT_PROVISIONING
-	default n
+	default y
 	bool "ODM ROT replacement"
 	help
 	  Replace ROT firmware by mcuboot recovery mechanism after devid provisioned
+
+config AST1060_PROGRAMMER_MP
+	depends on BOARD_AST1060_MP
+	default n
+	bool "MP via programmer"
+	help
+	  Support programming OTP and ROT firmware via programmer
+
+config MP_ROT_IMAGE_OFFSET
+	depends on AST1060_PROGRAMMER_MP
+	default 0x60000
+	hex "ROT firmware image start address"
+
+config MP_ROT_IMAGE_SIZE
+	depends on AST1060_PROGRAMMER_MP
+	default 0x60000
+	hex "ROT firmware image size"
+
+config MP_OTP_IMAGE_OFFSET
+	depends on AST1060_PROGRAMMER_MP
+	default 0x40000
+	hex "OTP image start address"
+
+config MP_OTP_IMAGE_SIZE
+	depends on AST1060_PROGRAMMER_MP
+	default 0x10000
+	hex "OTP image size"
 
 source "Kconfig.zephyr"

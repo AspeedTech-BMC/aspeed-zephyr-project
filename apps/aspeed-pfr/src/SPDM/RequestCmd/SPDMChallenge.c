@@ -16,7 +16,7 @@ int spdm_challenge(void *ctx, uint8_t slot_id, uint8_t measurements)
 	struct spdm_message req_msg, rsp_msg;
 	int ret;
 
-	req_msg.header.spdm_version = SPDM_VERSION;
+	req_msg.header.spdm_version = context->local.version.version_number_selected;
 	req_msg.header.request_response_code = SPDM_REQ_CHALLENGE;
 	req_msg.header.param1 = slot_id; // SlotID or 0xFF
 	req_msg.header.param2 = measurements; // No measuments, TCB measurement, All measurement
@@ -30,8 +30,9 @@ int spdm_challenge(void *ctx, uint8_t slot_id, uint8_t measurements)
 		LOG_ERR("CHALLENGE failed %x", ret);
 		ret = -1;
 		goto cleanup;
-	} else if (rsp_msg.header.spdm_version != SPDM_VERSION) {
-		LOG_ERR("Unsupported header SPDM_VERSION %x", rsp_msg.header.spdm_version);
+	} else if (rsp_msg.header.spdm_version != req_msg.header.spdm_version) {
+		LOG_ERR("Unsupported header SPDM_VERSION Req %x Rsp %x",
+				req_msg.header.spdm_version, rsp_msg.header.spdm_version);
 		ret = -1;
 		goto cleanup;
 	} else if (rsp_msg.header.request_response_code != SPDM_RSP_CHALLENGE_AUTH) {
@@ -72,7 +73,9 @@ int spdm_challenge(void *ctx, uint8_t slot_id, uint8_t measurements)
 
 	ret = spdm_crypto_verify(context, slot_id,
 			hash, 48,
-			(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 96);
+			(uint8_t *)rsp_msg.buffer.data + rsp_msg.buffer.write_ptr - 96, 96,
+			req_msg.header.spdm_version == SPDM_VERSION_12,
+			SPDM_SIGN_CONTEXT_M1M2_RSP, strlen(SPDM_SIGN_CONTEXT_M1M2_RSP));
 	LOG_INF("CHALLENG_AUTH SIGNATURE VERIFY ret=%x", -ret);
 	if (ret < 0) {
 		LOG_HEXDUMP_ERR(hash, 48, "Requester M2 hash:");

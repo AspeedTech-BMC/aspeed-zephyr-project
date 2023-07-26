@@ -173,6 +173,96 @@ K_SEM_DEFINE(bios_checkpoint_sem, 0, 1);
 K_SEM_DEFINE(bmc_update_intent2_sem, 0, 1);
 K_SEM_DEFINE(pch_update_intent2_sem, 0, 1);
 
+struct k_mutex write_fifo_mutex;
+
+int swmbx_mctp_i3c_doe_msg_read_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data)
+{
+	if (data_len > sizeof(gReadFifoData))
+		return -1;
+
+	if (addr == UfmReadFIFO) {
+		for (int i = 0; i < data_len; i++) {
+			if (swmbx_read(gSwMbxDev, true, UfmReadFIFO, &swmbx_data[i]))
+				goto error;
+		}
+	} else {
+		if (swmbx_read(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+	}
+
+	return 0;
+
+error:
+	LOG_ERR("Failed to read mailbox");
+	return -1;
+}
+
+int swmbx_mctp_i3c_doe_msg_write_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data)
+{
+	int status;
+	union aspeed_event_data data = {0};
+	data.bit8[0] = addr;
+	data.bit8[1] = *swmbx_data;
+
+	switch(addr) {
+	case UfmCommand:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		break;
+	case UfmCmdTriggerValue:
+		data.bit8[0] = UfmCmdTriggerValue;
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(PROVISION_CMD, data.ptr);
+		break;
+	case UfmWriteFIFO:
+		status = k_mutex_lock(&write_fifo_mutex, K_MSEC(1000));
+		if (status) {
+			LOG_ERR("Get write_fifo_mutex timeout, ret %d", status);
+			return -1;
+		}
+		for (int i = 0; i < data_len; i++) {
+			if (swmbx_write(gSwMbxDev, true, addr, &swmbx_data[i]))
+				goto error;
+			gUfmFifoData[gFifoData++] = swmbx_data[i];
+		}
+		status = k_mutex_unlock(&write_fifo_mutex);
+		if (status) {
+			LOG_ERR("Release write_fifo_mutex failed, ret %d", status);
+			return -1;
+		}
+		break;
+	case BmcCheckpoint:
+	case AcmCheckpoint:
+	case BiosCheckpoint:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(WDT_CHECKPOINT, data.ptr);
+		break;
+	case BmcUpdateIntent:
+	case PchUpdateIntent:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
+		break;
+	case BmcUpdateIntent2:
+	case PchUpdateIntent2:
+		if (swmbx_write(gSwMbxDev, false, addr, swmbx_data))
+			goto error;
+		GenerateStateMachineEvent(UPDATE_INTENT_2_REQUESTED, data.ptr);
+		break;
+	default:
+		LOG_ERR("Unsupported mailbox command");
+		goto error;
+	}
+
+	return 0;
+
+error:
+	LOG_ERR("Failed to write mailbox");
+	return -1;
+}
+
 void swmbx_notifyee_main(void *a, void *b, void *c)
 {
 	struct k_poll_event events[TOTAL_MBOX_EVENT];
@@ -188,7 +278,7 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 	k_poll_event_init(&events[8], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &bmc_update_intent2_sem);
 	k_poll_event_init(&events[9], K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &pch_update_intent2_sem);
 
-	int ret;
+	int ret, status;
 
 	while (1) {
 		ret = k_poll(events, TOTAL_MBOX_EVENT, K_FOREVER);
@@ -202,7 +292,12 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Write FIFO from BMC/PCH */
 			k_sem_take(events[0].sem, K_NO_WAIT);
-			// TODO: race condition
+			status = k_mutex_lock(&write_fifo_mutex, K_MSEC(1000));
+			if (status) {
+				LOG_ERR("Get write_fifo_mutex timeout, ret %d", status);
+				continue;
+			}
+
 			do {
 				uint8_t c;
 
@@ -211,6 +306,11 @@ void swmbx_notifyee_main(void *a, void *b, void *c)
 					gUfmFifoData[gFifoData++] = c;
 				}
 			} while (!ret && (gFifoData < sizeof(gUfmFifoData)));
+			status = k_mutex_unlock(&write_fifo_mutex);
+			if (status) {
+				LOG_ERR("Release write_fifo_mutex failed, ret %d", status);
+				continue;
+			}
 		} else if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			/* UFM Read FIFO empty prepare next data */
 			k_sem_take(events[1].sem, K_NO_WAIT);
@@ -284,12 +384,20 @@ void InitializeSoftwareMailbox(void)
 	/* Top level mailbox device driver */
 	const struct device *swmbx_dev = NULL;
 
+	int status;
+
 	swmbx_dev = device_get_binding("SWMBX");
 	if (swmbx_dev == NULL) {
 		LOG_ERR("%s: fail to bind %s", __func__, "SWMBX");
 		return;
 	}
 	gSwMbxDev = swmbx_dev;
+
+	status = k_mutex_init(&write_fifo_mutex);
+	if (status) {
+		LOG_ERR("%s: fail to init write fifo mutex", __func__);
+		return;
+	}
 
 	/* Enable mailbox read/write notifiaction and FIFO */
 	swmbx_enable_behavior(swmbx_dev, SWMBX_PROTECT | SWMBX_NOTIFY | SWMBX_FIFO, 1);
@@ -474,6 +582,11 @@ MBX_REG_SETTER_GETTER(AfmRecoverMajorVersion);
 MBX_REG_SETTER_GETTER(AfmRecoverMinorVersion);
 MBX_REG_SETTER_GETTER(ProvisionStatus2);
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+MBX_REG_SETTER_GETTER(IntelCpldActiveSvn);
+MBX_REG_SETTER_GETTER(IntelCpldActiveMajorVersion);
+MBX_REG_SETTER_GETTER(IntelCpldActiveMinorVersion);
+#endif
 
 #if defined(CONFIG_FRONT_PANEL_LED)
 #include <drivers/timer/aspeed_timer.h>
@@ -634,15 +747,16 @@ void SetFPLEDState(byte PlatformStateData)
 void SetPlatformState(byte PlatformStateData)
 {
 #if defined(CONFIG_PLATFORM_STATE_LED)
+	// Per RSU IP, platform state should be bit reversed.
 	static const struct gpio_dt_spec leds[] = {
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 0),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 1),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 2),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 3),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 4),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 5),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 7),
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 6),
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 7)};
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 5),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 4),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 3),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 2),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 1),
+		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common), platform_state_out_gpios, 0)};
 
 	for (uint8_t bit = 0; bit < 8; ++bit) {
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
@@ -705,12 +819,45 @@ void LogWatchdogRecovery(uint8_t recovery_reason, uint8_t panic_reason)
  */
 void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot_state)
 {
-	if (is_timed_boot_done())
+	CPLD_STATUS cpld_update_status;
+	union aspeed_event_data data = {0};
+	uint8_t intent = 0;
+	uint8_t update_intent_src = BmcUpdateIntent;
+
+	if (is_timed_boot_done()) {
 		// If other components have finished booting, log timed boot complete status.
 		SetPlatformState(T0_BOOT_COMPLETED);
-	else
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
+				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
+		if (cpld_update_status.Region[BMC_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
+			intent = BmcRecoveryUpdate;
+		} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
+			intent = PchRecoveryUpdate;
+		} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_RECOVERY_PENDING) {
+			intent = PchRecoveryUpdate;
+			update_intent_src = PchUpdateIntent;
+		} else if (cpld_update_status.Region[ROT_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
+			intent = HROTRecoveryUpdate;
+		}
+
+		if (intent) {
+			data.bit8[0] = update_intent_src;
+			data.bit8[1] = intent;
+			data.bit8[2] |= BootDoneRecovery;
+			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
+		}
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+		if (cpld_update_status.Region[AFM_REGION].Recoveryregion == BMC_INTENT2_AFM_RECOVERY_PENDING) {
+			data.bit8[0] = BmcUpdateIntent2;
+			data.bit8[1] = AfmRecoveryUpdate;
+			data.bit8[2] |= BootDoneRecovery;
+			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
+		}
+#endif
+	} else {
 		// Otherwise, just log the this boot complete status
 		SetPlatformState(current_boot_state);
+	}
 }
 
 // UFM Status

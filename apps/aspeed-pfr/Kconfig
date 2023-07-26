@@ -7,11 +7,17 @@ config ASPEED_DC_SCM
 	help
 	  Enable ASPEED DC-SCM board basic settings.
 
-config DUAL_FLASH
+config BMC_DUAL_FLASH
 	default n
-	bool "Enable dual flash support"
+	bool "Enable BMC dual flash support"
 	help
-	  Enable if BMC and/or PCH has dual flash
+	  Enable if BMC has dual flash
+
+config CPU_DUAL_FLASH
+	default n
+	bool "Enable CPU dual flash support"
+	help
+	  Enable if CPU has dual flash
 
 config INTEL_PFR
 	default y
@@ -148,10 +154,10 @@ config PCH_STAGING_SIZE
 	  The max size of PCH staging area for putting signed PCH capsule.
 
 config BMC_PFR_STAGING_OFFSET
-	depends on CERBERUS_PFR
+	default 0xcde0000
 	hex "PFR staging region offset in BMC flash"
 	help
-	  The starting offset of PFR staging region, and this is for Cerberus PFR provisioning.
+	  The starting offset of PFR staging region, and this is also for Cerberus PFR provisioning.
 
 config INIT_POWER_SEQUENCE
 	default n
@@ -192,6 +198,7 @@ config KEY_MANIFEST_MAX_COUNT
 	  The max count of key manifest for Cerberus PFR.
 
 rsource "Kconfig.spdm"
+rsource "Kconfig.rsu"
 
 config PFR_DEBUG_SHELL
 	bool "Enable debug shell for development"

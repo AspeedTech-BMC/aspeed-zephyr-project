@@ -47,10 +47,10 @@ The test step put certificate chain in BMC flash to test the flow of certificate
 AST1060 mcuboot has generated Device ID CSR and Alias Certificate and put them in internal flash offset 0x1c000.
 
 ### Steps
-1. Put certchain.der to ast2600-dcscm mtd14(0xd320000) before runing preload firmware
+1. Put certchain.der to ast2600-dcscm mtd15(0xd320000) before runing preload firmware
 
 ```
-flashcp -v certchain.der /dev/mtd14
+flashcp -v certchain.der /dev/mtd15
 ```
 
 2. Bootup AST1060 with preload firmware, if certificate in AST1060 internal flash is CSR, preload firmware sends CSR to HSM for device id provisioning.

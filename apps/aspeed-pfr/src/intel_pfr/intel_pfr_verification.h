@@ -11,7 +11,6 @@
 
 #define INTEL_PFR_BLOCK_0_TAG           0xB6EAFD19
 
-#define DECOMMISSION_CAPSULE            0x200
 #define KEY_CANCELLATION_CAPSULE        0x100
 
 #define BLOCK0_PCTYPE_ADDRESS           8
@@ -179,6 +178,7 @@ enum {
 	PFR_BMC_UPDATE_CAPSULE,
 	PFR_PCH_SEAMLESS_UPDATE_CAPSULE,
 	PFR_AFM,
+	PFR_INTEL_CPLD_UPDATE_CAPSULE,
 	PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON = 0x200
 };
 
@@ -212,6 +212,10 @@ struct pfr_authentication {
 	int (*fvm_verify)(struct pfr_manifest *manifest);
 	int (*fvms_verify)(struct pfr_manifest *manifest);
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	int (*cfms_verify)(struct pfr_manifest *manifest);
+	int (*online_update_cap_verify)(struct pfr_manifest *manifest);
+#endif
 };
 
 #pragma pack()
@@ -224,6 +228,10 @@ void init_pfr_authentication(struct pfr_authentication *pfr_authentication);
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		    struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length);
+#if defined(CONFIG_PIT_PROTECTION)
+int intel_pfr_pit_level1_verify(void);
+int intel_pfr_pit_level2_verify(void);
+#endif
 #if defined(CONFIG_SEAMLESS_UPDATE)
 int intel_fvms_verify(struct pfr_manifest *manifest);
 int intel_fvm_verify(struct pfr_manifest *manifest);

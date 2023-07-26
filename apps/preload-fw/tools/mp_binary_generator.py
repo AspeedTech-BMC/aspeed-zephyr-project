@@ -11,12 +11,13 @@ sample_path = workspace_path + '/aspeed-zephyr-project/apps/preload-fw/sample'
 build_path = config['PATH'].get('BuildPath', workspace_path + '/build/')
 socsec_path = config['PATH'].get('SocsecPath', workspace_path + '/socsec/')
 mp_imgs_path = config['PATH'].get('MPImagePath', build_path + 'mp_imgs/')
-otp_cfg = config['PATH'].get('OTPConfig', sample_path + '/otp/config/1060A1_ECDSA_MP.json')
+otp_cfg = config['PATH'].get('OTPConfig', sample_path + '/otp/config/1060A2_ECDSA_MP.json')
 otp_key_path = config['PATH'].get('OTPKeyPath', sample_path + '/otp/key')
 
 mcuboot_key = config['KEY'].get('MCUBootKey', sample_path + '/otp/key/rk384_prv.pem')
 preload_fw_key = config['KEY'].get('PreloadFWKey', sample_path + '/mp/key/root-rsa-2048.pem')
-rot_fw_key = config['KEY'].get('RoTFWKey', sample_path + '/mp/key/rot_image_sign.pem')
+#rot_fw_key = config['KEY'].get('RoTFWKey', sample_path + '/mp/key/rot_image_sign.pem')
+rot_fw_key = config['KEY'].get('RoTFWKey', sample_path + '/mp/key/root-rsa-2048.pem')
 
 pristine = config['BUILD_OPTION'].get('Pristine', 'always')
 

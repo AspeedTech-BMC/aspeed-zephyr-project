@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <stdint.h>
 
 #define BMC_FLASH_ID                0
 #define PCH_FLASH_ID                2
@@ -48,7 +49,12 @@
 #define PROVISION_UFM_SIZE          UFM0_SIZE
 #define UPDATE_STATUS_UFM           UFM1
 #define ROT_TYPE                    3
-#define UPDATE_STATUS_ADDRESS       0x00
+
+#define UPDATE_STATUS_ADDRESS           0x00
+#define UPDATE_STATUS_ROT_HASH_ADDR     0x40
+#define UPDATE_STATUS_BMC_HASH_ADDR     0x80
+#define UPDATE_STATUS_PCH_HASH_ADDR     0xC0
+
 #define SHA256_DIGEST_LENGTH        32
 #define SHA384_DIGEST_LENGTH        48
 #define SHA512_DIGEST_LENGTH        64
@@ -57,6 +63,21 @@
 #define MAX_WRITE_SIZE              0x1000
 #define PAGE_SIZE                   0x1000
 #define UFM_PAGE_SIZE               16
+
+typedef enum {
+	ROT_REGION = 0,
+	BMC_REGION,
+	PCH_REGION,
+} REGION_DEF;
+
+typedef enum {
+	BMC_INTENT_UPDATE_AT_RESET = 1,
+	BMC_INTENT_RECOVERY_PENDING,
+	PCH_INTENT_UPDATE_AT_RESET,
+	PCH_INTENT_RECOVERY_PENDING,
+	RECOVERY_PENDING_REQUEST_HANDLED,
+	MAX_INTENT_TYPE_DEF,
+} REGION_UPDATE_INTENT_TYPE_DEF;
 
 typedef struct {
 	uint8_t  ActiveRegion;

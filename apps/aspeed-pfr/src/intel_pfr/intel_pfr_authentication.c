@@ -46,6 +46,13 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 		verify_afm = true;
 	}
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (manifest->image_type == CPLD_TYPE) {
+		manifest->image_type = ROT_EXT_CPLD_RC;
+		read_address = 0;
+		manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
+	}
+#endif
 	else {
 		LOG_ERR("Incorrect manifest image_type");
 		return Failure;
@@ -117,6 +124,21 @@ int pfr_active_verify(struct pfr_manifest *manifest)
 		/* Fixed partition so starts from zero */
 		read_address = 0;
 		manifest->pc_type = PFR_AFM;
+	}
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (manifest->image_type == CPLD_TYPE) {
+		manifest->image_type = ROT_EXT_CPLD_ACT;
+		read_address = 0;
+		manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
+		manifest->address = read_address;
+		LOG_INF("Verifying capsule signature, address=0x%08x", manifest->address);
+		if (manifest->pfr_authentication->online_update_cap_verify(manifest)) {
+			LOG_ERR("Verify BMC's CPLD active region failed");
+			return Failure;
+		}
+		LOG_INF("Verify CPLD active region success");
+		return Success;
 	}
 #endif
 	else {

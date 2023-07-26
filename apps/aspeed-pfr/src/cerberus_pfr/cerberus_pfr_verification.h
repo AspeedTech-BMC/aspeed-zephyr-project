@@ -36,8 +36,8 @@ int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
 		struct signature_verification *verification, uint8_t *hash_out,
 		size_t hash_length);
 int cerberus_pfr_verify_image(struct pfr_manifest *pfr_manifest);
-int cerberus_verify_regions(struct manifest *manifest);
+int cerberus_verify_regions(struct pfr_manifest *pfr_manifest);
 void init_stage_and_recovery_offset(struct pfr_manifest *pfr_manifest);
 int verify_recovery_header_magic_number(struct recovery_header rec_head);
-int cerberus_pfr_verify_pfm_csk_key(struct pfr_manifest *manifest);
+int cerberus_pfr_verify_pfm_csk_key(struct pfr_manifest *pfr_manifest);
 

@@ -14,10 +14,12 @@
 #include "pfr/pfr_common.h"
 #include "intel_pfr_definitions.h"
 #include "pfr/pfr_util.h"
+#include "pfr/pfr_ufm.h"
 #include "intel_pfr_provision.h"
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_verification.h"
+#include "intel_pfr_cpld_utils.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
@@ -83,7 +85,7 @@ int intel_pfr_pit_level2_verify(void)
 	}
 
 	if (pfr_spi_read(BMC_TYPE, act_pfm_offset + sizeof(PFR_AUTHENTICATION_BLOCK0),
-				sizeof(PFR_AUTHENTICATION_BLOCK1), &block1)) {
+				sizeof(PFR_AUTHENTICATION_BLOCK1), (uint8_t *)&block1)) {
 		LOG_ERR("Failed to get block1");
 		return Failure;
 	}
@@ -100,7 +102,7 @@ int intel_pfr_pit_level2_verify(void)
 	pfr_manifest->pfr_hash->start_address = 0;
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_BMC_DUAL_FLASH)
 	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
@@ -129,7 +131,7 @@ int intel_pfr_pit_level2_verify(void)
 
 	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
 	flash_size = flash_get_flash_size(flash_dev);
-#if defined(CONFIG_DUAL_FLASH)
+#if defined(CONFIG_CPU_DUAL_FLASH)
 	flash_dev = device_get_binding(flash_devices[PCH_TYPE + 1]);
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
@@ -382,6 +384,11 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 		sign_bit_verify = SIGN_AFM_UPDATE_BIT5;
 	}
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	else if (manifest->pc_type == PFR_INTEL_CPLD_UPDATE_CAPSULE) {
+		sign_bit_verify = SIGN_INTEL_CPLD_UPDATE_BIT6;
+	}
+#endif
 
 	if (!(block1_buffer->CskEntryInitial.KeyPermission & sign_bit_verify)) {
 		LOG_ERR("Block1 CSK Entry: CSK key permission denied..., %x",
@@ -523,7 +530,7 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	}
 
 	// Both key cancellation certificate and decommission capsule have the same fixed size of 128 bytes.
-	if (block0_buffer->PcType & DECOMMISSION_CAPSULE) {
+	if (block0_buffer->PcType & PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON) {
 		if (block0_buffer->PcLength != KCH_CAN_CERT_OR_DECOMM_CAP_PC_SIZE) {
 			LOG_ERR("Block0: Invalid decommission capsule PC length, %x", block0_buffer->PcLength);
 			return Failure;
@@ -728,9 +735,10 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 				+ read_address + PFM_SIG_BLOCK_SIZE;
 
 			manifest->address = fvm_addr;
-			if (manifest->base->verify((struct signature_verification *)manifest,
+			if (manifest->base->verify((struct manifest *)manifest,
 						NULL, NULL, NULL, 0)) {
 				LOG_ERR("Verify FVM failed");
+				return Failure;
 			}
 			LOG_INF("FVM region verify successful");
 			cap_pfm_body_offset += sizeof(PFM_FVM_ADDRESS_DEFINITION);
@@ -749,6 +757,132 @@ int intel_fvms_verify(struct pfr_manifest *manifest)
 }
 #endif
 
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+int intel_cfms_verify(struct pfr_manifest *manifest)
+{
+	uint32_t image_type = manifest->image_type;
+	uint32_t cap_base_address = manifest->address;
+	uint32_t pfm_sig_offset = cap_base_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t pfm_offset = pfm_sig_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t pfm_body_offset = pfm_offset + sizeof(CPLD_PFM_STRUCTURE);
+	uint32_t pfm_body_end_addr;
+	uint32_t cfm_offset;
+	uint8_t major_ver, minor_ver;
+	CPLD_PFM_STRUCTURE pfm_header;
+	CPLD_ADDR_DEF_STRUCTURE cpld_addr_def;
+	CFM_STRUCTURE cfm_header;
+
+	if (pfr_spi_read(image_type, pfm_offset, sizeof(CPLD_PFM_STRUCTURE),
+				(uint8_t *)&pfm_header)) {
+		return Failure;
+	}
+
+	if (pfm_header.PfmTag != PFMTAG) {
+		LOG_ERR("CPLD PFM verification failed");
+		LOG_HEXDUMP_INF(&pfm_header, sizeof(PFM_STRUCTURE), "CPLD PFM Header:");
+		return Failure;
+	}
+
+#if 0
+	// TODO: define the online cpld update svn policy.
+	status = svn_policy_verify(SVN_POLICY_FOR_ONLINE_CPLD_FW_UPDATE, pfm_header.SVN);
+	if (status != Success) {
+		LogUpdateFailure(UPD_CAPSULE_INVALID_SVN, 1);
+		LOG_ERR("Anti rollback");
+		return Failure;
+	}
+#endif
+	major_ver = (uint8_t)(pfm_header.PfmRevision & 0xFF);
+	minor_ver = (uint8_t)(pfm_header.PfmRevision >> 8);
+	SetIntelCpldActiveMajorVersion(major_ver);
+	SetIntelCpldActiveMinorVersion(minor_ver);
+
+	pfm_body_end_addr = pfm_body_offset + pfm_header.Length - sizeof(CPLD_PFM_STRUCTURE);
+	while(pfm_body_offset < pfm_body_end_addr) {
+		pfr_spi_read(image_type, pfm_body_offset, sizeof(CPLD_ADDR_DEF_STRUCTURE),
+				(uint8_t *)&cpld_addr_def);
+		if (cpld_addr_def.FmDef == CFM_SPI_REGION) {
+			if (cpld_addr_def.FwType == CPU_CPLD)
+				LOG_INF("Verifying CPU CPLD Capsule");
+			else if (cpld_addr_def.FwType == SCM_CPLD)
+				LOG_INF("Verifying SCM CPLD Capsule");
+			else if (cpld_addr_def.FwType == DEBUG_CPLD)
+				LOG_INF("Verifying Debug CPLD Capsule");
+			else {
+				LOG_ERR("Unknown CPLD firmware type");
+				return Failure;
+			}
+			// Verify signature of indiviual cpld firmware image.
+			cfm_offset = cap_base_address + cpld_addr_def.ImageStartAddr;
+			manifest->address = cfm_offset;
+			manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
+			if (manifest->base->verify((struct manifest *)manifest,
+						NULL, NULL, NULL, 0)){
+				LOG_ERR("Verify CPLD firmware signature failed");
+				return Failure;
+			}
+			cfm_offset += PFM_SIG_BLOCK_SIZE;
+			pfr_spi_read(image_type, cfm_offset, sizeof(CFM_STRUCTURE),
+					(uint8_t *)&cfm_header);
+			if (cpld_addr_def.FwType != cfm_header.FwType) {
+				LOG_ERR("Incorrect capsule format");
+				return Failure;
+			}
+			cfm_offset += sizeof(CFM_STRUCTURE);
+			manifest->intel_cpld_addr[cpld_addr_def.FwType] = cfm_offset;
+			manifest->intel_cpld_img_size[cpld_addr_def.FwType] = cfm_header.Length;
+		} else {
+			break;
+		}
+		pfm_body_offset += sizeof(CPLD_ADDR_DEF_STRUCTURE);
+	}
+
+	manifest->address = cap_base_address;
+
+	return Success;
+}
+
+int intel_online_update_capsule_verify(struct pfr_manifest *manifest)
+{
+	int status = 0;
+	uint32_t cap_addr = manifest->address;
+
+	LOG_INF("Verifying Intel CPLD capsule");
+
+	manifest->pc_type = PFR_INTEL_CPLD_UPDATE_CAPSULE;
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("Capsule signature verification failed");
+		LogErrorCodes(INTEL_CPLD_UPDATE_FAIL, INTEL_CPLD_IMAGE_AUTH_FAIL);
+		return Failure;
+	}
+
+	manifest->address += PFM_SIG_BLOCK_SIZE;
+	LOG_INF("Verifying Intel CPLD PFM, address=%08x", manifest->address);
+	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
+			manifest->verification->base, manifest->pfr_hash->hash_out,
+			manifest->pfr_hash->length);
+	if (status != Success) {
+		LOG_ERR("PFM signature verification failed");
+		LogErrorCodes(INTEL_CPLD_UPDATE_FAIL, INTEL_CPLD_IMAGE_AUTH_FAIL);
+		return Failure;
+	}
+
+	manifest->address = cap_addr;
+	status = manifest->pfr_authentication->cfms_verify(manifest);
+	if (status != Success) {
+		LOG_ERR("CFM signature verification failed");
+		LogErrorCodes(INTEL_CPLD_UPDATE_FAIL, INTEL_CPLD_IMAGE_TOCTOU);
+		return Failure;
+	}
+
+	return Success;
+}
+
+#endif
+
 void init_pfr_authentication(struct pfr_authentication *pfr_authentication)
 {
 	pfr_authentication->validate_pctye = validate_pc_type;
@@ -760,6 +894,10 @@ void init_pfr_authentication(struct pfr_authentication *pfr_authentication)
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	pfr_authentication->fvms_verify = intel_fvms_verify;
 	pfr_authentication->fvm_verify = intel_fvm_verify;
+#endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	pfr_authentication->cfms_verify = intel_cfms_verify;
+	pfr_authentication->online_update_cap_verify = intel_online_update_capsule_verify;
 #endif
 }
 

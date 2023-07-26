@@ -13,8 +13,6 @@
 
 #pragma pack(1)
 
-typedef char byte;
-
 typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	CpldIdentifier = 0x00,
 	CpldReleaseVersion = 0x01,
@@ -68,6 +66,11 @@ typedef enum _SMBUS_MAILBOX_RF_ADDRESS_READONLY {
 	AfmRecoverMinorVersion  = 0x79,
 	ProvisionStatus2        = 0x7a,
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+	IntelCpldActiveSvn          = 0x7b,
+	IntelCpldActiveMajorVersion = 0x7c,
+	IntelCpldActiveMinorVersion = 0x7d,
+#endif
 	AcmBiosScratchPad       = 0x80,
 	BmcScratchPad           = 0xc0,
 } SMBUS_MAILBOX_RF_ADDRESS;
@@ -100,6 +103,7 @@ typedef enum _UPDATE_INTENT {
 	PchActiveAndRecoveryUpdateAtReset       = 0x83,
 	PchActiveDynamicUpdate                  = 0x41,
 	PchActiveAndDynamicUpdateAtReset        = 0xc1,
+	PchActiveRecoveryDynamicUpdateAtReset   = 0xc3,
 	HROTActiveAndRecoveryUpdate             = 0x24,
 	BmcActiveAndRecoveryUpdate              = 0x18,
 	PchActiveAndBmcActiveUpdate             = 0x09,
@@ -118,6 +122,15 @@ typedef enum _UPDATE_INTENT_2 {
 	AfmActiveAndRecoveryUpdate              = 0x06,
 	CPLDUpdate                              = 0x10,
 } UPDATE_INTENT_2;
+
+// EVT_DATA_0 : Update Intent(e.g. PchUpdateIntent)
+// EVT_DATA_1 : Value of Update Intent(e.g. BmcActiveUpdate)
+// EVT_DATA_2 : Other information
+typedef enum _EVT_DATA_2 {
+	BmcOnlyReset                            = 0x01,
+	PchOnlyReset                            = 0x02,
+	BootDoneRecovery                        = 0x04,
+} EVT_DATA_2;
 
 #pragma pack()
 
@@ -211,6 +224,14 @@ void SetAfmRecoverMinorVersion(byte RecoverMinorVersion);
 byte GettProvisionStatus2(void);
 void SetProvisionStatus2(byte ProvisionStatus2);
 #endif
+#if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
+byte GetIntelCpldActiveSvn(void);
+void SetIntelCpldActiveSvn(byte ActiveSVN);
+byte GetIntelCpldActiveMajorVersion(void);
+void SetIntelCpldActiveMajorVersion(byte ActiveMajorVersion);
+byte GetIntelCpldActiveMinorVersion(void);
+void SetIntelCpldActiveMinorVersion(byte ActiveMinorVersion);
+#endif
 void process_provision_command(void);
 void UpdateBiosCheckpoint(byte Data);
 void UpdateBmcCheckpoint(byte Data);
@@ -234,3 +255,5 @@ bool IsSpdmAttestationEnabled();
 // If root key hash, pch and bmc offsets are provisioned, we say CPLD has been provisioned
 #define UFM_STATUS_PROVISIONED_BIT_MASK               0b000001110
 
+int swmbx_mctp_i3c_doe_msg_write_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data);
+int swmbx_mctp_i3c_doe_msg_read_handler(uint8_t addr, uint8_t data_len, uint8_t *swmbx_data);
