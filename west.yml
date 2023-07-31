@@ -6,12 +6,14 @@ manifest:
     path: aspeed-zephyr-project
 
   remotes:
+    - name: gerrit
+      url-base: ssh://gerrit.aspeed.com:29418
     - name: github
       url-base: https://github.com/AspeedTech-BMC
 
   projects:
     - name: zephyr
-      remote: github
+      remote: gerrit
       revision: eb189d59674bc4b2b4bc879d69db1acee0dfc855
       import:
         name-whitelist:
@@ -20,10 +22,10 @@ manifest:
           - mcuboot
           - mbedtls
     - name: cerberus
-      remote: github
-      revision: e94b3ad26c19ad591d797ba1926da5f102c8a4da
+      remote: gerrit
+      revision: aspeed-dev
       path: middlewares/cerberus
     - name: mcuboot
-      remote: github
-      revision: 08fb1a46db5e84b91f0eb34d7ae2faac8b53030f
+      remote: gerrit
+      revision: aspeed-dev-v2.6.0
       path: bootloader/mcuboot
