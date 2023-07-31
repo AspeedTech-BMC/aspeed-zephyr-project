@@ -44,6 +44,7 @@ uint8_t gBmcOffsets[12];
 uint8_t gPitPassword[8];
 #endif
 
+uint8_t gProvisionCount = 0;
 uint8_t gFifoData = 0;
 uint8_t gProvisionData = 0;
 CPLD_STATUS cpld_update_status;
@@ -931,7 +932,7 @@ int ProvisionRootKeyHash(uint8_t *DataBuffer, uint32_t length)
 
 	Status = get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (Status != Success) {
-		LOG_ERR("Failed to get UFM status");
+		LOG_INF("Failed to get UFM status");
 		return Failure;
 	}
 
@@ -948,7 +949,7 @@ int ProvisionRootKeyHash(uint8_t *DataBuffer, uint32_t length)
 		return Failure;
 	}
 
-	LOG_WRN("%s, Provisioned or UFM Locked", __func__);
+	LOG_INF("%s, Provisioned or UFM Locked", __func__);
 
 	return UnSupported;
 }
@@ -963,7 +964,7 @@ int ProvisionPchOffsets(uint8_t *DataBuffer, uint32_t length)
 
 	Status = get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (Status != Success) {
-		LOG_ERR("Failed to get UFM status");
+		LOG_INF("Failed to get UFM status");
 		return Failure;
 	}
 
@@ -980,7 +981,7 @@ int ProvisionPchOffsets(uint8_t *DataBuffer, uint32_t length)
 		return Failure;
 	}
 
-	LOG_WRN("%s, Provisioned or UFM Locked", __func__);
+	LOG_INF("%s, Provisioned or UFM Locked", __func__);
 	return UnSupported;
 }
 
@@ -994,7 +995,7 @@ int ProvisionBmcOffsets(uint8_t *DataBuffer, uint32_t length)
 
 	Status = get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmStatus, sizeof(UfmStatus));
 	if (Status != Success) {
-		LOG_ERR("Failed to get UFM status");
+		LOG_INF("Failed to get UFM status");
 		return Failure;
 	}
 
@@ -1011,7 +1012,7 @@ int ProvisionBmcOffsets(uint8_t *DataBuffer, uint32_t length)
 		return Failure;
 	}
 
-	LOG_WRN("%s, Provisioned or UFM Locked", __func__);
+	LOG_INF("%s, Provisioned or UFM Locked", __func__);
 	return UnSupported;
 }
 
@@ -1154,7 +1155,7 @@ void process_provision_command(void)
 #if defined(CONFIG_CERBERUS_PFR)
 	if ((UfmCommandData == PROVISION_ROOT_KEY) || (UfmCommandData == PROVISION_PCH_OFFSET) ||
 	    (UfmCommandData == PROVISION_BMC_OFFSET)) {
-		LOG_WRN("Unsupported command: 0x%x", UfmCommandData);
+		LOG_INF("Unsupported command: 0x%x", UfmCommandData);
 		SetUfmStatusValue(COMMAND_ERROR);
 		return;
 	}
@@ -1164,7 +1165,7 @@ void process_provision_command(void)
 	if (CheckUfmStatus(UfmFlashStatus, UFM_STATUS_LOCK_BIT_MASK)) {
 		if ((UfmCommandData < READ_ROOT_KEY) || (UfmCommandData > READ_BMC_OFFSET)) {
 			// Ufm locked
-			LOG_WRN("UFM Locked and Dropped Write Command: 0x%x", UfmCommandData);
+			LOG_INF("UFM Locked and Dropped Write Command: 0x%x", UfmCommandData);
 			SetUfmStatusValue(COMMAND_ERROR);
 			return;
 		}
@@ -1173,16 +1174,14 @@ void process_provision_command(void)
 	switch (UfmCommandData) {
 	case ERASE_CURRENT:
 		Status = erase_provision_flash();
-		if (Status != Success)
+		if (Status == Success)
+			gProvisionCount = 0;
+		else
 			SetUfmStatusValue(COMMAND_ERROR);
 		break;
 	case PROVISION_ROOT_KEY:
 		memcpy(gRootKeyHash, gUfmFifoData, SHA384_DIGEST_LENGTH);
-		Status = ProvisionRootKeyHash(gRootKeyHash, sizeof(gRootKeyHash));
-		if (Status != Success) {
-			SetUfmStatusValue(COMMAND_ERROR);
-			return;
-		}
+		gProvisionCount |= 1 << 0;
 		gProvisionData = 1;
 		break;
 #if defined(CONFIG_PIT_PROTECTION)
@@ -1193,20 +1192,12 @@ void process_provision_command(void)
 #endif
 	case PROVISION_PCH_OFFSET:
 		memcpy(gPchOffsets, gUfmFifoData, sizeof(gPchOffsets));
-		Status = ProvisionPchOffsets(gPchOffsets, sizeof(gPchOffsets));
-		if (Status != Success) {
-			SetUfmStatusValue(COMMAND_ERROR);
-			return;
-		}
+		gProvisionCount |= 1 << 1;
 		gProvisionData = 1;
 		break;
 	case PROVISION_BMC_OFFSET:
 		memcpy(gBmcOffsets, gUfmFifoData, sizeof(gBmcOffsets));
-		Status = ProvisionBmcOffsets(gBmcOffsets, sizeof(gBmcOffsets));
-		if (Status != Success) {
-			SetUfmStatusValue(COMMAND_ERROR);
-			return;
-		}
+		gProvisionCount |= 1 << 2;
 		gProvisionData = 1;
 		break;
 	case LOCK_UFM:
@@ -1248,19 +1239,34 @@ void process_provision_command(void)
 		break;
 	}
 
-	if (gProvisionData) {
+	if ((gProvisionCount == 0x07) && (gProvisionData == 1)) {
+		LOG_INF("Calling provisioing process..");
 		gProvisionData = 0;
-		get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&UfmFlashStatus, sizeof(UfmFlashStatus));
-		if (CheckUfmStatus(UfmFlashStatus, UFM_STATUS_PROVISIONED_ROOT_KEY_HASH_BIT_MASK |
-			   UFM_STATUS_PROVISIONED_PCH_OFFSETS_BIT_MASK |
-			   UFM_STATUS_PROVISIONED_BMC_OFFSETS_BIT_MASK)) {
-			CPLD_STATUS cpld_status;
+		gProvisionCount = 0;
+		Status = ProvisionRootKeyHash(gRootKeyHash, sizeof(gRootKeyHash));
+		if (Status != Success) {
+			SetUfmStatusValue(COMMAND_ERROR);
+			return;
+		}
 
-			ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
-			if (cpld_status.DecommissionFlag) {
-				cpld_status.DecommissionFlag = 0;
-				ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
-			}
+		Status = ProvisionPchOffsets(gPchOffsets, sizeof(gPchOffsets));
+		if (Status != Success) {
+			SetUfmStatusValue(COMMAND_ERROR);
+			return;
+		}
+
+		Status = ProvisionBmcOffsets(gBmcOffsets, sizeof(gBmcOffsets));
+		if (Status != Success) {
+			SetUfmStatusValue(COMMAND_ERROR);
+			return;
+		}
+
+		CPLD_STATUS cpld_status;
+
+		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
+		if (cpld_status.DecommissionFlag) {
+			cpld_status.DecommissionFlag = 0;
+			ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 		}
 	}
 }

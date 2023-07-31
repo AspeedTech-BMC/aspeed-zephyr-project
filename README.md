@@ -11,6 +11,12 @@ cd workspace
 west update
 ```
 
+## AST2600 L board
+
+```
+west build -b ast1060_evb -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
 ## AST2600 DCSCM board
 
 ```
@@ -54,22 +60,5 @@ west build -b ast1060_dcscm_dice -p auto aspeed-zephyr-project/apps/preload-fw
 
 ```
 imgtool sign --version 1.1.1 --align 8 --header-size 1024 --slot-size 393216 --load-addr 196608 --key bootloader/mcuboot/root-rsa-2048.pem ./zephyr.bin ./zephyr.signed.bin
-```
-
-# Building DMTF/LibSPDM Emulator
-This spdm emualtor will create two threads as a requester and a responder.
-The requester will initiate the connection and establish a session.
-After the session is esatblished, the requester will ask for measurement and heartbeat every second.
-
-## Fetch DMTF/LibSPDM codebase
-DMTF/LibSPDM doesn't support Zephyr module, so we use git submodule to recursivily fetch the code base and related libraries.
-```
-git submodule update --init --recursive
-
-```
-
-## Building the firmware
-```
-west build -b ast1030_evb -p auto aspeed-zephyr-project/apps/spdm
 ```
 

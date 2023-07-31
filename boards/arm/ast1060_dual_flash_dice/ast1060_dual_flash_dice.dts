@@ -20,7 +20,7 @@
 };
 
 &sram0 {
-	reg = <0x30000 DT_SIZE_K(575)>, <16 DT_SIZE_K(192)>;
+	reg = <0x30000 DT_SIZE_K(576)>, <16 DT_SIZE_K(192)>;
 };
 
 &uart5 {

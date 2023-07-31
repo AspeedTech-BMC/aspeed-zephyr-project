@@ -21,9 +21,9 @@ manifest:
           - mbedtls
     - name: cerberus
       remote: github
-      revision: e94b3ad26c19ad591d797ba1926da5f102c8a4da
+      revision: e6d0be29c417f5874dcba785f45cea38f4200701
       path: middlewares/cerberus
     - name: mcuboot
       remote: github
-      revision: 08fb1a46db5e84b91f0eb34d7ae2faac8b53030f
+      revision: 0cced5e53dfa3a87a39b83de521726de89fe95a3
       path: bootloader/mcuboot
