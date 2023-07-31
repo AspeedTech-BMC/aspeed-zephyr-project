@@ -53,7 +53,7 @@ int set_cpld_status(uint32_t offset, uint8_t *data, uint32_t data_length)
 
 	status = spi_flash->spi.base.write((struct flash *)&spi_flash->spi, 0, buffer,
 			sizeof(buffer));
-	if (status != Success)
+	if (status != sizeof(buffer))
 		return Failure;
 
 	return Success;
