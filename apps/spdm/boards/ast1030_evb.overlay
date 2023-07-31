@@ -1,0 +1,154 @@
+&sram0 {
+	reg = <0 DT_SIZE_K(640)>, <0xa0000 DT_SIZE_K(128)>;
+};
+
+&jtag1{
+	status = "okay";
+};
+
+&sgpiom{
+	status = "okay";
+};
+
+&mbxctrl {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&pinctrl_i2c0_default>;
+
+	swmbx0: swmbx0@60 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x60>;
+		label = "SWMBX_SLAVE_0";
+		size = <256>;
+		port = <0>;
+		status = "okay";
+	};
+};
+
+&i2c1 {
+	pinctrl-0 = <&pinctrl_i2c1_default>;
+	status = "okay";
+};
+
+&i2c2 {
+	pinctrl-0 = <&pinctrl_i2c2_default>;
+	status = "okay";
+};
+
+&i2c3 {
+	pinctrl-0 = <&pinctrl_i2c3_default>;
+	status = "okay";
+};
+
+&i2c4 {
+	pinctrl-0 = <&pinctrl_i2c4_default>;
+	status = "okay";
+};
+
+&i2c5 {
+	pinctrl-0 = <&pinctrl_i2c5_default>;
+	status = "okay";
+};
+
+&i3c_gr {
+	status = "okay";
+};
+
+&i3c0 {
+	status = "okay";
+	assigned-address = <0x8>;
+};
+
+&i3c1 {
+	status = "okay";
+	assigned-address = <0x9>;
+	secondary;
+	ibi-append-pec;
+	i3c1_smq:i3c-slave-mqueue {
+		compatible = "aspeed,i3c-slave-mqueue";
+		msg-size = <256>;
+		num-of-msgs = <4>;
+		mandatory-data-byte = <0xbf>;
+		label = "I3C_1_SMQ";
+		status = "okay";
+	};
+};
+
+&fmc {
+	status = "okay";
+};
+
+&fmc_cs0 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		boot_partition: partition@0 {
+			label = "image-0";
+			reg = <0x0 0x100000>;
+		};
+		dfu_partition: partition@1 {
+		       label = "image-1";
+		       reg = <0x0 0x100000>;
+	       };
+	};
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&wdt1 {
+	status = "okay";
+};
+
+&wdt2 {
+	status = "okay";
+};
+
+&wdt3 {
+	status = "okay";
+};
+
+&wdt4 {
+	status = "okay";
+};
+
+&timer0 {
+	status = "okay";
+};
+
+&timer1 {
+	status = "okay";
+};
+
+&timer2 {
+	status = "okay";
+};
+
+&timer3 {
+	status = "okay";
+};
+
+&timer4 {
+	status = "okay";
+};
+
+&timer5 {
+	status = "okay";
+};
+
+&timer6 {
+	status = "okay";
+};
+
+&timer7 {
+	status = "okay";
+};
