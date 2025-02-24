@@ -190,9 +190,12 @@ K_SEM_DEFINE(asm_event_step, 0, 1);
 void GenerateStateMachineEvent(enum aspeed_pfr_event evt, void *data)
 {
 	struct event_context *event = (struct event_context *)k_malloc(sizeof(struct event_context));
-
+	if (!event) {
+		LOG_ERR("Failed to allocate event context");
+		return;
+	}
 	LOG_INF("Send event:%d data:%p to state machine", evt, data);
-	event_log[event_log_idx % 128] = evt;
+	event_log[event_log_idx % ARRAY_SIZE(event_log)] = evt;
 	event_log_idx++;
 	event->event = evt;
 	event->data.ptr = data;
