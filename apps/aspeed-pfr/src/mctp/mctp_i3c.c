@@ -362,7 +362,11 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 	xfer.flags = I3C_MSG_READ | I3C_MSG_STOP;
 	xfer.buf = i3c_data_in;
 	xfer.len = sizeof(i3c_data_in);
-	i3c_transfer(desc, &xfer, 1);
+	int ret = i3c_transfer(desc, &xfer, 1);
+	if (ret) {
+		LOG_ERR("Failed to read data, ret = %d", ret);
+		return MCTP_ERROR;
+	}
 
 	LOG_DBG("xfer.len = %d", xfer.len);
 	LOG_HEXDUMP_DBG(xfer.buf, xfer.len, "i3c read : ");
@@ -416,7 +420,11 @@ static uint16_t mctp_i3c_write(void *mctp_p, void *msg_p)
 	xfer.len = tx_msg->len;
 	LOG_DBG("write len : %d", xfer.len);
 	LOG_HEXDUMP_DBG(xfer.buf, xfer.len, "i3c write : ");
-	i3c_transfer(desc, &xfer, 1);
+	int ret = i3c_transfer(desc, &xfer, 1);
+	if (ret) {
+		LOG_ERR("Failed to write data, ret = %d", ret);
+		return MCTP_ERROR;
+	}
 
 	return MCTP_SUCCESS;
 }
@@ -518,6 +526,10 @@ uint8_t mctp_i3c_eid_assignment_thread_create(mctp_i3c *mctp_i3c_inst)
 			MCTP_I3C_STATE_HANDLER_STACK_SIZE,
 			mctp_i3c_state_handler,
 			mctp_i3c_inst, NULL, NULL, 5, 0, K_NO_WAIT);
+	if (!mctp_i3c_inst->i3c_state_tid) {
+		LOG_ERR("Failed to create i3c state handler thread");
+		return MCTP_ERROR;
+	}
 
 	int status = snprintf(mctp_i3c_inst->i3c_state_task_name, sizeof(mctp_i3c_inst->i3c_state_task_name),
 			"MCTP I3C State Handler B%02xA%02x",
