@@ -9,7 +9,7 @@
 		rst-rtcrst-cpu1-out-gpios = <&sgpiom_e_h 20 0>; /* SGPO52 */
 		pwrgd-cpu1-out-gpios = <&sgpiom_e_h 21 0>;      /* SGPO53 */
 		rst-pltrst-cpu1-out-gpios = <&sgpiom_e_h 22 0>; /* SGPO54 */
-		i3c-mng-mux-sel-out-gpios = <&sgpiom_a_d 6 0>; /* SGPO6 */
+		i3c-mng-mux-sel-out-gpios = <&gpio0_m_p 12 0>; /* GPIO_N4 */
 		scm-board-id0-in-gpios = <&sgpiom_a_d 1 0>;
 		scm-rsu-hide-done-in-gpios = <&sgpiom_e_h 10 0>; /* SGPI42 */
 		scm-rsu-hide-out-gpios = <&sgpiom_a_d 16 0>; /* SGPO16*/

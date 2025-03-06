@@ -255,6 +255,7 @@ void switch_i3c_mng_owner(int owner)
 		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_bhs),
 						i3c_mng_mux_sel_out_gpios,
 						{0});
+	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
 	if (i3c_mng_owner.port)
 		gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
 #endif
