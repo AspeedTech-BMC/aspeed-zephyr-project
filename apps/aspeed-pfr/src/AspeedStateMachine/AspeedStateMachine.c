@@ -1836,10 +1836,6 @@ void do_unprovisioned(void *o)
 	LOG_DBG("Start");
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 
-#if defined(CONFIG_PFR_MCTP_I3C)
-	switch_i3c_mng_owner(I3C_MNG_OWNER_BMC);
-#endif
-
 	switch (evt_ctx->event) {
 #if defined(CONFIG_CERBERUS_PFR)
 	case UPDATE_REQUESTED:

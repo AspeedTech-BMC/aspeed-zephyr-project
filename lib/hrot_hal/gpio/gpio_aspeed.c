@@ -256,8 +256,10 @@ void switch_i3c_mng_owner(int owner)
 						i3c_mng_mux_sel_out_gpios,
 						{0});
 	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
-	if (i3c_mng_owner.port)
+	if (i3c_mng_owner.port) {
+		LOG_INF("Switch I3C MNG Owner to %s", owner == I3C_MNG_OWNER_BMC ? "BMC" : "ROT");
 		gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
+	}
 #endif
 	i3c_mng_mux_owner = owner;
 }
