@@ -104,15 +104,15 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		return Failure;
 	}
 
+	manifest->address = read_address;
+	manifest->recovery_address = target_address;
+
 	status = pfr_spi_read(manifest->image_type, manifest->address + (2 * sizeof(uint32_t)),
 			sizeof(uint32_t), (uint8_t *)&manifest->pc_type);
 	if (status != Success) {
 		LOG_ERR("Flash read PC type failed");
 		return Failure;
 	}
-
-	manifest->address = read_address;
-	manifest->recovery_address = target_address;
 
 	LOG_INF("Verifying capsule signature, address=0x%08x", manifest->address);
 	// manifest verification
