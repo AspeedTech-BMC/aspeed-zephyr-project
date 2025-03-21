@@ -2098,7 +2098,7 @@ static const struct smf_state state_table[] = {
 	[SEAMLESS_UPDATE] = SMF_CREATE_STATE(NULL, do_seamless_update, NULL, &state_table[TZERO], NULL),
 	[SEAMLESS_VERIFY] = SMF_CREATE_STATE(NULL, do_seamless_verify, NULL, &state_table[TZERO], NULL),
 #endif
-	[SYSTEM_LOCKDOWN] = SMF_CREATE_STATE(NULL, do_lockdown, NULL, &state_table[TMIN1], NULL),
+	[SYSTEM_LOCKDOWN] = SMF_CREATE_STATE(enter_lockdown, do_lockdown, NULL, &state_table[TMIN1], NULL),
 	[SYSTEM_REBOOT] = SMF_CREATE_STATE(NULL, do_reboot, NULL, NULL, NULL),
 };
 
