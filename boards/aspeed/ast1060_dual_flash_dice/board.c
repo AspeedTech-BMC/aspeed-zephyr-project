@@ -8,6 +8,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 
+#if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_BHS_ENABLED)
+void RTCRSTControl(bool assert);
+#endif
+
 static int ast1060_dcscm_post_init(const struct device *arg)
 {
 	// Enable flash power by GPIOL2 and GPIOL3
@@ -27,6 +31,9 @@ static int ast1060_dcscm_init(const struct device *arg)
 	gpio_pin_configure(dev, 27, GPIO_OUTPUT_ACTIVE);
 #endif
 
+#if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_BHS_ENABLED)
+	RTCRSTControl(false);
+#endif
 	return 0;
 }
 
