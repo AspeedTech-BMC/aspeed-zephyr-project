@@ -1,5 +1,5 @@
-#include "ast2700_dcscm_gpio_common.dts"
-#include "ast2700_dcscm_gpio_bhs.dts"
+#include "ast2700a0_dcscm_gpio_common.dts"
+#include "ast2700a0_dcscm_gpio_bhs.dts"
 
 &i2cfilter {
 	status = "okay";
