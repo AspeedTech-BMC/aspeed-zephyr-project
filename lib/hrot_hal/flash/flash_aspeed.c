@@ -268,6 +268,11 @@ int bmc_pch_flash_read(uint8_t device_id, uint32_t address, uint32_t data_length
 	if (ret)
 		return ret;
 
+	if (address + data_length > flash_get_flash_size(flash_dev)) {
+		LOG_ERR("Address out of range, address=0x%x, length=0x%x", address, data_length);
+		return -1;
+	}
+
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
 	if (data >= (uint8_t *)NON_CACHED_SRAM_START && data < (uint8_t *)NON_CACHED_SRAM_END) {
 		ret = flash_read(flash_dev, address, data, data_length);
@@ -293,6 +298,11 @@ int rot_flash_read(uint8_t device_id, uint32_t address, uint32_t data_length, ui
 	ret = get_rot_region(device_id, &fa);
 	if (ret)
 		return ret;
+
+	if (address + data_length > fa->fa_size) {
+		LOG_ERR("Address out of range, address=0x%x, length=0x%x", address, data_length);
+		return -1;
+	}
 
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED)
 	if (data >= (uint8_t *)NON_CACHED_SRAM_START && data < (uint8_t *)NON_CACHED_SRAM_END) {
@@ -320,6 +330,11 @@ int bmc_pch_flash_write(uint8_t device_id, uint32_t address, uint32_t data_lengt
 	if (ret)
 		return ret;
 
+	if (address + data_length > flash_get_flash_size(flash_dev)) {
+		LOG_ERR("Address out of range, address=0x%x, length=0x%x", address, data_length);
+		return -1;
+	}
+
 #if defined(CONFIG_SPI_DMA_WRITE_SUPPORT_ASPEED)
 	if (data >= (uint8_t *)NON_CACHED_SRAM_START && data < (uint8_t *)NON_CACHED_SRAM_END) {
 		ret = flash_write(flash_dev, address, data, data_length);
@@ -346,6 +361,11 @@ int rot_flash_write(uint8_t device_id, uint32_t address, uint32_t data_length, u
 	if (ret)
 		return ret;
 
+	if (address + data_length > fa->fa_size) {
+		LOG_ERR("Address out of range, address=0x%x, length=0x%x", address, data_length);
+		return -1;
+	}
+
 #if defined(CONFIG_SPI_DMA_WRITE_SUPPORT_ASPEED)
 	if (data >= (uint8_t *)NON_CACHED_SRAM_START && data < (uint8_t *)NON_CACHED_SRAM_END) {
 		ret = flash_area_write(fa, address, data, data_length);
@@ -369,6 +389,11 @@ int bmc_pch_flash_erase(uint8_t device_id, uint32_t address, uint32_t size, bool
 	int ret = get_flash_dev(device_id, &address, &flash_dev);
 	if (ret)
 		return ret;
+
+	if (address + size > flash_get_flash_size(flash_dev)) {
+		LOG_ERR("Address out of range, address=0x%x, length=0x%x", address, size);
+		return -1;
+	}
 
 	if (sector_erase) {
 		if (size % SECTOR_SIZE)
@@ -398,6 +423,11 @@ int rot_flash_erase(uint8_t device_id, uint32_t address, uint32_t size, bool sec
 	flash_dev = fa->fa_dev;
 	if (!flash_dev)
 		return -1;
+
+	if (address + size > fa->fa_size) {
+		LOG_ERR("Address out of range, address=0x%x, length=0x%x", address, size);
+		return -1;
+	}
 
 	if (sector_erase) {
 		if (size % SECTOR_SIZE)
