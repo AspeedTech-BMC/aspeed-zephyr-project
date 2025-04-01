@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 #include <assert.h>
-#include <kernel.h>
+#include <zephyr/kernel.h>
 
 #include <spdm_rsp.h>
 #include <spdm_fifo.h>
@@ -292,7 +292,7 @@ static void *spdm_server_init()
 		libspdm_transport_mctp_encode_message,
 		libspdm_transport_mctp_decode_message);
 
-	LOG_INF("m_send_receive_buffer=%p", m_send_receive_buffer);
+	LOG_INF("m_send_receive_buffer=%p", (void *)m_send_receive_buffer);
 
 	size_t scratch_buffer_size = libspdm_get_sizeof_required_scratch_buffer(spdm_ctx);
 	void *scratch_buffer = (void *)malloc(scratch_buffer_size);

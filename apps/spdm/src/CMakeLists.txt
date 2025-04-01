@@ -13,8 +13,6 @@ target_sources(
 	spdm_rsp.c
 	spdm_fifo.c
 
-	os_stub/debuglib_zephyr/debuglib.c
-	os_stub/malloclib/malloclib.c
 	os_stub/platform_lib_zephyr/time_zephyr.c
 	os_stub/platform_lib_zephyr/watchdog.c
 	os_stub/rnglib/rng_zephyr.c

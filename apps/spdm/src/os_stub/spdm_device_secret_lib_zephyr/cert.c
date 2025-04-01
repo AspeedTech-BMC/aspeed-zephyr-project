@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(spdm_secret);
 
@@ -163,6 +163,10 @@ bool libspdm_read_responder_public_certificate_chain(
 				      is_requester_cert, is_device_cert_model);
 	if (!res) {
 		LOG_ERR("Failed libspdm_verify_cert_chain_data");
+		LOG_HEXDUMP_ERR(file_data, file_size, "cert chain");
+		LOG_ERR("base_asym_algo - 0x%x", base_asym_algo);
+		LOG_ERR("base_hash_algo - 0x%x", base_hash_algo);
+		LOG_ERR("is_requester_cert - %d is_device_cert_model - %d", is_requester_cert, is_device_cert_model);
 		goto cleanup;
 	}
 

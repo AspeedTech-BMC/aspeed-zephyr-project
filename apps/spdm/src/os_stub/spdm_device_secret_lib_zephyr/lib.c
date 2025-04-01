@@ -8,7 +8,7 @@
  * SPDM common library.
  * It follows the SPDM Specification.
  **/
-#include <logging/log.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(spdm_secret, CONFIG_LOG_DEFAULT_LEVEL);
 #include <base.h>
@@ -605,6 +605,20 @@ bool libspdm_generate_measurement_summary_hash(
 }
 #endif /* LIBSPDM_ENABLE_CAPABILITY_MEAS_CAP */
 
+#if LIBSPDM_ENABLE_CAPABILITY_MEL_CAP
+/*Collect the measurement extension log.*/
+bool libspdm_measurement_extension_log_collection(
+    void *spdm_context,
+    uint8_t mel_specification,
+    uint8_t measurement_specification,
+    uint32_t measurement_hash_algo,
+    void **spdm_mel,
+    size_t *spdm_mel_size)
+{
+    return false;
+}
+#endif /* LIBSPDM_ENABLE_CAPABILITY_MEL_CAP */
+
 #if LIBSPDM_ENABLE_CAPABILITY_MUT_AUTH_CAP
 bool libspdm_requester_data_sign(
 	spdm_version_number_t spdm_version, uint8_t op_code,
@@ -893,5 +907,105 @@ bool libspdm_gen_csr(uint32_t base_hash_algo, uint32_t base_asym_algo, bool *nee
 	LOG_ERR("libspdm_gen_csr");
 	return false;
 }
+
+#if LIBSPDM_ENABLE_CAPABILITY_CSR_CAP_EX
+bool libspdm_gen_csr_ex(
+#if LIBSPDM_HAL_PASS_SPDM_CONTEXT
+    void *spdm_context,
+#endif
+    uint32_t base_hash_algo, uint32_t base_asym_algo, bool *need_reset,
+    const void *request, size_t request_size,
+    uint8_t *requester_info, size_t requester_info_length,
+    uint8_t *opaque_data, uint16_t opaque_data_length,
+    size_t *csr_len, uint8_t *csr_pointer,
+    uint8_t req_cert_model,
+    uint8_t *csr_tracking_tag,
+    uint8_t req_key_pair_id,
+    bool overwrite
+#if LIBSPDM_SET_CERT_CSR_PARAMS
+    , bool *is_busy, bool *unexpected_request
+#endif
+    )
+{
+    return false;
+}
+#endif /*LIBSPDM_ENABLE_CAPABILITY_CSR_CAP_EX*/
 #endif /* LIBSPDM_ENABLE_CAPABILITY_CSR_CAP */
 
+#if LIBSPDM_ENABLE_CAPABILITY_EVENT_CAP
+bool libspdm_event_get_types(
+    void *spdm_context,
+    spdm_version_number_t spdm_version,
+    uint32_t session_id,
+    void *supported_event_groups_list,
+    uint32_t *supported_event_groups_list_len,
+    uint8_t *event_group_count)
+{
+    return false;
+}
+
+bool libspdm_event_subscribe(
+    void *spdm_context,
+    spdm_version_number_t spdm_version,
+    uint32_t session_id,
+    uint8_t subscribe_type,
+    uint8_t subscribe_event_group_count,
+    uint32_t subscribe_list_len,
+    const void *subscribe_list)
+{
+    return false;
+}
+#endif /* LIBSPDM_ENABLE_CAPABILITY_EVENT_CAP */
+
+#if LIBSPDM_ENABLE_CAPABILITY_GET_KEY_PAIR_INFO_CAP
+
+/**
+ * read the key pair info of the key_pair_id.
+ *
+ * @param  spdm_context               A pointer to the SPDM context.
+ * @param  key_pair_id                Indicate which key pair ID's information to retrieve.
+ *
+ * @param  capabilities               Indicate the capabilities of the requested key pairs.
+ * @param  key_usage_capabilities     Indicate the key usages the responder allows.
+ * @param  current_key_usage          Indicate the currently configured key usage for the requested key pairs ID.
+ * @param  asym_algo_capabilities     Indicate the asymmetric algorithms the Responder supports for this key pair ID.
+ * @param  current_asym_algo          Indicate the currently configured asymmetric algorithm for this key pair ID.
+ * @param  assoc_cert_slot_mask       This field is a bit mask representing the currently associated certificate slots.
+ * @param  public_key_info_len        On input, indicate the size in bytes of the destination buffer to store.
+ *                                    On output, indicate the size in bytes of the public_key_info.
+ *                                    It can be NULL, if public_key_info is not required.
+ * @param  public_key_info            A pointer to a destination buffer to store the public_key_info.
+ *                                    It can be NULL, if public_key_info is not required.
+ *
+ * @retval true  get key pair info successfully.
+ * @retval false get key pair info failed.
+ **/
+bool libspdm_read_key_pair_info(
+    void *spdm_context,
+    uint8_t key_pair_id,
+    uint16_t *capabilities,
+    uint16_t *key_usage_capabilities,
+    uint16_t *current_key_usage,
+    uint32_t *asym_algo_capabilities,
+    uint32_t *current_asym_algo,
+    uint8_t *assoc_cert_slot_mask,
+    uint16_t *public_key_info_len,
+    uint8_t *public_key_info)
+{
+    return false;
+}
+#endif /* LIBSPDM_ENABLE_CAPABILITY_GET_KEY_PAIR_INFO_CAP */
+
+#if LIBSPDM_ENABLE_CAPABILITY_SET_KEY_PAIR_INFO_CAP
+bool libspdm_write_key_pair_info(
+    void *spdm_context,
+    uint8_t key_pair_id,
+    uint8_t operation,
+    uint16_t desired_key_usage,
+    uint32_t desired_asym_algo,
+    uint8_t desired_assoc_cert_slot_mask,
+    bool *need_reset)
+{
+    return false;
+}
+#endif /* #if LIBSPDM_ENABLE_CAPABILITY_SET_KEY_PAIR_INFO_CAP */

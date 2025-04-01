@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include "kernel.h"
 #include "library/cryptlib/cryptlib_cert.h"
 #include "library/spdm_return_status.h"
 #include <stdlib.h>
@@ -145,7 +144,7 @@ static void *spdm_client_init()
 		spdm_device_release_receiver_buffer);
 
 
-	LOG_INF("m_send_receive_buffer=%p", m_send_receive_buffer);
+	LOG_INF("m_send_receive_buffer=%p", (void *)m_send_receive_buffer);
 
 	size_t scratch_buffer_size = libspdm_get_sizeof_required_scratch_buffer(spdm_ctx);
 	void *scratch_buffer = (void *)malloc(scratch_buffer_size);
