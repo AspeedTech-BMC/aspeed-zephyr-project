@@ -1,0 +1,8 @@
+
+&dram_ro_region {
+	reg = <0x0 DT_SIZE_K(512)>;
+};
+
+&dram_rw_region {
+	reg = <DT_SIZE_K(512) DT_SIZE_K(1024)>;
+};
