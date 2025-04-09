@@ -603,18 +603,12 @@ int mctp_i3c_attach_target_dev(uint8_t bus, uint64_t pid)
 			mctp_i3c_cpu0_inst.mctp_inst = mctp_init();
 		}
 		mctp_i3c_inst = &mctp_i3c_cpu0_inst;
-		mrl.len = 0x45;
-		mrl.ibi_len = 2;
-		i3c_ccc_do_setmrl(desc, &mrl);
 	} else if (pid == CONFIG_PFR_SPDM_I3C_CPU1_DEV_PID) {
 		if (mctp_i3c_cpu1_inst.mctp_inst == NULL) {
 			mctp_i3c_cpu1_inst.state = MCTP_I3C_TARGET_DETACHED;
 			mctp_i3c_cpu1_inst.mctp_inst = mctp_init();
 		}
 		mctp_i3c_inst = &mctp_i3c_cpu1_inst;
-		mrl.len = 0x45;
-		mrl.ibi_len = 2;
-		i3c_ccc_do_setmrl(desc, &mrl);
 	} else {
 		goto error;
 	}
