@@ -591,18 +591,22 @@ bool has_pending_update(uint8_t *update_intent_src, uint8_t *intent, uint8_t res
 		// PFR doesn't hold PCH reset and takeover spi flash during bmc only reset.
 		// PCH firmware update via PCH Update intent shouldn't be performed.
 		if (!(reset_policy & BmcOnlyReset)) {
-			if ((cpld_update_status.Region[PCH_REGION].ActiveRegion == PCH_INTENT_UPDATE_AT_RESET) ||
+			uint8_t pch_active_type = cpld_update_status.Region[PCH_REGION].ActiveRegion & ~DymanicUpdate;
+
+			if ((pch_active_type == PCH_INTENT_UPDATE_AT_RESET) ||
 					(cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_UPDATE_AT_RESET))
 				*update_intent_src = PchUpdateIntent;
 
-			if ((cpld_update_status.Region[PCH_REGION].ActiveRegion == PCH_INTENT_UPDATE_AT_RESET)
-					|| (cpld_update_status.Region[PCH_REGION].ActiveRegion == BMC_INTENT_UPDATE_AT_RESET))
+			if ((pch_active_type == PCH_INTENT_UPDATE_AT_RESET)
+					|| (pch_active_type == BMC_INTENT_UPDATE_AT_RESET))
 				*intent |= PchActiveUpdate;
 
 			if ((cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_UPDATE_AT_RESET)
 					|| (cpld_update_status.Region[PCH_REGION].Recoveryregion == BMC_INTENT_UPDATE_AT_RESET))
 				*intent |= PchRecoveryUpdate;
 
+			if (cpld_update_status.Region[PCH_REGION].ActiveRegion & DymanicUpdate)
+				*intent |= DymanicUpdate;
 			cpld_update_status.PchStatus = 0;
 			cpld_update_status.Region[PCH_REGION].ActiveRegion = 0;
 		} else {
@@ -625,10 +629,14 @@ bool has_pending_update(uint8_t *update_intent_src, uint8_t *intent, uint8_t res
 	}
 
 	if (cpld_update_status.BmcStatus == 1) {
-		if (cpld_update_status.Region[BMC_REGION].ActiveRegion == BMC_INTENT_UPDATE_AT_RESET)
+		uint8_t bmc_active_type = cpld_update_status.Region[BMC_REGION].ActiveRegion & ~DymanicUpdate;
+
+		if (bmc_active_type == BMC_INTENT_UPDATE_AT_RESET)
 			*intent |= BmcActiveUpdate;
 		if (cpld_update_status.Region[BMC_REGION].Recoveryregion == BMC_INTENT_UPDATE_AT_RESET)
 			*intent |= BmcRecoveryUpdate;
+		if (cpld_update_status.Region[BMC_REGION].ActiveRegion & DymanicUpdate)
+			*intent |= DymanicUpdate;
 		cpld_update_status.BmcStatus = 0;
 		cpld_update_status.Region[BMC_REGION].ActiveRegion = 0;
 	}
@@ -1983,6 +1991,8 @@ void handle_update_at_reset(void *o)
 	if (evt_ctx->data.bit8[1] & PchActiveUpdate) {
 		cpld_update_status.PchStatus = 1;
 		cpld_update_status.Region[PCH_REGION].ActiveRegion = update_intent_type;
+		if (evt_ctx->data.bit8[1] & DymanicUpdate)
+			cpld_update_status.Region[PCH_REGION].ActiveRegion |= DymanicUpdate;
 	}
 	if (evt_ctx->data.bit8[1] & PchRecoveryUpdate) {
 		cpld_update_status.PchStatus = 1;
@@ -1996,6 +2006,8 @@ void handle_update_at_reset(void *o)
 	if (evt_ctx->data.bit8[1] & BmcActiveUpdate) {
 		cpld_update_status.BmcStatus = 1;
 		cpld_update_status.Region[BMC_REGION].ActiveRegion = BMC_INTENT_UPDATE_AT_RESET;
+		if (evt_ctx->data.bit8[1] & DymanicUpdate)
+			cpld_update_status.Region[BMC_REGION].ActiveRegion |= DymanicUpdate;
 	}
 	if (evt_ctx->data.bit8[1] & BmcRecoveryUpdate) {
 		cpld_update_status.BmcStatus = 1;
@@ -2003,8 +2015,6 @@ void handle_update_at_reset(void *o)
 	}
 	if (evt_ctx->data.bit8[1] & HROTRecoveryUpdate)
 		LOG_ERR("HROTRecoveryUpdate not supported");
-	if (evt_ctx->data.bit8[1] & DymanicUpdate)
-		LOG_ERR("DymanicUpdate not supported");
 	/* Setting updated cpld status to ufm */
 	ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 }

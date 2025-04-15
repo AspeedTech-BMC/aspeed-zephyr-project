@@ -172,6 +172,11 @@ typedef enum {
 	AFM_REGION,
 } REGION_DEF;
 
+/*
+ * ActiveRegion may include the DynamicUpdate flag (0x40),
+ * indicating that a dynamic update should be processed after reset.
+ * This flag can be combined with other intent values.
+ */
 typedef enum {
 	BMC_INTENT_UPDATE_AT_RESET = 1,
 	BMC_INTENT_RECOVERY_PENDING,
