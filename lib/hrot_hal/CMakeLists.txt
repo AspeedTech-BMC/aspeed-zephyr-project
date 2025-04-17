@@ -13,6 +13,29 @@ if (CONFIG_HROT_HAL)
 
 	set(HROT_MIDDLEWARE_ROOT ${CMAKE_CURRENT_LIST_DIR} CACHE INTERNAL "HROT_MIDDLEWARE_ROOT")
 
+	if (CONFIG_DT_HAS_ASPEED_PFR_GPIO_BHS_ENABLED)
+		if (CONFIG_BOARD_AST1060_PROT)
+			zephyr_library_sources(
+				${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_bhs_prot.c
+			)
+		else()
+			zephyr_library_sources(
+				${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_bhs.c
+			)
+		endif()
+	elseif (CONFIG_DT_HAS_ASPEED_PFR_GPIO_EGS_ENABLED)
+		zephyr_library_sources(
+			${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_egs.c
+		)
+	elseif (CONFIG_DT_HAS_ASPEED_PFR_GPIO_GENOA_ENABLED)
+		zephyr_library_sources(
+			${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_genoa.c
+		)
+	elseif (CONFIG_DT_HAS_ASPEED_PFR_GPIO_OKS_ENABLED)
+		zephyr_library_sources(
+			${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_oks.c
+		)
+	endif()
 	zephyr_library_sources(
 	    ${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/gpio/gpio_aspeed.c

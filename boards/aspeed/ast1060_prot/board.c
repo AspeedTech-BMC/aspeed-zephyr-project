@@ -9,6 +9,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/sys_io.h>
+#include "gpio/gpio_aspeed.h"
 
 #define LOG_MODULE_NAME board
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
@@ -102,8 +103,7 @@ static int ast1060_prot_gpio_post_init(void)
 		gpio_pin_set_raw(dev, 6, 1);
 		/* RST_PFR_BMC_SPI_RESET_N */
 		gpio_pin_set_raw(dev, 7, 1);
-		/* RST_PFR_RTCRST_CPU0_N */
-		gpio_pin_set_raw(dev, 11, 1);
+		RTCRSTControl(false);
 	} else {
 		LOG_ERR("Unabled to find sgpiom_a_d device");
 	}

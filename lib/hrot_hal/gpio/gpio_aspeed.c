@@ -14,6 +14,7 @@
 #include <string.h>
 #include <zephyr/drivers/gpio.h>
 #include "gpio_aspeed.h"
+#include "platform/platform_gpio_ctrl.h"
 
 #define LOG_MODULE_NAME gpio_api
 
@@ -21,19 +22,8 @@
 #error "no correct pfr gpio device"
 #endif
 
-#if DT_NODE_HAS_STATUS(DT_INST(0, aspeed_pfr_gpio_bhs), okay)
-#define INTEL_BHS
-#if defined(CONFIG_BOARD_AST1060_PROT)
-#define INTEL_PROT
-#endif
-#endif
-
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 static bool first_time_boot = true;
-
-void AUXPowerGoodControl(bool assert);
-void RTCRSTControl(bool assert);
-void RSTPlatformReset(bool assert);
 
 static void bmc_srst_enable_ctrl(bool enable)
 {
@@ -73,34 +63,10 @@ static void bmc_extrst_enable_ctrl(bool enable)
 	k_busy_wait(10000); /* 10ms */
 }
 
-static void pch_rst_enable_ctrl(bool enable)
-{
-#if defined(INTEL_PROT) || !defined(INTEL_BHS)
-	int ret;
-	const struct gpio_dt_spec rst_gpio =
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common),
-						pch_rst_ctrl_out_gpios, 0);
-
-	if (enable) {
-		gpio_pin_set(rst_gpio.port, rst_gpio.pin, 0);
-	} else {
-		gpio_pin_set(rst_gpio.port, rst_gpio.pin, 1);
-	}
-
-	ret = gpio_pin_configure_dt(&rst_gpio, GPIO_OUTPUT);
-	if (ret)
-		return;
-
-	k_busy_wait(10000); /* 10ms */
-#endif
-}
-
 int BMCBootHold(void)
 {
 	const struct device *dev_m = NULL;
 	const struct device *flash_dev = NULL;
-
-	// I3CMNGSelection(false);
 
 	/* Hold BMC Reset */
 	bmc_extrst_enable_ctrl(true);
@@ -136,14 +102,14 @@ int PCHBootHold(void)
 {
 	const struct device *dev_m = NULL;
 	const struct device *flash_dev = NULL;
+	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
 
-
-	RSTPlatformReset(true);
-	/* Hold low AUX PWRGD */
-	// RTCRSTControl(true);
-	AUXPowerGoodControl(false);
-	/* Hold PCH Reset */
-	pch_rst_enable_ctrl(true);
+	if (gpio_ops->pch_hold) {
+		gpio_ops->pch_hold();
+	} else {
+		LOG_ERR("Failed to hold PCH");
+		return -1;
+	}
 
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	/* config spi monitor as master mode */
@@ -197,7 +163,6 @@ int BMCBootRelease(void)
 	/* config spi monitor as monitor mode */
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 #endif
-	// I3CMNGSelection(true);
 	if (first_time_boot) {
 		bmc_srst_enable_ctrl(false);
 		first_time_boot = false;
@@ -212,6 +177,7 @@ int PCHBootRelease(void)
 {
 	const struct device *dev_m = NULL;
 	const struct device *flash_dev = NULL;
+	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
 
 	flash_dev = device_get_binding("spi2@0");
 	if (flash_dev) {
@@ -237,31 +203,49 @@ int PCHBootRelease(void)
 	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
 #endif
 
-	// RTCRSTControl(false);
-	AUXPowerGoodControl(true);
-
-	pch_rst_enable_ctrl(false);
-	LOG_INF("release PCH");
+	if (gpio_ops->pch_release) {
+		gpio_ops->pch_release();
+		LOG_INF("release PCH");
+	} else {
+		LOG_ERR("Failed to release PCH");
+		return -1;
+	}
 	return 0;
 }
 
+void RTCRSTControl(bool assert)
+{
+	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
+	if (gpio_ops->rst_rtcrst) {
+		gpio_ops->rst_rtcrst(assert);
+	} else {
+		LOG_WRN("RTC Reset callback is not registered");
+		return;
+	}
+}
+
+void RSTPlatformReset(bool assert)
+{
+	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
+	if (gpio_ops->rst_pltrst) {
+		gpio_ops->rst_pltrst(assert);
+	} else {
+		LOG_WRN("RST Platform Reset callback is not registered");
+		return;
+	}
+}
+
 #if defined(CONFIG_PFR_MCTP_I3C)
-static int i3c_mng_mux_owner = I3C_MNG_OWNER_BMC;
+int i3c_mng_mux_owner = I3C_MNG_OWNER_BMC;
 void switch_i3c_mng_owner(int owner)
 {
-#if DT_NODE_HAS_STATUS(DT_INST(0, aspeed_pfr_gpio_bhs), okay)
-// BHS only
-	const struct gpio_dt_spec i3c_mng_owner =
-		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_bhs),
-						i3c_mng_mux_sel_out_gpios,
-						{0});
-	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
-	if (i3c_mng_owner.port) {
-		LOG_INF("Switch I3C MNG Owner to %s", owner == I3C_MNG_OWNER_BMC ? "BMC" : "ROT");
-		gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
+	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
+	if (gpio_ops->i3c_mng_switch) {
+		gpio_ops->i3c_mng_switch(owner);
+	} else {
+		LOG_WRN("I3C MNG switch callback is not registered");
+		return;
 	}
-#endif
-	i3c_mng_mux_owner = owner;
 }
 
 int get_i3c_mng_owner(void)
@@ -269,94 +253,4 @@ int get_i3c_mng_owner(void)
 	return i3c_mng_mux_owner;
 }
 #endif
-
-void AUXPowerGoodControl(bool assert)
-{
-#ifdef INTEL_BHS
-	const struct gpio_dt_spec aux_pwrgd_cpu0 =
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), pwrgd_cpu0_out_gpios, 0);
-	const struct gpio_dt_spec aux_pwrgd_cpu1 =
-		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_bhs), pwrgd_cpu1_out_gpios, {0});
-
-	if (assert) {
-		LOG_INF("[PFR->CPLD] AUX_PWRGD_CPU0 Assert[%s %d]", aux_pwrgd_cpu0.port->name, aux_pwrgd_cpu0.pin);
-		gpio_pin_set(aux_pwrgd_cpu0.port, aux_pwrgd_cpu0.pin, 1);
-		if (aux_pwrgd_cpu1.port) {
-			LOG_INF("[PFR->CPLD] AUX_PWRGD_CPU1 Assert[%s %d]", aux_pwrgd_cpu1.port->name, aux_pwrgd_cpu1.pin);
-			gpio_pin_set(aux_pwrgd_cpu1.port, aux_pwrgd_cpu1.pin, 1);
-		}
-	} else {
-		LOG_INF("[PFR->CPLD] AUX_PWRGD_CPU0 De-assert[%s %d]", aux_pwrgd_cpu0.port->name, aux_pwrgd_cpu0.pin);
-		gpio_pin_set(aux_pwrgd_cpu0.port, aux_pwrgd_cpu0.pin, 0);
-		if (aux_pwrgd_cpu1.port) {
-			LOG_INF("[PFR->CPLD] AUX_PWRGD_CPU1 De-assert[%s %d]", aux_pwrgd_cpu1.port->name, aux_pwrgd_cpu1.pin);
-			gpio_pin_set(aux_pwrgd_cpu1.port, aux_pwrgd_cpu1.pin, 0);
-		}
-	}
-
-	gpio_pin_configure_dt(&aux_pwrgd_cpu0, GPIO_OUTPUT);
-	if (aux_pwrgd_cpu1.port)
-		gpio_pin_configure_dt(&aux_pwrgd_cpu1, GPIO_OUTPUT);
-#endif
-}
-
-void RTCRSTControl(bool assert)
-{
-#ifdef INTEL_BHS
-	const struct gpio_dt_spec rtc_rst_cpu0 =
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), rst_rtcrst_cpu0_out_gpios, 0);
-	const struct gpio_dt_spec rtc_rst_cpu1 =
-		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_bhs), rst_rtcrst_cpu1_out_gpios, {0});
-
-	if (assert) {
-		LOG_INF("[PFR->CPLD] RTC_RST_CPU0 Assert[%s %d]", rtc_rst_cpu0.port->name, rtc_rst_cpu0.pin);
-		gpio_pin_set(rtc_rst_cpu0.port, rtc_rst_cpu0.pin, 0);
-		if (rtc_rst_cpu1.port) {
-			LOG_INF("[PFR->CPLD] RTC_RST_CPU1 Assert[%s %d]", rtc_rst_cpu1.port->name, rtc_rst_cpu1.pin);
-			gpio_pin_set(rtc_rst_cpu1.port, rtc_rst_cpu1.pin, 0);
-		}
-	} else {
-		LOG_INF("[PFR->CPLD] RTC_RST_CPU0 De-assert[%s %d]", rtc_rst_cpu0.port->name, rtc_rst_cpu0.pin);
-		gpio_pin_set(rtc_rst_cpu0.port, rtc_rst_cpu0.pin, 1);
-		if (rtc_rst_cpu1.port) {
-			LOG_INF("[PFR->CPLD] RTC_RST_CPU1 De-assert[%s %d]", rtc_rst_cpu1.port->name, rtc_rst_cpu1.pin);
-			gpio_pin_set(rtc_rst_cpu1.port, rtc_rst_cpu1.pin, 1);
-		}
-	}
-
-	gpio_pin_configure_dt(&rtc_rst_cpu0, GPIO_OUTPUT);
-	if (rtc_rst_cpu1.port)
-		gpio_pin_configure_dt(&rtc_rst_cpu1, GPIO_OUTPUT);
-#endif
-}
-
-void RSTPlatformReset(bool assert)
-{
-#ifdef INTEL_BHS
-	const struct gpio_dt_spec rst_pltrst_cpu0 =
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs), rst_pltrst_cpu0_out_gpios, 0);
-	const struct gpio_dt_spec rst_pltrst_cpu1 =
-		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_bhs), rst_pltrst_cpu1_out_gpios, {0});
-
-	if (assert) {
-		LOG_INF("[PFR->CPLD] PLTRSTN_CPU0 Assert[%s %d]", rst_pltrst_cpu0.port->name, rst_pltrst_cpu0.pin);
-		gpio_pin_set(rst_pltrst_cpu0.port, rst_pltrst_cpu0.pin, 0);
-		if (rst_pltrst_cpu1.port) {
-			LOG_INF("[PFR->CPLD] PLTRSTN_CPU1 Assert[%s %d]", rst_pltrst_cpu1.port->name, rst_pltrst_cpu1.pin);
-			gpio_pin_set(rst_pltrst_cpu1.port, rst_pltrst_cpu1.pin, 0);
-		}
-	} else {
-		LOG_INF("[PFR->CPLD] PLTRSTN_CPU0 De-assert[%s %d]", rst_pltrst_cpu0.port->name, rst_pltrst_cpu0.pin);
-		gpio_pin_set(rst_pltrst_cpu0.port, rst_pltrst_cpu0.pin, 1);
-		if (rst_pltrst_cpu1.port) {
-			LOG_INF("[PFR->CPLD] PLTRSTN_CPU1 De-assert[%s %d]", rst_pltrst_cpu1.port->name, rst_pltrst_cpu1.pin);
-			gpio_pin_set(rst_pltrst_cpu1.port, rst_pltrst_cpu1.pin, 1);
-		}
-	}
-
-	gpio_pin_configure_dt(&rst_pltrst_cpu0, GPIO_OUTPUT);
-	if (rst_pltrst_cpu1.port)
-		gpio_pin_configure_dt(&rst_pltrst_cpu1, GPIO_OUTPUT);
-#endif
-}
 

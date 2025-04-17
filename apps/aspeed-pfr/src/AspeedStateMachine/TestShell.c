@@ -1124,4 +1124,67 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 );
 
 SHELL_CMD_REGISTER(asm, &sub_asm, "Aspeed PFR State Machine Commands", NULL);
+
+#if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_OKS_ENABLED)
+#include <zephyr/drivers/gpio.h>
+
+static int cmd_oks_pwr_seq(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc < 3 || argc > 9) {
+        shell_print(shell, "Usage: oks_pwr_seq <pin_name> <value> OR oks_pwr_seq <hpm_stby_rst> <pfr_s5_att_fail> <pfr_s5_att_done> <pfr_cpu_aux_pwrgd> <pfr_s0_att_fail> <pfr_s0_att_done> <pfr_btg_att_fail> <pfr_btg_att_done>");
+        return -EINVAL;
+    }
+
+    const struct gpio_dt_spec pins[] = {
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), hpm_stby_rst_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s5_att_fail_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s5_att_done_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pwrgd_cpu0_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s0_att_fail_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s0_att_done_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_btg_att_fail_out_gpios, 0),
+        GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_btg_att_done_out_gpios, 0),
+    };
+
+    const char *pin_names[] = {
+        "hpm_stby_rst",
+        "pfr_s5_att_fail",
+        "pfr_s5_att_done",
+        "pfr_cpu_aux_pwrgd",
+        "pfr_s0_att_fail",
+        "pfr_s0_att_done",
+        "pfr_btg_att_fail",
+        "pfr_btg_att_done",
+    };
+
+    if (argc == 3) {
+        const char *pin_name = argv[1];
+        int value = atoi(argv[2]);
+        for (int i = 0; i < ARRAY_SIZE(pin_names); i++) {
+            if (strcmp(pin_name, pin_names[i]) == 0) {
+                gpio_pin_configure_dt(&pins[i], GPIO_OUTPUT);
+                gpio_pin_set(pins[i].port, pins[i].pin, value);
+                shell_print(shell, "SINGLE %s : %d", pin_name, value);
+                return 0;
+            }
+        }
+        shell_print(shell, "Invalid pin name: %s", pin_name);
+        return 0;
+    }
+
+    for (int i = 1; i < argc; i++) {
+        int value = atoi(argv[i]);
+        gpio_pin_configure_dt(&pins[i - 1], GPIO_OUTPUT);
+        gpio_pin_set(pins[i - 1].port, pins[i - 1].pin, value);
+        shell_print(shell, "%s : %d", pin_names[i - 1], value);
+	k_sleep(K_MSEC(1000));
+    }
+
+    shell_print(shell, "OKS power sequence pins configured successfully.");
+    return 0;
+}
+
+SHELL_CMD_REGISTER(oks_pwr_seq, NULL, "Configure OKS power sequence pins", cmd_oks_pwr_seq);
+
+#endif
 #endif

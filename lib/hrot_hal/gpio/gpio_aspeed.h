@@ -31,11 +31,12 @@ int BMCBootHold(void);
 int PCHBootHold(void);
 int BMCBootRelease(void);
 int PCHBootRelease(void);
+void RTCRSTControl(bool assert);
+void RSTPlatformReset(bool assert);
 
 #if defined(CONFIG_PFR_MCTP_I3C)
 #define I3C_MNG_OWNER_BMC     0
 #define I3C_MNG_OWNER_ROT     1
 void switch_i3c_mng_owner(int owner);
 int get_i3c_mng_owner(void);
-void RSTPlatformReset(bool assert);
 #endif

@@ -9,6 +9,7 @@
 #include <build_config.h>
 #include <zephyr/shell/shell.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/misc/aspeed/abr_aspeed.h>
 #if defined(CONFIG_AST10X0_PROGRAMMER_MP)
 #include "mp/mp_util.h"
 #else

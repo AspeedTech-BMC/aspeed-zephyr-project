@@ -1,0 +1,45 @@
+/ {
+	pfr_gpio_oks {
+		compatible = "aspeed,pfr-gpio-oks";
+		/* For AST2700 DCSCM Card */
+		cpu0-aux-pwrgd-in-gpios = <&sgpiom_e_h 1 0>;      /* SGPI33 */
+		cpu0-pltrst-sync-in-gpios = <&sgpiom_e_h 2 0>;    /* SGPI34 */
+		smbus0-rdy-in-gpios = <&sgpiom_e_h 8 0>;          /* SGPI40 */
+		fp0-pwr-btn-in-gpios = <&sgpiom_e_h 9 0>;         /* SGPI41 */
+		cpu1-aux-pwrgd-in-gpios = <&sgpiom_e_h 17 0>;     /* SGPI49 */
+		cpu1-pltrst-sync-in-gpios = <&sgpiom_e_h 18 0>;   /* SGPI50 */
+		smbus1-rdy-in-gpios = <&sgpiom_e_h 24 0>;         /* SGPI56 */
+		fp1-pwr-btn-in-gpios = <&sgpiom_e_h 25 0>;        /* SGPI57 */
+		// cpu1-aux-pwrgd-in-gpios = <&sgpiom_i_l 3 0>;      /* SGPI67 */
+		bmc-onctl-in-gpios = <&sgpiom_i_l 4 0>;           /* SGPI68 */
+
+		// rst-pltrst-cpu0-out-gpios = <&sgpiom_e_h 6 0>;    /* SGPO38 */
+		// rst-rtcrst-cpu1-out-gpios = <&sgpiom_e_h 20 0>;   /* SGPO52 */
+		i3c-mng-mux-sel-out-gpios = <&gpio0_m_p 12 0>;    /* GPIO_N4 */
+		scm-board-id0-in-gpios = <&sgpiom_a_d 1 0>;
+		scm-rsu-hide-done-in-gpios = <&sgpiom_e_h 10 0>;  /* SGPI42 */
+
+		hpm-stby-rdy-in-gpios = <&gpio0_q_t 31 0>;        /* GPI_T7 */
+		hpm-stby-rst-out-gpios = <&gpio0_m_p 4 0>;        /* GPIO_M4 */
+
+
+		bmc-pwr-btn-out-gpios = <&sgpiom_a_d 9 0>;        /* SGPO9 */
+		rst-rtcrst-cpu0-out-gpios = <&sgpiom_e_h 4 0>;    /* SGPO36 */
+		pwrgd-cpu0-out-gpios = <&sgpiom_e_h 5 0>;         /* SGPO37 */
+		pfr-btg-att-done-out-gpios = <&sgpiom_e_h 6 0>;   /* SGPO38 */
+		pfr-btg-att-fail-out-gpios = <&sgpiom_e_h 7 0>;   /* SGPO39 */
+		pfr-s0-att-done-out-gpios = <&sgpiom_e_h 8 0>;    /* SGPO40 */
+		pfr-s0-att-fail-out-gpios = <&sgpiom_e_h 9 0>;    /* SGPO41 */
+		pfr-s5-att-done-out-gpios = <&sgpiom_e_h 10 0>;   /* SGPO42 */
+		pfr-s5-att-fail-out-gpios = <&sgpiom_e_h 11 0>;   /* SGPO43 */
+		pwrgd-cpu1-out-gpios = <&sgpiom_e_h 21 0>;        /* SGPO53 */
+		pfr-btg-att1-done-out-gpios = <&sgpiom_e_h 22 0>; /* SGPO54 */
+		pfr-btg-att1-fail-out-gpios = <&sgpiom_e_h 7 0>;  /* SGPO55 */
+		pfr-s0-att1-done-out-gpios = <&sgpiom_e_h 8 0>;   /* SGPO56 */
+		pfr-s0-att1-fail-out-gpios = <&sgpiom_e_h 9 0>;   /* SGPO57 */
+		pfr-s5-att1-done-out-gpios = <&sgpiom_e_h 10 0>;  /* SGPO58 */
+		pfr-s5-att1-fail-out-gpios = <&sgpiom_e_h 11 0>;  /* SGPO59 */
+		// rst-pltrst-cpu1-out-gpios = <&sgpiom_e_h 22 0>;   /* SGPO54 */
+	};
+};
+

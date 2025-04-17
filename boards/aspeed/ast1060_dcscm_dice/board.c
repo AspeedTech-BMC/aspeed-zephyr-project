@@ -7,10 +7,10 @@
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
-
-#if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_BHS_ENABLED)
-void RTCRSTControl(bool assert);
+#if !defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_MP_ENABLED)
+#include "gpio/gpio_aspeed.h"
 #endif
+
 
 static int ast1060_dcscm_post_init(const struct device *arg)
 {
@@ -23,6 +23,11 @@ static int ast1060_dcscm_post_init(const struct device *arg)
 	return 0;
 }
 
+#if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_MP_ENABLED)
+static int ast1060_dcscm_init(const struct device *arg)
+{
+}
+#else
 static int ast1060_dcscm_init(const struct device *arg)
 {
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
@@ -31,11 +36,10 @@ static int ast1060_dcscm_init(const struct device *arg)
 	gpio_pin_configure(dev, 27, GPIO_OUTPUT_ACTIVE);
 #endif
 
-#if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_BHS_ENABLED)
 	RTCRSTControl(false);
-#endif
 	return 0;
 }
+#endif
 
 SYS_INIT(ast1060_dcscm_post_init, POST_KERNEL, 60);
 SYS_INIT(ast1060_dcscm_init, APPLICATION, 0);
