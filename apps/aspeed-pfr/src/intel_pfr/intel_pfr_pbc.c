@@ -102,20 +102,27 @@ int update_active_pfm(struct pfr_manifest *manifest, uint32_t pfm_size)
 }
 
 int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_addr,
-		uint32_t active_bitmap)
+		uint32_t active_bitmap, uint32_t bitmap_size)
 {
 	uint32_t region_start_bit = start_addr / PAGE_SIZE;
 	uint32_t region_end_bit = end_addr / PAGE_SIZE;
 	int sector_sz = pfr_spi_get_block_size(image_type);
-	uint8_t active_bitmap_byte[PAGE_SIZE];
+	uint8_t *active_bitmap_byte;
 	uint32_t erase_start_bit = 0xffffffff;
 	bool support_block_erase = false;
 	uint32_t bit_in_bitmap;
 	uint32_t erase_bits;
 
-	if (pfr_spi_read(image_type, active_bitmap, sizeof(active_bitmap_byte),
+	active_bitmap_byte = malloc(bitmap_size);
+	if (active_bitmap_byte == NULL) {
+		LOG_ERR("Failed to allocate memory for bitmap");
+		return Failure;
+	}
+
+	if (pfr_spi_read(image_type, active_bitmap, bitmap_size,
 				active_bitmap_byte)) {
 		LOG_ERR("Faild to get bitmap infromation");
+		free(active_bitmap_byte);
 		return Failure;
 	}
 
@@ -123,6 +130,11 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 		support_block_erase = true;
 
 	for (bit_in_bitmap = region_start_bit; bit_in_bitmap < region_end_bit; bit_in_bitmap++) {
+		if (bit_in_bitmap >= bitmap_size) {
+			LOG_INF("Erase bitmap is processed");
+			break;
+		}
+
 		if (active_bitmap_byte[bit_in_bitmap >> 3] & (1 << (7 - (bit_in_bitmap % 8)))) {
 			if (erase_start_bit == 0xffffffff)
 				erase_start_bit = bit_in_bitmap;
@@ -145,6 +157,7 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 				start_addr, end_addr - start_addr);
 	}
 
+	free(active_bitmap_byte);
 	return Success;
 }
 
@@ -152,19 +165,27 @@ int decompression_write(uint32_t image_type,
 		uint32_t decomp_src_addr,
 		uint32_t start_addr,
 		uint32_t end_addr,
-		uint32_t comp_bitmap)
+		uint32_t comp_bitmap,
+		uint32_t bitmap_size)
 {
 	uint32_t region_start_bit = start_addr / PAGE_SIZE;
 	uint32_t region_end_bit = end_addr / PAGE_SIZE;
-	uint8_t comp_bitmap_byte[PAGE_SIZE];
+	uint8_t *comp_bitmap_byte;
 	uint32_t dest_addr = start_addr;
 	uint32_t bitmap_byte_idx = 0;
 	uint32_t copy_this_page;
 	uint32_t cur_bit = 0;
 	uint16_t bit_mask;
 
-	if (pfr_spi_read(image_type, comp_bitmap, sizeof(comp_bitmap_byte), comp_bitmap_byte)) {
+	comp_bitmap_byte = malloc(bitmap_size);
+	if (comp_bitmap_byte == NULL) {
+		LOG_ERR("Failed to allocate memory for bitmap");
+		return Failure;
+	}
+	if (pfr_spi_read(image_type, comp_bitmap, bitmap_size,
+				comp_bitmap_byte)) {
 		LOG_ERR("Faild to get bitmap infromation");
+		free(comp_bitmap_byte);
 		return Failure;
 	}
 
@@ -175,8 +196,10 @@ int decompression_write(uint32_t image_type,
 			if ((region_start_bit <= cur_bit) && (cur_bit < region_end_bit)) {
 				if (copy_this_page) {
 					if (pfr_spi_page_read_write(image_type,
-								decomp_src_addr, dest_addr))
+								decomp_src_addr, dest_addr)){
+						free(comp_bitmap_byte);
 						return Failure;
+					}
 				}
 				dest_addr += PAGE_SIZE;
 			}
@@ -187,8 +210,13 @@ int decompression_write(uint32_t image_type,
 			cur_bit++;
 		}
 		bitmap_byte_idx++;
+		if (bitmap_byte_idx >= bitmap_size) {
+			LOG_INF("Compression bitmap is processed");
+			break;
+		}
 	}
 
+	free(comp_bitmap_byte);
 	return Success;
 }
 
@@ -213,11 +241,11 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 	active_bitmap = pbc_offset + sizeof(PBC_HEADER);
 	comp_bitmap = active_bitmap + bitmap_size;
 	decomp_src_addr = comp_bitmap + bitmap_size;
-	if (decompression_erase(image_type, start_addr, end_addr, active_bitmap))
+	if (decompression_erase(image_type, start_addr, end_addr, active_bitmap, bitmap_size))
 		return Failure;
 
 	status = decompression_write(image_type, decomp_src_addr, start_addr, end_addr,
-			comp_bitmap);
+			comp_bitmap, bitmap_size);
 
 	return status;
 }
