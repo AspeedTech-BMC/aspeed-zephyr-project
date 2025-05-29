@@ -129,6 +129,8 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 	if (sector_sz == BLOCK_SIZE)
 		support_block_erase = true;
 
+	// Convert bitmap size from bytes to bits to match bit-level indexing logic
+	bitmap_size <<= 3;
 	for (bit_in_bitmap = region_start_bit; bit_in_bitmap < region_end_bit; bit_in_bitmap++) {
 		if (bit_in_bitmap >= bitmap_size) {
 			LOG_INF("Erase bitmap is processed");
