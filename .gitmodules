@@ -1,3 +1,6 @@
 [submodule "lib/dmtf/libspdm"]
 	path = lib/dmtf/libspdm
 	url = https://github.com/DMTF/libspdm.git
+[submodule "apps/mcu-runtime/lib/dtc"]
+	path = apps/mcu-runtime/lib/dtc
+	url = https://github.com/dgibson/dtc.git
