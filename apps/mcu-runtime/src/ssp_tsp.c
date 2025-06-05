@@ -1,0 +1,160 @@
+// SPDX-License-Identifier: Apache-2.0
+/*
+ * Copyright (c) Aspeed Technology Inc.
+ */
+#include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/arch/common/sys_io.h>
+#include <zephyr/arch/common/sys_bitops.h>
+#include <zephyr/sys/sys_io.h>
+#include <zephyr/logging/log.h>
+#include <platform.h>
+#include <scu_ast2700.h>
+
+LOG_MODULE_REGISTER(ssp_tsp, CONFIG_SOC_FMC_LOG_LEVEL);
+
+#define MAX_I_D_ADDRESS		MB(512)
+
+int ssp_init(mem_addr_t load_addr)
+{
+	struct ast2700_scu0 *scu;
+	uint32_t reg_val;
+	uint64_t phy_addr;
+
+	if (load_addr != (mem_addr_t)DT_REG_ADDR(DT_NODELABEL(ssp_memory))) {
+		LOG_ERR("FIT load address %08lx doesn't match SSP reserved memory %08lx", load_addr,
+			(mem_addr_t)DT_REG_ADDR(DT_NODELABEL(ssp_memory)));
+		return -1;
+	}
+
+	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
+
+	reg_val = sys_read32((mm_reg_t)&scu->ssp_ctrl_1);
+	if (!(reg_val & SCU0_SSP_TSP_RESET_STS)) {
+		return 0;
+	}
+
+	sys_write32(SCU0_RST_SSP, (mm_reg_t)&scu->modrst1_ctrl);
+	sys_write32(SCU0_RST_SSP, (mm_reg_t)&scu->modrst1_clr);
+
+	reg_val = SCU0_SSP_TSP_NIDEN | SCU0_SSP_TSP_DBGEN |
+		  SCU0_SSP_TSP_DBG_ENABLE | SCU0_SSP_TSP_RESET;
+	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_1);
+
+	/*
+	 * SSP Memory Map:
+	 * - 0x0000_0000 - 0x0507_FFFF: ssp_remap2 -> DRAM[load_addr]
+	 * - 0x0508_0000 - 0x1FFF_FFFF: ssp_remap1 -> AHB -> DRAM[0]
+	 * - 0x2000_0000 - 0x2000_2000: ssp_remap0 -> TCM (Not used)
+	 *
+	 * The SSP serves as the secure loader for TSP, ATF, OP-TEE, and U-Boot.
+	 * Therefore, their load buffers must be visible to the SSP.
+	 *
+	 * - SSP remap entry #2 (ssp_memory_base/size) maps the load buffers
+	 *   for SSP, TSP, ATF, and OP-TEE. Ensure these buffers are contiguous.
+	 * - SSP remap entry #1 (ssp_ahb_base/size) maps the load buffer
+	 *   for U-Boot at DRAM offset 0x0.
+	 * - SSP remap entry #0 (ssp_tcm_base/size) maps TCM, which is not used.
+	 */
+	sys_write32(0, (mm_reg_t)&scu->ssp_memory_base);
+	reg_val = DT_REG_SIZE(DT_NODELABEL(ssp_memory)) + DT_REG_SIZE(DT_NODELABEL(tsp_memory)) +
+		  DT_REG_SIZE(DT_NODELABEL(atf)) + DT_REG_SIZE(DT_NODELABEL(optee_core));
+	sys_write32(reg_val, (mm_reg_t)&scu->ssp_memory_size);
+
+	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ahb_base);
+	sys_write32(MAX_I_D_ADDRESS - reg_val, (mm_reg_t)&scu->ssp_ahb_size);
+
+	sys_write32(MAX_I_D_ADDRESS, (mm_reg_t)&scu->ssp_tcm_base);
+	sys_write32(0x0, (mm_reg_t)&scu->ssp_tcm_size);
+
+	/* Configure physical AHB remap: through H2M, mapped to SYS_DRAM_BASE */
+	sys_write32((uint32_t)(SYS_DRAM_BASE >> 4), (mm_reg_t)&scu->ssp_ctrl_2);
+
+	/* Configure physical DRAM remap */
+	phy_addr = ((uint64_t)load_addr - ASPEED_DRAM_BASE) | SYS_DRAM_BASE;
+	reg_val = (uint32_t)(phy_addr >> 4);
+	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_3);
+
+	/* Enable 1st i-cache area */
+	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_4);
+
+	/* Enable 1st d-cache area */
+	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_5);
+
+	/* Disable i & d cache by default */
+	sys_write32(0x0, (mm_reg_t)&scu->ssp_ctrl_7);
+
+	return 0;
+}
+
+int ssp_enable(void)
+{
+	struct ast2700_scu0 *scu;
+
+	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
+	sys_set_bits((mem_addr_t)&scu->ssp_ctrl_1, SCU0_SSP_TSP_ENABLE);
+
+	/* HW auto de-asserts SSP reset when WDT timeout reset occurs */
+	sys_clear_bits((mem_addr_t)&scu->ssp_ctrl_1, SCU0_SSP_TSP_ENABLE);
+
+	return 0;
+}
+
+int tsp_init(mem_addr_t load_addr)
+{
+	struct ast2700_scu0 *scu;
+	uint32_t reg_val;
+	uint64_t phy_addr;
+
+	if (load_addr != (mem_addr_t)DT_REG_ADDR(DT_NODELABEL(tsp_memory))) {
+		LOG_ERR("FIT load address %08lx doesn't match TSP reserved memory %08lx", load_addr,
+			(mem_addr_t)DT_REG_ADDR(DT_NODELABEL(tsp_memory)));
+		return -1;
+	}
+
+	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
+
+	reg_val = sys_read32((mm_reg_t)&scu->tsp_ctrl_1);
+	if (!(reg_val & SCU0_SSP_TSP_RESET_STS)) {
+		return 0;
+	}
+
+	sys_write32(SCU0_RST2_TSP, (mm_reg_t)&scu->modrst2_ctrl);
+	sys_write32(SCU0_RST2_TSP, (mm_reg_t)&scu->modrst2_clr);
+
+	reg_val = SCU0_SSP_TSP_NIDEN | SCU0_SSP_TSP_DBGEN |
+		  SCU0_SSP_TSP_DBG_ENABLE | SCU0_SSP_TSP_RESET;
+	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_1);
+
+	/* TSP 0x0000_0000 - 0x0200_0000 -> DRAM */
+	sys_write32(DT_REG_SIZE(DT_NODELABEL(tsp_memory)), (mm_reg_t)&scu->tsp_remap_size);
+
+	/* Configure physical DRAM remap */
+	phy_addr = ((uint64_t)load_addr - ASPEED_DRAM_BASE) | SYS_DRAM_BASE;
+	reg_val = (uint32_t)(phy_addr >> 4);
+	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_3);
+
+	/* Enable 1st i-cache area */
+	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_4);
+
+	/* Enable 1st d-cache area */
+	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_5);
+
+	/* Disable i & d cache by default */
+	sys_write32(0x0, (mm_reg_t)&scu->tsp_ctrl_7);
+
+	return 0;
+}
+
+int tsp_enable(void)
+{
+	struct ast2700_scu0 *scu;
+
+	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
+	sys_set_bits((mem_addr_t)&scu->tsp_ctrl_1, SCU0_SSP_TSP_ENABLE);
+
+	/* HW auto de-asserts TSP reset when WDT timeout reset occurs */
+	sys_clear_bits((mem_addr_t)&scu->tsp_ctrl_1, SCU0_SSP_TSP_RESET);
+
+	return 0;
+}

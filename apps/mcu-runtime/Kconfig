@@ -1,0 +1,35 @@
+# Copyright (c) 2021 ASPEED Technology Inc. <chin-ting_kuo@aspeedtech.com>
+# SPDX-License-Identifier: Apache-2.0
+
+config ASPEED_DDR_3200
+        default y
+        bool "ASPEED DDR data rate"
+        help
+          Choose DDR3200 data rate
+
+config SOC_FMC_LOAD_FIT_ADDRESS
+        hex "load address of fit image"
+        help
+	  Specify the load address of the fit image that will be loaded
+
+config SYS_LOAD_ADDR
+	hex "Address in memory to use by default"
+	help
+	  Address in memory to use as the default safe load address.
+
+config FIT_SIGNATURE
+	default n
+	bool "Enable signature verification of FIT uImages"
+	help
+	  This option enables signature verification of FIT uImages,
+          using a hash signed and verified using RSA. If
+          CONFIG_SHA_PROG_HW_ACCEL is defined, i.e support for progressive
+          hashing is available using hardware, then the RSA library will use
+          it.
+
+rsource "src/Kconfig"
+
+module = SOC_FMC
+module-str = soc-fmc
+source "subsys/logging/Kconfig.template.log_config"
+source "Kconfig.zephyr"
