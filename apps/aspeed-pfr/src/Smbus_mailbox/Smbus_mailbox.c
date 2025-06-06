@@ -899,15 +899,30 @@ void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot
 		SetPlatformState(T0_BOOT_COMPLETED);
 		ufm_read(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS,
 				(uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
-		if (cpld_update_status.Region[BMC_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
-			intent = BmcRecoveryUpdate;
-		} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
-			intent = PchRecoveryUpdate;
-		} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion == PCH_INTENT_RECOVERY_PENDING) {
+
+		if (cpld_update_status.Region[PCH_REGION].Recoveryregion ==
+			PCH_INTENT_RECOVERY_PENDING) {
 			intent = PchRecoveryUpdate;
 			update_intent_src = PchUpdateIntent;
-		} else if (cpld_update_status.Region[ROT_REGION].Recoveryregion == BMC_INTENT_RECOVERY_PENDING) {
-			intent = HROTRecoveryUpdate;
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+		} else if (cpld_update_status.Region[AFM_REGION].Recoveryregion ==
+			BMC_INTENT2_AFM_RECOVERY_PENDING) {
+			intent = AfmRecoveryUpdate;
+			update_intent_src = BmcUpdateIntent2;
+#endif
+		} else {
+			if (cpld_update_status.Region[BMC_REGION].Recoveryregion ==
+				BMC_INTENT_RECOVERY_PENDING) {
+				intent = BmcRecoveryUpdate;
+			} else if (cpld_update_status.Region[PCH_REGION].Recoveryregion ==
+				BMC_INTENT_RECOVERY_PENDING) {
+				intent = PchRecoveryUpdate;
+			}
+
+			if (cpld_update_status.Region[ROT_REGION].Recoveryregion ==
+				BMC_INTENT_RECOVERY_PENDING) {
+				intent |= HROTRecoveryUpdate;
+			}
 		}
 
 		if (intent) {
@@ -916,14 +931,6 @@ void log_t0_timed_boot_complete_if_ready(const PLATFORM_STATE_VALUE current_boot
 			data.bit8[2] |= BootDoneRecovery;
 			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
 		}
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
-		if (cpld_update_status.Region[AFM_REGION].Recoveryregion == BMC_INTENT2_AFM_RECOVERY_PENDING) {
-			data.bit8[0] = BmcUpdateIntent2;
-			data.bit8[1] = AfmRecoveryUpdate;
-			data.bit8[2] |= BootDoneRecovery;
-			GenerateStateMachineEvent(UPDATE_REQUESTED, data.ptr);
-		}
-#endif
 	} else {
 		// Otherwise, just log the this boot complete status
 		SetPlatformState(current_boot_state);
