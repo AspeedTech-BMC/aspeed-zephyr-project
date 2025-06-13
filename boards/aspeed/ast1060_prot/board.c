@@ -116,6 +116,15 @@ static int ast1060_prot_init(const struct device *arg)
 	return 0;
 }
 
-SYS_INIT(ast1060_prot_gpio_post_init, POST_KERNEL, 45);
-SYS_INIT(ast1060_prot_post_init, POST_KERNEL, 85);
+/*
+ * Priority of ast1060_prot_gpio_post_init should be later than
+ * CONFIG_GPIO_ASPEED_INIT_PRIORITY (default: 60)
+ */
+SYS_INIT(ast1060_prot_gpio_post_init, POST_KERNEL, 65);
+
+/*
+ * Priority of ast1060_prot_post_init should be earlier than
+ * CONFIG_SPI_NOR_INIT_PRIORITY (default: 80)
+ */
+SYS_INIT(ast1060_prot_post_init, POST_KERNEL, 75);
 SYS_INIT(ast1060_prot_init, APPLICATION, 0);
