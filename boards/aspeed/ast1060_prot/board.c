@@ -120,11 +120,19 @@ static int ast1060_prot_init(const struct device *arg)
  * Priority of ast1060_prot_gpio_post_init should be later than
  * CONFIG_GPIO_ASPEED_INIT_PRIORITY (default: 60)
  */
-SYS_INIT(ast1060_prot_gpio_post_init, POST_KERNEL, 65);
+#define APP_GPIO_INIT_PRIORITY 65
+BUILD_ASSERT(APP_GPIO_INIT_PRIORITY > CONFIG_GPIO_ASPEED_INIT_PRIORITY,
+	"APP GPIO Init Priority should be bigger than the driver GPIO Init Priority");
+
+SYS_INIT(ast1060_prot_gpio_post_init, POST_KERNEL, APP_GPIO_INIT_PRIORITY);
 
 /*
  * Priority of ast1060_prot_post_init should be earlier than
  * CONFIG_SPI_NOR_INIT_PRIORITY (default: 80)
  */
-SYS_INIT(ast1060_prot_post_init, POST_KERNEL, 75);
+#define APP_PROT_POST_INIT_PRIORITY 75
+BUILD_ASSERT(APP_PROT_POST_INIT_PRIORITY < CONFIG_SPI_NOR_INIT_PRIORITY,
+	"Post INIT Init Priority should be less than the SPI Init Priority");
+
+SYS_INIT(ast1060_prot_post_init, POST_KERNEL, APP_PROT_POST_INIT_PRIORITY);
 SYS_INIT(ast1060_prot_init, APPLICATION, 0);
