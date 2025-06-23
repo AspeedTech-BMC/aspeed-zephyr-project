@@ -27,6 +27,19 @@ config FIT_SIGNATURE
           hashing is available using hardware, then the RSA library will use
           it.
 
+config CPTRA_MANIFEST
+	bool "Enable CPTRA manifest image loader"
+	default n
+	help
+	  This option enable the CPTRA manifest image loader.
+
+config CPTRA_MANIFEST_SIGNATURE
+	bool "Enable CPTRA manifest image signature verification"
+	default n
+	help
+	  This option enables signature verification of CPTRA manifest images,
+	  using a hash signed and verified using ECC.
+
 rsource "src/Kconfig"
 
 module = SOC_FMC

@@ -21,6 +21,7 @@
 #include <fit.h>
 #include <spi.h>
 #include <ufs.h>
+#include <manifest.h>
 #include <mmc.h>
 #include <abr.h>
 #include <stor.h>
@@ -91,6 +92,38 @@ void board_fit_image_post_process(const void *fit, int node, void **p_image, siz
 		break;
 	case IH_OS_U_BOOT:
 		sys_write64(ep_arm, SCU0_CPU_SMP_EP0);
+		break;
+	default:
+		break;
+	}
+}
+
+void board_manifest_image_post_process(struct cptra_manifest_ime *ime)
+{
+	uintptr_t ep = cptra_ime_get_load_addr(ime);
+	uint64_t ep_arm = 0;
+
+	/* convert to Arm view */
+	ep_arm = ((uint64_t)ep - 0x80000000) | 0x400000000ULL;
+
+	switch (ime->fw_id) {
+	case CPTRA_ATF_FW_ID:
+		has_pspfw = true;
+		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR0);
+		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR1);
+		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR2);
+		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR3);
+		break;
+	case CPTRA_UBOOT_FW_ID:
+		sys_write64(ep_arm, SCU0_CPU_SMP_EP0);
+		break;
+	case CPTRA_SSP_FW_ID:
+		ssp_init(ep);
+		has_sspfw = true;
+		break;
+	case CPTRA_TSP_FW_ID:
+		tsp_init(ep);
+		has_tspfw = true;
 		break;
 	default:
 		break;
@@ -260,19 +293,20 @@ static void soc_fmc_dp_run(void *o)
 static void soc_fmc_image_load_run(void *o)
 {
 	struct soc_fmc_object *s_obj = (struct soc_fmc_object *)o;
-	struct fit_image_info fit_image;
-	int err;
 
-	err = fit_load_image(s_obj->boot_mode, &fit_image);
-	if (err)
-		LOG_DBG("soc_fmc_load_image err=0x%x", err);
-
-	switch (fit_image.os) {
-	case IH_OS_U_BOOT:
-		LOG_DBG("Jumping to %s...", fit_phase_name(fit_next_phase()));
-		break;
-	default:
-		LOG_DBG("Unsupported OS image.. Jumping nevertheless..");
+	/* Load the image */
+	if (IS_ENABLED(CONFIG_CPTRA_MANIFEST)) {
+		if (cptra_load_image(s_obj->boot_mode, &s_obj->man_image) < 0) {
+			LOG_ERR("Failed to load manifest image");
+			smf_set_state(SMF_CTX(s_obj), &soc_fmc_states[REBOOT]);
+			return;
+		}
+	} else {
+		if (fit_load_image(s_obj->boot_mode, &s_obj->fit_image) < 0) {
+			LOG_ERR("Failed to load FIT image");
+			smf_set_state(SMF_CTX(s_obj), &soc_fmc_states[REBOOT]);
+			return;
+		}
 	}
 
 	LOG_DBG("soc_fmc_image_load_run");

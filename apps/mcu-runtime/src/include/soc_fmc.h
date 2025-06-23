@@ -9,6 +9,7 @@
 
 #include <zephyr/smf.h>
 #include <fit.h>
+#include <manifest.h>
 #include <stor.h>
 
 /* User defined object */
@@ -16,6 +17,7 @@ struct soc_fmc_object {
 	/* This must be first */
 	struct smf_ctx ctx;
 	struct fit_image_info fit_image;
+	struct manifest_image_info man_image;
 	/* Events */
 	struct k_event smf_event;
 	int32_t events;

@@ -20,6 +20,9 @@ target_sources(app PRIVATE
 	fit.c
 	fit_image.c
 	fit_image_sig.c
+	manifest.c
+	manifest_image.c
+	manifest_image_sig.c
 )
 
 #target_sources_ifdef(CONFIG_SLI_AST2700 app PRIVATE sli_ast2700.c)
