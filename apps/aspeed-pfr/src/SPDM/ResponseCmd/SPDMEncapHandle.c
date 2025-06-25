@@ -184,35 +184,55 @@ int spdm_encap_get_certificate(struct spdm_context *context, struct spdm_message
 			size_t asn1_len, current_cert_len = 0;
 			size_t cert_chain_len;
 			uint8_t *cert_chain;
-			uint8_t *tmp_ptr, *current_cert;
+			uint8_t *tmp_ptr, *current_cert, *end;
 			int32_t current_index = -1;
 
 			remote_cert = &context->remote.certificate.certs[slot_id].chain;
 			cert_chain_len = context->remote.certificate.certs[slot_id].size - 4 - 48;
 			cert_chain = context->remote.certificate.certs[slot_id].data + 4 + 48;
 			current_cert = cert_chain;
+			end = cert_chain + cert_chain_len;
 			mbedtls_x509_crt_free(remote_cert);
 			mbedtls_x509_crt_init(remote_cert);
 			while (true) {
 				tmp_ptr = current_cert;
+				if (current_cert >= end)
+					break;
+
 				ret = mbedtls_asn1_get_tag(
-					&tmp_ptr, cert_chain + cert_chain_len, &asn1_len,
+					&tmp_ptr, end, &asn1_len,
 					MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
 				if (ret != 0)
 					break;
 
 				current_cert_len = asn1_len + (tmp_ptr - current_cert);
 				current_index++;
-				ret = mbedtls_x509_crt_parse_der_nocopy(
-					remote_cert, current_cert, current_cert_len);
-				if (ret < 0)
-					break;
+
+				if (current_index) {
+					/*
+					 * If there are more certificates,
+					 * to verify it before inserting it
+					 */
+					ret = append_next_certificate(
+						remote_cert,
+						current_cert,
+						current_cert_len);
+					if (ret)
+						break;
+				} else {
+					/* insert first certificate to remote_cert */
+					ret = mbedtls_x509_crt_parse_der_nocopy(
+						remote_cert, current_cert,
+						current_cert_len);
+					if (ret < 0)
+						break;
+				}
 
 				current_cert = current_cert + current_cert_len;
 			}
-
-			ret = mbedtls_x509_crt_verify(remote_cert, ca_cert, NULL,
-					NULL, &flags, NULL, NULL);
+			if (ret == 0)
+				ret = mbedtls_x509_crt_verify(remote_cert, ca_cert, NULL,
+						NULL, &flags, NULL, NULL);
 			if (ret < 0 || flags != 0) {
 				LOG_ERR("Failed to verify Certificate[%d], ret=%x flags=%x",
 					slot_id, -ret, flags);

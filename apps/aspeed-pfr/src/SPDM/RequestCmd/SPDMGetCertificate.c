@@ -150,13 +150,16 @@ cleanup:
 		size_t asn1_len, current_cert_len = 0;
 		size_t cert_chain_len = context->remote.certificate.certs[slot_id].size - 4 - 48;
 		uint8_t *cert_chain = context->remote.certificate.certs[slot_id].data + 4 + 48;
-		uint8_t *tmp_ptr, *current_cert = cert_chain;
+		uint8_t *tmp_ptr, *current_cert = cert_chain, *end = cert_chain + cert_chain_len;
 		int32_t current_index = -1;
 
 		while (true) {
 			tmp_ptr = current_cert;
+			if (current_cert >= end)
+				break;
+
 			ret = mbedtls_asn1_get_tag(
-					&tmp_ptr, cert_chain + cert_chain_len, &asn1_len,
+					&tmp_ptr, end, &asn1_len,
 					MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
 			if (ret != 0)
 				break;
@@ -164,15 +167,32 @@ cleanup:
 			current_cert_len = asn1_len + (tmp_ptr - current_cert);
 			current_index++;
 
-			ret = mbedtls_x509_crt_parse_der_nocopy(
-					remote_cert, current_cert, current_cert_len);
-			if (ret < 0)
-				break;
+			if (current_index) {
+				/*
+				 * If there are more certificates,
+				 * to verify it before inserting it
+				 */
+				ret = append_next_certificate(
+					remote_cert,
+					current_cert,
+					current_cert_len);
+				if (ret)
+					break;
+			} else {
+				/* insert first certificate to remote_cert */
+				ret = mbedtls_x509_crt_parse_der_nocopy(
+					remote_cert, current_cert,
+					current_cert_len);
+				if (ret < 0)
+					break;
+			}
 
 			current_cert = current_cert + current_cert_len;
 		}
 
-		ret = mbedtls_x509_crt_verify(remote_cert, ca_cert, NULL, NULL, &flags, NULL, NULL);
+		if (ret == 0)
+			ret = mbedtls_x509_crt_verify(remote_cert, ca_cert, NULL, NULL, &flags, NULL, NULL);
+
 		if (context->private_data && pPubkey->CertificateSize)
 			mbedtls_x509_crt_free(ca_cert);
 

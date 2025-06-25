@@ -309,6 +309,43 @@ mbedtls_x509_crt *spdm_get_root_certificate(void)
 	return &system_root_ca;
 }
 
+int append_next_certificate(mbedtls_x509_crt *crt_chain, uint8_t *current_cert, size_t current_cert_len)
+{
+	mbedtls_x509_crt *new_crt, *last_ca_crt;
+	int ret, flags;
+
+	new_crt = calloc(1, sizeof(mbedtls_x509_crt));
+	if (new_crt == NULL) {
+		LOG_ERR("Failed to allocate crt (%d)", sizeof(mbedtls_x509_crt));
+		return -1;
+	}
+
+	mbedtls_x509_crt_init(new_crt);
+	ret = mbedtls_x509_crt_parse_der_nocopy(new_crt, current_cert, current_cert_len);
+	if (ret < 0) {
+		mbedtls_x509_crt_free(new_crt);
+		free(new_crt);
+		return -1;
+	}
+
+	/* find the last CA certificate from certificate chain */
+	last_ca_crt = crt_chain;
+	while (last_ca_crt->next)
+		last_ca_crt = last_ca_crt->next;
+
+	ret = mbedtls_x509_crt_verify(new_crt, last_ca_crt, NULL, NULL, &flags, NULL, NULL);
+
+	/* if new certificate is verified, to append it */
+	if (ret == 0)
+		last_ca_crt->next = new_crt;
+	else {
+		mbedtls_x509_crt_free(new_crt);
+		free(new_crt);
+	}
+
+	return ret;
+}
+
 size_t spdm_context_base_hash_size(void *ctx)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;

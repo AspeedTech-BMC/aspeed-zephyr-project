@@ -148,3 +148,4 @@ void spdm_context_update_m1m2_hash(void *ctx, void *req, void *rsp);
 void spdm_context_reset_l1l2_hash(void *ctx);
 void spdm_context_update_l1l2_hash_buffer(void *ctx, void *buf);
 void spdm_context_update_l1l2_hash(void *ctx, void *req, void *rsp);
+int append_next_certificate(mbedtls_x509_crt *crt_chain, uint8_t *current_cert, size_t current_cert_len);
