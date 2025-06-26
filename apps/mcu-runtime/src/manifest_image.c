@@ -47,29 +47,14 @@ static struct cptra_load_image image_list[] = {
 	{"ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID, CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE},
 };
 
-int cptra_get_all_image_size(struct manifest_image_info *man)
-{
-	int64_t img_size = 0;
-	uint32_t img_num = man->hdr->img_count;
-	struct cptra_image_info *img_info = man->img_info;
-
-	for (img_info = man->img_info; img_info < man->img_info + img_num; img_info++)
-		img_size += img_info->size;
-
-	if (img_size > INT32_MAX)
-		LOG_ERR("Total image size is large than UINT32_MAX.");
-
-	return img_size < INT32_MAX ? img_size : CPTRA_ERR_IMAGE_SIZE_OVERFLOW;
-}
-
-static struct cptra_image_info *cptra_find_image_info(struct manifest_image_info *man,
+static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context *ctx,
 						      uint32_t identifier)
 {
 	bool match = false;
-	uint32_t img_num = man->hdr->img_count;
-	struct cptra_image_info *img_info = man->img_info;
+	uint32_t img_num = ctx->hdr->img_count;
+	struct cptra_image_info *img_info = ctx->img_info;
 
-	for (img_info = man->img_info; img_info < man->img_info + img_num; img_info++) {
+	for (img_info = ctx->img_info; img_info < ctx->img_info + img_num; img_info++) {
 		if (img_info->identifier == identifier) {
 			match = true;
 			break;
@@ -79,34 +64,22 @@ static struct cptra_image_info *cptra_find_image_info(struct manifest_image_info
 	return match ? img_info : NULL;
 }
 
-static int cptra_img_info_get_offset(struct manifest_image_info *man, uint32_t identifier)
+static int cptra_img_info_get_offset(struct cptra_image_context *ctx, uint32_t identifier)
 {
 	struct cptra_image_info *img_info = NULL;
 
-	img_info = cptra_find_image_info(man, identifier);
+	img_info = cptra_find_image_info(ctx, identifier);
 
 	return img_info ? img_info->offset : CPTRA_ERR_IMAGE_OFFSET_INVALID;
 }
 
-static int cptra_img_info_get_size(struct manifest_image_info *man, uint32_t identifier)
+static int cptra_img_info_get_size(struct cptra_image_context *ctx, uint32_t identifier)
 {
 	struct cptra_image_info *img_info = NULL;
 
-	img_info = cptra_find_image_info(man, identifier);
+	img_info = cptra_find_image_info(ctx, identifier);
 
 	return img_info ? img_info->size : CPTRA_ERR_IMAGE_SIZE_INVALID;
-}
-
-static void *cptra_img_info_get_bin(struct manifest_image_info *man, uint32_t identifier)
-{
-	int offset = cptra_img_info_get_offset(man, identifier);
-
-	if (offset < 0) {
-		LOG_ERR("Cannot find image with id 0x%x (%x).", identifier, offset);
-		return NULL;
-	}
-
-	return (void *)(cptra_manifest_buffer_addr(offset));
 }
 
 static struct cptra_load_image *cptra_find_load_image(uint32_t fw_id)
@@ -120,25 +93,7 @@ static struct cptra_load_image *cptra_find_load_image(uint32_t fw_id)
 	return match != -1 ? &image_list[match] : NULL;
 }
 
-void *cptra_get_soc_mafniest(struct manifest_image_info *man)
-{
-	return cptra_img_info_get_bin(man, CPTRA_SOC_MANIFEST_HDR_ID);
-}
-
-void *cptra_ime_get_bin(struct manifest_image_info *man, struct cptra_manifest_ime *ime)
-{
-	struct cptra_load_image *img = NULL;
-
-	img = cptra_find_load_image(ime->fw_id);
-	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", ime->fw_id);
-		return NULL;
-	}
-
-	return cptra_img_info_get_bin(man, img->identifier);
-}
-
-int cptra_ime_image_size(struct manifest_image_info *man, struct cptra_manifest_ime *ime)
+int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
 {
 	struct cptra_load_image *img = NULL;
 
@@ -148,7 +103,25 @@ int cptra_ime_image_size(struct manifest_image_info *man, struct cptra_manifest_
 		return CPTRA_ERR_IMAGE_SIZE_INVALID;
 	}
 
-	return cptra_img_info_get_size(man, img->identifier);
+	return cptra_img_info_get_offset(ctx, img->identifier);
+}
+
+int cptra_soc_manifest_offset(struct cptra_image_context *ctx)
+{
+	return cptra_img_info_get_offset(ctx, CPTRA_SOC_MANIFEST_HDR_ID);
+}
+
+int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
+{
+	struct cptra_load_image *img = NULL;
+
+	img = cptra_find_load_image(ime->fw_id);
+	if (!img) {
+		LOG_ERR("Cannot find image with fw_id 0x%x.", ime->fw_id);
+		return CPTRA_ERR_IMAGE_SIZE_INVALID;
+	}
+
+	return cptra_img_info_get_size(ctx, img->identifier);
 }
 
 char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime)
