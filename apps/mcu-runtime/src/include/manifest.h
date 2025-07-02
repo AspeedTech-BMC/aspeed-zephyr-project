@@ -65,8 +65,30 @@ struct cptra_image_info {
 	uint32_t size;
 } __attribute__((__packed__));
 
+struct cptra_manifest_aspeed_preamble {
+	uint32_t manifest_marker;
+	uint32_t preamble_size;
+	uint32_t manifest_version;
+	uint32_t manifest_sec_version;
+	uint32_t manifest_flags;
+	uint32_t manifest_vendor_ecc384_key[24];
+	uint32_t manifest_vendor_lms_key[12];
+	uint32_t manifest_vendor_ecc384_sig[24];
+	uint32_t manifest_vendor_LMS_sig[405];
+	uint32_t manifest_owner_ecc384_key[24];
+	uint32_t manifest_owner_lms_key[12];
+	uint32_t manifest_owner_ecc384_sig[24];
+	uint32_t manifest_owner_LMS_sig[405];
+	uint32_t manifest_owner_svn_ecc384_sig[24];
+	uint32_t manifest_owner_svn_LMS_sig[405];
+	uint32_t metadata_vendor_ecc384_sig[24];
+	uint32_t metadata_vendor_LMS_sig[405];
+	uint32_t metadata_owner_ecc384_sig[24];
+	uint32_t metadata_owner_LMS_sig[405];
+} __attribute__((__packed__));
+
 struct cptra_soc_manifest {
-	struct cptra_manifest_preamble preamble;
+	struct cptra_manifest_aspeed_preamble preamble;
 	uint32_t ime_count;
 	struct cptra_manifest_ime imc[CPTRA_IMC_ENTRY_COUNT];
 } __attribute__((__packed__, __aligned__(4)));

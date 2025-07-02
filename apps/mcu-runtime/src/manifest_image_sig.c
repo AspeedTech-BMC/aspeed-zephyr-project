@@ -17,6 +17,40 @@
 LOG_MODULE_REGISTER(cptra_manifest_sig, CONFIG_LOG_DEFAULT_LEVEL);
 
 static struct cptra_set_auth_manifest_ia input = {0};
+
+static void cptra_preamble_convert(struct cptra_manifest_preamble *preamble,
+				   struct cptra_manifest_aspeed_preamble *aspeed_preamble)
+{
+	preamble->manifest_marker = aspeed_preamble->manifest_marker;
+	preamble->preamble_size = aspeed_preamble->preamble_size;
+	preamble->manifest_version = aspeed_preamble->manifest_version;
+	preamble->manifest_flags = aspeed_preamble->manifest_flags;
+	memcpy(preamble->manifest_vendor_ecc384_key, aspeed_preamble->manifest_vendor_ecc384_key,
+	       sizeof(preamble->manifest_vendor_ecc384_key));
+	memcpy(preamble->manifest_vendor_lms_key, aspeed_preamble->manifest_vendor_lms_key,
+	       sizeof(preamble->manifest_vendor_lms_key));
+	memcpy(preamble->manifest_vendor_ecc384_sig, aspeed_preamble->manifest_vendor_ecc384_sig,
+	       sizeof(preamble->manifest_vendor_ecc384_sig));
+	memcpy(preamble->manifest_vendor_LMS_sig, aspeed_preamble->manifest_vendor_LMS_sig,
+	       sizeof(preamble->manifest_vendor_LMS_sig));
+	memcpy(preamble->manifest_owner_ecc384_key, aspeed_preamble->manifest_owner_ecc384_key,
+	       sizeof(preamble->manifest_owner_ecc384_key));
+	memcpy(preamble->manifest_owner_lms_key, aspeed_preamble->manifest_owner_lms_key,
+	       sizeof(preamble->manifest_owner_lms_key));
+	memcpy(preamble->manifest_owner_ecc384_sig, aspeed_preamble->manifest_owner_ecc384_sig,
+	       sizeof(preamble->manifest_owner_ecc384_sig));
+	memcpy(preamble->manifest_owner_LMS_sig, aspeed_preamble->manifest_owner_LMS_sig,
+	       sizeof(preamble->manifest_owner_LMS_sig));
+	memcpy(preamble->metadata_vendor_ecc384_sig, aspeed_preamble->metadata_vendor_ecc384_sig,
+	       sizeof(preamble->metadata_vendor_ecc384_sig));
+	memcpy(preamble->metadata_vendor_LMS_sig, aspeed_preamble->metadata_vendor_LMS_sig,
+	       sizeof(preamble->metadata_vendor_LMS_sig));
+	memcpy(preamble->metadata_owner_ecc384_sig, aspeed_preamble->metadata_owner_ecc384_sig,
+	       sizeof(preamble->metadata_owner_ecc384_sig));
+	memcpy(preamble->metadata_owner_LMS_sig, aspeed_preamble->metadata_owner_LMS_sig,
+	       sizeof(preamble->metadata_owner_LMS_sig));
+}
+
 static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 {
 	struct hash_ctx ini = {0};
@@ -42,9 +76,12 @@ int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest)
 	struct cptra_set_auth_manifest_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
 
-	input.manifest_size = sizeof(struct cptra_soc_manifest);
+	input.manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
+			      sizeof(manifest->imc);
 	input.metadata_entry_entry_count = manifest->ime_count;
-	memcpy(&(input.preamble), &(manifest->preamble), sizeof(manifest->preamble));
+
+	/* Convert aspeed preamble format to caliptra preamble format*/
+	cptra_preamble_convert(&(input.preamble), &(manifest->preamble));
 	memcpy(&(input.metadata_entries), manifest->imc, sizeof(manifest->imc));
 
 	return caliptra_set_auth_manifest(dev, &input, &output);
