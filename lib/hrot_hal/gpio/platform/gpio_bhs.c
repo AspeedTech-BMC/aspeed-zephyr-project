@@ -110,11 +110,15 @@ void BhsSwitchI3cMng(int owner)
 		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_bhs),
 						i3c_mng_mux_sel_out_gpios,
 						{0});
-	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
-	if (i3c_mng_owner.port) {
-		LOG_INF("Switch I3C MNG Owner to %s", owner == I3C_MNG_OWNER_BMC ? "BMC" : "ROT");
-		gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
+
+	if (gpio_is_ready_dt(&i3c_mng_owner) == false) {
+		LOG_ERR("I3C MNG Owner GPIO is not ready");
+		return;
 	}
+
+	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
+	LOG_INF("Switch I3C MNG Owner to %s", owner == I3C_MNG_OWNER_BMC ? "BMC" : "ROT");
+	gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
 	i3c_mng_mux_owner = owner;
 }
 #endif
