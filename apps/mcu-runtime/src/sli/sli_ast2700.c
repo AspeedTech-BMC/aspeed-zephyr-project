@@ -31,6 +31,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 #define   SLI_CLEAR_TX			BIT(1)
 #define   SLI_RESET_TRIGGER		BIT(0)
 #define SLI_CTRL_II			0x04
+#define   SLIV_TX_ENT_SUSPEND		GENMASK(15, 14)
 #define SLI_CTRL_III			0x08
 #define   SLI_CLK_SEL			GENMASK(31, 28)
 #define     SLI_CLK_25M			0x0
@@ -51,6 +52,10 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 #define   SLIH_PAD_DLY_TX0		GENMASK(17, 12)
 #define   SLIH_PAD_DLY_RX1		GENMASK(11, 6)
 #define   SLIH_PAD_DLY_RX0		GENMASK(5, 0)
+#define   SLIV_PAD_DLY_TX1		GENMASK(23, 18)
+#define   SLIV_PAD_DLY_TX0		GENMASK(17, 12)
+#define   SLIV_PAD_DLY_RX1		GENMASK(11, 6)
+#define   SLIV_PAD_DLY_RX0		GENMASK(5, 0)
 #define   SLIM_PAD_DLY_RX3		GENMASK(23, 18)
 #define   SLIM_PAD_DLY_RX2		GENMASK(17, 12)
 #define   SLIM_PAD_DLY_RX1		GENMASK(11, 6)
@@ -116,11 +121,13 @@ struct sli_config {
 struct sli_data {
 	struct sli_config die0;	/* CPU die */
 	struct sli_config die1;	/* IO die */
+	struct ast2700_scu0 *scu0;
 	struct ast2700_scu1 *scu1;
 
 #define SLI_FLAG_AST2700A0		BIT(0)
 #define SLI_FLAG_RX_LAH_NEG_IO_SLIH	BIT(1)
 #define SLI_FLAG_RX_LAH_NEG_IO_SLIM	BIT(2)
+#define SLI_FLAG_RX_LAH_NEG_IO_SLIV	BIT(3)
 	uint32_t flags;
 };
 
@@ -511,6 +518,157 @@ static void sli_calibrate_mbus_delay(struct sli_data *data)
 	setbits_le32(data->die1.slim + SLIM_MARB_FUNC_I, SLIM_SLI_MARB_RR);
 }
 
+static void sli_set_video_rx_delay(uint32_t base, int d0, int d1)
+{
+	uint32_t value;
+
+	value = FIELD_PREP(SLIV_PAD_DLY_RX1, d1) | FIELD_PREP(SLIV_PAD_DLY_RX0, d0);
+	clrsetbits_le32(base + SLI_CTRL_III, SLIV_PAD_DLY_RX1 | SLIV_PAD_DLY_RX0, value);
+	sys_read32(base + SLI_CTRL_III);
+	k_busy_wait(8);
+}
+
+static int sli_log_video_pad_delay(uintptr_t scu, int first, int last)
+{
+	clrsetbits_le32(scu, 0xffff0000, ((last & 0xff) << 24) | ((first & 0xff) << 16));
+
+	return 0;
+}
+
+static int sli_get_video_pad_delay(mem_addr_t scu, int *first, int *last)
+{
+	uint32_t value;
+
+	value = sys_read32(scu);
+	*first = (value >> 16) & 0xff;
+	*last = (value >> 24) & 0xff;
+
+	return 0;
+}
+
+static void sli_calibrate_video_delay(struct sli_data *data, bool is_cpu_tx)
+{
+	int d;
+	int d_first_pass = -1;
+	int d_last_pass = -1;
+	int dc_begin = 0;
+	int dc_end = 24;
+	int d_def = 12;
+	int win_size = 0;
+	mem_addr_t tx, rx, scu;
+	char *die_name = NULL;
+
+	if (is_cpu_tx) {
+		tx = data->die0.sliv;
+		rx = data->die1.sliv;
+		scu = (mem_addr_t)&data->scu0->cpu_scratch[30];
+		die_name = "IOD";
+	} else {
+		tx = data->die1.sliv;
+		rx = data->die0.sliv;
+		scu = (mem_addr_t)&data->scu1->scratch[30];
+		die_name = "CPUD";
+	}
+
+	setbits_le32(rx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+	setbits_le32(tx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+
+	if (data->flags & SLI_FLAG_RX_LAH_NEG_IO_SLIV)
+		setbits_le32(rx + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
+	else
+		clrbits_le32(rx + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
+
+	/* Set RX SLIV to receiver */
+	clrsetbits_le32(rx + SLI_CTRL_I, SLI_TX_MODE, SLIV_RAW_MODE);
+
+	/* Set TX SLIV to transmitter */
+	setbits_le32(tx + SLI_CTRL_I, SLIV_RAW_MODE | SLI_TX_MODE);
+
+	/* set max wait count */
+	setbits_le32(tx + SLI_CTRL_II, SLIV_TX_ENT_SUSPEND);
+
+	for (d = dc_begin; d < dc_end; d++) {
+		sli_set_video_rx_delay(rx, d, d);
+
+		/* reset SLIV */
+		sli_clear(rx, SLI_CLEAR_BUS | SLI_RESET_TRIGGER);
+		sli_clear(tx, SLI_CLEAR_BUS | SLI_RESET_TRIGGER);
+
+		/* check interrupt status */
+		sli_clear_interrupt_status(rx);
+		k_busy_wait(200);
+		if (is_sli_suspend(rx) > 0) {
+			if (d_first_pass == -1)
+				d_first_pass = d;
+
+			d_last_pass = d;
+		} else if (d_last_pass != -1) {
+			if (d_last_pass - d_first_pass > win_size) {
+				win_size = d_last_pass - d_first_pass;
+				sli_log_video_pad_delay(scu, d_first_pass, d_last_pass);
+				LOG_DBG("%s SLIV DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+			}
+			d_first_pass = -1;
+			d_last_pass = -1;
+		}
+	}
+
+	if (win_size == 0 && d_last_pass != -1) {
+		win_size = d_last_pass - d_first_pass;
+		sli_log_video_pad_delay(scu, d_first_pass, d_last_pass);
+		LOG_DBG("%s SLIV DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+	}
+
+	sli_get_video_pad_delay(scu, &d_first_pass, &d_last_pass);
+	if (d_first_pass < 0 || (d_last_pass - d_first_pass) < 4)
+		printf("%s SLIV margin not enough! {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+
+	d = (d_first_pass + d_last_pass) >> 1;
+	if (d == 0)
+		d = d_def;
+	LOG_DBG("%s SLIV DS coarse win: {%d, %d} -> select %d\n", die_name, d_first_pass, d_last_pass, d);
+
+	sli_set_video_rx_delay(rx, d, d);
+
+	sli_clear(rx, SLI_CLEAR_BUS | SLI_RESET_TRIGGER);
+	sli_clear(tx, SLI_CLEAR_BUS | SLI_RESET_TRIGGER);
+	k_busy_wait(200);
+	clrbits_le32(rx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+	clrbits_le32(tx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+	sli_wait_suspend(rx);
+}
+
+static void sli_switch_video_dir(struct sli_data *data, bool is_cpu_tx)
+{
+	mem_addr_t tx, rx, scu;
+
+	if (is_cpu_tx) {
+		tx = data->die0.sliv;
+		rx = data->die1.sliv;
+		scu = (mem_addr_t)&data->scu0->cpu_scratch[30];
+	} else {
+		tx = data->die1.sliv;
+		rx = data->die0.sliv;
+		scu = (mem_addr_t)&data->scu1->scratch[30];
+	}
+
+	setbits_le32(rx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+	setbits_le32(tx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+
+	/* Set RX SLIV to receiver */
+	clrsetbits_le32(rx + SLI_CTRL_I, SLI_TX_MODE, SLIV_RAW_MODE);
+
+	/* Set TX SLIV to transmitter */
+	setbits_le32(tx + SLI_CTRL_I, SLIV_RAW_MODE | SLI_TX_MODE);
+
+	sli_clear(rx, SLI_CLEAR_BUS | SLI_RESET_TRIGGER);
+	sli_clear(tx, SLI_CLEAR_BUS | SLI_RESET_TRIGGER);
+	k_busy_wait(200);
+	clrbits_le32(rx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+	clrbits_le32(tx + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+	sli_wait_suspend(rx);
+}
+
 int sli_init_f(void)
 {
 	struct sli_data ast2700_sli_data[1];
@@ -625,6 +783,8 @@ int sli_init_f(void)
 
 int sli_init_r(void)
 {
+	struct sli_data ast2700_sli_data[1];
+	struct sli_data *data = ast2700_sli_data;
 	struct ast2700_scu0 *scu0;
 	struct ast2700_scu1 *scu1;
 	uint32_t reg_val;
@@ -638,6 +798,20 @@ int sli_init_r(void)
 
 	scu0 = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
 	scu1 = (struct ast2700_scu1 *)DT_REG_ADDR(DT_NODELABEL(syscon1));
+
+	/* CPU die */
+	data->die0.slim = SLI0_REG + SLIM_REG_OFFSET;
+	data->die0.slih = SLI0_REG + SLIH_REG_OFFSET;
+	data->die0.sliv = SLI0_REG + SLIV_REG_OFFSET;
+
+	/* IO die */
+	data->die1.slim = SLI1_REG + SLIM_REG_OFFSET;
+	data->die1.slih = SLI1_REG + SLIH_REG_OFFSET;
+	data->die1.sliv = SLI1_REG + SLIV_REG_OFFSET;
+
+	data->flags = 0;
+	data->scu0 = scu0;
+	data->scu1 = scu1;
 
 	if (scu1->scratch[31] & SCU1_SCRATCH31_SLI_SKIP_CALI) {
 		printf("SLI0 has been initialized\n");
@@ -682,6 +856,9 @@ int sli_init_r(void)
 		/* Clear the INTC reset interrupt status. */
 		reg_val = sys_read32((mem_addr_t)ASPEED_IO_INTC_BASE + 0x14);
 		sys_write32(reg_val, (mem_addr_t)ASPEED_IO_INTC_BASE + 0x14);
+
+		sli_calibrate_video_delay(data, false);
+		sli_switch_video_dir(data, true);
 
 		return 0;
 	}
