@@ -10,6 +10,8 @@
 #define LOG_MODULE_NAME			sli_ast2700
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
+#define SLIM_K_IO_RX
+
 #define SLIM_REG_OFFSET			0x000
 #define SLIH_REG_OFFSET			0x200
 #define SLIV_REG_OFFSET			0x400
@@ -288,6 +290,8 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 	int d_last_pass = -1;
 	int win_size = 0;
 
+	setbits_le32(data->die1.slih + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
+
 	if (data->flags & SLI_FLAG_RX_LAH_NEG_IO_SLIH)
 		setbits_le32(data->die1.slih + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
 	else
@@ -332,25 +336,31 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 	/* SLI-H is available now */
 }
 
-static void sli_set_mbus_rx_delay_single(mm_reg_t base, int index, int d)
+static void sli_set_mbus_delay_single(mm_reg_t base, int index, int d, bool is_rx)
 {
 	uint32_t offset = index * 6;
 	uint32_t mask = SLIM_PAD_DLY_RX0 << offset;
+	mem_addr_t reg_base = (is_rx) ?
+			      (base + SLI_CTRL_III) :
+			      (base + SLI_CTRL_IV);
 
-	clrsetbits_le32(base + SLI_CTRL_III, mask, d << offset);
-	sys_read32(base + SLI_CTRL_III);
+	clrsetbits_le32(reg_base, mask, d << offset);
+	sys_read32(reg_base);
 	k_busy_wait(8);
 }
 
-static void sli_set_mbus_rx_delay(mm_reg_t base, int d0, int d1, int d2, int d3)
+static void sli_set_mbus_delay(mm_reg_t base, int d0, int d1, int d2, int d3, bool is_rx)
 {
 	uint32_t clr, set;
+	mem_addr_t reg_base = (is_rx) ?
+			      (base + SLI_CTRL_III) :
+			      (base + SLI_CTRL_IV);
 
 	clr = SLIM_PAD_DLY_RX3 | SLIM_PAD_DLY_RX2 | SLIM_PAD_DLY_RX1 | SLIM_PAD_DLY_RX0;
 	set = FIELD_PREP(SLIM_PAD_DLY_RX3, d3) | FIELD_PREP(SLIM_PAD_DLY_RX2, d2) |
 	      FIELD_PREP(SLIM_PAD_DLY_RX1, d1) | FIELD_PREP(SLIM_PAD_DLY_RX0, d0);
-	clrsetbits_le32(base + SLI_CTRL_III, clr, set);
-	sys_read32(base + SLI_CTRL_III);
+	clrsetbits_le32(reg_base, clr, set);
+	sys_read32(reg_base);
 	k_busy_wait(8);
 }
 
@@ -398,16 +408,17 @@ static int sli_get_mbus_pad_delay(struct sli_data *data, int index, int *first, 
 	return 0;
 }
 
-static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int begin, int end)
+static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int begin, int end, bool is_k_rx)
 {
 	int d;
 	int d_first_pass = -1;
 	int d_last_pass = -1;
 	int count;
+	mem_addr_t kx = (is_k_rx) ? data->die1.slim : data->die0.slim;
 
 	for (count = 0; count < 99; count++) {
 		for (d = begin; d < end; d++) {
-			sli_set_mbus_rx_delay_single(data->die1.slim, index, d);
+			sli_set_mbus_delay_single(kx, index, d, is_k_rx);
 
 			/* Reset CPU-die TX and IO-die RX */
 			sli_clear(data->die0.slim, SLI_RESET_TRIGGER);
@@ -441,22 +452,25 @@ static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int be
 	return d;
 }
 
-static void sli_calibrate_mbus_delay(struct sli_data *data)
+static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 {
 	int dc, d0, d1, d2, d3;
 	int begin, end;
 	int d_first_pass = -1;
 	int d_last_pass = -1;
 	int win_size = 0;
+	mem_addr_t kx = (is_k_rx) ? data->die1.slim : data->die0.slim;
+
+	setbits_le32(data->die1.slim + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
 
 	if (data->flags & SLI_FLAG_RX_LAH_NEG_IO_SLIM)
-		setbits_le32(data->die1.slim + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
+		setbits_le32(kx + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
 	else
-		clrbits_le32(data->die1.slim + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
+		clrbits_le32(kx + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
 
 	/* Find coarse delay */
 	for (dc = SLIM_COARSE_D_BEGIN; dc < SLIM_COARSE_D_END; dc++) {
-		sli_set_mbus_rx_delay(data->die1.slim, dc, dc, dc, dc);
+		sli_set_mbus_delay(kx, dc, dc, dc, dc, is_k_rx);
 
 		/* Reset CPU-die TX and IO-die RX */
 		sli_clear(data->die0.slim, SLI_RESET_TRIGGER);
@@ -488,23 +502,23 @@ static void sli_calibrate_mbus_delay(struct sli_data *data)
 
 	LOG_DBG("IOD SLIM DS coarse win: {%d, %d} -> select %d", d_first_pass, d_last_pass, dc);
 
-	sli_set_mbus_rx_delay(data->die1.slim, dc, dc, dc, dc);
+	sli_set_mbus_delay(kx, dc, dc, dc, dc, is_k_rx);
 
 	begin = MAX(dc - SLIM_FINE_MARGIN, 0);
 	end = MIN(dc + SLIM_FINE_MARGIN, 31);
 
 	/* Fine-tune per-PAD delay */
-	d0 = sli_calibrate_mbus_pad_delay(data, 0, begin, end);
-	sli_set_mbus_rx_delay_single(data->die1.slim, 0, d0);
+	d0 = sli_calibrate_mbus_pad_delay(data, 0, begin, end, is_k_rx);
+	sli_set_mbus_delay_single(kx, 0, d0, is_k_rx);
 
-	d1 = sli_calibrate_mbus_pad_delay(data, 1, begin, end);
-	sli_set_mbus_rx_delay_single(data->die1.slim, 1, d1);
+	d1 = sli_calibrate_mbus_pad_delay(data, 1, begin, end, is_k_rx);
+	sli_set_mbus_delay_single(kx, 1, d1, is_k_rx);
 
-	d2 = sli_calibrate_mbus_pad_delay(data, 2, begin, end);
-	sli_set_mbus_rx_delay_single(data->die1.slim, 2, d2);
+	d2 = sli_calibrate_mbus_pad_delay(data, 2, begin, end, is_k_rx);
+	sli_set_mbus_delay_single(kx, 2, d2, is_k_rx);
 
-	d3 = sli_calibrate_mbus_pad_delay(data, 3, begin, end);
-	sli_set_mbus_rx_delay_single(data->die1.slim, 3, d3);
+	d3 = sli_calibrate_mbus_pad_delay(data, 3, begin, end, is_k_rx);
+	sli_set_mbus_delay_single(kx, 3, d3, is_k_rx);
 
 	/* Reset CPU-die TX and IO-die RX */
 	sli_clear(data->die0.slim, SLI_RESET_TRIGGER);
@@ -764,13 +778,13 @@ int sli_init_f(void)
 			SLI_PHYCLK_SEL | SLIH_PAD_DLY_TX1 | SLIH_PAD_DLY_TX0,
 			reg_val);
 
-	/* Turn off auto-training */
-	setbits_le32(data->die1.slih + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
-	setbits_le32(data->die1.slim + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
-	setbits_le32(data->die1.sliv + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
-
 	sli_calibrate_ahb_delay(data);
-	sli_calibrate_mbus_delay(data);
+#ifdef SLIM_K_IO_RX
+	sli_calibrate_mbus_delay(data, true);
+#else
+	sys_write32(0, (void *)data->die1.slim + SLI_CTRL_III);
+	sli_calibrate_mbus_delay(data, false);
+#endif
 
 	LOG_INF("SLI1 calibration completed");
 
