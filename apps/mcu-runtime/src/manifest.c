@@ -209,6 +209,12 @@ static int cptra_simple_manifest_parse(struct cptra_image_context *ctx,
 		LOG_INF("Verify soc manifest... fail");
 		return CPTRA_ERR_SOC_MANIFEST_VFY;
 	}
+
+	ret = cptra_verify_soc_manifest_ver(manifest);
+	if (ret) {
+		LOG_INF("Verify soc manifest version... fail");
+		return ret;
+	}
 #endif
 
 	/* SoC manifest verification pass */

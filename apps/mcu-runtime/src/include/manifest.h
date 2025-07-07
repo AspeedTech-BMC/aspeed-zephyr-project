@@ -15,6 +15,12 @@
 #define CPTRA_SYS_LOAD_ADDR     (void *)(CONFIG_SYS_LOAD_ADDR)
 #define CPTRA_SYS_LOAD_ADDR_END (void *)(CONFIG_SYS_LOAD_ADDR + 0x4000000)
 
+#define CPTRA_ECDSA384_VFY_PKT(_r, _s)                                                             \
+	.r = (char *)(_r), .s = (char *)(_s), .m_len = 48, .r_len = 48, .s_len = 48,
+
+#define CPTRA_ECDSA384_NIST_P384_CURVE(_x, _y)                                                     \
+	.curve_id = ECC_CURVE_NIST_P384, .qx = (char *)(_x), .qy = (char *)(_y),
+
 enum {
 	CPTRA_FMC_FW_ID = 0x01,
 	CPTRA_ATF_FW_ID = 0x0a,
@@ -40,6 +46,8 @@ enum cptra_error_code {
 	CPTRA_ERR_SOC_MANIFEST_READ_ERROR,
 	CPTRA_ERR_SOC_MANIFEST_MAGIC_MISMATCH,
 	CPTRA_ERR_SOC_MANIFEST_VFY,
+	CPTRA_ERR_SOC_MANIFEST_SVN_VFY,
+	CPTRA_ERR_SOC_MANIFEST_VER_MISMATCH,
 	CPTRA_ERR_SHA384_CAL,
 	CPTRA_ERR_IMAGE_VFY,
 	CPTRA_ERR_IMAGE_LOAD,
@@ -85,6 +93,14 @@ struct cptra_manifest_aspeed_preamble {
 	uint32_t metadata_vendor_LMS_sig[405];
 	uint32_t metadata_owner_ecc384_sig[24];
 	uint32_t metadata_owner_LMS_sig[405];
+} __attribute__((__packed__, __aligned__(4)));
+
+struct cptra_manifest_aspeed_svn {
+	uint32_t ver;
+	uint32_t sec_ver;
+	uint32_t flags;
+	uint32_t manifest_owner_ecc384_key[24];
+	uint32_t manifest_owner_lms_key[12];
 } __attribute__((__packed__));
 
 struct cptra_soc_manifest {
@@ -131,6 +147,7 @@ static inline void *cptra_manifest_buffer_addr(uint32_t offset)
 
 int cptra_load_image(enum boot_mode_type boot_mode, struct cptra_image_context *ctx);
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
+int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
 int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_ime *ime);
 void board_manifest_image_post_process(struct cptra_manifest_ime *ime);
 
