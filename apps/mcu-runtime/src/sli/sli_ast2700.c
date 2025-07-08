@@ -10,8 +10,6 @@
 #define LOG_MODULE_NAME			sli_ast2700
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
-#define SLIM_K_IO_RX
-
 #define SLIM_REG_OFFSET			0x000
 #define SLIH_REG_OFFSET			0x200
 #define SLIV_REG_OFFSET			0x400
@@ -264,23 +262,19 @@ static void sli_set_ahb_rx_delay(mm_reg_t base, int d0, int d1)
 	k_busy_wait(8);
 }
 
-static int sli_log_ahb_pad_delay(struct sli_data *data, int first, int last)
+static void sli_log_ahb_pad_delay(struct sli_data *data, int first, int last)
 {
 	clrsetbits_le32((mem_addr_t)&data->scu1->scratch[30], 0xffff,
 			((last & 0xff) << 8) | (first & 0xff));
-
-	return 0;
 }
 
-static int sli_get_ahb_pad_delay(struct sli_data *data, int *first, int *last)
+static void sli_get_ahb_pad_delay(struct sli_data *data, int *first, int *last)
 {
 	uint32_t value;
 
 	value = sys_read32((mem_addr_t)&data->scu1->scratch[30]);
 	*first = (value & 0xff);
 	*last = (value >> 8) & 0xff;
-
-	return 0;
 }
 
 static void sli_calibrate_ahb_delay(struct sli_data *data)
@@ -364,7 +358,7 @@ static void sli_set_mbus_delay(mm_reg_t base, int d0, int d1, int d2, int d3, bo
 	k_busy_wait(8);
 }
 
-static int sli_log_mbus_pad_delay(struct sli_data *data, int index, int first, int last)
+static void sli_log_mbus_pad_delay(struct sli_data *data, int index, int first, int last)
 {
 	mem_addr_t addr;
 	uint32_t bit_offset;
@@ -381,11 +375,9 @@ static int sli_log_mbus_pad_delay(struct sli_data *data, int index, int first, i
 
 	clrsetbits_le32(addr, 0xffff << bit_offset,
 			(last << (bit_offset + 8)) | (first << bit_offset));
-
-	return 0;
 }
 
-static int sli_get_mbus_pad_delay(struct sli_data *data, int index, int *first, int *last)
+static void sli_get_mbus_pad_delay(struct sli_data *data, int index, int *first, int *last)
 {
 	mem_addr_t addr;
 	uint32_t value;
@@ -404,8 +396,6 @@ static int sli_get_mbus_pad_delay(struct sli_data *data, int index, int *first, 
 	value = sys_read32(addr);
 	*first = (value >> bit_offset) & 0xff;
 	*last = (value >> (bit_offset + 8)) & 0xff;
-
-	return 0;
 }
 
 static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int begin, int end, bool is_k_rx)
@@ -459,6 +449,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 	int d_first_pass = -1;
 	int d_last_pass = -1;
 	int win_size = 0;
+	char *die_name = (is_k_rx) ? "IOD" : "CPUD";
 	mem_addr_t kx = (is_k_rx) ? data->die1.slim : data->die0.slim;
 
 	setbits_le32(data->die1.slim + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
@@ -488,7 +479,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 			if ((d_last_pass - d_first_pass) > win_size) {
 				win_size = d_last_pass - d_first_pass;
 				sli_log_mbus_pad_delay(data, 0, d_first_pass, d_last_pass);
-				LOG_DBG("IOD SLIM DS coarse win: {%d, %d}\n", d_first_pass, d_last_pass);
+				LOG_DBG("%s SLIM DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
 			}
 			d_first_pass = -1;
 			d_last_pass = -1;
@@ -500,7 +491,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 	if (dc == 0)
 		dc = SLIM_DEFAULT_DELAY;
 
-	LOG_DBG("IOD SLIM DS coarse win: {%d, %d} -> select %d", d_first_pass, d_last_pass, dc);
+	LOG_DBG("%s SLIM DS coarse win: {%d, %d} -> select %d\n", die_name, d_first_pass, d_last_pass, dc);
 
 	sli_set_mbus_delay(kx, dc, dc, dc, dc, is_k_rx);
 
@@ -546,25 +537,21 @@ static void sli_set_video_rx_delay(uint32_t base, int d0, int d1, bool is_k_rx)
 	k_busy_wait(8);
 }
 
-static int sli_log_video_pad_delay(uintptr_t scu, int first, int last)
+static void sli_log_video_pad_delay(uintptr_t scu, int first, int last)
 {
 	clrsetbits_le32(scu, 0xffff0000, ((last & 0xff) << 24) | ((first & 0xff) << 16));
-
-	return 0;
 }
 
-static int sli_get_video_pad_delay(mem_addr_t scu, int *first, int *last)
+static void sli_get_video_pad_delay(mem_addr_t scu, int *first, int *last)
 {
 	uint32_t value;
 
 	value = sys_read32(scu);
 	*first = (value >> 16) & 0xff;
 	*last = (value >> 24) & 0xff;
-
-	return 0;
 }
 
-static void sli_calibrate_video_delay(struct sli_data *data, bool is_cpu_tx, bool is_k_rx)
+static void sli_calibrate_video_delay(struct sli_data *data, bool is_DS, bool is_k_rx)
 {
 	int d;
 	int d_first_pass = -1;
@@ -574,10 +561,10 @@ static void sli_calibrate_video_delay(struct sli_data *data, bool is_cpu_tx, boo
 	int d_def = 12;
 	int win_size = 0;
 	mem_addr_t tx, rx, kx, scu;
-	char *die_name = (is_cpu_tx ^ is_k_rx) ? "CPUD" : "IOD";
-	char *dir_name = (is_cpu_tx) ? "DS" : "US";
+	char *die_name = (is_DS ^ is_k_rx) ? "CPUD" : "IOD";
+	char *dir_name = (is_DS) ? "DS" : "US";
 
-	if (is_cpu_tx) {
+	if (is_DS) {
 		tx = data->die0.sliv;
 		rx = data->die1.sliv;
 		scu = (mem_addr_t)&data->scu0->cpu_scratch[30];
@@ -657,11 +644,11 @@ static void sli_calibrate_video_delay(struct sli_data *data, bool is_cpu_tx, boo
 	sli_wait_suspend(rx);
 }
 
-static void sli_switch_video_dir(struct sli_data *data, bool is_cpu_tx)
+static void __maybe_unused sli_switch_video_dir(struct sli_data *data, bool is_DS)
 {
 	mem_addr_t tx, rx, scu;
 
-	if (is_cpu_tx) {
+	if (is_DS) {
 		tx = data->die0.sliv;
 		rx = data->die1.sliv;
 		scu = (mem_addr_t)&data->scu0->cpu_scratch[30];
@@ -784,12 +771,12 @@ int sli_init_f(void)
 			reg_val);
 
 	sli_calibrate_ahb_delay(data);
-#ifdef SLIM_K_IO_RX
-	sli_calibrate_mbus_delay(data, true);
-#else
-	sys_write32(0, (void *)data->die1.slim + SLI_CTRL_III);
-	sli_calibrate_mbus_delay(data, false);
-#endif
+	if (IS_ENABLED(CONFIG_SLI_K_ON_CPU)) {
+		sys_write32(0, data->die1.slim + SLI_CTRL_III);
+		sli_calibrate_mbus_delay(data, false);
+	} else {
+		sli_calibrate_mbus_delay(data, true);
+	}
 
 	LOG_INF("SLI1 calibration completed");
 
@@ -877,7 +864,12 @@ int sli_init_r(void)
 		sys_write32(reg_val, (mem_addr_t)ASPEED_IO_INTC_BASE + 0x14);
 
 		sli_calibrate_video_delay(data, false, true);
-		sli_switch_video_dir(data, true);
+		if (IS_ENABLED(CONFIG_SLI_K_ON_CPU)) {
+			sys_write32(0, data->die1.sliv + SLI_CTRL_III);
+			sli_calibrate_video_delay(data, true, false);
+		} else {
+			sli_calibrate_video_delay(data, true, true);
+		}
 
 		return 0;
 	}
