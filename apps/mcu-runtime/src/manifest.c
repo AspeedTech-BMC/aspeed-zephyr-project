@@ -10,6 +10,7 @@
 
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/__assert.h>
 #include <zephyr/sys/crc.h>
 
 LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
@@ -281,6 +282,7 @@ static int cptra_load_simple_manifest(struct cptra_image_context *ctx, struct cp
 
 end:
 	LOG_INF("Caliptra load simple image... %s(%d)", ret ? "fail" : "pass", ret);
+	__ASSERT(!ret, "Caliptra load simple image fail, ret: %d", ret);
 	return ret;
 }
 
