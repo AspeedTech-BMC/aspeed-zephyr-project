@@ -743,7 +743,8 @@ int sli_init_f(void)
 		}
 	}
 
-	if (IS_ENABLED(CONFIG_SLI_TARGET_PHYCLK_25MHZ)) {
+	if (IS_ENABLED(CONFIG_SLI_TARGET_PHYCLK_25MHZ) ||
+	    IS_ENABLED(CONFIG_ASPEED_FPGA)) {
 		LOG_DBG("AST2700 SLI1 ready, 25MHz");
 		return 0;
 	}
@@ -811,7 +812,8 @@ int sli_init_r(void)
 	int retry = 10;
 	bool sli0_ready = false;
 
-	if (IS_ENABLED(CONFIG_SLI_TARGET_PHYCLK_25MHZ)) {
+	if (IS_ENABLED(CONFIG_SLI_TARGET_PHYCLK_25MHZ) ||
+	    IS_ENABLED(CONFIG_ASPEED_FPGA)) {
 		LOG_DBG("AST2700 SLI0 ready, 25MHz");
 		return 0;
 	}
