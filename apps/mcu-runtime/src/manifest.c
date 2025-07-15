@@ -36,7 +36,28 @@ static void *cptra_read(struct cptra_load_info *info, int size, bool persist)
 		info->write_sector += count;
 	}
 
+	info->size = persist ? 0 : size;
+
 	return buf;
+}
+
+static void cptra_manifest_err_handler(int ret, struct cptra_load_info *info)
+{
+	uint32_t wipe_size = 0;
+	void *buf = cptra_manifest_buffer_addr(0);
+
+	wipe_size = info->write_sector + info->size;
+	wipe_size = wipe_size < CPTRA_SYS_LOAD_SIZE ? wipe_size : CPTRA_SYS_LOAD_SIZE;
+
+	if (!ret) {
+		LOG_INF("Caliptra load simple image... pass");
+	} else {
+		/* Wipe the tmp buffer stored image */
+		memset(buf, 0, wipe_size);
+		LOG_ERR("Caliptra load simple image... fail(%d)", ret);
+	}
+
+	__ASSERT(!ret, "Caliptra load simple image fail, ret: %d", ret);
 }
 
 static int cptra_crc32_check(struct cptra_image_context *ctx, struct cptra_load_info *info)
@@ -135,6 +156,11 @@ static int cptra_read_soc_manifest(struct cptra_image_context *ctx, struct cptra
 		return CPTRA_ERR_SOC_MANIFEST_MAGIC_MISMATCH;
 
 	*manifest = ptr;
+
+	LOG_INF("ver: %x, flags: %x, soc_ver: %x", ptr->preamble.manifest_version,
+		ptr->preamble.manifest_flags, ptr->preamble.manifest_sec_version);
+	LOG_INF("manfiest vendor pubk: 0x%08x", ptr->preamble.manifest_vendor_ecc384_key[0]);
+	LOG_INF("manfiest owner pubk: 0x%08x", ptr->preamble.manifest_owner_ecc384_key[0]);
 
 	return CPTRA_SUCCESS;
 }
@@ -281,8 +307,7 @@ static int cptra_load_simple_manifest(struct cptra_image_context *ctx, struct cp
 		goto end;
 
 end:
-	LOG_INF("Caliptra load simple image... %s(%d)", ret ? "fail" : "pass", ret);
-	__ASSERT(!ret, "Caliptra load simple image fail, ret: %d", ret);
+	cptra_manifest_err_handler(ret, info);
 	return ret;
 }
 

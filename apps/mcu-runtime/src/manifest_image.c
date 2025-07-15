@@ -54,6 +54,9 @@ static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context
 	uint32_t img_num = ctx->hdr->img_count;
 	struct cptra_image_info *img_info = ctx->img_info;
 
+	if (img_num > CPTRA_IMC_ENTRY_COUNT + 2)
+		return NULL;
+
 	for (img_info = ctx->img_info; img_info < ctx->img_info + img_num; img_info++) {
 		if (img_info->identifier == identifier) {
 			match = true;
@@ -97,10 +100,13 @@ int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifes
 {
 	struct cptra_load_image *img = NULL;
 
+	if (!ctx || !ime)
+		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
+
 	img = cptra_find_load_image(ime->fw_id);
 	if (!img) {
 		LOG_ERR("Cannot find image with fw_id 0x%x.", ime->fw_id);
-		return CPTRA_ERR_IMAGE_SIZE_INVALID;
+		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
 	}
 
 	return cptra_img_info_get_offset(ctx, img->identifier);
@@ -108,12 +114,18 @@ int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifes
 
 int cptra_soc_manifest_offset(struct cptra_image_context *ctx)
 {
+	if (!ctx)
+		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
+
 	return cptra_img_info_get_offset(ctx, CPTRA_SOC_MANIFEST_HDR_ID);
 }
 
 int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
 {
 	struct cptra_load_image *img = NULL;
+
+	if (!ctx || !ime)
+		return CPTRA_ERR_IMAGE_SIZE_INVALID;
 
 	img = cptra_find_load_image(ime->fw_id);
 	if (!img) {
@@ -128,6 +140,9 @@ char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime)
 {
 	struct cptra_load_image *img = NULL;
 
+	if (!ime)
+		return "Unknown";
+
 	img = cptra_find_load_image(ime->fw_id);
 
 	return img ? img->name : "Unknown";
@@ -137,6 +152,9 @@ bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime)
 {
 	struct cptra_load_image *img = NULL;
 
+	if (!ime)
+		return false;
+
 	img = cptra_find_load_image(ime->fw_id);
 
 	return img ? img->loadable : false;
@@ -145,6 +163,9 @@ bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime)
 uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime)
 {
 	struct cptra_load_image *img = NULL;
+
+	if (!ime)
+		return (uintptr_t)NULL;
 
 	img = cptra_find_load_image(ime->fw_id);
 	if (!img) {
@@ -157,8 +178,12 @@ uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime)
 
 int cptra_ime_load_image(void *img_bin, uint32_t img_size, struct cptra_manifest_ime *ime)
 {
-	uintptr_t load_addr = cptra_ime_get_load_addr(ime);
+	uintptr_t load_addr = 0;
 
+	if (!img_bin || img_size == 0 || !ime)
+		return CPTRA_ERR_IMAGE_LOAD_INVALID_PARAM;
+
+	load_addr = cptra_ime_get_load_addr(ime);
 	if (!load_addr) {
 		LOG_ERR("Cannot find load address for fw_id 0x%x.", ime->fw_id);
 		return CPTRA_ERR_IMAGE_LOAD;

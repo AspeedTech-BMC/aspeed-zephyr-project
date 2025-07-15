@@ -200,7 +200,17 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_im
 	input.source = ime->flags & 0x3;
 	ret = caliptra_authorize_and_stash(dev, &input, &output);
 	if (ret)
-		return CPTRA_ERR_IMAGE_VFY;
+		return CPTRA_ERR_IMAGE_VFY_MBOX_ERROR;
 
-	return CPTRA_SUCCESS;
+	/* Mailbox error handler */
+	switch (output.auth_req_result) {
+	case AUTHORIZE_IMAGE:
+		return CPTRA_SUCCESS;
+	case IMAGE_HASH_MISMATCH:
+		return CPTRA_ERR_IMAGE_VFY_HASH_MISMATCH;
+	case IMAGE_NOT_AUTHORIZED:
+		return CPTRA_ERR_IMAGE_VFY_FWID_MISMATCH;
+	default:
+		return CPTRA_ERR_IMAGE_VFY_UNKNOWN_ERROR;
+	}
 }

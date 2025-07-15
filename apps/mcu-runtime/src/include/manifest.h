@@ -13,6 +13,7 @@
 #define CPTRA_FLASH_IMG_MAGIC (0x48534C46)
 
 #define CPTRA_SYS_LOAD_ADDR     (void *)(CONFIG_SYS_LOAD_ADDR)
+#define CPTRA_SYS_LOAD_SIZE     (0x4000000)
 #define CPTRA_SYS_LOAD_ADDR_END (void *)(CONFIG_SYS_LOAD_ADDR + 0x4000000)
 
 #define CPTRA_ECDSA384_VFY_PKT(_r, _s)                                                             \
@@ -49,7 +50,11 @@ enum cptra_error_code {
 	CPTRA_ERR_SOC_MANIFEST_SVN_VFY,
 	CPTRA_ERR_SOC_MANIFEST_VER_MISMATCH,
 	CPTRA_ERR_SHA384_CAL,
-	CPTRA_ERR_IMAGE_VFY,
+	CPTRA_ERR_IMAGE_VFY_UNKNOWN_ERROR,
+	CPTRA_ERR_IMAGE_VFY_MBOX_ERROR,
+	CPTRA_ERR_IMAGE_VFY_FWID_MISMATCH,
+	CPTRA_ERR_IMAGE_VFY_HASH_MISMATCH,
+	CPTRA_ERR_IMAGE_LOAD_INVALID_PARAM,
 	CPTRA_ERR_IMAGE_LOAD,
 	CPTRA_ERR_IMAGE_READ,
 	CPTRA_ERR_IMAGE_SIZE_INVALID = -1,
@@ -126,6 +131,7 @@ struct cptra_load_info {
 	 */
 	int read_sector;
 	int write_sector;
+	int size;
 
 	/**
 	 * read() - Read from device
