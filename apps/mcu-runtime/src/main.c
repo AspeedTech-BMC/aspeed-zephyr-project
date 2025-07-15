@@ -296,7 +296,7 @@ static void soc_fmc_image_load_run(void *o)
 
 	/* Load the image */
 	if (IS_ENABLED(CONFIG_CPTRA_MANIFEST)) {
-		if (cptra_load_image(s_obj->boot_mode, &s_obj->bundle_image) < 0) {
+		if (cptra_load_image(s_obj->boot_mode, &s_obj->bundle_image) != 0) {
 			LOG_ERR("Failed to load bundle image");
 			smf_set_state(SMF_CTX(s_obj), &soc_fmc_states[REBOOT]);
 			return;
@@ -341,6 +341,7 @@ static const struct smf_state soc_fmc_states[] = {
 	[SLI_INIT_R] = SMF_CREATE_STATE(NULL, soc_fmc_sli_init_r, NULL, NULL, NULL),
 	[IMAGE_LOAD] = SMF_CREATE_STATE(NULL, soc_fmc_image_load_run, NULL, NULL, NULL),
 	[CPU_BOOT] = SMF_CREATE_STATE(NULL, soc_fmc_cpuboot, NULL, NULL, NULL),
+	[REBOOT] = SMF_CREATE_STATE(NULL, NULL, NULL, NULL, NULL),
 	[RUNTIME] = SMF_CREATE_STATE(NULL, soc_fmc_runtime, NULL, NULL, NULL),
 };
 
