@@ -34,12 +34,11 @@
 		pfr-s5-att-fail-out-gpios = <&sgpiom_e_h 11 0>;   /* SGPO43 */
 		pwrgd-cpu1-out-gpios = <&sgpiom_e_h 21 0>;        /* SGPO53 */
 		pfr-btg-att1-done-out-gpios = <&sgpiom_e_h 22 0>; /* SGPO54 */
-		pfr-btg-att1-fail-out-gpios = <&sgpiom_e_h 7 0>;  /* SGPO55 */
-		pfr-s0-att1-done-out-gpios = <&sgpiom_e_h 8 0>;   /* SGPO56 */
-		pfr-s0-att1-fail-out-gpios = <&sgpiom_e_h 9 0>;   /* SGPO57 */
-		pfr-s5-att1-done-out-gpios = <&sgpiom_e_h 10 0>;  /* SGPO58 */
-		pfr-s5-att1-fail-out-gpios = <&sgpiom_e_h 11 0>;  /* SGPO59 */
-		// rst-pltrst-cpu1-out-gpios = <&sgpiom_e_h 22 0>;   /* SGPO54 */
+		pfr-btg-att1-fail-out-gpios = <&sgpiom_e_h 23 0>;  /* SGPO55 */
+		pfr-s0-att1-done-out-gpios = <&sgpiom_e_h 24 0>;   /* SGPO56 */
+		pfr-s0-att1-fail-out-gpios = <&sgpiom_e_h 25 0>;   /* SGPO57 */
+		pfr-s5-att1-done-out-gpios = <&sgpiom_e_h 26 0>;  /* SGPO58 */
+		pfr-s5-att1-fail-out-gpios = <&sgpiom_e_h 27 0>;  /* SGPO59 */
 	};
 };
 
