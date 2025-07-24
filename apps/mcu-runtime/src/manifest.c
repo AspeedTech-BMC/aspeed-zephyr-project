@@ -6,6 +6,8 @@
 
 #include <fit.h>
 #include <manifest.h>
+#include <platform.h>
+#include <scu_ast2700.h>
 #include <spi.h>
 
 #include <zephyr/drivers/cptra.h>
@@ -14,6 +16,15 @@
 #include <zephyr/sys/crc.h>
 
 LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
+
+static bool cptra_manifest_sec_en(void)
+{
+#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+	return !!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_EN_SECBOOT);
+#else
+	return false;
+#endif
+}
 
 static void *cptra_read(struct cptra_load_info *info, int size, bool persist)
 {
@@ -230,19 +241,19 @@ static int cptra_simple_manifest_parse(struct cptra_image_context *ctx,
 	if (!manifest || ret)
 		return ret;
 
-		/* Verify SoC manifest */
-#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-	if (cptra_verify_soc_manifest(manifest)) {
-		LOG_INF("Verify soc manifest... fail");
-		return CPTRA_ERR_SOC_MANIFEST_VFY;
-	}
+	/* Verify SoC manifest */
+	if (cptra_manifest_sec_en()) {
+		if (cptra_verify_soc_manifest(manifest)) {
+			LOG_INF("Verify soc manifest... fail");
+			return CPTRA_ERR_SOC_MANIFEST_VFY;
+		}
 
-	ret = cptra_verify_soc_manifest_ver(manifest);
-	if (ret) {
-		LOG_INF("Verify soc manifest version... fail");
-		return ret;
+		ret = cptra_verify_soc_manifest_ver(manifest);
+		if (ret) {
+			LOG_INF("Verify soc manifest version... fail");
+			return ret;
+		}
 	}
-#endif
 
 	/* SoC manifest verification pass */
 	ctx->soc_manifest = manifest;
@@ -269,14 +280,14 @@ static int cptra_simple_manifest_load(struct cptra_image_context *ctx, struct cp
 		if (!img_bin || img_size < 0)
 			return CPTRA_ERR_IMAGE_READ;
 
-			/* Verify the ime denoted image */
-#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-		ret = cptra_verify_image(img_bin, img_size, ime);
-		LOG_INF("Verify %s image... %s", cptra_ime_get_image_name(ime),
-			ret ? "fail" : "pass");
-		if (ret)
-			return ret;
-#endif
+		/* Verify the ime denoted image */
+		if (cptra_manifest_sec_en()) {
+			ret = cptra_verify_image(img_bin, img_size, ime);
+			LOG_INF("Verify %s image... %s", cptra_ime_get_image_name(ime),
+				ret ? "fail" : "pass");
+			if (ret)
+				return ret;
+		}
 
 		/* Load the ime denoted image */
 		ret = cptra_ime_load_image(img_bin, img_size, ime);
