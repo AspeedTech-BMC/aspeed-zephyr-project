@@ -13,8 +13,8 @@
 #define CPTRA_FLASH_IMG_MAGIC (0x48534C46)
 
 #define CPTRA_SYS_LOAD_ADDR     (void *)(CONFIG_SYS_LOAD_ADDR)
-#define CPTRA_SYS_LOAD_SIZE     (0x4000000)
-#define CPTRA_SYS_LOAD_ADDR_END (void *)(CONFIG_SYS_LOAD_ADDR + 0x4000000)
+#define CPTRA_SYS_LOAD_SIZE     (0x400000)
+#define CPTRA_SYS_LOAD_ADDR_END (void *)(CONFIG_SYS_LOAD_ADDR + 0x400000)
 
 #define CPTRA_ECDSA384_VFY_PKT(_r, _s)                                                             \
 	.r = (char *)(_r), .s = (char *)(_s), .m_len = 48, .r_len = 48, .s_len = 48,
