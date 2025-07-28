@@ -74,3 +74,13 @@
 &emmc {
 	status = "okay";
 };
+
+&fmc {
+	status = "okay";
+	timing-calibration-disabled;
+};
+
+&fmc_cs0 {
+	spi-max-buswidth = <1>;
+	spi-max-frequency = <25000000>;
+};
