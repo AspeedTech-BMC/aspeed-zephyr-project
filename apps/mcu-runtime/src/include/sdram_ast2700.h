@@ -22,6 +22,7 @@
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 #include <platform.h>
+#include <chip.h>
 
 #define SCU_CPU_VGA0_SCRATCH            (SCU0_REG + 0x900)
 #define SCU_CPU_VGA1_SCRATCH            (SCU0_REG + 0x910)
@@ -391,5 +392,5 @@ struct train_bin {
 void fpga_phy_init(struct sdramc *sdramc);
 void dwc_phy_init(struct sdramc *sdramc);
 bool is_ddr4(void);
-int dram_init(void);//struct udevice *dev)
+int dram_init(struct ast_chip *chip);
 #endif

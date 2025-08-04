@@ -8,9 +8,10 @@
 #include <zephyr/logging/log.h>
 #include <string.h>
 #include <platform.h>
-#include <fit.h>
 #include <ufs.h>
 #include <unipro.h>
+#include <ast_loader.h>
+#include <abr.h>
 
 #define UFSHCI_TOP_ADDRESS 0x12C08000
 #define UFSHCI_BASE_ADDRESS 0x12C08200
@@ -889,7 +890,7 @@ static int wait_for_transfer_complete(struct ufs_hba *hba, uint32_t slot)
 }
 
 uint32_t num_sg_arry[] = {1, 2, 64, 128, 256, 512, 1024};
-int ufs_scsi_read10(uint32_t lba, uint32_t length, uintptr_t *data_buf, int sync)
+static int ufs_scsi_read10(uint32_t lba, uint32_t length, uintptr_t *data_buf, int sync)
 {
 	int ret = 0;
 	struct ufs_hba *hba = &g_hba;
@@ -940,7 +941,7 @@ int ufs_scsi_read10(uint32_t lba, uint32_t length, uintptr_t *data_buf, int sync
 	return ret;
 }
 
-int ufs_test_unit_ready(void)
+static int ufs_test_unit_ready(void)
 {
 	int ret = 0;
 	struct ufs_hba *hba = &g_hba;
@@ -1168,7 +1169,7 @@ static int ufshcd_change_power_mode(struct ufs_hba *hba)
 	return ret;
 }
 
-int ufs_connection_test(int lun)
+static int ufs_connection_test(int lun)
 {
 	int ret = 0, retry = 10;
 	struct ufs_hba *hba = &g_hba;
@@ -1233,17 +1234,7 @@ int ufs_connection_test(int lun)
 	return ret;
 }
 
-int ufs_init(int id)
-{
-	int lun = (1 << id);
-	int err = 0;
-
-	err = ufs_connection_test(lun);
-
-	return err;
-}
-
-int ufs_read(uint32_t *dst, uint32_t src, uint32_t len)
+static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len)
 {
 	int err = 0;
 	uint32_t from = src;
@@ -1294,18 +1285,35 @@ int ufs_read(uint32_t *dst, uint32_t src, uint32_t len)
 	return err;
 }
 
-uint32_t fit_scsi_load_read(struct fit_load_info *load, uint32_t sector,
-			       uint32_t count, void *buf)
+static int ufs_init(struct device *dev)
 {
-	int ret;
-	uint32_t src = sector * 0x1000;
+	int lun = (1 << abr_get_id());
+	int err = 0;
 
-	LOG_DBG("%s: sector %x, count %x, buf %x",
-	      __func__, sector, count, (uint32_t)buf);
+	err = ufs_connection_test(lun);
 
-	ret = ufs_read(buf, src, count);
-	if (ret)
-		return 0;
+	return err;
+}
 
-	return count;
+static struct ast_loader_ops bootufs_ops = {
+	.init = ufs_init,
+	.copy = ufs_read,
+};
+
+int ufs_register(struct ast_loader *loader)
+{
+	struct device *dev;
+
+	dev = (struct device *)device_get_binding("ufs@xxxxxxxx");
+	if (!dev) {
+		LOG_ERR("No device named ufs");
+		return -1;
+	}
+
+	loader->ops = &bootufs_ops;
+	loader->dev = dev;
+
+	LOG_DBG("UFS loader registered");
+
+	return 0;
 }

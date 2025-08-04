@@ -2,12 +2,9 @@
 /*
  * Copyright (C) ASPEED Technology Inc.
  */
-//#include <common.h>
-//#include <dm.h>
-//#include <asm/arch-aspeed/sdram_ast2700.h>
-//#include <asm/arch-aspeed/pll.h>
-#include <sdram_ast2700.h>
+
 #include <zephyr/logging/log.h>
+#include <sdram_ast2700.h>
 
 #define LOG_MODULE_NAME	sdram_ast2700
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
@@ -108,9 +105,11 @@ struct sdramc_ac_timing ac_table[] = {
 };
 
 #define DRAMC_INIT_DONE		BIT(6)
-static bool is_ddr_initialized(void)
+static bool is_ddr_initialized(struct sdramc *sdramc)
 {
-	if (sys_read32(SCU_CPU_VGA0_SCRATCH) & DRAMC_INIT_DONE) {
+	struct sdramc_regs *regs = sdramc->regs;
+
+	if (sys_read32((uint32_t)&regs->mctl) & DRAMC_MCTL_PHY_POWER_ON) {
 		//printf("DDR has been initialized\n");
 		return 1;
 	}
@@ -709,19 +708,30 @@ static int sdramc_ecc_enable(struct sdramc *sdramc)
 	return err;
 }
 
-int dram_init(void)
+int dram_init(struct ast_chip *chip)
 {
 	struct sdramc_ac_timing *ac;
 	uint32_t bistcfg;
 	int err = 0;
 
-	if (is_ddr_initialized())
-		goto out;
-
 	sdramc->regs = (struct sdramc_regs *)DRAMC_BASE;
 	sdramc->phy_regs = (uint32_t *)DRAMC_PHY_BASE;
 
+	if (is_ddr_initialized(sdramc))
+		goto out;
+
 //	mpll_init();
+
+//	LOG_DBG("0x14b80000=0x%x\n", sys_read32(0x14b80000));
+//	LOG_DBG("0x14b80004=0x%x\n", sys_read32(0x14b80004));
+//	LOG_DBG("0x14b80008=0x%x\n", sys_read32(0x14b80008));
+//	LOG_DBG("0x14b8000c=0x%x\n", sys_read32(0x14b8000c));
+//	ast_loader_read(0x14b80000, 0x100000, 0x200);
+//
+//	LOG_DBG("0x14b80000=0x%x\n", sys_read32(0x14b80000));
+//	LOG_DBG("0x14b80004=0x%x\n", sys_read32(0x14b80004));
+//	LOG_DBG("0x14b80008=0x%x\n", sys_read32(0x14b80008));
+//	LOG_DBG("0x14b8000c=0x%x\n", sys_read32(0x14b8000c));
 
 	sdramc_unlock(sdramc);
 

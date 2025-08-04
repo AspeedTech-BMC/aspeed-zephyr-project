@@ -9,9 +9,10 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <fit.h>
 #include <scu_ast2700.h>
 #include <zephyr/sd/mmc.h>
+#include <ast_loader.h>
+#include <abr.h>
 
 #define MMC_CLK_DRIVING_REG	(SCU0_REG + 0x480)
 #define MMC_CMD_DRIVING_REG	(SCU0_REG + 0x484)
@@ -28,12 +29,11 @@
 
 #define MMC_BLK_LEN	512
 
-LOG_MODULE_REGISTER(aspeed_mmc, CONFIG_SOC_FMC_LOG_LEVEL);
+LOG_MODULE_REGISTER(ast_mmc, CONFIG_SOC_FMC_LOG_LEVEL);
 
-static const struct device *const sdhc_dev = DEVICE_DT_GET(DT_ALIAS(emmc));
 static struct sd_card card;
 
-int mmc_init(int id)
+static int mmc_init(struct device *dev)
 {
 	int ret = 0;
 
@@ -51,72 +51,112 @@ int mmc_init(int id)
 	/* config gpio18 a0 to A5 to emmc mode */
 	sys_write32(0xff, 0x12c02400);
 
-	ret = sd_init(sdhc_dev, &card);
+	ret = sd_init(dev, &card);
 	if (ret) {
-		LOG_DBG("cannot get BLK driver\n");
+		LOG_ERR("cannot get BLK driver\n");
 		return -ENODEV;
 	}
 
-	ret = mmc_switch_part(&card, 1 << id);
+	ret = mmc_switch_part(&card, 1 << abr_get_id());
 	if (ret) {
-		LOG_DBG("cannot switch part\n");
+		LOG_ERR("cannot switch part\n");
 		return -1;
 	}
 
 	return ret;
 }
 
-int mmc_copy(uint32_t *dest, uint32_t src, uint32_t len)
+static int mmc_copy(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len)
 {
 	int ret;
-	uint32_t blk, blks;
-	uint32_t ofst_in_blk = src;
-	uint32_t i = 0;
 	uint32_t *base;
+	uint32_t blks;
+	uint32_t offset, lba, trans, extra;
+	uint8_t blk_buf[MMC_BLK_LEN], *out = (uint8_t *)dst, *in = (uint8_t *)src;
 
-	blk = src / MMC_BLK_LEN;
-	blks = len / MMC_BLK_LEN;
-	ofst_in_blk %= MMC_BLK_LEN;
+	lba = (uint32_t)src / MMC_BLK_LEN;
+	offset = (uint32_t)src % MMC_BLK_LEN;
 
-	if (len % MMC_BLK_LEN)
-		blks++;
+	/* Handle the case where the source address is not aligned to block size */
+	if (offset) {
+		if (len < (MMC_BLK_LEN - offset))
+			trans = len;
+		else
+			trans = MMC_BLK_LEN - offset;
 
-	if ((uint32_t)src % MMC_BLK_LEN)
-		blks++;
+		/* Read the first block to get the offset */
+		ret = mmc_read_blocks(&card, (void *)blk_buf, lba, 1);
+		if (ret) {// != 1) {
+			LOG_ERR("blk read is incomplete!!!\n");
+			return -1;
+		}
 
-	LOG_DBG("blk read blk=0x%x, blks=0x%x\n", blk, blks);
+		base = (uint32_t *)(blk_buf + offset);
+		memcpy(dst, base, trans);
 
-	ret = mmc_read_blocks(&card, (void *)ASPEED_SRAM_BASE, blk, blks);
-	if (ret) {
-		LOG_DBG("blk read is incomplete!!!\n");
-		return 1;
+		out += trans;
+		in  += trans;
+		len -= trans;
 	}
 
-	base = (uint32_t *)(ASPEED_SRAM_BASE + ofst_in_blk);
+	/* Read the rest of the blocks */
+	while (len)  {
+		blks = len / MMC_BLK_LEN;
+		extra = len % MMC_BLK_LEN;
 
-	LOG_DBG("mmc load image base = %x\n", (uint32_t)base);
-	LOG_DBG("mmc load image base[0] = %x\n", *base);
+		lba = (uint32_t)in / MMC_BLK_LEN;
+		offset = (uint32_t)in % MMC_BLK_LEN;
 
-	for (i = 0; i < len / 4; i++)
-		sys_write32(*(base + i), (uint32_t)(dest + i));
+		if (len == extra) {
+			/* Read out the last block */
+			ret = mmc_read_blocks(&card, (void *)blk_buf, lba, 1);
+			if (ret) {// != 1) {
+				LOG_ERR("blk read is incomplete!!!\n");
+				return -1;
+			}
 
-	if (len % MMC_BLK_LEN)
-		sys_write32(*(base + i), (uint32_t)(dest + i));
+			memcpy(out, blk_buf + offset, extra);
 
-	return 0;
+			out += extra;
+			in += extra;
+			len -= extra;
+		} else {
+			/* Read out the whole block */
+			ret = mmc_read_blocks(&card, (void *)out, lba, blks);
+			LOG_DBG("blk read cnt=%d\n", ret);
+			if (ret) {// != blks) {
+				LOG_ERR("blk read is incomplete!!!\n");
+				return -1;
+			}
+
+			out += (MMC_BLK_LEN * blks);
+			in += (MMC_BLK_LEN * blks);
+			len -= (MMC_BLK_LEN * blks);
+		}
+	}
+
+	return ret;
 }
 
-uint32_t fit_mmc_load_read(struct fit_load_info *load, uint32_t sector,
-			       uint32_t count, void *buf)
+static struct ast_loader_ops bootmmc_ops = {
+	.init = mmc_init,
+	.copy = mmc_copy,
+};
+
+int mmc_register(struct ast_loader *loader)
 {
-	int ret;
+	struct device *dev;
 
-	LOG_DBG("%s: sector %x, count %x, buf %x",
-	      __func__, sector, count, (uint32_t)buf);
+	dev = (struct device *)device_get_binding("sdhci@12090000");
+	if (!dev) {
+		LOG_ERR("No device named emmc");
+		return -1;
+	}
 
-	ret = mmc_read_blocks(&card, buf, sector, count);
-	if (ret)
-		return 0;
+	loader->ops = &bootmmc_ops;
+	loader->dev = dev;
 
-	return count;
+	LOG_DBG("MMC loader registered");
+
+	return 0;
 }

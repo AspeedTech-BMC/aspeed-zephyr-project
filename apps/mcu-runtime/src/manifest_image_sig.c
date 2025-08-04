@@ -6,6 +6,7 @@
 
 #include <manifest.h>
 
+#include <zephyr/sys/byteorder.h>
 #include <zephyr/crypto/crypto.h>
 #include <zephyr/crypto/ecdsa.h>
 #include <zephyr/crypto/ecdsa_structs.h>

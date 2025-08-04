@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <fit.h>
 #include <manifest.h>
 #include <platform.h>
 #include <scu_ast2700.h>
@@ -14,8 +13,12 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/crc.h>
+#include <ast_loader.h>
 
-LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
+//LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
+
+LOG_MODULE_REGISTER(cptra_manifest, CONFIG_SOC_FMC_LOG_LEVEL);
+struct cptra_manifest_hdr manihdr;
 
 static uint8_t sram_buf[CPTRA_SRAM_BUF_SIZE];
 static struct cptra_image_context cptra_ctx;
@@ -309,6 +312,7 @@ static int cptra_load_simple_manifest(struct cptra_image_context *ctx)
 	struct cptra_load_info sram = {0};
 
 	CPTRA_INIT_LOADER(&sram, sram_buf, sizeof(sram_buf));
+
 	ret = cptra_simple_manifest_read(ctx, &sram);
 	if (ret)
 		goto end;

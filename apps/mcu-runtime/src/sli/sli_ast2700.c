@@ -7,6 +7,8 @@
 #include "zephyr/sys/sys_io.h"
 
 #include <zephyr/logging/log.h>
+#include <sli.h>
+
 #define LOG_MODULE_NAME			sli_ast2700
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
@@ -689,7 +691,7 @@ static void __maybe_unused sli_switch_video_dir(struct sli_data *data, bool is_D
 	sli_wait_suspend(rx);
 }
 
-int sli_init_f(void)
+int sli_init_f(struct ast_chip *chip)
 {
 	struct sli_data ast2700_sli_data[1];
 	struct sli_data *data = ast2700_sli_data;
@@ -802,7 +804,7 @@ int sli_init_f(void)
 	return 0;
 }
 
-int sli_init_r(void)
+int sli_init_r(struct ast_chip *chip)
 {
 	struct sli_data ast2700_sli_data[1];
 	struct sli_data *data = ast2700_sli_data;

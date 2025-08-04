@@ -15,42 +15,103 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <soc_fmc.h>
-#include <stor.h>
-#include <scu_ast2700.h>
+#include <ast_loader.h>
+#include <chip.h>
 
-LOG_MODULE_REGISTER(aspeed_stor, CONFIG_SOC_FMC_LOG_LEVEL);
+LOG_MODULE_REGISTER(ast_stor, CONFIG_SOC_FMC_LOG_LEVEL);
 
-enum boot_mode_type boot_mode(void)
+struct image_info {
+	int id;
+	uint32_t offset;
+	uint32_t size;
+};
+
+static struct image_info img_info[] = {
+	{0, 0, 0},
+	{CPTRA_FMC_FW_ID, 0, 0},
+	{CPTRA_DDR4_IMEM_FW_ID, 0, 0},
+	{CPTRA_DDR4_DMEM_FW_ID, 0, 0},
+	{CPTRA_DDR4_2D_IMEM_FW_ID, 0, 0},
+	{CPTRA_DDR4_2D_DMEM_FW_ID, 0, 0},
+	{CPTRA_DDR5_IMEM_FW_ID, 0, 0},
+	{CPTRA_DDR5_DMEM_FW_ID, 0, 0},
+	{CPTRA_DP_FW_FW_ID, 0, 0},
+	{CPTRA_UEFI_FW_ID, 0, 0},
+};
+
+static int stor_get_image_info(struct image_info *info)
 {
-	uint32_t dis, strap;
+	uint32_t manifest_base = CONFIG_SOC_FMC_LOAD_FIT_ADDRESS & 0x0fffffff;
+	uint32_t offset, sz;
+	int err;
 
-	dis = sys_read32(SCU1_OTPCFG_03_02);
-	strap = sys_read32(SCU1_HWSTRAP1);
+	if (!info) {
+		LOG_ERR("Image info pointer is NULL.\n");
+		return -1;
+	}
 
-	/* check if recovery is disabled by OTP */
-	if (!(dis & OTPCFG2_DIS_RECOVERY_MODE)) {
-		/* check if recovery is enabled by hwstrap */
-		if (strap & SCU1_HWSTRAP1_EN_RECOVERY_BOOT) {
-			if ((strap & SCU1_HWSTRAP1_RECOVERY_INTERFACE) == SCU1_HWSTRAP1_RECOVERY_USB)
-				return BOOT_DEV_USB;
-			else if ((strap & SCU1_HWSTRAP1_RECOVERY_INTERFACE) == SCU1_HWSTRAP1_RECOVERY_I2C)
-				return BOOT_DEV_I2C;
-			else if ((strap & SCU1_HWSTRAP1_RECOVERY_INTERFACE) == SCU1_HWSTRAP1_RECOVERY_I3C)
-				return BOOT_DEV_I3C;
-			else
-				return BOOT_DEV_UART;
+	for (int i = 2; i < CPTRA_UEFI_FW_ID + 1; i++) {
+		/* Call cptra's service to get the image info */
+		err = cptra_hdr_get_prebuilt(info[i].id, &offset, &sz);
+		if (err) {
+			LOG_ERR("Failed to get image info for ID %d, err=%d\n", info[i].id, err);
+			return err;
 		}
+
+		info[i].offset = offset + manifest_base;
+		info[i].size = sz;
 	}
 
-	/* if not recovery mode, then it is storage */
-	if ((strap & SCU1_HWSTRAP1_BOOT_EMMC_UFS)) {
-		if (strap & SCU1_HWSTRAP1_BOOT_UFS)
-			return BOOT_DEV_UFS;
-		else
-			return BOOT_DEV_MMC;
-	}
+	return err;
+}
 
-	/* leave FWSPI as default for safety */
-	return BOOT_DEV_SPI;
+static int stor_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, uint32_t *len)
+{
+        struct ast_loader_ops *ops;
+        uint32_t src, sz = 0;
+        int err = 0;
+
+        src = img_info[type].offset;
+	sz = img_info[type].size;
+
+        ops = ast_loader_get_ops(loader);
+        if (ops && ops->copy)
+                err = ops->copy(loader->dev, dst, src, sz);
+
+        *len = sz;
+
+        return err;
+}
+
+int stor_init(struct ast_loader *loader)
+{
+        struct ast_loader_ops *ops;
+        int bootmode;
+        int err = -1;
+
+        bootmode = loader->bootmode;
+
+        if (bootmode == BOOT_DEVICE_RAM)
+		err = spi_register(loader);
+        else if (bootmode == BOOT_DEVICE_MMC1)
+		err = mmc_register(loader);
+        else if (bootmode == BOOT_DEVICE_SATA)
+		err = ufs_register(loader);
+        else
+                return -1;
+
+        if (err) {
+                printf("Get stor udevice Failed %d.\n", err);
+                return err;
+        }
+
+        loader->load = stor_load;
+
+        ops = ast_loader_get_ops(loader);
+        if (ops && ops->init)
+                err = ops->init(loader->dev);
+
+	stor_get_image_info(img_info);
+
+        return err;
 }

@@ -13,9 +13,8 @@
 #define _SPI_AST2700_H
 
 #include <stdlib.h>
+#include <ast_loader.h>
 
-int spi_init(int id);
-int spi_copy(uint32_t *dest, uint32_t src, uint32_t len);
-uint32_t fit_ram_load_read(struct fit_load_info *load, uint32_t sector,
-			       uint32_t count, void *buf);
+//int spi_init(struct device *dev);
+//int spi_copy(struct device *dev, uint32_t *dest, uint32_t src, uint32_t len);
 #endif

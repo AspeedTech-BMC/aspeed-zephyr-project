@@ -5,7 +5,6 @@
 #ifndef _MANIFEST_H
 #define _MANIFEST_H
 
-#include <fit.h>
 #include <stdint.h>
 
 #include <zephyr/drivers/cptra.h>

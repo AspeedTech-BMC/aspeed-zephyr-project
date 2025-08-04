@@ -5,6 +5,8 @@
 #ifndef _ASM_ARCH_DP_AST2700_H
 #define _ASM_ARCH_DP_AST2700_H
 
+#include <ast_loader.h>
+
 #define MCU_BASE			(0x11000000)
 #define MCU_DMEM_BASE			(MCU_BASE)
 #define MCU_REG_BASE			(MCU_BASE + 0x10000)
@@ -35,6 +37,6 @@
 #define  DP_HANDSHAKE_HOST_READ_EDID	BIT(28)
 #define  DP_HANDSHAKE_VIDEO_FMT_SRC	BIT(24)
 
-int dp_init(void);
+int dp_init(struct ast_chip *chip);
 
 #endif

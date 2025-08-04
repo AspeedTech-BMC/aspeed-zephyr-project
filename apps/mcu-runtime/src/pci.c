@@ -21,7 +21,7 @@ static void setbits_le32(void *addr, uint32_t set)
 	sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr);
 }
 
-int pci_init(void)
+int pci_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = (void *)SCU0_REG;
 	uint8_t efuse;

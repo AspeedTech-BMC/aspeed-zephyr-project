@@ -10,12 +10,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <platform.h>
-#include <soc_fmc.h>
-#include <fmc_hdr.h>
 #include <e2m_ast2700.h>
 #include <sdram_ast2700.h>
-#include <scu_ast2700.h>
 #include <vga_ast2700.h>
+#include <ast_loader.h>
 
 #define VBIOS0_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base0))
 #define VBIOS1_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base1))
@@ -49,7 +47,6 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	uint32_t vbios_e2m_value;
 	uint32_t arm_dram_base = ASPEED_DRAM_BASE >> 1;
 
-	fmc_hdr_get_prebuilt(PBT_UEFI_X64_AST2700, &vbios_ofst, &vbios_size, NULL);
 	LOG_DBG("%s: vbios0 addr(%d) size(%d)", __func__, vbios_ofst, vbios_size);
 
 	if (node == 0)
@@ -65,7 +62,7 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 
 	/* Initial memory region and copy vbios into it */
 	memset((uint32_t *)vbios_base, 0x0, 0x10000);
-	soc_fmc_obj.stor_copy((uint32_t *)vbios_base, vbios_ofst, vbios_size);
+	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0);
 
 	/* Remove riscv Dram base */
 	vbios_mem_base &= ~(ASPEED_DRAM_BASE);

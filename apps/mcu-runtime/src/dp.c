@@ -10,8 +10,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <platform.h>
-#include <soc_fmc.h>
-#include <fmc_hdr.h>
 #include <dp_ast2700.h>
 #include <scu_ast2700.h>
 
@@ -22,17 +20,12 @@ static void setbits_le32(void *addr, uint32_t set)
 	sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr);
 }
 
-int dp_init(void)
+int dp_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = (void *)SCU0_REG;
-	uint32_t fw_ofst;
-	uint32_t fw_size;
 	uint32_t mcu_ctrl, val;
 	uintptr_t scu_offset;
 	bool is_mcu_stop = false;
-
-	fmc_hdr_get_prebuilt(PBT_DP_FW, &fw_ofst, &fw_size, NULL);
-	LOG_DBG("%s: DP-FW addr(%d) size(%d)", __func__, fw_ofst, fw_size);
 
 	val = scu->vga_func_ctrl;
 	scu_offset = (((val >> 8) & 0x3) == 1)
@@ -89,7 +82,7 @@ int dp_init(void)
 		mcu_ctrl |= MCU_CTRL_AHBS_IMEM_EN;
 		sys_write32(mcu_ctrl, MCU_CTRL);
 
-		soc_fmc_obj.stor_copy((uint32_t *)MCU_IMEM_BASE, fw_ofst, fw_size);
+		ast_loader_load_image(CPTRA_DP_FW_FW_ID, (uint32_t *)MCU_IMEM_BASE, 0);
 
 		/* release DPMCU internal reset */
 		mcu_ctrl &= ~MCU_CTRL_AHBS_IMEM_EN;

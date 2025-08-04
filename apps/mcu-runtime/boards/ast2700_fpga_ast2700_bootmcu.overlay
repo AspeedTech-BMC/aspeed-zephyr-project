@@ -1,0 +1,76 @@
+/ {
+	chosen {
+		zephyr,console = &uart12;
+		zephyr,shell-uart = &uart12;
+	};
+
+	sram: memory@14b80a00 {
+		reg = <0x14b80000 0x3be00>;
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		espi_mmbi_memory: espi-mmbi-memory@a8000000 {
+			reg = <0xa8000000 0x4000000>;
+			no-map;
+		};
+
+		ssp_memory: ssp-memory@ac000000 {
+			reg = <0xac000000 0x2000000>;
+			no-map;
+			bootph-all;
+		};
+
+		tsp_memory: tsp-memory@ae000000 {
+			reg = <0xae000000 0x2000000>;
+			no-map;
+			bootph-all;
+		};
+
+		atf: trusted-firmware-a@b0000000 {
+			reg = <0xb0000000 0x80000>;
+			no-map;
+			bootph-all;
+		};
+
+		optee_core: optee-core@b0080000 {
+			reg = <0xb0080000 0x1000000>;
+			no-map;
+			bootph-all;
+		};
+
+		vbios_base0: vbios-base0@b1bb0000 {
+			reg = <0xb1bb0000 0x10000>;
+			no-map;
+			bootph-all;
+		};
+
+		vbios_base1: vbios-base1@b1bc0000 {
+			reg = <0xb1bc0000 0x10000>;
+			no-map;
+			bootph-all;
+		};
+
+		mctp0_reserved: mctp0-reserved@b1bd0000 {
+			reg = <0xb1bd0000 0x10000>;
+			no-map;
+		};
+
+		mctp1_reserved: mctp1-reserved@b1be0000 {
+			reg = <0xb1be0000 0x10000>;
+			no-map;
+		};
+
+		mctp2_reserved: mctp2-reserved@b1bf0000 {
+			reg = <0xb1bf0000 0x10000>;
+			no-map;
+		};
+	};
+};
+
+&emmc {
+	status = "okay";
+};

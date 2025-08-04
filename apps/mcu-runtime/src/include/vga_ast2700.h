@@ -5,6 +5,8 @@
 #ifndef _VGA_AST2700_H
 #define _VGA_AST2700_H
 
+#include <scu_ast2700.h>
+
 #define VGA_PACKER_CPU_BASE	(0x12c1d000)
 #define VGA_RETIMER_CPU_BASE	(0x12c1d100)
 #define VGA_PACKER_IO_BASE	(0x14c3a000)

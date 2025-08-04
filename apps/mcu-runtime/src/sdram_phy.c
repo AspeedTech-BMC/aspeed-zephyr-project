@@ -4,10 +4,8 @@
  */
 
 #include <sdram_ast2700.h>
-#include <stor.h>
-#include <soc_fmc.h>
-#include <fmc_hdr.h>
 #include <zephyr/logging/log.h>
+#include <ast_loader.h>
 
 LOG_MODULE_REGISTER(sdram_phy, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -911,6 +909,7 @@ void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
 int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
 {
 	uint32_t imem_base = DWC_PHY_IMEM_OFFSET;
+	int fw;
 	int type;
 	int ret = 0;
 
@@ -918,18 +917,9 @@ int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
 
 	type = is_ddr4();
 
-//	if (is_recovery()) {
-//		aspeed_spl_ddr_image_ymodem_load(dwc_train, type,
-//						 1, train2D);
-//		memcpy((void *)(DRAMC_PHY_BASE + 2 * imem_base),
-//		       (void *)dwc_train[type][train2D].imem_base,
-//		       dwc_train[type][train2D].imem_len);
-//		return ret;
-//	}
+	fw = (type ? (train2D ? CPTRA_DDR4_2D_IMEM_FW_ID: CPTRA_DDR4_IMEM_FW_ID) : CPTRA_DDR5_IMEM_FW_ID);
 
-	soc_fmc_obj.stor_copy((uint32_t *)(DRAMC_PHY_BASE + 2 * imem_base),
-		  dwc_train[type][train2D].imem_base,
-		  dwc_train[type][train2D].imem_len);
+	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * imem_base), 0);
 
 	return ret;
 }
@@ -937,6 +927,7 @@ int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
 int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D)
 {
 	uint32_t dmem_base = DWC_PHY_DMEM_OFFSET;
+	int fw;
 	int type;
 	int ret = 0;
 
@@ -944,60 +935,14 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 
 	type = is_ddr4();
 
-//	if (is_recovery()) {
-//		aspeed_spl_ddr_image_ymodem_load(dwc_train, type,
-//						 0, train2D);
-//		memcpy((void *)(DRAMC_PHY_BASE + 2 * dmem_base),
-//		       (void *)dwc_train[type][train2D].dmem_base,
-//		       dwc_train[type][train2D].dmem_len);
-//		return ret;
-//	}
+	fw = (type ? (train2D ? CPTRA_DDR4_2D_DMEM_FW_ID: CPTRA_DDR4_DMEM_FW_ID) : CPTRA_DDR5_DMEM_FW_ID);
 
-	soc_fmc_obj.stor_copy((uint32_t *)(DRAMC_PHY_BASE + 2 * dmem_base),
-		  dwc_train[type][train2D].dmem_base,
-		  dwc_train[type][train2D].dmem_len);
-
+	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * dmem_base), 0);
 	return ret;
 }
 
 void dwc_phy_init(struct sdramc *sdramc)
 {
-	uint32_t imem_start = 0, dmem_start = 0, imem_2d_start = 0, dmem_2d_start = 0;
-	uint32_t imem_len = 0, dmem_len = 0, imem_2d_len = 0, dmem_2d_len = 0;
-	uint32_t ddr5_imem = 0, ddr5_imem_len = 0, ddr5_dmem = 0, ddr5_dmem_len = 0;
-
-	fmc_hdr_get_prebuilt(PBT_DDR4_PMU_TRAIN_IMEM, &imem_start, &imem_len, NULL);
-	fmc_hdr_get_prebuilt(PBT_DDR4_PMU_TRAIN_DMEM, &dmem_start, &dmem_len, NULL);
-	fmc_hdr_get_prebuilt(PBT_DDR4_2D_PMU_TRAIN_IMEM, &imem_2d_start, &imem_2d_len, NULL);
-	fmc_hdr_get_prebuilt(PBT_DDR4_2D_PMU_TRAIN_DMEM, &dmem_2d_start, &dmem_2d_len, NULL);
-	fmc_hdr_get_prebuilt(PBT_DDR5_PMU_TRAIN_IMEM, &ddr5_imem, &ddr5_imem_len, NULL);
-	fmc_hdr_get_prebuilt(PBT_DDR5_PMU_TRAIN_DMEM, &ddr5_dmem, &ddr5_dmem_len, NULL);
-
-	LOG_DBG("%s: imem_start=0x%x, imem_len=0x%x\n", __func__, imem_start, imem_len);
-	LOG_DBG("%s: dmem_start=0x%x, dmem_len=0x%x\n", __func__, dmem_start, dmem_len);
-	LOG_DBG("%s: imem_2d_start=0x%x, imem_2d_len=0x%x\n", __func__, imem_2d_start, imem_2d_len);
-	LOG_DBG("%s: dmem_2d_start=0x%x, dmem_2d_len=0x%x\n", __func__, dmem_2d_start, dmem_2d_len);
-	LOG_DBG("%s: ddr5_imem=0x%x, ddr5_imem_len=0x%x\n", __func__, ddr5_imem, ddr5_imem_len);
-	LOG_DBG("%s: ddr5_dmem=0x%x, ddr5_dmem_len=0x%x\n", __func__, ddr5_dmem, ddr5_dmem_len);
-
-	// ddr5
-	dwc_train[0][0].imem_base = ddr5_imem;
-	dwc_train[0][0].imem_len = ddr5_imem_len;
-	dwc_train[0][0].dmem_base = ddr5_dmem;
-	dwc_train[0][0].dmem_len = ddr5_dmem_len;
-
-	// ddr4 1d
-	dwc_train[1][0].imem_base = imem_start;
-	dwc_train[1][0].imem_len = imem_len;
-	dwc_train[1][0].dmem_base = dmem_start;
-	dwc_train[1][0].dmem_len = dmem_len;
-
-	// ddr4 2d
-	dwc_train[1][1].imem_base = imem_2d_start;
-	dwc_train[1][1].imem_len = imem_2d_len;
-	dwc_train[1][1].dmem_base = dmem_2d_start;
-	dwc_train[1][1].dmem_len = dmem_2d_len;
-
 	// enable ddrphy free-run clock
 	sys_write32(SCU0_DDR_PHY_CLOCK, SCU0_CLOCK_STOP_CLR_REG);
 

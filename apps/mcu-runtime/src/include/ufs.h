@@ -1387,8 +1387,4 @@ static inline bool ufshcd_is_intr_aggr_allowed(struct ufs_hba *hba)
 		!(hba->quirks & UFSHCD_QUIRK_BROKEN_INTR_AGGR);
 }
 
-int ufs_init(int id);
-int ufs_read(uint32_t *dst, uint32_t src, uint32_t len);
-uint32_t fit_scsi_load_read(struct fit_load_info *load, uint32_t sector,
-			       uint32_t count, void *buf);
 #endif

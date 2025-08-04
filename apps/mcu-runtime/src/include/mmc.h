@@ -14,9 +14,5 @@
 
 #include <stdlib.h>
 
-int mmc_init(int id);
-int mmc_copy(uint32_t *dest, uint32_t src, uint32_t len);
-uint32_t fit_mmc_load_read(struct fit_load_info *load, uint32_t sector,
-			       uint32_t count, void *buf);
 
 #endif
