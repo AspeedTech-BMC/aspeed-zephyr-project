@@ -296,7 +296,7 @@ static void soc_fmc_image_load_run(void *o)
 
 	/* Load the image */
 	if (IS_ENABLED(CONFIG_CPTRA_MANIFEST)) {
-		if (cptra_load_image(s_obj->boot_mode, &s_obj->bundle_image) != 0) {
+		if (cptra_load_image()) {
 			LOG_ERR("Failed to load bundle image");
 			smf_set_state(SMF_CTX(s_obj), &soc_fmc_states[REBOOT]);
 			return;

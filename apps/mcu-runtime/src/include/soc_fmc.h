@@ -17,7 +17,6 @@ struct soc_fmc_object {
 	/* This must be first */
 	struct smf_ctx ctx;
 	struct fit_image_info fit_image;
-	struct cptra_image_context bundle_image;
 	/* Events */
 	struct k_event smf_event;
 	int32_t events;

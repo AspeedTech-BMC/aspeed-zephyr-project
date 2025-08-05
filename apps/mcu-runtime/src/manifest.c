@@ -17,6 +17,9 @@
 
 LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
 
+static uint8_t sram_buf[CPTRA_SRAM_BUF_SIZE];
+static struct cptra_image_context cptra_ctx;
+
 static bool cptra_manifest_sec_en(void)
 {
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
@@ -26,52 +29,54 @@ static bool cptra_manifest_sec_en(void)
 #endif
 }
 
-static void *cptra_read(struct cptra_load_info *info, int size, bool persist)
+#include <zephyr/drivers/flash.h>
+__weak int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 {
-	int count = 0;
-	void *buf = cptra_manifest_buffer_addr(info->write_sector);
-	void *buf_end = (void *)((uint8_t *)buf + size);
+	const struct device *dev = device_get_binding("fmc@0");
 
-	if (buf < CPTRA_SYS_LOAD_ADDR || buf_end >= CPTRA_SYS_LOAD_ADDR_END)
+	return flash_read(dev, src, dst, len);
+}
+
+static void *cptra_read(struct cptra_load_info *loader, int size, bool persist)
+{
+	int ret = 0;
+	uintptr_t src = CPTRA_MANIFEST_OFFSET + loader->read_sector;
+	uintptr_t dest = loader->base + loader->write_sector;
+
+	if (dest < loader->base || dest >= loader->limit)
 		return NULL;
 
-	count = info->read((struct fit_load_info *)info, info->read_sector, size, buf);
-	if (count <= 0)
-		return NULL;
-
-	if (count != size)
+	ret = ast_loader_read((uint32_t *)dest, src, size);
+	if (ret)
 		return NULL;
 
 	if (persist) {
-		info->read_sector += count;
-		info->write_sector += count;
+		loader->read_sector += size;
+		loader->write_sector += size;
 	}
 
-	info->size = persist ? 0 : size;
+	loader->size = persist ? 0 : size;
 
-	return buf;
+	return (void *)dest;
 }
 
-static void cptra_manifest_err_handler(int ret, struct cptra_load_info *info)
+static void cptra_manifest_err_handler(int ret, struct cptra_load_info *loader)
 {
 	uint32_t wipe_size = 0;
-	void *buf = cptra_manifest_buffer_addr(0);
 
-	wipe_size = info->write_sector + info->size;
-	wipe_size = wipe_size < CPTRA_SYS_LOAD_SIZE ? wipe_size : CPTRA_SYS_LOAD_SIZE;
+	if (ret) {
+		/* Wipe the sram tmp buffer stored image */
+		wipe_size = loader->write_sector + loader->size;
+		wipe_size = wipe_size < loader->limit ? wipe_size : loader->limit;
+		memset((void *)loader->base, 0, wipe_size);
 
-	if (!ret) {
-		LOG_INF("Caliptra load simple image... pass");
-	} else {
-		/* Wipe the tmp buffer stored image */
-		memset(buf, 0, wipe_size);
 		LOG_ERR("Caliptra load simple image... fail(%d)", ret);
 	}
 
 	__ASSERT(!ret, "Caliptra load simple image fail, ret: %d", ret);
 }
 
-static int cptra_crc32_check(struct cptra_image_context *ctx, struct cptra_load_info *info)
+static int cptra_crc32_check(struct cptra_image_context *ctx)
 {
 #ifdef CONFIG_CRC
 	uint32_t hdr_crc32 = 0;
@@ -91,12 +96,13 @@ static int cptra_crc32_check(struct cptra_image_context *ctx, struct cptra_load_
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_header(struct cptra_image_context *ctx, struct cptra_load_info *info)
+static int cptra_read_header(struct cptra_image_context *ctx, struct cptra_load_info *loader)
 {
 	void *ptr = NULL;
 	struct cptra_manifest_hdr *hdr = NULL;
 
-	ptr = cptra_read(info, sizeof(struct cptra_manifest_hdr), true);
+	loader->read_sector = 0;
+	ptr = cptra_read(loader, sizeof(struct cptra_manifest_hdr), true);
 	if (!ptr) {
 		LOG_ERR("Failed to read manifest header.");
 		return CPTRA_ERR_READ_HDR;
@@ -118,11 +124,12 @@ static int cptra_read_header(struct cptra_image_context *ctx, struct cptra_load_
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_checksum(struct cptra_image_context *ctx, struct cptra_load_info *info)
+static int cptra_read_checksum(struct cptra_image_context *ctx, struct cptra_load_info *loader)
 {
 	void *ptr = NULL;
 
-	ptr = cptra_read(info, sizeof(struct cptra_manifest_hdr), true);
+	loader->read_sector = sizeof(struct cptra_manifest_hdr);
+	ptr = cptra_read(loader, sizeof(struct cptra_checksum_info), true);
 	if (!ptr)
 		return CPTRA_ERR_READ_CHKSUM;
 
@@ -131,7 +138,7 @@ static int cptra_read_checksum(struct cptra_image_context *ctx, struct cptra_loa
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_img_info(struct cptra_image_context *ctx, struct cptra_load_info *info)
+static int cptra_read_img_info(struct cptra_image_context *ctx, struct cptra_load_info *loader)
 {
 	int img_num = ctx->hdr->img_count;
 	void *ptr = NULL;
@@ -139,7 +146,9 @@ static int cptra_read_img_info(struct cptra_image_context *ctx, struct cptra_loa
 	if (img_num > CPTRA_IMC_ENTRY_COUNT)
 		return CPTRA_ERR_EXCEED_MAX_IMG_COUNT;
 
-	ptr = cptra_read(info, sizeof(struct cptra_image_info) * img_num, true);
+	loader->read_sector =
+		sizeof(struct cptra_manifest_hdr) + sizeof(struct cptra_checksum_info);
+	ptr = cptra_read(loader, sizeof(struct cptra_image_info) * img_num, true);
 	if (!ptr)
 		return CPTRA_ERR_READ_IMG_INFO;
 
@@ -148,7 +157,7 @@ static int cptra_read_img_info(struct cptra_image_context *ctx, struct cptra_loa
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_soc_manifest(struct cptra_image_context *ctx, struct cptra_load_info *info,
+static int cptra_read_soc_manifest(struct cptra_image_context *ctx, struct cptra_load_info *loader,
 				   struct cptra_soc_manifest **manifest)
 {
 	int image_offset = 0;
@@ -158,8 +167,8 @@ static int cptra_read_soc_manifest(struct cptra_image_context *ctx, struct cptra
 	if (image_offset < 0)
 		return CPTRA_ERR_SOC_MANIFEST_NO_INFO;
 
-	info->read_sector = image_offset;
-	ptr = cptra_read(info, sizeof(struct cptra_soc_manifest), true);
+	loader->read_sector = image_offset;
+	ptr = cptra_read(loader, sizeof(struct cptra_soc_manifest), true);
 	if (!ptr)
 		return CPTRA_ERR_SOC_MANIFEST_READ_ERROR;
 
@@ -176,7 +185,7 @@ static int cptra_read_soc_manifest(struct cptra_image_context *ctx, struct cptra
 	return CPTRA_SUCCESS;
 }
 
-static void *cptra_read_image(struct cptra_image_context *ctx, struct cptra_load_info *info,
+static void *cptra_read_image(struct cptra_image_context *ctx, struct cptra_load_info *loader,
 			      struct cptra_manifest_ime *ime)
 {
 	int image_offset = 0;
@@ -191,8 +200,8 @@ static void *cptra_read_image(struct cptra_image_context *ctx, struct cptra_load
 	if (image_size < 0)
 		goto end;
 
-	info->read_sector = image_offset;
-	ptr = cptra_read(info, image_size, false);
+	loader->read_sector = image_offset;
+	ptr = cptra_read(loader, image_size, false);
 	if (!ptr)
 		goto end;
 
@@ -200,30 +209,32 @@ end:
 	return ptr;
 }
 
-static int cptra_simple_manifest_read(struct cptra_image_context *ctx, struct cptra_load_info *info,
-				      uint32_t sector)
+static int cptra_simple_manifest_read(struct cptra_image_context *ctx,
+				      struct cptra_load_info *loader)
 {
 	int ret = 0;
 
-	info->write_sector = 0;
-	info->read_sector = sector;
+	/* header, checksum, img_info has been read exit directly */
+	if (ctx->hdr && ctx->chk && ctx->img_info)
+		return ret;
 
-	ret = cptra_read_header(ctx, info);
+	ret = cptra_read_header(ctx, loader);
 	if (ret)
 		goto fail;
 
-	ret = cptra_read_checksum(ctx, info);
+	ret = cptra_read_checksum(ctx, loader);
 	if (ret)
 		goto fail;
 
-	ret = cptra_read_img_info(ctx, info);
+	ret = cptra_read_img_info(ctx, loader);
 	if (ret)
 		goto fail;
 
-	ret = cptra_crc32_check(ctx, info);
+	ret = cptra_crc32_check(ctx);
 	if (ret)
 		goto fail;
 
+	LOG_INF("Manifest simple manifeset read success.\n");
 	return ret;
 fail:
 	LOG_ERR("Manifest simple manifeset read fail (0x%x).\n", ret);
@@ -231,13 +242,17 @@ fail:
 }
 
 static int cptra_simple_manifest_parse(struct cptra_image_context *ctx,
-				       struct cptra_load_info *info)
+				       struct cptra_load_info *loader)
 {
 	int ret = 0;
 	struct cptra_soc_manifest *manifest = NULL;
 
+	/* soc manifest has been read, exit directly */
+	if (ctx->soc_manifest)
+		return ret;
+
 	/* Find the soc manifest */
-	ret = cptra_read_soc_manifest(ctx, info, &manifest);
+	ret = cptra_read_soc_manifest(ctx, loader, &manifest);
 	if (!manifest || ret)
 		return ret;
 
@@ -258,10 +273,12 @@ static int cptra_simple_manifest_parse(struct cptra_image_context *ctx,
 	/* SoC manifest verification pass */
 	ctx->soc_manifest = manifest;
 
+	LOG_INF("Manifest soc manifeset read success.\n");
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_simple_manifest_load(struct cptra_image_context *ctx, struct cptra_load_info *info)
+static int cptra_simple_manifest_load(struct cptra_image_context *ctx,
+				      struct cptra_load_info *loader)
 {
 	void *img_bin = NULL;
 	int ret = 0;
@@ -275,7 +292,7 @@ static int cptra_simple_manifest_load(struct cptra_image_context *ctx, struct cp
 			continue;
 
 		/* Get the ime denoted image and size */
-		img_bin = cptra_read_image(ctx, info, ime);
+		img_bin = cptra_read_image(ctx, loader, ime);
 		img_size = cptra_ime_image_size(ctx, ime);
 		if (!img_bin || img_size < 0)
 			return CPTRA_ERR_IMAGE_READ;
@@ -300,49 +317,69 @@ static int cptra_simple_manifest_load(struct cptra_image_context *ctx, struct cp
 	return ret;
 }
 
-static int cptra_load_simple_manifest(struct cptra_image_context *ctx, struct cptra_load_info *info,
-				      uint64_t sector, void *man)
+static int cptra_load_simple_manifest(struct cptra_image_context *ctx)
 {
 	int ret = 0;
+	struct cptra_load_info sram = {0};
 
-	ret = cptra_simple_manifest_read(ctx, info, sector);
+	CPTRA_INIT_LOADER(&sram, sram_buf, sizeof(sram_buf));
+	ret = cptra_simple_manifest_read(ctx, &sram);
 	if (ret)
 		goto end;
 
-	ret = cptra_simple_manifest_parse(ctx, info);
-	if (ret)
-		goto end;
-
-	ret = cptra_simple_manifest_load(ctx, info);
+	ret = cptra_simple_manifest_parse(ctx, &sram);
 	if (ret)
 		goto end;
 
 end:
-	cptra_manifest_err_handler(ret, info);
+	cptra_manifest_err_handler(ret, &sram);
 	return ret;
 }
 
-int cptra_load_image(enum boot_mode_type boot_mode, struct cptra_image_context *ctx)
+static int cptra_load_simple_manifest_image(struct cptra_image_context *ctx)
 {
-	uint32_t blk = 0;
-	void *header = NULL;
-	struct cptra_load_info load = {0};
+	int ret = 0;
+	struct cptra_load_info dram = {0};
 
-	if (!ctx) {
-		LOG_ERR("Calitra manifest load fail: unkown error");
-		return CPTRA_ERR_INVALID_PARAMETER;
-	}
+	CPTRA_INIT_LOADER(&dram, CPTRA_SYS_LOAD_ADDR, CPTRA_SYS_LOAD_SIZE);
+	ret = cptra_simple_manifest_load(ctx, &dram);
 
-	switch (boot_mode) {
-	case BOOT_DEV_SPI:
-		LOG_INF("Trying to boot from RAM");
-		load.read = fit_ram_load_read;
-		header = (void *)CONFIG_SOC_FMC_LOAD_FIT_ADDRESS;
-		break;
-	default:
-		LOG_ERR("Calitra manifest load fail: unsupported boot device");
-		return CPTRA_ERR_UNSUPPORT_BOOT_DEV;
-	}
+	cptra_manifest_err_handler(ret, &dram);
+	return ret;
+}
 
-	return cptra_load_simple_manifest(ctx, &load, blk, header);
+int cptra_load_image(void)
+{
+	int ret = 0;
+
+	ret = cptra_load_simple_manifest(&cptra_ctx);
+	if (ret)
+		return ret;
+
+	return cptra_load_simple_manifest_image(&cptra_ctx);
+}
+
+int cptra_hdr_get_prebuilt(uint32_t fw_id, uint32_t *ofst, uint32_t *size)
+{
+	int image_offset = 0;
+	int image_size = 0;
+	int ret = 0;
+	struct cptra_manifest_ime ime = {.fw_id = fw_id};
+
+	ret = cptra_load_simple_manifest(&cptra_ctx);
+	if (ret)
+		return ret;
+
+	image_offset = cptra_ime_image_offset(&cptra_ctx, &ime);
+	if (image_offset < 0)
+		return CPTRA_ERR_IMAGE_READ;
+
+	image_size = cptra_ime_image_size(&cptra_ctx, &ime);
+	if (image_size < 0)
+		return CPTRA_ERR_IMAGE_READ;
+
+	*ofst = image_offset;
+	*size = image_size;
+
+	return CPTRA_SUCCESS;
 }

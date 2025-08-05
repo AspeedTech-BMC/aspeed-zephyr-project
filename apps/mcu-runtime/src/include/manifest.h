@@ -14,13 +14,21 @@
 
 #define CPTRA_SYS_LOAD_ADDR     (void *)(CONFIG_SYS_LOAD_ADDR)
 #define CPTRA_SYS_LOAD_SIZE     (0x400000)
-#define CPTRA_SYS_LOAD_ADDR_END (void *)(CONFIG_SYS_LOAD_ADDR + 0x400000)
+#define CPTRA_SRAM_BUF_SIZE     (16 * 1024)
+#define CPTRA_MANIFEST_OFFSET   (0x100000)
 
 #define CPTRA_ECDSA384_VFY_PKT(_r, _s)                                                             \
 	.r = (char *)(_r), .s = (char *)(_s), .m_len = 48, .r_len = 48, .s_len = 48,
 
 #define CPTRA_ECDSA384_NIST_P384_CURVE(_x, _y)                                                     \
 	.curve_id = ECC_CURVE_NIST_P384, .qx = (char *)(_x), .qy = (char *)(_y),
+
+#define CPTRA_INIT_LOADER(_loader, _base, _size)                                                   \
+	(_loader)->base = (uintptr_t)(_base);                                                      \
+	(_loader)->limit = (uintptr_t)(_base) + (_size);                                           \
+	(_loader)->read_sector = 0;                                                                \
+	(_loader)->write_sector = 0;                                                               \
+	(_loader)->size = 0;
 
 enum {
 	CPTRA_FMC_FW_ID = 0x01,
@@ -130,27 +138,11 @@ struct cptra_image_context {
 };
 
 struct cptra_load_info {
-	/**
-	 * read_sector - Number of bytes read from the device
-	 * write_sector - Number of bytes written to the buffer
-	 *
-	 * Manifest load operations reads the manifest from the device
-	 * and writes it to a buffer.
-	 */
-	int read_sector;
-	int write_sector;
-	int size;
-
-	/**
-	 * read() - Read from device
-	 *
-	 * @load: Information about the load state
-	 * @sector: Sector number to read from (each @load->bl_len bytes)
-	 * @count: Number of sectors to read
-	 * @buf: Buffer to read into
-	 * @return number of sectors read, 0 on error
-	 */
-	uint32_t (*read)(struct fit_load_info *load, uint32_t sector, uint32_t count, void *buf);
+	uintptr_t base; /* Base address of the buffer to read/write */
+	uintptr_t limit;
+	uint32_t read_sector;  /* Number of bytes read from the device */
+	uint32_t write_sector; /* Number of bytes written to the buffer */
+	uint32_t size;         /* Size of the data to be read */
 };
 
 static inline void *cptra_manifest_buffer_addr(uint32_t offset)
@@ -159,7 +151,8 @@ static inline void *cptra_manifest_buffer_addr(uint32_t offset)
 	return (void *)(CONFIG_SYS_LOAD_ADDR + offset);
 }
 
-int cptra_load_image(enum boot_mode_type boot_mode, struct cptra_image_context *ctx);
+int cptra_load_image(void);
+int cptra_hdr_get_prebuilt(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
 int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_ime *ime);
