@@ -790,6 +790,7 @@ void handle_image_verification(void *o)
 			LOG_INF("AFM image verification recovery=%s active=%s",
 					state->afm_active_object.RecoveryImageStatus ? "Bad" : "Good",
 					state->afm_active_object.ActiveImageStatus ? "Bad" : "Good");
+			LOG_INF("AFM format size = %x", CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET);
 			if (state->afm_active_object.RestrictActiveUpdate)
 				LOG_WRN("AFM Restrict Active Update Mode");
 #endif
