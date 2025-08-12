@@ -124,35 +124,25 @@ static int cptra_read_header(struct cptra_image_context *ctx, struct cptra_load_
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_checksum(struct cptra_image_context *ctx, struct cptra_load_info *loader)
-{
-	void *ptr = NULL;
-
-	loader->read_sector = sizeof(struct cptra_manifest_hdr);
-	ptr = cptra_read(loader, sizeof(struct cptra_checksum_info), true);
-	if (!ptr)
-		return CPTRA_ERR_READ_CHKSUM;
-
-	ctx->chk = (struct cptra_checksum_info *)ptr;
-
-	return CPTRA_SUCCESS;
-}
-
-static int cptra_read_img_info(struct cptra_image_context *ctx, struct cptra_load_info *loader)
+static int cptra_read_header_body(struct cptra_image_context *ctx, struct cptra_load_info *loader)
 {
 	int img_num = ctx->hdr->img_count;
+	uint32_t chk_sz = 0;
+	uint32_t info_sz = 0;
 	void *ptr = NULL;
 
 	if (img_num > CPTRA_IMC_ENTRY_COUNT)
 		return CPTRA_ERR_EXCEED_MAX_IMG_COUNT;
 
-	loader->read_sector =
-		sizeof(struct cptra_manifest_hdr) + sizeof(struct cptra_checksum_info);
-	ptr = cptra_read(loader, sizeof(struct cptra_image_info) * img_num, true);
+	loader->read_sector = sizeof(struct cptra_manifest_hdr);
+	chk_sz = sizeof(struct cptra_checksum_info);
+	info_sz = sizeof(struct cptra_image_info) * img_num;
+	ptr = cptra_read(loader, chk_sz + info_sz, true);
 	if (!ptr)
 		return CPTRA_ERR_READ_IMG_INFO;
 
-	ctx->img_info = (struct cptra_image_info *)ptr;
+	ctx->chk = (struct cptra_checksum_info *)ptr;
+	ctx->img_info = (struct cptra_image_info *)((uint8_t *)ptr + chk_sz);
 
 	return CPTRA_SUCCESS;
 }
@@ -222,11 +212,7 @@ static int cptra_simple_manifest_read(struct cptra_image_context *ctx,
 	if (ret)
 		goto fail;
 
-	ret = cptra_read_checksum(ctx, loader);
-	if (ret)
-		goto fail;
-
-	ret = cptra_read_img_info(ctx, loader);
+	ret = cptra_read_header_body(ctx, loader);
 	if (ret)
 		goto fail;
 
