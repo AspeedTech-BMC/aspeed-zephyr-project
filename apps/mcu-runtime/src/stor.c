@@ -41,7 +41,7 @@ static struct image_info img_info[] = {
 
 static int stor_get_image_info(struct image_info *info)
 {
-	uint32_t manifest_base = CONFIG_SOC_FMC_LOAD_FIT_ADDRESS & 0x0fffffff;
+	uint32_t manifest_base = CPTRA_MANIFEST_OFFSET;
 	uint32_t offset, sz;
 	int err;
 

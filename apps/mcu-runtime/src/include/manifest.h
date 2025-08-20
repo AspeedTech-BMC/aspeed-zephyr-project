@@ -14,7 +14,7 @@
 #define CPTRA_SYS_LOAD_ADDR     (void *)(CONFIG_SYS_LOAD_ADDR)
 #define CPTRA_SYS_LOAD_SIZE     (0x400000)
 #define CPTRA_SRAM_BUF_SIZE     (16 * 1024)
-#define CPTRA_MANIFEST_OFFSET   (0x100000)
+#define CPTRA_MANIFEST_OFFSET   (CONFIG_SOC_FMC_LOAD_MANIFEST_ADDRESS & 0x0fffffff)
 
 #define CPTRA_ECDSA384_VFY_PKT(_r, _s)                                                             \
 	.r = (char *)(_r), .s = (char *)(_s), .m_len = 48, .r_len = 48, .s_len = 48,
