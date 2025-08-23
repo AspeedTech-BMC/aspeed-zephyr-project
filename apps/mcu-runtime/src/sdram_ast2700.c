@@ -12,6 +12,12 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 #define DRAMC_UNLOCK_KEY		0x1688a8a8
 #define DRAMC_VIDEO_UNLOCK_KEY		0x00440003
 
+#define SCU_IO_HWSTRAP1			(SCU1_REG + 0x010)
+#define IO_HWSTRAP1_DRAM_TYPE		BIT(10)
+#define SCU_IO_MCU0_CTRL		(SCU1_REG + 0x110)
+#define SCU_MCU0_MAP1_MASK		GENMASK(22, 16)
+#define SCU_MCU0_MAP1_SHIFT		(16)
+
 /*
  * Given a maximum RFC value for biggest capacity,
  * it will be updated after dram size is determined later
@@ -708,6 +714,70 @@ static int sdramc_ecc_enable(struct sdramc *sdramc)
 	return err;
 }
 
+struct ddr_capacity {
+	size_t size;
+	int rfc[2];
+};
+
+static int sdramc_size_detect(struct sdramc *sdramc)
+{
+	struct sdramc_regs *regs = sdramc->regs;
+	struct ddr_capacity ram_size[] = {
+		{0x40,	{208, 256}}, // 256MB
+		{0x40,	{208, 416}}, // 512MB
+		{0x40,	{208, 560}}, // 1GB
+		{0x44,	{472, 880}}, // 2GB
+		{0x48,	{656, 880}}, // 4GB
+		{0x50,	{880, 880}}, // 8GB
+		};
+	uint32_t val;
+	int sz, ddr4;
+	uint32_t pattern = 0xdeadbeef;
+	void *test_addr = (void *)0xc0000000;
+	void *start_addr = (void *)0x80000000;
+
+	/* Assume the mimimum dram size is 1GB, hence test starts from 2GB */
+	for (sz = SDRAM_SIZE_2GB; sz < SDRAM_SIZE_MAX; sz++) {
+		/* change mapping address for mcu0 upper 1G space */
+		sys_write32((sys_read32((uint32_t)SCU_IO_MCU0_CTRL) & ~SCU_MCU0_MAP1_MASK)
+		       | (ram_size[sz].size << SCU_MCU0_MAP1_SHIFT),
+		       (uint32_t)SCU_IO_MCU0_CTRL);
+
+		sys_read32((uint32_t)SCU_IO_MCU0_CTRL);
+
+		/* test if pattern wrapped around */
+		sys_write32(pattern, (uint32_t)test_addr);
+
+		/* prevent RAW hazzard */
+		k_busy_wait(10);
+
+		/* if it is wrapped around, the size should be smaller one */
+		if (sys_read32((uint32_t)start_addr) == pattern)
+			break;
+
+		pattern = pattern >> 4;
+	}
+
+	sz--;
+	sdramc->sz = sz;
+
+	/* re-configure ram size to dramc. */
+	val = sys_read32((uint32_t)&regs->mcfg);
+	val &= ~(0x7 << 2);
+
+	sys_write32(val | (sz << 2), (uint32_t)&regs->mcfg);
+
+	ddr4 = is_ddr4();
+
+	/* update rfc in ac_timing5 register. */
+	val = sys_read32((uint32_t)&regs->actime5);
+	val &= ~(0x3ff);
+	val |= (ram_size[sz].rfc[ddr4] >> 1);
+	sys_write32(val, (uint32_t)&regs->actime5);
+
+	return 0;
+}
+
 int dram_init(struct ast_chip *chip)
 {
 	struct sdramc_ac_timing *ac;
@@ -719,19 +789,6 @@ int dram_init(struct ast_chip *chip)
 
 	if (is_ddr_initialized(sdramc))
 		goto out;
-
-//	mpll_init();
-
-//	LOG_DBG("0x14b80000=0x%x\n", sys_read32(0x14b80000));
-//	LOG_DBG("0x14b80004=0x%x\n", sys_read32(0x14b80004));
-//	LOG_DBG("0x14b80008=0x%x\n", sys_read32(0x14b80008));
-//	LOG_DBG("0x14b8000c=0x%x\n", sys_read32(0x14b8000c));
-//	ast_loader_read(0x14b80000, 0x100000, 0x200);
-//
-//	LOG_DBG("0x14b80000=0x%x\n", sys_read32(0x14b80000));
-//	LOG_DBG("0x14b80004=0x%x\n", sys_read32(0x14b80004));
-//	LOG_DBG("0x14b80008=0x%x\n", sys_read32(0x14b80008));
-//	LOG_DBG("0x14b8000c=0x%x\n", sys_read32(0x14b8000c));
 
 	sdramc_unlock(sdramc);
 
@@ -763,13 +820,12 @@ int dram_init(struct ast_chip *chip)
 		return err;
 	}
 
+	sdramc_size_detect(sdramc);
+
 	LOG_DBG("%s is successfully initialized\n", ac->desc);
 	sdramc_set_flag(DRAMC_INIT_DONE);
 
 out:
-//	sdramc->info.base = 0x80000000;
-//	sdramc->info.size = 0x40000000;
-//	gd->ram_size = sdramc->info.size;
 
 	return 0;
 }

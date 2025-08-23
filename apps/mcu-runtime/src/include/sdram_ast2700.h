@@ -5,7 +5,6 @@
 #ifndef _SDRAM_AST2700_H
 #define _SDRAM_AST2700_H
 
-//#include <clk.h>
 #include <errno.h>
 //#include <ram.h>
 //#include <regmap.h>
@@ -23,6 +22,8 @@
 #include <zephyr/kernel.h>
 #include <platform.h>
 #include <chip.h>
+
+#define MAX_MPU_COUNT                   16
 
 #define SCU_CPU_VGA0_SCRATCH            (SCU0_REG + 0x900)
 #define SCU_CPU_VGA1_SCRATCH            (SCU0_REG + 0x910)
@@ -52,6 +53,10 @@
 #define DRAMC_IRQSTA_OVERSZ_ERR			BIT(2)
 #define DRAMC_IRQSTA_MR_DONE			BIT(1)
 #define DRAMC_IRQSTA_PHY_INIT_DONE		BIT(0)
+
+/* offset 0x10 */
+#define DRAMC_MCFG_ECC_EN			BIT(6)
+#define DRAMC_MCFG_PGM_EN			BIT(5)
 
 /* offset 0x14 */
 #define DRAMC_MCTL_WB_SOFT_RESET		BIT(24)
@@ -222,6 +227,81 @@
 #define BIST_PMODE_CRC				(3)
 #define BIST_BMODE_RW_SWITCH			(3)
 
+/* offset 0x288 */
+#define DRAMC_PORT1_VE_HIGH_SHIFT		(0)
+#define DRAMC_PORT1_VE_LOW_SHIFT		(1)
+#define DRAMC_PORT1_USB2_A1_SHIFT		(2)
+#define DRAMC_PORT1_USB2_A2_SHIFT		(3)
+#define DRAMC_PORT1_E2M_SHIFT			(4)
+#define DRAMC_PORT1_MCTP_SHIFT			(5)
+#define DRAMC_PORT1_H2M_SHIFT			(6)
+#define DRAMC_PORT1_HMAC_SHIFT			(7)
+
+#define QOS_USB2_A1_LEVEL(x)			((x) << (DRAMC_PORT1_USB2_A1_SHIFT * 4))
+#define QOS_USB2_A2_LEVEL(x)			((x) << (DRAMC_PORT1_USB2_A2_SHIFT * 4))
+
+/* offset 0x310 */
+#define DRAMC_PORT2_USB2_B1_SHIFT		(0)
+#define DRAMC_PORT2_USB2_B2_SHIFT		(1)
+#define DRAMC_PORT2_VGA1_CR_SHIFT		(2)
+#define DRAMC_PORT2_VGA1_LE_SHIFT		(3)
+#define DRAMC_PORT2_TSP_INST_SHIFT		(4)
+#define DRAMC_PORT2_VIDEO_SHIFT			(5)
+#define DRAMC_PORT2_MCTP8_SHIFT			(6)
+#define DRAMC_PORT2_UHCI_SHIFT			(7)
+
+#define QOS_USB2_B1_LEVEL(x)			((x) << (DRAMC_PORT2_USB2_B1_SHIFT * 4))
+#define QOS_USB2_B2_LEVEL(x)			((x) << (DRAMC_PORT2_USB2_B2_SHIFT * 4))
+#define QOS_VGA1_CR_LEVEL(x)			((x) << (DRAMC_PORT2_VGA1_CR_SHIFT * 4))
+
+/* offset 0x380 */
+#define DRAMC_PORT_CFG_RDQOS_EN			BIT(2)
+#define DRAMC_PORT_CFG_WRQOS_EN			BIT(3)
+#define DRAMC_PORT_CFG_RDQOS_LVL_MASK		GENMASK(7, 4)
+#define DRAMC_PORT_CFG_RDQOS_LVL_SHIFT		(4)
+
+/* offset 0x388 */
+#define DRAMC_PORT3_USB3_A1_SHIFT		(0)
+#define DRAMC_PORT3_USB3_B1_SHIFT		(1)
+#define DRAMC_PORT3_SHA3_SHIFT			(2)
+#define DRAMC_PORT3_VGA2_CR_SHIFT		(3)
+#define DRAMC_PORT3_VGA2_LE_SHIFT		(4)
+#define DRAMC_PORT3_TSP_SHIFT			(5)
+#define DRAMC_PORT3_E2M1_SHIFT			(6)
+#define DRAMC_PORT3_GFX_SHIFT			(7)
+
+#define QOS_VGA2_CR_LEVEL(x)			((x) << (DRAMC_PORT3_VGA2_CR_SHIFT * 4))
+
+/* offset 0x400 */
+#define DRAMC_PORT4_XDMA_SHIFT			(0)
+#define DRAMC_PORT4_SDIO_SHIFT			(1)
+#define DRAMC_PORT4_SLI_SHIFT			(3)
+
+/* offset 0x600 */
+#define DRAMC_MPU_EN				BIT(0)
+#define DRAMC_MPU_NS_WRITE			BIT(4)
+#define DRAMC_MPU_NS_READ			BIT(5)
+#define DRAMC_MPU_S_WRITE			BIT(6)
+#define DRAMC_MPU_S_READ			BIT(7)
+
+#define QOS_SLI_LEVEL(x)			((x) << (DRAMC_PORT4_SLI_SHIFT * 4))
+
+#define DEFAULT_RDQOS_LEVEL			(8 << DRAMC_PORT_CFG_RDQOS_LVL_SHIFT)
+
+struct mpu_allow {
+	int id;
+	int attr;
+};
+
+struct mpu_info {
+	int id;
+	char name[8];
+	uint32_t start;
+	uint32_t end;
+	struct mpu_allow *allow;
+	int allow_cnt;
+};
+
 struct sdramc {
 //	struct ram_info info;
 	struct sdramc_regs *regs;
@@ -229,26 +309,42 @@ struct sdramc {
 	bool fpga;
 //	void __iomem *phy_setting;
 //	void __iomem *phy_status;
+	unsigned long clock_rate;
+
+	int sz;
+
+	bool ecc_enable;
+	uint32_t ecc_size;
+	bool aes_enable;
+	uint32_t aes_size;
+
+	struct mpu_info mpu[MAX_MPU_COUNT];
+	int mpu_cnt;
 };
 
 struct sdramc_port {
 	uint32_t cfg;
 	uint32_t timeout;
 	uint32_t read_qos;
+	uint32_t resvd0;
 	uint32_t write_qos;
+	uint32_t resvd1[3];
 	uint32_t monitor_config;
 	uint32_t monitor_limit;
 	uint32_t monitor_timer;
+	uint32_t resvd2;
 	uint32_t monitor_status;
 	uint32_t bandwidth_log;
+	uint32_t resvd3[2];
 	uint32_t intf_monitor[3];
+	uint32_t resvd4[13];
 };
 
 struct sdramc_protect {
-	uint32_t control;
-	uint32_t err_status;
-	uint32_t lo_addr;
-	uint32_t hi_addr;
+	uint32_t ctrl;
+	uint32_t status;
+	uint32_t start;
+	uint32_t end;
 	uint32_t wr_master_0;
 	uint32_t wr_master_1;
 	uint32_t rd_master_0;
@@ -257,6 +353,7 @@ struct sdramc_protect {
 	uint32_t wr_secure_1;
 	uint32_t rd_secure_0;
 	uint32_t rd_secure_1;
+	uint32_t resvd[4];
 };
 
 struct sdramc_regs {
@@ -318,8 +415,9 @@ struct sdramc_regs {
 	uint32_t gfmcfg;			/* 0x100 */
 	uint32_t gfm0ctl;
 	uint32_t gfm1ctl;
-	uint32_t reserved3[0xf8];
+	uint32_t reserved3[0x3d];
 	struct sdramc_port port[6];	/* 0x200 */
+	uint32_t reserved4[64];
 	struct sdramc_protect region[16];/* 0x600 */
 };
 
@@ -392,5 +490,6 @@ struct train_bin {
 void fpga_phy_init(struct sdramc *sdramc);
 void dwc_phy_init(struct sdramc *sdramc);
 bool is_ddr4(void);
+//void sdramc_mpu_enable(struct udevice *dev);
 int dram_init(struct ast_chip *chip);
 #endif
