@@ -15,9 +15,8 @@
 #include <zephyr/sys/crc.h>
 #include <ast_loader.h>
 
-//LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
+LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
 
-LOG_MODULE_REGISTER(cptra_manifest, CONFIG_SOC_FMC_LOG_LEVEL);
 struct cptra_manifest_hdr manihdr;
 
 static uint8_t sram_buf[CPTRA_SRAM_BUF_SIZE];
@@ -26,7 +25,7 @@ static struct cptra_image_context cptra_ctx;
 static bool cptra_manifest_sec_en(void)
 {
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-	return !!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_EN_SECBOOT);
+	return true;
 #else
 	return false;
 #endif
@@ -73,10 +72,10 @@ static void cptra_manifest_err_handler(int ret, struct cptra_load_info *loader)
 		wipe_size = wipe_size < loader->limit ? wipe_size : loader->limit;
 		memset((void *)loader->base, 0, wipe_size);
 
-		LOG_ERR("Caliptra load simple image... fail(%d)", ret);
+		LOG_ERR("Caliptra load simple image... fail(0x%x)", ret);
 	}
 
-	__ASSERT(!ret, "Caliptra load simple image fail, ret: %d", ret);
+	__ASSERT(!ret, "Caliptra load simple image fail, ret: 0x%x", ret);
 }
 
 static int cptra_crc32_check(struct cptra_image_context *ctx)
