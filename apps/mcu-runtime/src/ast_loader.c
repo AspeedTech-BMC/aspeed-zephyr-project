@@ -20,25 +20,16 @@ struct ast_loader g_loader;
 
 static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 {
-//	struct fmc_hdr_v2 *hdr = (struct fmc_hdr_v2 *)(_start - sizeof(struct fmc_hdr_v2));
-//	struct image_region region[1];
-//	u8 hash[HDR_DGST_LEN];
-//	int err;
-//
-//	region[0].data = message;
-//	region[0].size = len;
-//
-//	err = hash_calculate("sha384", region, 1, hash);
-//	if (err) {
-//		printf("%s Hash calculate err=%d\n", __func__, err);
-//		return err;
-//	}
-//
-//	printf("0x%x\n", *((uint32_t *)hash));
-//	err = memcmp(hash, hdr->body.pbs[type - 1].dgst, sizeof(hash));
-//
-//	return err;
-return 0;
+	int err = 0;
+
+	struct cptra_manifest_ime ime = {
+		.fw_id = type,
+		.flags = 0x1, // Denote that the image must be verfied
+	};
+
+	err = cptra_verify_image((uint8_t *)message, len, &ime);
+
+	return err;
 }
 
 void *memcpy32(uint32_t *dst, uint32_t *src, uint32_t len)
@@ -114,7 +105,7 @@ int ast_loader_load_image(uint32_t type, uint32_t *dst, bool verify)
 
 		err = loader->verify(type, hash_buf, sz);
 		if (err) {
-			printf("%s: verify failed, err=%d\n", __func__, err);
+			printf("%s: type %d verify failed, err=%d\n", __func__, type, err);
 			return err;
 		}
 	}
