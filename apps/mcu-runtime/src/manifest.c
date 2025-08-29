@@ -276,7 +276,7 @@ static int cptra_simple_manifest_load(struct cptra_image_context *ctx,
 
 	for (ime = &man->imc[0]; ime < man->imc + man->ime_count; ime++) {
 		/* Check the whether ime denote image should be loaded */
-		if (!cptra_ime_loadable_image(ime))
+		if (!cptra_ime_loadable_image(ctx, ime))
 			continue;
 
 		/* Get the ime denoted image and size */

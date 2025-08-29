@@ -166,16 +166,23 @@ char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime)
 	return img ? img->name : "Unknown";
 }
 
-bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime)
+bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
 {
+	uint32_t img_size = 0;
 	struct cptra_load_image *img = NULL;
 
 	if (!ime)
 		return false;
 
 	img = cptra_find_load_image(ime->fw_id);
+	if (!img || img->loadable == CPTRA_UNLOADABLE)
+		return false;
 
-	return img ? img->loadable : false;
+	img_size = cptra_img_info_get_size(ctx, img->identifier);
+	if (img_size == 0)
+		return false;
+
+	return true;
 }
 
 uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime)

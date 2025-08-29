@@ -165,7 +165,7 @@ char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime);
 int cptra_soc_manifest_offset(struct cptra_image_context *ctx);
 int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
 int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
-bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime);
+bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
 uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime);
 int cptra_ime_load_image(void *img_bin, uint32_t img_size, struct cptra_manifest_ime *ime);
 
