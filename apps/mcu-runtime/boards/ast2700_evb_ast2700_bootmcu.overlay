@@ -42,6 +42,12 @@
 			bootph-all;
 		};
 
+		ipc_ssp_share: ipc-ssp-share@b1080000 {
+			reg = <0xb1080000 0x800000>;
+			no-map;
+			bootph-all;
+		};
+
 		vbios_base0: vbios-base0@b1bb0000 {
 			reg = <0xb1bb0000 0x10000>;
 			no-map;

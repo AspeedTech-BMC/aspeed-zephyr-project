@@ -43,8 +43,8 @@ int ssp_init(mem_addr_t load_addr)
 
 	/*
 	 * SSP Memory Map:
-	 * - 0x0000_0000 - 0x0507_FFFF: ssp_remap2 -> DRAM[load_addr]
-	 * - 0x0508_0000 - 0x1FFF_FFFF: ssp_remap1 -> AHB -> DRAM[0]
+	 * - 0x0000_0000 - 0x0587_FFFF: ssp_remap2 -> DRAM[load_addr]
+	 * - 0x0588_0000 - 0x1FFF_FFFF: ssp_remap1 -> AHB -> DRAM[0]
 	 * - 0x2000_0000 - 0x2000_2000: ssp_remap0 -> TCM (Not used)
 	 *
 	 * The SSP serves as the secure loader for TSP, ATF, OP-TEE, and U-Boot.
@@ -58,7 +58,8 @@ int ssp_init(mem_addr_t load_addr)
 	 */
 	sys_write32(0, (mm_reg_t)&scu->ssp_memory_base);
 	reg_val = DT_REG_SIZE(DT_NODELABEL(ssp_memory)) + DT_REG_SIZE(DT_NODELABEL(tsp_memory)) +
-		  DT_REG_SIZE(DT_NODELABEL(atf)) + DT_REG_SIZE(DT_NODELABEL(optee_core));
+		  DT_REG_SIZE(DT_NODELABEL(atf)) + DT_REG_SIZE(DT_NODELABEL(optee_core)) +
+		  DT_REG_SIZE(DT_NODELABEL(ipc_ssp_share));
 	sys_write32(reg_val, (mm_reg_t)&scu->ssp_memory_size);
 
 	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ahb_base);
