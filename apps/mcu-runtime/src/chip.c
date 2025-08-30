@@ -16,12 +16,13 @@
 #include <dp_ast2700.h>
 #include <pci_ast2700.h>
 #include <ast_loader.h>
+#include <wdt.h>
 
 LOG_MODULE_REGISTER(ast_chip, CONFIG_SOC_FMC_LOG_LEVEL);
 
 static struct peripheral peri_tbl[] = {
 	{"POLICY",	NULL, NULL},//sys_policy_init},
-	{"WDT",		NULL, NULL},//wdt_init},
+	{"WDT",		wdt_init, NULL},
 	{"EXTRST",	NULL, NULL},//extrst_mask_init},
 	{"LOADER",	ast_loader_init, NULL},
 	{"SLI1",	sli_init_f, NULL},

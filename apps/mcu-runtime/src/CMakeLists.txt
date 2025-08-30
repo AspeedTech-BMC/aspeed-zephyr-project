@@ -27,6 +27,7 @@ target_sources(app PRIVATE
 	manifest_image.c
 	manifest_image_sig.c
 	ast_loader.c
+	wdt.c
 )
 
 #target_sources_ifdef(CONFIG_SLI_AST2700 app PRIVATE sli_ast2700.c)
