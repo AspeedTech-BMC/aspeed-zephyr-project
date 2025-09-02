@@ -29,7 +29,7 @@ int ssp_init(mem_addr_t load_addr)
 
 	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
 
-	reg_val = sys_read32((mm_reg_t)&scu->ssp_ctrl_1);
+	reg_val = sys_read32((mm_reg_t)&scu->ssp_ctrl_0);
 	if (!(reg_val & SCU0_SSP_TSP_RESET_STS)) {
 		return 0;
 	}
@@ -39,7 +39,7 @@ int ssp_init(mem_addr_t load_addr)
 
 	reg_val = SCU0_SSP_TSP_NIDEN | SCU0_SSP_TSP_DBGEN |
 		  SCU0_SSP_TSP_DBG_ENABLE | SCU0_SSP_TSP_RESET;
-	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_1);
+	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_0);
 
 	/*
 	 * SSP Memory Map:
@@ -69,21 +69,21 @@ int ssp_init(mem_addr_t load_addr)
 	sys_write32(0x0, (mm_reg_t)&scu->ssp_tcm_size);
 
 	/* Configure physical AHB remap: through H2M, mapped to SYS_DRAM_BASE */
-	sys_write32((uint32_t)(SYS_DRAM_BASE >> 4), (mm_reg_t)&scu->ssp_ctrl_2);
+	sys_write32((uint32_t)(SYS_DRAM_BASE >> 4), (mm_reg_t)&scu->ssp_ctrl_1);
 
 	/* Configure physical DRAM remap */
 	phy_addr = ((uint64_t)load_addr - ASPEED_DRAM_BASE) | SYS_DRAM_BASE;
 	reg_val = (uint32_t)(phy_addr >> 4);
-	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_3);
+	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_2);
 
 	/* Enable 1st i-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_4);
+	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_3);
 
 	/* Enable 1st d-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_5);
+	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_4);
 
 	/* Disable i & d cache by default */
-	sys_write32(0x0, (mm_reg_t)&scu->ssp_ctrl_7);
+	sys_write32(0x0, (mm_reg_t)&scu->ssp_ctrl_6);
 
 	return 0;
 }
@@ -93,10 +93,10 @@ int ssp_enable(void)
 	struct ast2700_scu0 *scu;
 
 	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
-	sys_set_bits((mem_addr_t)&scu->ssp_ctrl_1, SCU0_SSP_TSP_ENABLE);
+	sys_set_bits((mem_addr_t)&scu->ssp_ctrl_0, SCU0_SSP_TSP_ENABLE);
 
 	/* HW auto de-asserts SSP reset when WDT timeout reset occurs */
-	sys_clear_bits((mem_addr_t)&scu->ssp_ctrl_1, SCU0_SSP_TSP_ENABLE);
+	sys_clear_bits((mem_addr_t)&scu->ssp_ctrl_0, SCU0_SSP_TSP_ENABLE);
 
 	return 0;
 }
@@ -115,7 +115,7 @@ int tsp_init(mem_addr_t load_addr)
 
 	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
 
-	reg_val = sys_read32((mm_reg_t)&scu->tsp_ctrl_1);
+	reg_val = sys_read32((mm_reg_t)&scu->tsp_ctrl_0);
 	if (!(reg_val & SCU0_SSP_TSP_RESET_STS)) {
 		return 0;
 	}
@@ -125,7 +125,7 @@ int tsp_init(mem_addr_t load_addr)
 
 	reg_val = SCU0_SSP_TSP_NIDEN | SCU0_SSP_TSP_DBGEN |
 		  SCU0_SSP_TSP_DBG_ENABLE | SCU0_SSP_TSP_RESET;
-	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_1);
+	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_0);
 
 	/* TSP 0x0000_0000 - 0x0200_0000 -> DRAM */
 	sys_write32(DT_REG_SIZE(DT_NODELABEL(tsp_memory)), (mm_reg_t)&scu->tsp_remap_size);
@@ -133,16 +133,16 @@ int tsp_init(mem_addr_t load_addr)
 	/* Configure physical DRAM remap */
 	phy_addr = ((uint64_t)load_addr - ASPEED_DRAM_BASE) | SYS_DRAM_BASE;
 	reg_val = (uint32_t)(phy_addr >> 4);
-	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_3);
+	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_1);
 
 	/* Enable 1st i-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_4);
+	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_2);
 
 	/* Enable 1st d-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_5);
+	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_3);
 
 	/* Disable i & d cache by default */
-	sys_write32(0x0, (mm_reg_t)&scu->tsp_ctrl_7);
+	sys_write32(0x0, (mm_reg_t)&scu->tsp_ctrl_5);
 
 	return 0;
 }
@@ -152,10 +152,10 @@ int tsp_enable(void)
 	struct ast2700_scu0 *scu;
 
 	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
-	sys_set_bits((mem_addr_t)&scu->tsp_ctrl_1, SCU0_SSP_TSP_ENABLE);
+	sys_set_bits((mem_addr_t)&scu->tsp_ctrl_0, SCU0_SSP_TSP_ENABLE);
 
 	/* HW auto de-asserts TSP reset when WDT timeout reset occurs */
-	sys_clear_bits((mem_addr_t)&scu->tsp_ctrl_1, SCU0_SSP_TSP_RESET);
+	sys_clear_bits((mem_addr_t)&scu->tsp_ctrl_0, SCU0_SSP_TSP_RESET);
 
 	return 0;
 }

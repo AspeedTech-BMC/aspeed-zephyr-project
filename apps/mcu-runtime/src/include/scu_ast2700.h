@@ -429,13 +429,13 @@ struct ast2700_scu0 {
 	uint32_t random_num_ctrl;	/* 0x0F0 */
 	uint32_t random_num_data;	/* 0x0F4 */
 	uint32_t rsv_0xF8[10];		/* 0x0F8 ~ 0x11C */
-	uint32_t ssp_ctrl_1;		/* 0x120 */
-	uint32_t ssp_ctrl_2;		/* 0x124 */
-	uint32_t ssp_ctrl_3;		/* 0x128 */
-	uint32_t ssp_ctrl_4;		/* 0x12C */
-	uint32_t ssp_ctrl_5;		/* 0x130 */
-	uint32_t ssp_ctrl_6;		/* 0x134 */
-	uint32_t ssp_ctrl_7;		/* 0x138 */
+	uint32_t ssp_ctrl_0;		/* 0x120 */
+	uint32_t ssp_ctrl_1;		/* 0x124 */
+	uint32_t ssp_ctrl_2;		/* 0x128 */
+	uint32_t ssp_ctrl_3;		/* 0x12C */
+	uint32_t ssp_ctrl_4;		/* 0x130 */
+	uint32_t ssp_ctrl_5;		/* 0x134 */
+	uint32_t ssp_ctrl_6;		/* 0x138 */
 	uint32_t rsv_0x13c[1];		/* 0x13C */
 	uint32_t ssp_tcm_base;		/* 0x140 */
 	uint32_t ssp_tcm_size;		/* 0x144 */
@@ -444,13 +444,13 @@ struct ast2700_scu0 {
 	uint32_t ssp_memory_base;	/* 0x150 */
 	uint32_t ssp_memory_size;	/* 0x154 */
 	uint32_t rsv_0x158[2];		/* 0x158 ~ 0x15C */
-	uint32_t tsp_ctrl_1;		/* 0x160 */
+	uint32_t tsp_ctrl_0;		/* 0x160 */
 	uint32_t rsv_0x164[1];		/* 0x164 */
-	uint32_t tsp_ctrl_3;		/* 0x168 */
-	uint32_t tsp_ctrl_4;		/* 0x16C */
-	uint32_t tsp_ctrl_5;		/* 0x170 */
-	uint32_t tsp_ctrl_6;		/* 0x174 */
-	uint32_t tsp_ctrl_7;		/* 0x178 */
+	uint32_t tsp_ctrl_1;		/* 0x168 */
+	uint32_t tsp_ctrl_2;		/* 0x16C */
+	uint32_t tsp_ctrl_3;		/* 0x170 */
+	uint32_t tsp_ctrl_4;		/* 0x174 */
+	uint32_t tsp_ctrl_5;		/* 0x178 */
 	uint32_t rsv_0x17c[6];		/* 0x17C ~ 0x190 */
 	uint32_t tsp_remap_size;	/* 0x194 */
 	uint32_t rsv_0x198[26];		/* 0x198 ~ 0x1FC */
