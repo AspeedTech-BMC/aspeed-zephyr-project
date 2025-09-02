@@ -96,10 +96,8 @@ int ssp_enable(void)
 	struct ast2700_scu0 *scu;
 
 	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
-	sys_set_bits((mem_addr_t)&scu->ssp_ctrl_0, SCU0_SSP_TSP_ENABLE);
-
-	/* HW auto de-asserts SSP reset when WDT timeout reset occurs */
-	sys_clear_bits((mem_addr_t)&scu->ssp_ctrl_0, SCU0_SSP_TSP_ENABLE);
+        sys_set_bits((mem_addr_t)&scu->ssp_ctrl_0,
+                     SCU0_SSP_TSP_ENABLE | SCU0_SSP_TSP_RESET);
 
 	return 0;
 }
@@ -157,10 +155,8 @@ int tsp_enable(void)
 	struct ast2700_scu0 *scu;
 
 	scu = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
-	sys_set_bits((mem_addr_t)&scu->tsp_ctrl_0, SCU0_SSP_TSP_ENABLE);
+        sys_set_bits((mem_addr_t)&scu->tsp_ctrl_0,
+                     SCU0_SSP_TSP_ENABLE | SCU0_SSP_TSP_RESET);
 
-	/* HW auto de-asserts TSP reset when WDT timeout reset occurs */
-	sys_clear_bits((mem_addr_t)&scu->tsp_ctrl_0, SCU0_SSP_TSP_RESET);
-
-	return 0;
+        return 0;
 }
