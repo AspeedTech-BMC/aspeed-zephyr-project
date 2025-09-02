@@ -14,6 +14,7 @@
 LOG_MODULE_REGISTER(ssp_tsp, CONFIG_SOC_FMC_LOG_LEVEL);
 
 #define MAX_I_D_ADDRESS		MB(512)
+#define TCM_SIZE		KB(8)
 
 int ssp_init(mem_addr_t load_addr)
 {
@@ -44,8 +45,8 @@ int ssp_init(mem_addr_t load_addr)
 	/*
 	 * SSP Memory Map:
 	 * - 0x0000_0000 - 0x0587_FFFF: ssp_remap2 -> DRAM[load_addr]
-	 * - 0x0588_0000 - 0x1FFF_FFFF: ssp_remap1 -> AHB -> DRAM[0]
-	 * - 0x2000_0000 - 0x2000_2000: ssp_remap0 -> TCM (Not used)
+	 * - 0x0588_0000 - 0x1FFF_DFFF: ssp_remap1 -> AHB -> DRAM[0]
+	 * - 0x1FFF_E000 - 0x2000_0000: ssp_remap0 -> TCM (SSP stack)
 	 *
 	 * The SSP serves as the secure loader for TSP, ATF, OP-TEE, and U-Boot.
 	 * Therefore, their load buffers must be visible to the SSP.
@@ -54,7 +55,7 @@ int ssp_init(mem_addr_t load_addr)
 	 *   for SSP, TSP, ATF, and OP-TEE. Ensure these buffers are contiguous.
 	 * - SSP remap entry #1 (ssp_ahb_base/size) maps the load buffer
 	 *   for U-Boot at DRAM offset 0x0.
-	 * - SSP remap entry #0 (ssp_tcm_base/size) maps TCM, which is not used.
+	 * - SSP remap entry #0 (ssp_remap0_base/size) maps TCM, which is used for stack.
 	 */
 	sys_write32(0, (mm_reg_t)&scu->ssp_memory_base);
 	reg_val = DT_REG_SIZE(DT_NODELABEL(ssp_memory)) + DT_REG_SIZE(DT_NODELABEL(tsp_memory)) +
@@ -63,10 +64,10 @@ int ssp_init(mem_addr_t load_addr)
 	sys_write32(reg_val, (mm_reg_t)&scu->ssp_memory_size);
 
 	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ahb_base);
-	sys_write32(MAX_I_D_ADDRESS - reg_val, (mm_reg_t)&scu->ssp_ahb_size);
+	sys_write32(MAX_I_D_ADDRESS - reg_val - TCM_SIZE, (mm_reg_t)&scu->ssp_ahb_size);
 
-	sys_write32(MAX_I_D_ADDRESS, (mm_reg_t)&scu->ssp_tcm_base);
-	sys_write32(0x0, (mm_reg_t)&scu->ssp_tcm_size);
+	sys_write32(MAX_I_D_ADDRESS - TCM_SIZE, (mm_reg_t)&scu->ssp_tcm_base);
+	sys_write32(TCM_SIZE, (mm_reg_t)&scu->ssp_tcm_size);
 
 	/* Configure physical AHB remap: through H2M, mapped to SYS_DRAM_BASE */
 	sys_write32((uint32_t)(SYS_DRAM_BASE >> 4), (mm_reg_t)&scu->ssp_ctrl_1);
