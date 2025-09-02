@@ -57,6 +57,7 @@
 #define SCU0_HPLL2_LOCK				BIT(31)
 #define SCU0_HPLL2_BWADJ			GENMASK(11, 0)
 
+/* SSP control register 0 */
 #define SCU0_SSP_TSP_RESET_STS			BIT(8)
 #define SCU0_SSP_TSP_SRAM_SD			BIT(7)
 #define SCU0_SSP_TSP_SRAM_DSLP			BIT(6)
@@ -66,6 +67,10 @@
 #define SCU0_SSP_TSP_DBG_ENABLE			BIT(2)
 #define SCU0_SSP_TSP_RESET			BIT(1)
 #define SCU0_SSP_TSP_ENABLE			BIT(0)
+
+/* SSP control register 6 */
+#define SCU0_SSP_TSP_CTRL_ICACHE_EN		BIT(1)
+#define SCU0_SSP_TSP_CTRL_DCACHE_EN		BIT(0)
 
 /* SoC1 SCU Register */
 #define SCU1_HWSTRAP_UFS			BIT(23)

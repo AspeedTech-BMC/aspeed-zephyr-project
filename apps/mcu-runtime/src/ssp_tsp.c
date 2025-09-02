@@ -77,14 +77,16 @@ int ssp_init(mem_addr_t load_addr)
 	reg_val = (uint32_t)(phy_addr >> 4);
 	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_2);
 
-	/* Enable 1st i-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_3);
+        /*
+         * For A1, the Cache region can only be enabled entirely;
+         * partial enabling is not supported.
+         */
+        sys_write32(GENMASK(31, 0), (mm_reg_t)&scu->ssp_ctrl_3);
+        sys_write32(GENMASK(31, 0), (mm_reg_t)&scu->ssp_ctrl_4);
 
-	/* Enable 1st d-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->ssp_ctrl_4);
-
-	/* Disable i & d cache by default */
-	sys_write32(0x0, (mm_reg_t)&scu->ssp_ctrl_6);
+        /* Disable i & d cache by default */
+        sys_write32(SCU0_SSP_TSP_CTRL_ICACHE_EN | SCU0_SSP_TSP_CTRL_DCACHE_EN,
+                    (mm_reg_t)&scu->ssp_ctrl_6);
 
 	return 0;
 }
@@ -136,16 +138,18 @@ int tsp_init(mem_addr_t load_addr)
 	reg_val = (uint32_t)(phy_addr >> 4);
 	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_1);
 
-	/* Enable 1st i-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_2);
+        /*
+         * For A1, the Cache region can only be enabled entirely;
+         * partial enabling is not supported.
+         */
+        sys_write32(GENMASK(31, 0), (mm_reg_t)&scu->tsp_ctrl_2);
+        sys_write32(GENMASK(31, 0), (mm_reg_t)&scu->tsp_ctrl_3);
 
-	/* Enable 1st d-cache area */
-	sys_write32(BIT(0), (mm_reg_t)&scu->tsp_ctrl_3);
+        /* Disable i & d cache by default */
+        sys_write32(SCU0_SSP_TSP_CTRL_ICACHE_EN | SCU0_SSP_TSP_CTRL_DCACHE_EN,
+                    (mm_reg_t)&scu->tsp_ctrl_5);
 
-	/* Disable i & d cache by default */
-	sys_write32(0x0, (mm_reg_t)&scu->tsp_ctrl_5);
-
-	return 0;
+        return 0;
 }
 
 int tsp_enable(void)
