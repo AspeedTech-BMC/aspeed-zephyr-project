@@ -15,6 +15,8 @@
 #include <platform.h>
 #include <chip.h>
 
+#include "aspeed_zephyr_project_version.h"
+
 LOG_MODULE_REGISTER(ast_soc_fmc, CONFIG_SOC_FMC_LOG_LEVEL);
 
 int main(void)
@@ -23,7 +25,7 @@ int main(void)
 	struct ast_board *board = NULL;
 	int err;
 
-	printf("Aspeed SoC FMC %s\n", CONFIG_BOARD_TARGET);
+	printf("Aspeed SoC FMC %s %s (%s %s)\n", CONFIG_BOARD_TARGET, ASPEED_ZEPHYR_PROJECT_VERSION, __DATE__, __TIME__);
 
 	chip = ast_create_chip();
 
