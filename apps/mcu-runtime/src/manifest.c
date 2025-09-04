@@ -25,7 +25,7 @@ static struct cptra_image_context cptra_ctx;
 static bool cptra_manifest_sec_en(void)
 {
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-	return true;
+	return !!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_EN_SECBOOT);
 #else
 	return false;
 #endif
