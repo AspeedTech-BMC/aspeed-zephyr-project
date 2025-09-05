@@ -84,35 +84,44 @@ int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 	return err;
 }
 
-int ast_loader_load_image(uint32_t type, uint32_t *dst, bool verify)
+static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, bool verify)
 {
 	struct ast_loader *loader = &g_loader;
-	uint32_t *hash_buf = (uint32_t *)AST_HASH_BUFFER;
 	uint32_t sz = 0;
 	int err = 0;
 
 	if (loader->load) {
-		err = loader->load(loader, type, hash_buf, &sz);
+		err = loader->load(loader, type, buf, &sz);
 		if (err)
 			return err;
 	}
 
 	if (loader->verify && verify) {
-		if (!hash_buf || sz == 0) {
+		if (!buf || sz == 0) {
 			LOG_ERR("Hash buffer is NULL or size is zero.\n");
 			return -1;
 		}
 
-		err = loader->verify(type, hash_buf, sz);
+		err = loader->verify(type, buf, sz);
 		if (err) {
 			printf("%s: type %d verify failed, err=%d\n", __func__, type, err);
 			return err;
 		}
 	}
 
-	memcpy32(dst, hash_buf, sz);
+	memcpy32(dst, buf, sz);
 
 	return err;
+}
+
+int ast_loader_load_image(uint32_t type, uint32_t *dst, bool verify)
+{
+	return _ast_loader_load_image(type, dst, (uint32_t *)AST_HASH_BUFFER, 1);
+}
+
+int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify)
+{
+	return _ast_loader_load_image(type, dst, (uint32_t *)CONFIG_SYS_LOAD_ADDR, 1);
 }
 
 static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
@@ -131,7 +140,9 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 		return err;
 
 	loader->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
+#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
 	loader->verify = ast_loader_verify;
+#endif
 
 	return err;
 }

@@ -37,6 +37,11 @@ static struct image_info img_info[] = {
 	{CPTRA_DDR5_DMEM_FW_ID, 0, 0},
 	{CPTRA_DP_FW_FW_ID, 0, 0},
 	{CPTRA_UEFI_FW_ID, 0, 0},
+	{CPTRA_ATF_FW_ID, 0, 0},
+	{CPTRA_OPTEE_FW_ID, 0, 0},
+	{CPTRA_UBOOT_FW_ID, 0, 0},
+	{CPTRA_SSP_FW_ID, 0, 0},
+	{CPTRA_TSP_FW_ID, 0, 0},
 };
 
 static int stor_get_image_info(struct image_info *info)
@@ -50,7 +55,7 @@ static int stor_get_image_info(struct image_info *info)
 		return -1;
 	}
 
-	for (int i = 2; i < CPTRA_UEFI_FW_ID + 1; i++) {
+	for (int i = 2; i < CPTRA_TSP_FW_ID + 1; i++) {
 		/* Call cptra's service to get the image info */
 		err = cptra_hdr_get_prebuilt(info[i].id, &offset, &sz);
 		if (err) {

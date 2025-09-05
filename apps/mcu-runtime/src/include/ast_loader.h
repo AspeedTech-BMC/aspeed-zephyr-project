@@ -52,6 +52,7 @@ struct stor_ops {
 /* external use */
 int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len);
 int ast_loader_load_image(uint32_t type, uint32_t *dst, bool verify);
+int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify);
 void *memcpy32(uint32_t *dst, uint32_t *src, uint32_t len);
 
 /* internal use */
