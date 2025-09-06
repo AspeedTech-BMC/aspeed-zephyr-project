@@ -1,6 +1,9 @@
 #ifndef _AST_CHIP_H
 #define _AST_CHIP_H
 
+#define SCU_CPU_REVISION_ID_HW                  GENMASK(23, 16)
+#define SCU_CPU_REVISION_ID_EFUSE               GENMASK(15, 8)
+
 enum boot_mode_type {
 	BOOT_DEVICE_RAM = 0,
 	BOOT_DEVICE_MMC1,
@@ -43,6 +46,10 @@ struct ast_chip {
 	struct ast_board *board;
 
 	int (*new)(void *priv);
+
+	uint32_t efuse;
+	uint32_t pcie0_enable;
+	uint32_t pcie1_enable;
 };
 
 struct ast_chip *ast_create_chip(void);

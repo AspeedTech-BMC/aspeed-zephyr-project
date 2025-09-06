@@ -684,40 +684,97 @@ static void sdramc_aes_enable(struct sdramc *sdramc, uint32_t addr_min, uint32_t
 	sys_write32(1, (uint32_t)&regs->enccfg);
 }
 
+static int sdramc_get_vga_mem_size(struct sdramc *sdramc)
+{
+	struct ast_chip *chip = sdramc->chip;
+	struct sdramc_regs *regs = sdramc->regs;
+	uint8_t node0 = chip->pcie0_enable;
+	uint8_t node1 = chip->pcie1_enable;
+	uint32_t efuse;
+	uint32_t vga_ram_size[] = {
+	        0x2000000, // 32MB
+		0x4000000, // 64MB
+	};
+	int vga_sz_sel;
+	int vga_cnt;
+
+	efuse = chip->efuse;
+	vga_sz_sel = sys_read32((uint32_t)&regs->gfmcfg) & 0x1;
+
+	/*
+	 * Decide feature by efuse
+	 *  0: 2750 has full function
+	 *  1: 2700 has only 1 VGA
+	 *  2: 2720 has no VGA
+	 */
+	switch (efuse) {
+
+	case 0:
+		vga_cnt = node0 + node1;
+		break;
+	case 1:
+		vga_cnt = node0;
+	case 2:
+		vga_cnt =  0;
+	default:
+		printf("Unknown efuse setting %x\n", efuse);
+		return -1;
+	};
+
+	return vga_ram_size[vga_sz_sel] * vga_cnt;
+}
+
 /* offset 0x10 */
 #define DRAMC_MCFG_ECC_EN			BIT(6)
 #define DRAMC_MCFG_PGM_EN			BIT(5)
 #define DRAM_SIZE_DEF	3
 static int sdramc_ecc_enable(struct sdramc *sdramc)
 {
-	size_t ram_size_ary[] = {
-		0x10000000, // 256MB
-		0x20000000, // 512MB
-		0x40000000, // 1GB
-		0x80000000, // 2GB
+	uint32_t ram_size_ary[] = {
+		0x1000000, // 256MB
+		0x2000000, // 512MB
+		0x4000000, // 1GB
+		0x8000000, // 2GB
+		0x10000000, // 4GB
+		0x20000000, // 8GB
 		};
-	size_t ecc_sz, ram_size = ram_size_ary[DRAM_SIZE_DEF];
+	uint32_t ecc_sz, ram_size;
 	struct sdramc_regs *regs = sdramc->regs;
 	uint32_t bistcfg;
 	uint32_t val;
 	int err;
 
+	if (!sdramc->ecc_enable) {
+		LOG_DBG("ECC is not enabled\n");
+		return 0;
+	}
+
+	/* declare a size arrary that already shifted by 4 */
+	ram_size = ram_size_ary[sdramc->sz];
+
+	/* Clean up all the dram for ECC redundant */
 	bistcfg = 0x82;
 	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 0x200000);
 	if (err) {
-		printf("bist is failed\n");
+		printf("ecc bist failed\n");
 		return err;
 	}
 
-	/* config ecc range */
-	//ecc_sz = (((ram_size / 9) * 8) >> 4);
-	ecc_sz = ((0x30000000) >> 4);
+	/*
+	 * When ecc enabled without given a size, it will use the full dram size.
+	 * The rule of ecc range is (dram size - vga memory size) * 8 / 9.
+	 */
+	if (sdramc->ecc_size == 0)
+		ecc_sz = (ram_size - (sdramc_get_vga_mem_size(sdramc) >> 4)) * 8 / 9;
+	else
+		ecc_sz = sdramc->ecc_size >> 4;
+
 	sys_write32(ecc_sz, (uint32_t)&regs->ecc_addr_range);
 
 	/* enable ecc, page matching should be disabled */
 	val = sys_read32((uint32_t)&regs->mcfg);
-	val &= ~(DRAMC_MCFG_PGM_EN | 0x1c);
-	val |= (DRAMC_MCFG_ECC_EN | (DRAM_SIZE_DEF << 2));
+	val &= ~(DRAMC_MCFG_PGM_EN);
+	val |= (DRAMC_MCFG_ECC_EN);
 	sys_write32(val, (uint32_t)&regs->mcfg);
 
 	return err;
@@ -984,6 +1041,14 @@ static void sdramc_get_property(struct sdramc *sdramc)
 
 	DT_FOREACH_PROP_ELEM(SDRAMMC_NODE, mpus, MPU_PHANDLE_BY_IDX);
 #endif
+#if DT_NODE_HAS_PROP(SDRAMMC_NODE, ecc_enable)
+	sdramc->ecc_enable = DT_PROP(SDRAMMC_NODE, ecc_enable);
+#if DT_NODE_HAS_PROP(SDRAMC_NODE, ecc_size)
+	sdramc->ecc_size = DT_PROP(SDRAMC_NODE, ecc_size);
+#else
+	sdramc->ecc_size = 0;
+#endif
+#endif
 }
 
 int dram_init(struct ast_chip *chip)
@@ -992,6 +1057,7 @@ int dram_init(struct ast_chip *chip)
 	uint32_t bistcfg;
 	int err = 0;
 
+	sdramc->chip = chip;
 	sdramc->regs = (struct sdramc_regs *)DRAMC_BASE;
 	sdramc->phy_regs = (uint32_t *)DRAMC_PHY_BASE;
 
@@ -1014,9 +1080,6 @@ int dram_init(struct ast_chip *chip)
 
 	sdramc_get_property(sdramc);
 
-	if (IS_ENABLED(CONFIG_ASPEED_DRAM_ECC))
-		sdramc_ecc_enable(sdramc);
-
 	if (IS_ENABLED(CONFIG_ASPEED_DRAM_AES))
 		sdramc_aes_enable(sdramc, 0, 0x30000000);
 
@@ -1031,6 +1094,9 @@ int dram_init(struct ast_chip *chip)
 	}
 
 	sdramc_size_detect(sdramc);
+
+	sdramc_ecc_enable(sdramc);
+
 	sdramc_init_mpu(sdramc);
 	sdramc_mpu_enable(sdramc);
 

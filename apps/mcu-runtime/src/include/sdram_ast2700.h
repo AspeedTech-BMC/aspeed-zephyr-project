@@ -294,6 +294,7 @@ struct mpu_info {
 };
 
 struct sdramc {
+	struct ast_chip *chip;
 //	struct ram_info info;
 	struct sdramc_regs *regs;
 	uint32_t *phy_regs;
