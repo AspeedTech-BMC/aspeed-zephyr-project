@@ -6,15 +6,6 @@
 #define _SDRAM_AST2700_H
 
 #include <errno.h>
-//#include <ram.h>
-//#include <regmap.h>
-//#include <reset.h>
-//#include <asm/io.h>
-//#include <asm/global_data.h>
-//#include <linux/err.h>
-//#include <linux/kernel.h>
-//#include <linux/bitfield.h>
-//#include <time.h>
 #include <zephyr/types.h>
 #include <zephyr/sys/sys_io.h>
 #include <zephyr/sys/util.h>
@@ -295,7 +286,7 @@ struct mpu_allow {
 
 struct mpu_info {
 	int id;
-	char name[8];
+	const char *name;
 	uint32_t start;
 	uint32_t end;
 	struct mpu_allow *allow;

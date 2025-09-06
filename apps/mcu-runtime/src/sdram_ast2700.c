@@ -3,11 +3,20 @@
  * Copyright (C) ASPEED Technology Inc.
  */
 
+#include <stdlib.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/init.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/dt-bindings/memory-controller/ast27xx-mpu.h>
 #include <sdram_ast2700.h>
 
 #define LOG_MODULE_NAME	sdram_ast2700
-LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_SOC_FMC_LOG_LEVEL);
+
+#define SDRAMMC_NODE DT_NODELABEL(sdrammc)
 
 #define DRAMC_UNLOCK_KEY		0x1688a8a8
 #define DRAMC_VIDEO_UNLOCK_KEY		0x00440003
@@ -778,6 +787,205 @@ static int sdramc_size_detect(struct sdramc *sdramc)
 	return 0;
 }
 
+struct mpu_attr {
+        uint32_t attr;
+        const char *str;
+};
+
+struct mpu_id {
+        int id;
+        const char *str;
+        uint8_t ofst;
+        uint32_t mask;
+};
+
+static int sdramc_init_mpu(struct sdramc *sdramc)
+{
+	struct sdramc_regs *regs = sdramc->regs;
+	uint32_t val;
+	int id, attr;
+	int i;
+	char *name;
+	struct mpu_attr attr_info[] = {
+		{S_READWRITE, "_rw"},
+		{S_READONLY, "_ro"},
+		{S_WRITEONLY, "_wo"},
+		{NS_READWRITE, "_nrw"},
+		{NS_READONLY, "_nro"},
+		{NS_WRITEONLY, "_nwo"},
+	};
+
+	struct mpu_id id_info[] = {
+		{MPU_ID_CA35,   "ca35", 0x00, BIT(4)},
+		{MPU_ID_VE_HI,  "ve_hi", 0x10, BIT(0)},
+		{MPU_ID_VE_LO,  "ve_lo", 0x10, BIT(1)},
+		{MPU_ID_USB_A1, "usb_a1", 0x10, BIT(2)},
+		{MPU_ID_USB_A2, "usb_a2", 0x10, BIT(3)},
+		{MPU_ID_E2M,    "e2m", 0x10, BIT(4)},
+		{MPU_ID_MCTP,   "mctp", 0x10, BIT(5)},
+		{MPU_ID_H2M,    "h2m", 0x10, BIT(6)},
+		{MPU_ID_HMAC,   "hmac", 0x10, BIT(7)},
+		{MPU_ID_USB_B1, "usb_b1", 0x10, BIT(16)},
+		{MPU_ID_USB_B2, "usb_b2", 0x10, BIT(17)},
+		{MPU_ID_VGA1_CR, "vga1_cr", 0x10, BIT(18)},
+		{MPU_ID_VGA1_LE, "vga1_le", 0x10, BIT(19)},
+		{MPU_ID_TSP_INST, "tsp_i", 0x10, BIT(20)},
+		{MPU_ID_VE,     "ve", 0x10, BIT(21)},
+		{MPU_ID_MCTP8,  "mctp8", 0x10, BIT(22)},
+		{MPU_ID_UHCI,   "uhci", 0x10, BIT(23)},
+		{MPU_ID_USB3_A1, "usb3_a1", 0x14, BIT(0)},
+		{MPU_ID_USB3_A2, "usb3_a2", 0x14, BIT(1)},
+		{MPU_ID_SHA3,   "sha3", 0x14, BIT(2)},
+		{MPU_ID_VGA2_CR, "vga2_cr", 0x14, BIT(3)},
+		{MPU_ID_VGA2_LE, "vga2_le", 0x14, BIT(4)},
+		{MPU_ID_TSP_DATA, "tsp_d", 0x14, BIT(5)},
+		{MPU_ID_E2M1,   "e2m1", 0x14, BIT(6)},
+		{MPU_ID_GFX,    "gfx", 0x14, BIT(7)},
+		{MPU_ID_RVAS1,  "rvas1", 0x14, BIT(8)},
+		{MPU_ID_RVAS2,  "rvas2", 0x14, BIT(9)},
+		{MPU_ID_MHMAC,  "mhmac", 0x14, BIT(10)},
+		{MPU_ID_M2D,    "m2d", 0x14, BIT(11)},
+		{MPU_ID_M2D2,   "m2d2", 0x14, BIT(12)},
+		{MPU_ID_SSP_INST, "ssp_i", 0x14, BIT(13)},
+		{MPU_ID_SSP_DATA, "ssp_d", 0x14, BIT(14)},
+		{MPU_ID_XDMA8,  "xdma8", 0x14, BIT(15)},
+		{MPU_ID_XDMA,   "xdma", 0x14, BIT(16)},
+		{MPU_ID_SDIO,   "sdio", 0x14, BIT(17)},
+		{MPU_ID_SLIM,   "slim", 0x14, BIT(19)},
+		{MPU_ID_USBH_A, "usbh_a", 0x14, BIT(24)},
+		{MPU_ID_USBH_B, "usbh_b", 0x14, BIT(25)},
+		{MPU_ID_UFS,    "ufs", 0x14, BIT(26)},
+	};
+
+	for (i = 0; i < sdramc->mpu_cnt; i++) {
+		/* define mpu range */
+		sys_write32(sdramc->mpu[i].start >> 4, (uint32_t)&regs->region[i].start);
+		sys_write32((sdramc->mpu[i].end - 1) >> 4, (uint32_t)&regs->region[i].end);
+
+		/* protect from all master by default */
+		sys_write32(0x00000030, (uint32_t)&regs->region[i].ctrl);
+		sys_write32(0xffffffff, (uint32_t)&regs->region[i].wr_master_0);
+		sys_write32(0xffffffff, (uint32_t)&regs->region[i].wr_master_1);
+		sys_write32(0xffffffff, (uint32_t)&regs->region[i].rd_master_0);
+		sys_write32(0xffffffff, (uint32_t)&regs->region[i].rd_master_1);
+		sys_write32(0x00000000, (uint32_t)&regs->region[i].wr_secure_0);
+		sys_write32(0x00000000, (uint32_t)&regs->region[i].wr_secure_1);
+		sys_write32(0x00000000, (uint32_t)&regs->region[i].rd_secure_0);
+		sys_write32(0x00000000, (uint32_t)&regs->region[i].rd_secure_1);
+
+		name = malloc(128);
+		if (!name)
+			return -ENOMEM;
+
+                memset(name, 0, 128);
+
+                /* define mpu policy */
+                for (int j = 0; j < sdramc->mpu[i].allow_cnt; j++) {
+                        id = sdramc->mpu[i].allow[j].id;
+                        attr = sdramc->mpu[i].allow[j].attr;
+
+                        switch (attr) {
+                        case S_READWRITE:
+                                if (id == MPU_ID_CA35) {
+                                        sys_write32(0xf0, (uint32_t)&regs->region[i].ctrl);
+                                        break;
+                                }
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst);
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x8);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x8);
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x10);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x10);
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x18);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x18);
+                                break;
+                        case S_READONLY:
+                                if (id == MPU_ID_CA35) {
+                                        sys_write32(0xb0, (uint32_t)&regs->region[i].ctrl);
+                                        break;
+                                }
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x8);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x8);
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x18);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x18);
+                                break;
+                        case S_WRITEONLY:
+                                if (id == MPU_ID_CA35) {
+                                        sys_write32(0x70, (uint32_t)&regs->region[i].ctrl);
+                                        break;
+                                }
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst);
+                                val = sys_read32((uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x10);
+                                sys_write32(val & ~id_info[id].mask, (uint32_t)&regs->region[i].ctrl + id_info[id].ofst + 0x10);
+                                break;
+                        case NS_READWRITE:
+                                if (id == MPU_ID_CA35) {
+                                        sys_write32(0x00, (uint32_t)&regs->region[i].ctrl);
+                                        break;
+                                }
+                                break;
+                        case NS_READONLY:
+                                break;
+                        case NS_WRITEONLY:
+                                break;
+                        default:
+                                break;
+                        };
+
+                        strcat(name, id_info[id].str);
+                        strcat(name, attr_info[attr].str);
+                        strcat(name, ",");
+                }
+
+                printf("[mpu-%d:%s:	0x%08x~0x%08x] %s\n", i, sdramc->mpu[i].name, sdramc->mpu[i].start, sdramc->mpu[i].end, name);
+                free(name);
+        }
+
+        return 0;
+}
+
+void sdramc_mpu_enable(struct sdramc *sdramc)
+{
+        struct sdramc_regs *regs = sdramc->regs;
+        int i;
+
+        for (i = 0; i < sdramc->mpu_cnt; i++) {
+		sys_set_bits((mm_reg_t)&regs->region[i].ctrl, DRAMC_MPU_EN);
+                sys_write32(1 << i, (mm_reg_t)&regs->protect_lock_set);
+        }
+}
+
+#define MPU_PHANDLE_BY_IDX(node_id, prop, idx) \
+	do { \
+		const uint32_t start = DT_PROP(DT_PHANDLE_BY_IDX(node_id, prop, idx), protect_start); \
+		const uint32_t end = DT_PROP(DT_PHANDLE_BY_IDX(node_id, prop, idx), protect_end); \
+		const char *name = DT_NODE_FULL_NAME(DT_PHANDLE_BY_IDX(node_id, prop, idx)); \
+		const uint32_t attr[] = DT_PROP(DT_PHANDLE_BY_IDX(node_id, prop, idx), allow); \
+		LOG_DBG("MPU-%d @ %s\n", (idx), DT_NODE_FULL_NAME(DT_PHANDLE_BY_IDX(node_id, prop, idx))); \
+		sdramc->mpu[idx].start = start; \
+		sdramc->mpu[idx].end = end; \
+		sdramc->mpu[idx].name = name; \
+		sdramc->mpu[idx].allow = malloc(sizeof(attr)); \
+		for (int i = 0; i < DT_PROP_LEN(DT_PHANDLE_BY_IDX(node_id, prop, idx), allow); i += 2) { \
+			const uint32_t id = attr[i]; \
+			const uint32_t perm = attr[i + 1]; \
+			sdramc->mpu[idx].allow[i / 2].id = id; \
+			sdramc->mpu[idx].allow[i / 2].attr = perm; \
+		} \
+		sdramc->mpu[idx].allow_cnt = DT_PROP_LEN(DT_PHANDLE_BY_IDX(node_id, prop, idx), allow) / 2; \
+		LOG_DBG("finalize region %s: [0x%08x, 0x%08x)", name, start, end); \
+	} while (0);
+
+static void sdramc_get_property(struct sdramc *sdramc)
+{
+#if DT_NODE_HAS_PROP(SDRAMMC_NODE, mpus)
+	sdramc->mpu_cnt = DT_PROP_LEN(SDRAMMC_NODE, mpus);
+
+	DT_FOREACH_PROP_ELEM(SDRAMMC_NODE, mpus, MPU_PHANDLE_BY_IDX);
+#endif
+}
+
 int dram_init(struct ast_chip *chip)
 {
 	struct sdramc_ac_timing *ac;
@@ -804,6 +1012,8 @@ int dram_init(struct ast_chip *chip)
 
 	sdramc_enable_refresh(sdramc);
 
+	sdramc_get_property(sdramc);
+
 	if (IS_ENABLED(CONFIG_ASPEED_DRAM_ECC))
 		sdramc_ecc_enable(sdramc);
 
@@ -821,6 +1031,8 @@ int dram_init(struct ast_chip *chip)
 	}
 
 	sdramc_size_detect(sdramc);
+	sdramc_init_mpu(sdramc);
+	sdramc_mpu_enable(sdramc);
 
 	LOG_DBG("%s is successfully initialized\n", ac->desc);
 	sdramc_set_flag(DRAMC_INIT_DONE);
