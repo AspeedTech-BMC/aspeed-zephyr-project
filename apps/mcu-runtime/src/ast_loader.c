@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(ast_loader, CONFIG_SOC_FMC_LOG_LEVEL);
 #define AST_HASH_BUFFER            0x14baf800
 struct ast_loader g_loader;
 
+#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
 static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 {
 	int err = 0;
@@ -31,6 +32,7 @@ static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 
 	return err;
 }
+#endif
 
 void *memcpy32(uint32_t *dst, uint32_t *src, uint32_t len)
 {
