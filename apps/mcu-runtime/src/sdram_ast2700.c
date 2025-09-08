@@ -652,7 +652,7 @@ static int sdramc_bist(struct sdramc *sdramc, uint32_t addr, uint32_t size, uint
 	sys_write32(0, (uint32_t)&regs->bistcfg);
 	sys_write32(cfg, (uint32_t)&regs->bistcfg);
 	sys_write32(addr >> 4, (uint32_t)&regs->bist_addr);
-	sys_write32(size >> 4, (uint32_t)&regs->bist_size);
+	sys_write32(size, (uint32_t)&regs->bist_size);
 	sys_write32(0x89abcdef, (uint32_t)&regs->bist_patt);
 	sys_write32(cfg | DRAMC_BISTCFG_START, (uint32_t)&regs->bistcfg);
 
@@ -1045,8 +1045,8 @@ static void sdramc_get_property(struct sdramc *sdramc)
 #endif
 #if DT_NODE_HAS_PROP(SDRAMMC_NODE, ecc_enable)
 	sdramc->ecc_enable = DT_PROP(SDRAMMC_NODE, ecc_enable);
-#if DT_NODE_HAS_PROP(SDRAMC_NODE, ecc_size)
-	sdramc->ecc_size = DT_PROP(SDRAMC_NODE, ecc_size);
+#if DT_NODE_HAS_PROP(SDRAMMC_NODE, ecc_size)
+	sdramc->ecc_size = DT_PROP(SDRAMMC_NODE, ecc_size);
 #else
 	sdramc->ecc_size = 0;
 #endif
