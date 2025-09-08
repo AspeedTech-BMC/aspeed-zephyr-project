@@ -856,6 +856,13 @@ static int wait_for_transfer_complete(struct ufs_hba *hba, uint32_t slot)
 		;
 	ufshcd_writel(hba, (1 << slot), REG_UTP_TRANSFER_REQ_LIST_COMPL);
 
+	while (!(ufshcd_readl(hba, REG_INTERRUPT_STATUS) & UTP_TRANSFER_REQ_COMPL))
+		;
+
+	ufshcd_writel(hba, UTP_TRANSFER_REQ_COMPL, REG_INTERRUPT_STATUS);
+
+	k_busy_wait(10);
+
 	ocs = ufshcd_get_tr_ocs(utrdlp);
 	switch (ocs) {
 	case OCS_SUCCESS:
@@ -1236,53 +1243,76 @@ static int ufs_connection_test(int lun)
 
 static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len)
 {
-	int err = 0;
-	uint32_t from = src;
-	uint32_t lba, remain, extra, offset, trans;
-	uint8_t tmp[UFS_SECTOR_LENGTH] = {0};
-	uint8_t *out = (uint8_t *)dst;
+	uint32_t *base;
+	int ret;
+	uint32_t blks;
+	uint32_t offset, lba, trans, extra;
+	uint8_t blk_buf[UFS_SECTOR_LENGTH], *out = (uint8_t *)dst, *in = (uint8_t *)src;
 
-	lba = from / UFS_SECTOR_LENGTH;
-	offset = from % UFS_SECTOR_LENGTH;
-	trans = ((len < UFS_SECTOR_LENGTH) ? len : (UFS_SECTOR_LENGTH - offset));
+	lba = (uint32_t)src / UFS_SECTOR_LENGTH;
+	offset = (uint32_t)src % UFS_SECTOR_LENGTH;
 
-	/* un-align address */
+	/* Handle the case where the source address is not aligned to block size */
 	if (offset) {
-		err = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)tmp, SYNC);
-		if (err)
-			return err;
+		if (len < (UFS_SECTOR_LENGTH - offset))
+			trans = len;
+		else
+			trans = UFS_SECTOR_LENGTH - offset;
 
-		memcpy(out, tmp + offset, trans);
+		/* Read the first block to get the offset */
+		ret = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)blk_buf, SYNC);
+		if (ret) {
+			printf("blk read is incomplete!!!\n");
+			return -1;
+		}
+
+		base = (uint32_t *)(blk_buf + offset);
+		memcpy(dst, base, trans);
 
 		out += trans;
-		from += trans;
+		in  += trans;
 		len -= trans;
-		lba++;
 	}
 
-	remain = len & 0xfffff000;
-	extra = len & 0xfff;
+	/* Read the rest of the blocks */
+	while (len)  {
+		blks = len / UFS_SECTOR_LENGTH;
+		extra = len % UFS_SECTOR_LENGTH;
 
-	if (remain) {
-		/* remain data for sector alignment */
-		err = ufs_scsi_read10(lba, remain, (uintptr_t *)out, SYNC);
-		if (err)
-			return err;
+		lba = (uint32_t)in / UFS_SECTOR_LENGTH;
+		offset = (uint32_t)in % UFS_SECTOR_LENGTH;
 
-		lba += (remain / UFS_SECTOR_LENGTH);
-		out += remain;
+		if (len == extra) {
+			/* Read out the last block */
+			ret = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)blk_buf, SYNC);
+			if (ret) {
+				printf("blk read is incomplete!!!\n");
+				return -1;
+			}
+
+			memcpy(out, blk_buf + offset, extra);
+
+			out += extra;
+			in += extra;
+			len -= extra;
+		} else {
+			if (blks > 0x20)
+				blks = 0x20;
+
+			/* Read out the whole block */
+			ret = ufs_scsi_read10(lba, blks * UFS_SECTOR_LENGTH, (uintptr_t *)out, SYNC);
+			if (ret) {
+				printf("blk read is incomplete!!!\n");
+				return -1;
+			}
+
+			out += (UFS_SECTOR_LENGTH * blks);
+			in += (UFS_SECTOR_LENGTH * blks);
+			len -= (UFS_SECTOR_LENGTH * blks);
+		}
 	}
 
-	if (extra) {
-		/* extra data for sector un-alignment */
-		err = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)tmp, SYNC);
-		if (err)
-			return err;
-
-		memcpy(out, tmp, extra);
-	}
-
-	return err;
+	return 0;
 }
 
 static int ufs_init(struct device *dev)
@@ -1304,7 +1334,7 @@ int ufs_register(struct ast_loader *loader)
 {
 	struct device *dev;
 
-	dev = (struct device *)device_get_binding("ufs@xxxxxxxx");
+	dev = (struct device *)device_get_binding("ufshc@12c08000");
 	if (!dev) {
 		LOG_ERR("No device named ufs");
 		return -1;
@@ -1317,3 +1347,8 @@ int ufs_register(struct ast_loader *loader)
 
 	return 0;
 }
+
+DEVICE_DEFINE(ufs, "ufshc@12c08000", NULL, NULL,
+		&g_hba, NULL,
+		POST_KERNEL, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT,
+		NULL);
