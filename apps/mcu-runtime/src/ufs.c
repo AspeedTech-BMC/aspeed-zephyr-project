@@ -89,7 +89,7 @@ static int ufshcd_send_uic_cmd(struct ufs_hba *hba, struct uic_command *uic_cmd)
 	int ret = 0;
 
 	if (!ufshcd_ready_for_uic_cmd(hba)) {
-		printf("Controller not ready to accept UIC commands\n");
+		LOG_ERR("Controller not ready to accept UIC commands\n");
 		return UFS_ERROR;
 	}
 
@@ -118,12 +118,12 @@ static int ufshcd_dme_get_attr(struct ufs_hba *hba, uint32_t attr_sel,
 		/* for peer attributes we retry upon failure */
 		ret = ufshcd_send_uic_cmd(hba, &uic_cmd);
 		if (ret)
-			printf("ufshcd send uic cmd error\n");
+			LOG_ERR("ufshcd send uic cmd error\n");
 
 	} while (ret && peer && --retries);
 
 	if (ret)
-		printf("ufshcd send uic cmd timeout\n");
+		LOG_ERR("ufshcd send uic cmd timeout\n");
 
 	if (mib_val && !ret)
 		*mib_val = uic_cmd.argument3;
@@ -163,7 +163,7 @@ static int ufshcd_dme_set_attr(struct ufs_hba *hba, uint32_t attr_sel,
 	} while (ret && peer && --retries);
 
 	if (ret)
-		printf("dme set attr error\n");
+		LOG_ERR("dme set attr error\n");
 
 	return ret;
 }
@@ -202,7 +202,7 @@ static int ufshcd_dme_link_startup(struct ufs_hba *hba)
 
 	ret = ufshcd_send_uic_cmd(hba, &uic_cmd);
 	if (ret)
-		printf("dme-link-startup: error code %d\n", ret);
+		LOG_ERR("dme-link-startup: error code %d\n", ret);
 
 	return ret;
 }
@@ -365,7 +365,7 @@ static int ufshcd_make_hba_operational(struct ufs_hba *hba)
 	if (!(ufshcd_get_lists_status(reg))) {
 		ufshcd_enable_run_stop_reg(hba);
 	} else {
-		printf("Host controller not ready to process requests");
+		LOG_ERR("Host controller not ready to process requests");
 		return UFS_ERROR;
 	}
 
@@ -482,7 +482,7 @@ static int ufshcd_copy_query_response(struct ufs_hba *hba)
 		if (buf_len >= resp_len) {
 			memcpy(hba->dev_cmd.query.descriptor, descp, resp_len);
 		} else {
-			printf("%s: Response size is bigger than buffer", __func__);
+			LOG_ERR("%s: Response size is bigger than buffer", __func__);
 			return UFS_ERROR;
 		}
 	}
@@ -504,7 +504,7 @@ static int ufshcd_hba_enable(struct ufs_hba *hba)
 		if (retry) {
 			retry--;
 		} else {
-			printf("Controller enable failed\n");
+			LOG_ERR("Controller enable failed\n");
 			return UFS_ERROR;
 		}
 	}
@@ -537,14 +537,14 @@ static int ufshcd_init(struct ufs_hba *hba)
 	/* enable dme layer */
 	ret = ufshcd_hba_enable(hba);
 	if (ret) {
-		printf("ufshcd dme enable failed!!!\n");
+		LOG_ERR("ufshcd dme enable failed!!!\n");
 		return ret;
 	}
 
 	while (1) {
 		ret = ufshcd_dme_get(hba, UIC_ARG_MIB(0x0041), &tmp);
 		if (ret) {
-			printf("get 0x0041 failed\n");
+			LOG_ERR("get 0x0041 failed\n");
 			return UFS_MPHY_TX_NOT_READY;
 		}
 
@@ -555,7 +555,7 @@ static int ufshcd_init(struct ufs_hba *hba)
 	while (cnt--) {
 		ret = ufshcd_dme_get(hba, UIC_ARG_MIB_SEL(0x00c1, 4), &tmp);
 		if (ret) {
-			printf("get 0x00c1 failed\n");
+			LOG_ERR("get 0x00c1 failed\n");
 			return UFS_MPHY_RX_NOT_READY;
 		}
 
@@ -565,47 +565,47 @@ static int ufshcd_init(struct ufs_hba *hba)
 
 	ret = ufshcd_dme_reset(hba);
 	if (ret) {
-		printf("ufshcd_dme_reset failed\n");
+		LOG_ERR("ufshcd_dme_reset failed\n");
 		return ret;
 	}
 
 	ret = ufshcd_dme_enable(hba);
 	if (ret) {
-		printf("ufshcd_dme_enable failed\n");
+		LOG_ERR("ufshcd_dme_enable failed\n");
 		return ret;
 	}
 
 	ret = ufshcd_disable_host_tx_lcc(hba);
 	if (ret) {
-		printf("ufshcd_disable_host_tx_lcc failed!!!\n");
+		LOG_ERR("ufshcd_disable_host_tx_lcc failed!!!\n");
 		return ret;
 	}
 
 	/* To write Shadow register bank to effective configuration block */
 	ret = ufshcd_dme_set(hba, UIC_ARG_MIB(VS_MPHYCFGUPDT), 0x01);
 	if (ret) {
-		printf("ufshcd dme set VS_MPHYCFGUPDT failed!!!\n");
+		LOG_ERR("ufshcd dme set VS_MPHYCFGUPDT failed!!!\n");
 		return ret;
 	}
 
 	/* start link up process */
 	ret = ufshcd_dme_link_startup(hba);
 	if (ret) {
-		printf("ufshcd start link failed\n");
+		LOG_ERR("ufshcd start link failed\n");
 		return ret;
 	}
 
 	/* check link status */
 	ret = ufshcd_dwc_link_is_up(hba);
 	if (ret) {
-		printf("ufshcd link is not up!!!\n");
+		LOG_ERR("ufshcd link is not up!!!\n");
 		return ret;
 	}
 
 	/* dwc specific configuration */
 	ret = ufshcd_dwc_connection_setup(hba);
 	if (ret) {
-		printf("ufshcd connection setup failed\n");
+		LOG_ERR("ufshcd connection setup failed\n");
 		return ret;
 	}
 
@@ -713,7 +713,7 @@ static int ufshcd_wait_for_dev_cmd(struct ufs_hba *hba, uint32_t task_tag)
 
 	err = ufshcd_get_tr_ocs(utrdlp);
 	if (err) {
-		printf("Error in OCS:%d\n", err);
+		LOG_ERR("Error in OCS:%d\n", err);
 		return UFS_ERROR;
 	}
 
@@ -731,17 +731,17 @@ static int ufshcd_wait_for_dev_cmd(struct ufs_hba *hba, uint32_t task_tag)
 
 		err = result & MASK_SCSI_STATUS;
 		if (err)
-			printf("SCSI error!!!\n");
+			LOG_ERR("SCSI error!!!\n");
 
 		break;
 	case UPIU_TRANSACTION_REJECT_UPIU:
 		/* TODO: handle Reject UPIU Response */
 		err = UFS_ERROR;
-		printf("%s: Reject UPIU not fully implemented\n", __func__);
+		LOG_ERR("%s: Reject UPIU not fully implemented\n", __func__);
 		break;
 	default:
 		err = UFS_ERROR;
-		printf("%s: Invalid device management cmd response: %x\n", __func__, resp);
+		LOG_ERR("%s: Invalid device management cmd response: %x\n", __func__, resp);
 	}
 
 	hba->errors = err;
@@ -779,7 +779,7 @@ static int ufshcd_verify_dev_init(struct ufs_hba *hba)
 		if (!ret)
 			break;
 
-		printf("ufshcd verify retry cnt = %d\n", retries);
+		LOG_DBG("ufshcd verify retry cnt = %d\n", retries);
 	}
 
 	return ret;
@@ -838,9 +838,9 @@ static void ufshcd_map_sg(struct ufs_hba *hba, struct scsi_cmd *cmd, int tag)
 		prd_table[i].base_addr = sg->dma_address & 0xffffffff;
 		prd_table[i].upper_addr = 0;
 		prd_table[i].reserved = 0;
-		printf("%s: prd_tbl[%d].size=%x\n", __func__, i, prd_table[i].size);
-		printf("%s: prd_tbl[%d].base_addr=%x\n", __func__, i, prd_table[i].base_addr);
-		printf("%s: prd_tbl[%d].upper_addr=%x\n", __func__, i, prd_table[i].upper_addr);
+		LOG_DBG("%s: prd_tbl[%d].size=%x\n", __func__, i, prd_table[i].size);
+		LOG_DBG("%s: prd_tbl[%d].base_addr=%x\n", __func__, i, prd_table[i].base_addr);
+		LOG_DBG("%s: prd_tbl[%d].upper_addr=%x\n", __func__, i, prd_table[i].upper_addr);
 	}
 }
 
@@ -874,22 +874,22 @@ static int wait_for_transfer_complete(struct ufs_hba *hba, uint32_t slot)
 			scsi_status = result & MASK_SCSI_STATUS;
 			if (scsi_status) {
 				hba->errors = UFS_ERROR;
-				printf("SCSI error!!!\n");
+				LOG_ERR("SCSI error!!!\n");
 			}
 
 			break;
 		case UPIU_TRANSACTION_REJECT_UPIU:
 			/* TODO: handle Reject UPIU Response */
-			printf("Reject UPIU not fully implemented\n");
+			LOG_ERR("Reject UPIU not fully implemented\n");
 			hba->errors = UFS_ERROR;
 			break;
 		default:
-			printf("Unexpected request response code = %x\n", result);
+			LOG_ERR("Unexpected request response code = %x\n", result);
 			hba->errors = UFS_ERROR;
 		}
 		break;
 	default:
-		printf("OCS error from controller = %x\n", ocs);
+		LOG_ERR("OCS error from controller = %x\n", ocs);
 		hba->errors = UFS_ERROR;
 	}
 
@@ -924,7 +924,7 @@ static int ufs_scsi_read10(uint32_t lba, uint32_t length, uintptr_t *data_buf, i
 	cmd.length = length;
 	cmd.num_sg = num_sg_arry[SG_ID];
 
-	printf("%s: lba = 0x%x, num_sg = %d, length = 0x%x, *buf=0x%x\n", __func__, lba, cmd.num_sg, length, (uint32_t)data_buf);
+	LOG_DBG("%s: lba = 0x%x, num_sg = %d, length = 0x%x, *buf=0x%x\n", __func__, lba, cmd.num_sg, length, (uint32_t)data_buf);
 
 	for (i = 0; i < cmd.num_sg; i++) {
 		cmd.sdb.sg[i].dma_address = ((unsigned long)data_buf) + length / cmd.num_sg * i;
@@ -940,10 +940,10 @@ static int ufs_scsi_read10(uint32_t lba, uint32_t length, uintptr_t *data_buf, i
 	if (sync)
 		ret = wait_for_transfer_complete(hba, TEST_TAG);
 
-	printf("%s: *buf[0]=0x%x\n", __func__, *((uint32_t *)data_buf));
-	printf("%s: *buf[1]=0x%x\n", __func__, *((uint32_t *)data_buf + 1));
-	printf("%s: *buf[2]=0x%x\n", __func__, *((uint32_t *)data_buf + 2));
-	printf("%s: *buf[3]=0x%x\n", __func__, *((uint32_t *)data_buf + 3));
+	LOG_DBG("%s: *buf[0]=0x%x\n", __func__, *((uint32_t *)data_buf));
+	LOG_DBG("%s: *buf[1]=0x%x\n", __func__, *((uint32_t *)data_buf + 1));
+	LOG_DBG("%s: *buf[2]=0x%x\n", __func__, *((uint32_t *)data_buf + 2));
+	LOG_DBG("%s: *buf[3]=0x%x\n", __func__, *((uint32_t *)data_buf + 3));
 
 	return ret;
 }
@@ -963,7 +963,7 @@ static int ufs_test_unit_ready(void)
 		},/* reserved/flag/link */
 	};
 
-	printf("%s\n", __func__);
+	LOG_DBG("%s\n", __func__);
 
 	ret = ufshcd_comp_scsi_upiu(hba, &cmd, TEST_TAG);
 
@@ -1009,14 +1009,14 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 		request->query_func = UPIU_QUERY_FUNC_STANDARD_READ_REQUEST;
 		if (!flag_res) {
 			/* No dummy reads */
-			printf("%s: Invalid argument for read request\n",
+			LOG_ERR("%s: Invalid argument for read request\n",
 			      __func__);
 			err = UFS_ERROR;
 			goto out;
 		}
 		break;
 	default:
-		printf("%s: Expected query flag opcode but got = %d\n",
+		LOG_ERR("%s: Expected query flag opcode but got = %d\n",
 		      __func__, opcode);
 		err = UFS_ERROR;
 		goto out;
@@ -1025,7 +1025,7 @@ int ufshcd_query_flag(struct ufs_hba *hba, enum query_opcode opcode,
 	err = ufshcd_exec_dev_cmd(hba, DEV_CMD_TYPE_QUERY, timeout);
 
 	if (err) {
-		printf("%s: Sending flag query for idn %d failed, err = %d\n",
+		LOG_ERR("%s: Sending flag query for idn %d failed, err = %d\n",
 		      __func__, idn, err);
 		goto out;
 	}
@@ -1045,19 +1045,19 @@ static int ufshcd_query_flag_retry(struct ufs_hba *hba,
 	int ret;
 	int retries;
 
-	printf("%s\n", __func__);
+	LOG_DBG("%s\n", __func__);
 
 	for (retries = 0; retries < QUERY_REQ_RETRIES; retries++) {
 		ret = ufshcd_query_flag(hba, opcode, idn, flag_res);
 		if (ret)
-			printf("%s: failed with error %d, retries %d\n",
+			LOG_ERR("%s: failed with error %d, retries %d\n",
 			      __func__, ret, retries);
 		else
 			break;
 	}
 
 	if (ret)
-		printf("%s: query attribute, opcode %d, idn %d, failed with error %d after %d retires\n",
+		LOG_DBG("%s: query attribute, opcode %d, idn %d, failed with error %d after %d retires\n",
 		      __func__, opcode, idn, ret, retries);
 	return ret;
 }
@@ -1068,12 +1068,12 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 	int err;
 	bool flag_res = 1;
 
-	printf("%s\n", __func__);
+	LOG_DBG("%s\n", __func__);
 
 	err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_SET_FLAG,
 				      QUERY_FLAG_IDN_FDEVICEINIT, NULL);
 	if (err) {
-		printf("%s setting fDeviceInit flag failed with error %d\n",
+		LOG_ERR("%s setting fDeviceInit flag failed with error %d\n",
 		      __func__, err);
 		goto out;
 	}
@@ -1083,14 +1083,14 @@ static int ufshcd_complete_dev_init(struct ufs_hba *hba)
 		err = ufshcd_query_flag_retry(hba, UPIU_QUERY_OPCODE_READ_FLAG,
 					      QUERY_FLAG_IDN_FDEVICEINIT,
 					      &flag_res);
-		printf("flag_res=%d\n", flag_res);
+		LOG_DBG("flag_res=%d\n", flag_res);
 	}
 
 	if (err)
-		printf("%s reading fDeviceInit flag failed with error %d\n",
+		LOG_ERR("%s reading fDeviceInit flag failed with error %d\n",
 		      __func__, err);
 	else if (flag_res)
-		printf("%s fDeviceInit was not cleared by the device\n",
+		LOG_ERR("%s fDeviceInit was not cleared by the device\n",
 		      __func__);
 
 out:
@@ -1110,7 +1110,7 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 
 	ret = ufshcd_send_uic_cmd(hba, cmd);
 	if (ret) {
-		printf("pwr ctrl cmd 0x%x with mode 0x%x uic error %d\n",
+		LOG_ERR("pwr ctrl cmd 0x%x with mode 0x%x uic error %d\n",
 		      cmd->command, cmd->argument3, ret);
 
 		return ret;
@@ -1119,7 +1119,7 @@ static int ufshcd_uic_pwr_ctrl(struct ufs_hba *hba, struct uic_command *cmd)
 	do {
 		status = ufshcd_get_upmcrs(hba);
 		if (timer++ > UFS_UIC_CMD_TIMEOUT) {
-			printf("pwr ctrl cmd 0x%x failed, host upmcrs:0x%x\n",
+			LOG_ERR("pwr ctrl cmd 0x%x failed, host upmcrs:0x%x\n",
 			      cmd->command, status);
 			ret = (status != PWR_OK) ? status : -1;
 			break;
@@ -1151,7 +1151,7 @@ static int ufshcd_change_power_mode(struct ufs_hba *hba)
 {
 	int ret, rx_lane, tx_lane;
 
-	printf("%s\n", __func__);
+	LOG_DBG("%s\n", __func__);
 
 	/* Get the connected lane count */
 	ufshcd_dme_get(hba, UIC_ARG_MIB(PA_CONNECTEDRXDATALANES),
@@ -1160,11 +1160,11 @@ static int ufshcd_change_power_mode(struct ufs_hba *hba)
 		       &tx_lane);
 
 	if (!rx_lane || !tx_lane) {
-		printf("%s, invalid connected lanes\n", __func__);
+		LOG_ERR("%s, invalid connected lanes\n", __func__);
 		return 0xfe;
 	}
 
-	printf("%s, connected_rx_lane=%d, connected_tx_lane=%d\n", __func__, rx_lane, tx_lane);
+	LOG_DBG("%s, connected_rx_lane=%d, connected_tx_lane=%d\n", __func__, rx_lane, tx_lane);
 
 	/* set lane number */
 	ufshcd_dme_set(hba, UIC_ARG_MIB(PA_ACTIVERXDATALANES), rx_lane);
@@ -1262,7 +1262,7 @@ static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t le
 		/* Read the first block to get the offset */
 		ret = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)blk_buf, SYNC);
 		if (ret) {
-			printf("blk read is incomplete!!!\n");
+			LOG_ERR("blk read is incomplete!!!\n");
 			return -1;
 		}
 
@@ -1286,7 +1286,7 @@ static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t le
 			/* Read out the last block */
 			ret = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)blk_buf, SYNC);
 			if (ret) {
-				printf("blk read is incomplete!!!\n");
+				LOG_ERR("blk read is incomplete!!!\n");
 				return -1;
 			}
 
@@ -1302,7 +1302,7 @@ static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t le
 			/* Read out the whole block */
 			ret = ufs_scsi_read10(lba, blks * UFS_SECTOR_LENGTH, (uintptr_t *)out, SYNC);
 			if (ret) {
-				printf("blk read is incomplete!!!\n");
+				LOG_ERR("blk read is incomplete!!!\n");
 				return -1;
 			}
 
