@@ -8,6 +8,7 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/device.h>
+#include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
@@ -45,6 +46,7 @@ int main(void)
 			board->boot();
 
 			/* TODO: go to runtime loop */
+			cptra_ipc_enable();
 		}
 	}
 
