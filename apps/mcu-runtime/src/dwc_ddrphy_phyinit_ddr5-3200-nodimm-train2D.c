@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) ASPEED Technology Inc.
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 // [dwc_ddrphy_phyinit_main] Start of dwc_ddrphy_phyinit_main()
 // [dwc_ddrphy_phyinit_sequence] Start of dwc_ddrphy_phyinit_sequence()

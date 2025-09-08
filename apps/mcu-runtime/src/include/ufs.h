@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef _UFS_H
 #define _UFS_H
 

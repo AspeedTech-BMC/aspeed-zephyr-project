@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef _AST_CHIP_H
 #define _AST_CHIP_H
 

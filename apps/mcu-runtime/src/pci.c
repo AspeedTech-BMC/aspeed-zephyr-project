@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (c) Aspeed Technology Inc.
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 #include <errno.h>
 #include <zephyr/types.h>

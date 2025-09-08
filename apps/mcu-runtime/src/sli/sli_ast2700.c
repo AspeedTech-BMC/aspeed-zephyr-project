@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 #include <platform.h>

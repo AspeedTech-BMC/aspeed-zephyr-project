@@ -1,5 +1,8 @@
-
-
+/*
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef _ASPEED_EXTRST_H_
 #define _ASPEED_EXTRST_H_
 

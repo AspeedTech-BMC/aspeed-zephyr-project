@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (C) ASPEED Technology Inc.
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 #ifndef _MANIFEST_H
 #define _MANIFEST_H

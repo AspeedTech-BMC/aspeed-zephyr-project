@@ -1,10 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
- * Copyright (C) ASPEED Technology Inc.
- * Chin-Ting Kuo <chin-ting_kuo@aspeedtech.com>
+ * Copyright (c) 2025 ASPEED Technology Inc.
  *
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 #ifndef _ABR_H_
 #define _ABR_H_
 

@@ -1,5 +1,5 @@
-# Copyright (c) 2024 ASPEED Technology Inc.
-# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20.0)
 

@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) ASPEED Technology Inc.
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 #include <sdram_ast2700.h>
 #include <zephyr/logging/log.h>
 #include <ast_loader.h>

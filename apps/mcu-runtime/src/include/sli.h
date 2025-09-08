@@ -1,4 +1,8 @@
-
+/*
+ * Copyright (c) 2025 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef SLI_H
 #define SLI_H
 

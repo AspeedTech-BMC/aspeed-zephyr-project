@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2024 ASPEED Technology Inc.
+ * Copyright (c) 2025 ASPEED Technology Inc.
  *
- * SPDX-License-Identifier: MIT
+ * SPDX-License-Identifier: Apache-2.0
  */
-
 #include <manifest.h>
 #include <stdint.h>
 
