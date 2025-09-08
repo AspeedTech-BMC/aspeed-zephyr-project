@@ -44,15 +44,11 @@ struct ast_chip *ast_create_chip(void)
 {
 	struct ast_chip *chip = &ast_27xx;
 
-	/* en low secure for uartdbg */
-	sys_write32(0x100, 0x14c02010);
-
+	/* Put chip info here, for example scu */
 	chip->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 	chip->efuse = FIELD_GET(SCU_CPU_REVISION_ID_EFUSE, sys_read32(SCU0_REVISION_ID));
 	chip->pcie0_enable = sys_read32(SCU0_REG + 0xa00) & BIT(0);
 	chip->pcie1_enable = sys_read32(SCU0_REG + 0xa80) & BIT(0);
-
-	/* Put chip info here, for example scu */
 
 	return chip;
 }
