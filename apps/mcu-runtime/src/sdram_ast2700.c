@@ -714,8 +714,10 @@ static int sdramc_get_vga_mem_size(struct sdramc *sdramc)
 		break;
 	case 1:
 		vga_cnt = node0;
+		break;
 	case 2:
 		vga_cnt =  0;
+		break;
 	default:
 		printf("Unknown efuse setting %x\n", efuse);
 		return -1;
