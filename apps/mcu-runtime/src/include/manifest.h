@@ -154,6 +154,7 @@ static inline void *cptra_manifest_buffer_addr(uint32_t offset)
 	return (void *)(CONFIG_SYS_LOAD_ADDR + offset);
 }
 
+bool cptra_manifest_sec_en(void);
 int cptra_load_image(void);
 int cptra_hdr_get_prebuilt(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
