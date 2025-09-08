@@ -25,7 +25,8 @@ int main(void)
 	struct ast_board *board = NULL;
 	int err;
 
-	printf("Aspeed SoC FMC %s %s (%s %s)\n", CONFIG_BOARD_TARGET, ASPEED_ZEPHYR_PROJECT_VERSION, __DATE__, __TIME__);
+	printf("Aspeed SoC FMC %s %s (%s)\n", CONFIG_BOARD_TARGET, \
+		ASPEED_ZEPHYR_PROJECT_VERSION, ASPEED_ZEPHYR_PROJECT_BUILD_TIMESTAMP);
 
 	chip = ast_create_chip();
 
