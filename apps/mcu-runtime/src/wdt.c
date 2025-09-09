@@ -26,7 +26,7 @@ int wdt_init(struct ast_chip *chip)
 			wdt_base_addr = ASPEED_WDT_BASE + idx * 0x80;
 
 			/* SoC reset mask */
-			wdt_writel(0x8207e771, wdt_base_addr + WDT_RST_MASK_1);
+			wdt_writel(0x8207ef71, wdt_base_addr + WDT_RST_MASK_1);
 			wdt_writel(0x000003f6, wdt_base_addr + WDT_RST_MASK_2);
 			wdt_writel(0x000093ec, wdt_base_addr + WDT_RST_MASK_3);
 			wdt_writel(0x40303803, wdt_base_addr + WDT_RST_MASK_4);
