@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2025 ASPEED Technology Inc.
+
+config SLI_AST2700
+	bool "Enable AST2700 IO-die SLI calibration"
+	depends on SOC_AST2700_BOOTMCU
+	help
+	  This option enables AST2700 IO-die SLI calibration.
+
+if SLI_AST2700
+choice SLI_TARGET_PHYCLK
+	prompt "SLI PHY clock selection"
+	default SLI_TARGET_PHYCLK_25MHZ
+
+config SLI_TARGET_PHYCLK_1GHZ
+	bool "Enable SLI PHY clock 1GHz"
+
+config SLI_TARGET_PHYCLK_800MHZ
+	bool "Enable SLI PHY clock 800MHz"
+
+config SLI_TARGET_PHYCLK_500MHZ
+	bool "Enable SLI PHY clock 500MHz"
+
+config SLI_TARGET_PHYCLK_400MHZ
+	bool "Enable SLI PHY clock 400MHz"
+
+config SLI_TARGET_PHYCLK_25MHZ
+	bool "Enable SLI PHY clock 25MHz"
+endchoice
+
+config SLI_K_ON_CPU
+	bool "Enable SLI calibration on CPU-DIE's delay"
+	default n
+	help
+	  This option enables SLI calibration on CPU-DIE using tx or rx
+	  delay except for AHB.
+	  Otherwise, it will calibrate by rx delay on both cpu/io-die.
+
+endif
