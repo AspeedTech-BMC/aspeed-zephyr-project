@@ -208,13 +208,6 @@ void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
 
 	sys_write32(0x0, (uint32_t)&regs->dcfg); // [16] reset=0
 
-	if (!is_ddr4()) {
-		dwc_ddrphy_apb_wr(0xd0000, 0);		// DWC_DDRPHYA_APBONLY0_MicroContMuxSel
-		dwc_ddrphy_apb_wr(0x20240, 0x3900);	// DWC_DDRPHYA_MASTER0_base0_D5ACSMPtr0lat0
-		dwc_ddrphy_apb_wr(0x900da, 8);		// DWC_DDRPHYA_INITENG0_base0_SequenceReg0b59s0
-		dwc_ddrphy_apb_wr(0xd0000, 1);		// DWC_DDRPHYA_APBONLY0_MicroContMuxSel
-	}
-
 	/* phy init start */
 	val = sys_read32((uint32_t)&regs->mctl);
 	val = val | DRAMC_MCTL_PHY_INIT_START;
@@ -228,13 +221,6 @@ void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
 
 	while (sys_read32((uint32_t)&regs->intr_status))
 		;
-
-	if (!is_ddr4()) {
-		dwc_ddrphy_apb_wr(0xd0000, 0);		// DWC_DDRPHYA_APBONLY0_MicroContMuxSel
-		dwc_ddrphy_apb_wr(0x20240, 0x4300);	// DWC_DDRPHYA_MASTER0_base0_D5ACSMPtr0lat0
-		dwc_ddrphy_apb_wr(0x900da, 0);		// DWC_DDRPHYA_INITENG0_base0_SequenceReg0b59s0
-		dwc_ddrphy_apb_wr(0xd0000, 1);		// DWC_DDRPHYA_APBONLY0_MicroContMuxSel
-	}
 }
 
 int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
