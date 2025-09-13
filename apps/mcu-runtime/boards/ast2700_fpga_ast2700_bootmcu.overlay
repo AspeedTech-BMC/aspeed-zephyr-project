@@ -4,7 +4,7 @@
 		zephyr,shell-uart = &uart12;
 	};
 
-	sram: memory@14b80a00 {
+	sram: memory@14b80000 {
 		reg = <0x14b80000 0x2ee00>;
 	};
 
