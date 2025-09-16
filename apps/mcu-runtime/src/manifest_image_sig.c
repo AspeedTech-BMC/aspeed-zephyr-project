@@ -5,6 +5,8 @@
  */
 #include <ast_loader.h>
 #include <manifest.h>
+#include <platform.h>
+#include <scu_ast2700.h>
 #include <stdlib.h>
 
 #include <zephyr/sys/byteorder.h>
@@ -21,6 +23,15 @@
 #define CPTRA_MISC_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_cptra_misc))
 
 LOG_MODULE_REGISTER(cptra_manifest_sig, CONFIG_LOG_DEFAULT_LEVEL);
+
+static bool cptra_manifest_sec_en(void)
+{
+#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+	return !!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_EN_SECBOOT);
+#else
+	return false;
+#endif
+}
 
 static int cptra_memcpy_to_be(uint32_t *dest, uint32_t *src, uint32_t size)
 {
@@ -177,6 +188,9 @@ int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest)
 	struct cptra_set_auth_manifest_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
 
+	if (!cptra_manifest_sec_en())
+		return CPTRA_SUCCESS;
+
 	input = malloc(sizeof(struct cptra_set_auth_manifest_ia));
 	if (!input)
 		return CPTRA_ERR_EXCEED_MEMORY_LIMIT;
@@ -203,6 +217,9 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 	struct lms_pub_key lms_pubk = {0};
 	struct cptra_manifest_aspeed_svn data = {0};
 	struct cptra_manifest_aspeed_preamble *preamble = &(manifest->preamble);
+
+	if (!cptra_manifest_sec_en())
+		return CPTRA_SUCCESS;
 
 	data.ver = preamble->manifest_version;
 	data.sec_ver = preamble->manifest_sec_version;
@@ -237,25 +254,39 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_im
 	struct cptra_authorize_and_stash_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
 
+	if (!cptra_manifest_sec_en())
+		return CPTRA_SUCCESS;
+
 	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
-	if (ret)
+	if (ret) {
+		LOG_ERR("Caliptra sha384 calculate fail.");
 		return CPTRA_ERR_SHA384_CAL;
+	}
 
 	*input.fw_id = ime->fw_id;
 	input.source = ime->flags & 0x3;
 	ret = caliptra_authorize_and_stash(dev, &input, &output);
-	if (ret)
+	if (ret) {
+		LOG_ERR("Caliptra image authorize and stash fail.");
 		return CPTRA_ERR_IMAGE_VFY_MBOX_ERROR;
+	}
 
 	/* Mailbox error handler */
 	switch (output.auth_req_result) {
 	case AUTHORIZE_IMAGE:
-		return CPTRA_SUCCESS;
+		ret = CPTRA_SUCCESS;
+		break;
 	case IMAGE_HASH_MISMATCH:
-		return CPTRA_ERR_IMAGE_VFY_HASH_MISMATCH;
+		ret = CPTRA_ERR_IMAGE_VFY_HASH_MISMATCH;
+		break;
 	case IMAGE_NOT_AUTHORIZED:
-		return CPTRA_ERR_IMAGE_VFY_FWID_MISMATCH;
+		ret = CPTRA_ERR_IMAGE_VFY_FWID_MISMATCH;
+		break;
 	default:
-		return CPTRA_ERR_IMAGE_VFY_UNKNOWN_ERROR;
+		ret = CPTRA_ERR_IMAGE_VFY_UNKNOWN_ERROR;
+		break;
 	}
+
+	LOG_INF("Verify %s image... %s", cptra_ime_get_image_name(ime), ret ? "fail" : "pass");
+	return ret;
 }

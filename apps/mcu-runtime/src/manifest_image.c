@@ -9,8 +9,7 @@
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/logging/log.h>
 
-//LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
-LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_SOC_FMC_LOG_LEVEL);
+LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 
 /* Define caliptra image identifier */
 #define CPTRA_SOC_MANIFEST_HDR_ID (0x0002)

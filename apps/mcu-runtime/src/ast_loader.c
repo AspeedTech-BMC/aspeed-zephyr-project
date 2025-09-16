@@ -144,8 +144,7 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 
 	loader->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-	if (cptra_manifest_sec_en())
-		loader->verify = ast_loader_verify;
+	loader->verify = ast_loader_verify;
 #endif
 
 	return err;
