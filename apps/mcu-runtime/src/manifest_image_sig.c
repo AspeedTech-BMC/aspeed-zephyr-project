@@ -287,6 +287,7 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_im
 		break;
 	}
 
-	LOG_INF("Verify %s image... %s", cptra_ime_get_image_name(ime), ret ? "fail" : "pass");
+	LOG_INF("Verify %s image... %s (0x%x)", cptra_ime_get_image_name(ime),
+		ret ? "fail" : "pass", ret);
 	return ret;
 }
