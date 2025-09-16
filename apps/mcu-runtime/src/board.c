@@ -22,15 +22,15 @@ static bool has_pspfw;
 static bool has_sspfw;
 static bool has_tspfw;
 
-void board_manifest_image_post_process(struct cptra_manifest_ime *ime)
+void board_manifest_image_post_process(uint32_t fw_id)
 {
-	uintptr_t ep = cptra_ime_get_load_addr(ime);
+	uintptr_t ep = cptra_ime_get_load_addr(fw_id);
 	uint64_t ep_arm = 0;
 
 	/* convert to Arm view */
 	ep_arm = ((uint64_t)ep - 0x80000000) | 0x400000000ULL;
 
-	switch (ime->fw_id) {
+	switch (fw_id) {
 	case CPTRA_ATF_FW_ID:
 		has_pspfw = true;
 		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR0);

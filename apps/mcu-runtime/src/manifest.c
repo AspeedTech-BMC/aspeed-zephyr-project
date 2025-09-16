@@ -219,17 +219,16 @@ int cptra_load_abb_image(void)
 		if (!cptra_ime_loadable_image(&cptra_ctx, ime))
 			continue;
 
-		load_addr = (uint32_t *)cptra_ime_get_load_addr(ime);
+		load_addr = (uint32_t *)cptra_ime_get_load_addr(ime->fw_id);
 		if (!load_addr)
 			continue;
 
 		ret = ast_loader_load_manifest_image(ime->fw_id, load_addr,
 						     true);
-		LOG_INF("Load %s image... %s (0x%x)",
-			cptra_ime_get_image_name(ime), ret ? "fail" : "pass",
-			ret);
+		LOG_INF("Load %s image... %s (0x%x)", cptra_ime_get_image_name(ime->fw_id),
+			ret ? "fail" : "pass", ret);
 
-		board_manifest_image_post_process(ime);
+		board_manifest_image_post_process(ime->fw_id);
 	}
 
 	cptra_deinit_abb_loader(ret);
@@ -241,17 +240,16 @@ int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size)
 	int ret = 0;
 	int image_offset = 0;
 	int image_size = 0;
-	struct cptra_manifest_ime ime = {.fw_id = fw_id};
 
 	ret = cptra_init_abb_loader();
 	if (ret)
 		return ret;
 
-	image_offset = cptra_ime_image_offset(&cptra_ctx, &ime);
+	image_offset = cptra_ime_image_offset(&cptra_ctx, fw_id);
 	if (image_offset < 0)
 		return CPTRA_ERR_IMAGE_READ;
 
-	image_size = cptra_ime_image_size(&cptra_ctx, &ime);
+	image_size = cptra_ime_image_size(&cptra_ctx, fw_id);
 	if (image_size < 0)
 		return CPTRA_ERR_IMAGE_READ;
 
