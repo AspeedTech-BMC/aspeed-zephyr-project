@@ -23,13 +23,9 @@ struct ast_loader g_loader;
 static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 {
 	int err = 0;
-	struct cptra_manifest_ime ime = {
-		.fw_id = type,
-		.flags = 0x1, // Denote that the image must be verfied
-	};
 
 	if (type != CPTRA_MANIFEST_FW_ID) {
-		err = cptra_verify_image((uint8_t *)message, len, &ime);
+		err = cptra_verify_image((uint8_t *)message, len, type);
 	} else {
 		err = cptra_verify_soc_manifest(
 			(struct cptra_soc_manifest *)message);

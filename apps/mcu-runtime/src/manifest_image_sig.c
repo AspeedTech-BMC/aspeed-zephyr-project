@@ -247,7 +247,7 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 	return CPTRA_SUCCESS;
 }
 
-int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_ime *ime)
+int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 {
 	int ret = 0;
 	struct cptra_authorize_and_stash_ia input = {0};
@@ -263,8 +263,12 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_im
 		return CPTRA_ERR_SHA384_CAL;
 	}
 
-	*input.fw_id = ime->fw_id;
-	input.source = ime->flags & 0x3;
+	/*
+	 * Caliptra 1.2 only supports source = 0x1, to reduce
+	 * complexity, the source is hardcoded to 0x1
+	 */
+	*input.fw_id = fw_id;
+	input.source = 0x1;
 	ret = caliptra_authorize_and_stash(dev, &input, &output);
 	if (ret) {
 		LOG_ERR("Caliptra image authorize and stash fail.");
@@ -287,7 +291,7 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_im
 		break;
 	}
 
-	LOG_INF("Verify %s image... %s (0x%x)", cptra_ime_get_image_name(ime),
+	LOG_INF("Verify %s image... %s (0x%x)", cptra_ime_get_image_name(fw_id),
 		ret ? "fail" : "pass", ret);
 	return ret;
 }

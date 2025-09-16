@@ -148,13 +148,13 @@ int cptra_load_abb_image(void);
 int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
-int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_ime *ime);
-void board_manifest_image_post_process(struct cptra_manifest_ime *ime);
+int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id);
+void board_manifest_image_post_process(uint32_t fw_id);
 
-char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime);
-int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
-int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
 bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
-uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime);
+char *cptra_ime_get_image_name(uint32_t fw_id);
+int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id);
+int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id);
+uintptr_t cptra_ime_get_load_addr(uint32_t fw_id);
 
 #endif /* _MANIFEST_H */
