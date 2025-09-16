@@ -48,19 +48,34 @@ struct cptra_load_image {
 };
 
 static struct cptra_load_image image_list[] = {
-	{"mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID, CPTRA_FMC_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID, CPTRA_ATF_LOAD_ADDR, CPTRA_LOADABLE},
-	{"optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID, CPTRA_OPTEE_LOAD_ADDR, CPTRA_LOADABLE},
-	{"uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID, CPTRA_UBOOT_LOAD_ADDR, CPTRA_LOADABLE},
-	{"ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID, CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE},
+	{ "manifest", CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID,
+	  CPTRA_FMC_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID,
+	  CPTRA_ATF_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID,
+	  CPTRA_OPTEE_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID,
+	  CPTRA_UBOOT_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID,
+	  CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE },
 };
 
 static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context *ctx,
@@ -128,14 +143,6 @@ int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifes
 	return cptra_img_info_get_offset(ctx, img->identifier);
 }
 
-int cptra_soc_manifest_offset(struct cptra_image_context *ctx)
-{
-	if (!ctx)
-		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
-
-	return cptra_img_info_get_offset(ctx, CPTRA_SOC_MANIFEST_HDR_ID);
-}
-
 int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
 {
 	struct cptra_load_image *img = NULL;
@@ -197,22 +204,4 @@ uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime)
 	}
 
 	return img->load_addr;
-}
-
-int cptra_ime_load_image(void *img_bin, uint32_t img_size, struct cptra_manifest_ime *ime)
-{
-	uintptr_t load_addr = 0;
-
-	if (!img_bin || img_size == 0 || !ime)
-		return CPTRA_ERR_IMAGE_LOAD_INVALID_PARAM;
-
-	load_addr = cptra_ime_get_load_addr(ime);
-	if (!load_addr) {
-		LOG_ERR("Cannot find load address for fw_id 0x%x.", ime->fw_id);
-		return CPTRA_ERR_IMAGE_LOAD;
-	}
-
-	memcpy((void *)load_addr, img_bin, img_size);
-
-	return CPTRA_SUCCESS;
 }

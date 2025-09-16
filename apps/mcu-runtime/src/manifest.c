@@ -14,54 +14,12 @@
 
 LOG_MODULE_REGISTER(cptra_manifest, CONFIG_LOG_DEFAULT_LEVEL);
 
-static uint8_t sram_buf[CPTRA_SRAM_BUF_SIZE];
-static struct cptra_image_context cptra_ctx;
-
 #include <zephyr/drivers/flash.h>
 __weak int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 {
 	const struct device *dev = device_get_binding("fmc@0");
 
 	return flash_read(dev, src, dst, len);
-}
-
-static void *cptra_read(struct cptra_load_info *loader, int size, bool persist)
-{
-	int ret = 0;
-	uintptr_t src = CPTRA_MANIFEST_OFFSET + loader->read_sector;
-	uintptr_t dest = loader->base + loader->write_sector;
-
-	if (dest < loader->base || dest >= loader->limit)
-		return NULL;
-
-	ret = ast_loader_read((uint32_t *)dest, src, size);
-	if (ret)
-		return NULL;
-
-	if (persist) {
-		loader->read_sector += size;
-		loader->write_sector += size;
-	}
-
-	loader->size = persist ? 0 : size;
-
-	return (void *)dest;
-}
-
-static void cptra_manifest_err_handler(int ret, struct cptra_load_info *loader)
-{
-	uint32_t wipe_size = 0;
-
-	if (ret) {
-		/* Wipe the sram tmp buffer stored image */
-		wipe_size = loader->write_sector + loader->size;
-		wipe_size = wipe_size < loader->limit ? wipe_size : loader->limit;
-		memset((void *)loader->base, 0, wipe_size);
-
-		LOG_ERR("Caliptra load simple image... fail(0x%x)", ret);
-	}
-
-	__ASSERT(!ret, "Caliptra load simple image fail, ret: 0x%x", ret);
 }
 
 static int cptra_crc32_check(struct cptra_image_context *ctx)
@@ -84,121 +42,64 @@ static int cptra_crc32_check(struct cptra_image_context *ctx)
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_header(struct cptra_image_context *ctx, struct cptra_load_info *loader)
+static int cptra_read_header(struct cptra_image_context *ctx)
 {
-	void *ptr = NULL;
-	struct cptra_manifest_hdr *hdr = NULL;
+	int ret = 0;
+	static struct cptra_manifest_hdr hdr = { 0 };
 
 	/* Read the manfiest header */
-	loader->read_sector = 0;
-	ptr = cptra_read(loader, sizeof(struct cptra_manifest_hdr), true);
-	if (!ptr) {
+	ret = ast_loader_read((uint32_t *)&hdr, CPTRA_MANIFEST_OFFSET,
+			      sizeof(struct cptra_manifest_hdr));
+	if (ret) {
 		LOG_ERR("Failed to read manifest header.");
 		return CPTRA_ERR_READ_HDR;
 	}
 
-	hdr = (struct cptra_manifest_hdr *)ptr;
-	if (hdr->magic != CPTRA_FLASH_IMG_MAGIC) {
-		LOG_ERR("Manifest header magic mismatch: 0x%x.", hdr->magic);
+	if (hdr.magic != CPTRA_FLASH_IMG_MAGIC) {
+		LOG_ERR("Manifest header magic mismatch: 0x%x.", hdr.magic);
 		return CPTRA_ERR_HDR_MAGIC_MISMATCH;
 	}
 
-	if (hdr->img_count > CPTRA_IMC_ENTRY_COUNT) {
-		LOG_ERR("Manifest image count exceeds maximum limit: %d.", hdr->img_count);
+	if (hdr.img_count > CPTRA_IMC_ENTRY_COUNT) {
+		LOG_ERR("Manifest image count exceeds maximum limit: %d.",
+			hdr.img_count);
 		return CPTRA_ERR_EXCEED_MAX_IMG_COUNT;
 	}
 
 	/* The image header is correct, keep it in context */
-	ctx->hdr = hdr;
+	ctx->hdr = &hdr;
 
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_chk_img_info(struct cptra_image_context *ctx, struct cptra_load_info *loader)
+static int cptra_read_chk_img_info(struct cptra_image_context *ctx)
 {
+	int ret = 0;
 	int img_num = ctx->hdr->img_count;
-	uint32_t chk_sz = 0;
-	uint32_t info_sz = 0;
-	void *ptr = NULL;
+	static uint8_t chk_img[sizeof(struct cptra_checksum_info) +
+			       sizeof(struct cptra_image_info) *
+				       CPTRA_IMC_ENTRY_COUNT] = { 0 };
+	uint32_t ofst = sizeof(struct cptra_manifest_hdr);
+	uint32_t size = 0;
 
 	if (img_num > CPTRA_IMC_ENTRY_COUNT)
 		return CPTRA_ERR_EXCEED_MAX_IMG_COUNT;
 
-	loader->read_sector = sizeof(struct cptra_manifest_hdr);
-	chk_sz = sizeof(struct cptra_checksum_info);
-	info_sz = sizeof(struct cptra_image_info) * img_num;
-	ptr = cptra_read(loader, chk_sz + info_sz, true);
-	if (!ptr)
+	size = sizeof(struct cptra_checksum_info);
+	size += sizeof(struct cptra_image_info) * img_num;
+	ret = ast_loader_read((uint32_t *)chk_img, CPTRA_MANIFEST_OFFSET + ofst,
+			      size);
+	if (ret)
 		return CPTRA_ERR_READ_IMG_INFO;
 
-	ctx->chk = (struct cptra_checksum_info *)ptr;
-	ctx->img_info = (struct cptra_image_info *)((uint8_t *)ptr + chk_sz);
+	ctx->chk = (struct cptra_checksum_info *)chk_img;
+	ctx->img_info = (struct cptra_image_info *)(chk_img +
+					sizeof(struct cptra_checksum_info));
 
 	return CPTRA_SUCCESS;
 }
 
-static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx, struct cptra_load_info *loader)
-{
-	int ret = 0;
-	int image_offset = 0;
-	struct cptra_soc_manifest *ptr = NULL;
-
-	image_offset = cptra_soc_manifest_offset(ctx);
-	if (image_offset < 0)
-		return CPTRA_ERR_SOC_MANIFEST_NO_INFO;
-
-	loader->read_sector = image_offset;
-	ptr = cptra_read(loader, sizeof(struct cptra_soc_manifest), true);
-	if (!ptr)
-		return CPTRA_ERR_SOC_MANIFEST_READ_ERROR;
-
-	if (ptr->preamble.manifest_marker != CPTRA_MBCMD_SET_AUTH_MANIFEST)
-		return CPTRA_ERR_SOC_MANIFEST_MAGIC_MISMATCH;
-
-	ret = cptra_verify_soc_manifest(ptr);
-	if (ret)
-		return CPTRA_ERR_SOC_MANIFEST_VFY;
-
-	ret = cptra_verify_soc_manifest_ver(ptr);
-	if (ret)
-		return ret;
-
-	ctx->soc_manifest = ptr;
-
-	LOG_INF("ver: %x, flags: %x, soc_ver: %x", ptr->preamble.manifest_version,
-		ptr->preamble.manifest_flags, ptr->preamble.manifest_sec_version);
-	LOG_INF("manfiest vendor pubk: 0x%08x", ptr->preamble.manifest_vendor_ecc384_key[0]);
-	LOG_INF("manfiest owner pubk: 0x%08x", ptr->preamble.manifest_owner_ecc384_key[0]);
-
-	return CPTRA_SUCCESS;
-}
-
-static void *cptra_read_image(struct cptra_image_context *ctx, struct cptra_load_info *loader,
-			      struct cptra_manifest_ime *ime)
-{
-	int image_offset = 0;
-	int image_size = 0;
-	void *ptr = NULL;
-
-	image_offset = cptra_ime_image_offset(ctx, ime);
-	if (image_offset < 0)
-		goto end;
-
-	image_size = cptra_ime_image_size(ctx, ime);
-	if (image_size < 0)
-		goto end;
-
-	loader->read_sector = image_offset;
-	ptr = cptra_read(loader, image_size, false);
-	if (!ptr)
-		goto end;
-
-end:
-	return ptr;
-}
-
-static int cptra_read_abb_header(struct cptra_image_context *ctx,
-				      struct cptra_load_info *loader)
+static int cptra_read_abb_header(struct cptra_image_context *ctx)
 {
 	int ret = 0;
 
@@ -206,11 +107,11 @@ static int cptra_read_abb_header(struct cptra_image_context *ctx,
 	if (ctx->hdr && ctx->chk && ctx->img_info)
 		return ret;
 
-	ret = cptra_read_header(ctx, loader);
+	ret = cptra_read_header(ctx);
 	if (ret)
 		goto fail;
 
-	ret = cptra_read_chk_img_info(ctx, loader);
+	ret = cptra_read_chk_img_info(ctx);
 	if (ret)
 		goto fail;
 
@@ -218,88 +119,124 @@ static int cptra_read_abb_header(struct cptra_image_context *ctx,
 	if (ret)
 		goto fail;
 
-	LOG_INF("Manifest simple manifeset read success.\n");
-	return ret;
 fail:
-	LOG_ERR("Manifest simple manifeset read fail (0x%x).\n", ret);
 	return ret;
 }
 
-int cptra_init_abb_loader(void)
+static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 {
 	int ret = 0;
-	struct cptra_load_info sram = {0};
+	static struct cptra_soc_manifest soc_manifest;
 
-	if (cptra_ctx.hdr && cptra_ctx.img_info &&
-		cptra_ctx.chk && cptra_ctx.soc_manifest)
+	ret = ast_loader_load_image(CPTRA_MANIFEST_FW_ID,
+				    (uint32_t *)&soc_manifest, true);
+	if (ret)
+		return CPTRA_ERR_SOC_MANIFEST_READ_ERROR;
+
+	if (soc_manifest.preamble.manifest_marker !=
+	    CPTRA_MBCMD_SET_AUTH_MANIFEST)
+		return CPTRA_ERR_SOC_MANIFEST_MAGIC_MISMATCH;
+
+	ctx->soc_manifest = &soc_manifest;
+
+	LOG_INF("ver: %x, flags: %x, soc_ver: %x",
+		soc_manifest.preamble.manifest_version,
+		soc_manifest.preamble.manifest_flags,
+		soc_manifest.preamble.manifest_sec_version);
+	LOG_INF("manfiest vendor pubk: 0x%08x",
+		soc_manifest.preamble.manifest_vendor_ecc384_key[0]);
+	LOG_INF("manfiest owner pubk: 0x%08x",
+		soc_manifest.preamble.manifest_owner_ecc384_key[0]);
+
+	return CPTRA_SUCCESS;
+}
+
+static struct cptra_image_context cptra_ctx;
+static void cptra_deinit_abb_loader(int ret)
+{
+	if (ret && cptra_ctx.hdr)
+		memset(cptra_ctx.hdr, 0, sizeof(struct cptra_manifest_hdr));
+
+	if (ret && cptra_ctx.chk)
+		memset(cptra_ctx.chk, 0, sizeof(struct cptra_checksum_info));
+
+	if (ret && cptra_ctx.img_info)
+		memset(cptra_ctx.img_info, 0,
+		       sizeof(struct cptra_image_info) * CPTRA_IMC_ENTRY_COUNT);
+
+	if (ret && cptra_ctx.soc_manifest)
+		memset(cptra_ctx.soc_manifest, 0,
+		       sizeof(struct cptra_soc_manifest));
+
+	__ASSERT(!ret, "Caliptra load image fail, ret: 0x%x", ret);
+}
+
+static int cptra_init_abb_loader(void)
+{
+	int ret = 0;
+
+	if (cptra_ctx.hdr && cptra_ctx.img_info && cptra_ctx.chk)
 		return ret;
 
-	CPTRA_INIT_LOADER(&sram, sram_buf, sizeof(sram_buf));
-	ret = cptra_read_abb_header(&cptra_ctx, &sram);
-	if (ret) {
-		LOG_ERR("Read abb header... fail");
-		return ret;
-	}
+	ret = cptra_read_abb_header(&cptra_ctx);
+	LOG_INF("Read abb header... %s (0x%x)", ret ? "fail" : "pass", ret);
 
-	ret = cptra_read_abb_soc_manifest(&cptra_ctx, &sram);
-	if (ret) {
-		LOG_ERR("Read/Verify soc manifest... fail");
-		return ret;
-	}
+	cptra_deinit_abb_loader(ret);
+	return ret;
+}
 
+int cptra_verify_abb_loader(void)
+{
+	int ret = 0;
+
+	if (cptra_ctx.soc_manifest)
+		return ret;
+
+	ret = cptra_read_abb_soc_manifest(&cptra_ctx);
+	LOG_INF("Read soc manifest... %s (0x%x)", ret ? "fail" : "pass", ret);
+
+	cptra_deinit_abb_loader(ret);
 	return ret;
 }
 
 int cptra_load_abb_image(void)
 {
 	int ret = 0;
-	void *img_bin = NULL;
-	uint32_t img_size = 0;
-	struct cptra_load_info dram = {0};
+	uint32_t *load_addr = 0;
 	struct cptra_soc_manifest *man = cptra_ctx.soc_manifest;
 	struct cptra_manifest_ime *ime = &man->imc[0];
-
-	CPTRA_INIT_LOADER(&dram, CPTRA_SYS_LOAD_ADDR, CPTRA_SYS_LOAD_SIZE);
-	for (ime = &man->imc[0]; ime < man->imc + man->ime_count; ime++) {
-		/* Check the whether ime denote image should be loaded */
-		if (!cptra_ime_loadable_image(&cptra_ctx, ime))
-			continue;
-
-		/* Get the ime denoted image and size */
-		img_bin = cptra_read_image(&cptra_ctx, &dram, ime);
-		img_size = cptra_ime_image_size(&cptra_ctx, ime);
-		if (!img_bin || img_size < 0)
-			return CPTRA_ERR_IMAGE_READ;
-
-		/* Verify the ime denoted image */
-		ret = cptra_verify_image(img_bin, img_size, ime);
-		if (ret)
-			return ret;
-
-		/* Load the ime denoted image */
-		ret = cptra_ime_load_image(img_bin, img_size, ime);
-		LOG_INF("Load %s image... %s", cptra_ime_get_image_name(ime),
-			ret ? "fail" : "pass");
-
-		board_manifest_image_post_process(ime);
-	}
-
-	cptra_manifest_err_handler(ret, &dram);
-	return ret;
-}
-
-int cptra_load_image(void)
-{
-	int ret = 0;
 
 	ret = cptra_init_abb_loader();
 	if (ret)
 		return ret;
 
-	return cptra_load_abb_image();
+	ret = cptra_verify_abb_loader();
+	if (ret)
+		return ret;
+
+	for (ime = &man->imc[0]; ime < man->imc + man->ime_count; ime++) {
+		/* Check the whether ime denote image should be loaded */
+		if (!cptra_ime_loadable_image(&cptra_ctx, ime))
+			continue;
+
+		load_addr = (uint32_t *)cptra_ime_get_load_addr(ime);
+		if (!load_addr)
+			continue;
+
+		ret = ast_loader_load_manifest_image(ime->fw_id, load_addr,
+						     true);
+		LOG_INF("Load %s image... %s (0x%x)",
+			cptra_ime_get_image_name(ime), ret ? "fail" : "pass",
+			ret);
+
+		board_manifest_image_post_process(ime);
+	}
+
+	cptra_deinit_abb_loader(ret);
+	return ret;
 }
 
-int cptra_hdr_get_prebuilt(uint32_t fw_id, uint32_t *ofst, uint32_t *size)
+int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size)
 {
 	int ret = 0;
 	int image_offset = 0;

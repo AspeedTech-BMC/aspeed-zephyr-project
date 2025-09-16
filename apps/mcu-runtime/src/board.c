@@ -58,7 +58,7 @@ static int board_load_image(void)
 {
 	int err;
 
-	err = cptra_load_image();
+	err = cptra_load_abb_image();
 
 	return err;
 }

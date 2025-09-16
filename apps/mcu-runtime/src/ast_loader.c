@@ -23,14 +23,24 @@ struct ast_loader g_loader;
 static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 {
 	int err = 0;
-
 	struct cptra_manifest_ime ime = {
 		.fw_id = type,
 		.flags = 0x1, // Denote that the image must be verfied
 	};
 
-	err = cptra_verify_image((uint8_t *)message, len, &ime);
+	if (type != CPTRA_MANIFEST_FW_ID) {
+		err = cptra_verify_image((uint8_t *)message, len, &ime);
+	} else {
+		err = cptra_verify_soc_manifest(
+			(struct cptra_soc_manifest *)message);
+		if (err)
+			goto end;
 
+		err = cptra_verify_soc_manifest_ver(
+			(struct cptra_soc_manifest *)message);
+	}
+
+end:
 	return err;
 }
 #endif
@@ -99,7 +109,12 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 			return err;
 	}
 
-	if (loader->verify && verify) {
+	if (verify) {
+		if (!loader->verify) {
+			LOG_ERR("Verifier does not be registered.\n");
+			return -1;
+		}
+
 		if (!buf || sz == 0) {
 			LOG_ERR("Hash buffer is NULL or size is zero.\n");
 			return -1;
@@ -147,6 +162,9 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 	loader->verify = ast_loader_verify;
 #endif
 
+#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+	err = cptra_verify_abb_loader();
+#endif
 	return err;
 }
 
