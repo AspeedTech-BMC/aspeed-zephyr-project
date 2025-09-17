@@ -8,4 +8,6 @@ target_sources(app PRIVATE
 	dtc/libfdt/fdt_rw.c
 	dtc/libfdt/fdt_strerror.c
 	dtc/libfdt/fdt_sw.c
-	dtc/libfdt/fdt_wip.c)
+	dtc/libfdt/fdt_wip.c
+	xyzmodem/xyzModem.c
+	xyzmodem/crc16.c)
