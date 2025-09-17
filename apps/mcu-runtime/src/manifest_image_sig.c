@@ -5,6 +5,7 @@
  */
 #include <ast_loader.h>
 #include <manifest.h>
+#include <stdlib.h>
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/crypto/crypto.h>
@@ -20,8 +21,6 @@
 #define CPTRA_MISC_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_cptra_misc))
 
 LOG_MODULE_REGISTER(cptra_manifest_sig, CONFIG_LOG_DEFAULT_LEVEL);
-
-static struct cptra_set_auth_manifest_ia input = {0};
 
 static int cptra_memcpy_to_be(uint32_t *dest, uint32_t *src, uint32_t size)
 {
@@ -173,18 +172,27 @@ static int cptra_manifest_lms(uint8_t *data, uint32_t data_size, struct lms_pub_
 
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest)
 {
+	int ret = CPTRA_SUCCESS;
+	struct cptra_set_auth_manifest_ia *input;
 	struct cptra_set_auth_manifest_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
 
-	input.manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
+	input = malloc(sizeof(struct cptra_set_auth_manifest_ia));
+	if (!input)
+		return CPTRA_ERR_EXCEED_MEMORY_LIMIT;
+
+	input->manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
 			      sizeof(manifest->imc);
-	input.metadata_entry_entry_count = manifest->ime_count;
+	input->metadata_entry_entry_count = manifest->ime_count;
 
 	/* Convert aspeed preamble format to caliptra preamble format*/
-	cptra_preamble_convert(&(input.preamble), &(manifest->preamble));
-	memcpy(&(input.metadata_entries), manifest->imc, sizeof(manifest->imc));
+	cptra_preamble_convert(&(input->preamble), &(manifest->preamble));
+	memcpy(&(input->metadata_entries), manifest->imc, sizeof(manifest->imc));
 
-	return caliptra_set_auth_manifest(dev, &input, &output);
+	ret = caliptra_set_auth_manifest(dev, input, &output);
+	free(input);
+
+	return ret;
 }
 
 #define CPTRA_SOC_MANIFEST_VER (0)
