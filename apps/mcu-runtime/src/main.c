@@ -8,14 +8,12 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
 #include <soc.h>
 #include <platform.h>
 #include <chip.h>
-#include <cptra_idevid.h>
 
 #include "aspeed_zephyr_project_version.h"
 
@@ -38,19 +36,24 @@ int main(void)
 		if (board) {
 			printf("Trying to boot from %s\n", board->bootmodestr);
 
-			err = board->load_image();
-			if (err) {
-				LOG_ERR("Failed to load image, err=%d", err);
-				return err;
+			if (board->load_image) {
+				err = board->load_image();
+				if (err) {
+					LOG_ERR("Failed to load image, err=%d", err);
+					return err;
+				}
 			}
 
-			board->boot();
+			if (board->boot)
+				board->boot();
 
 			/* Populate IDEVID Certificate */
-			cptra_populate_idevid();
+			if (board->populate)
+				board->populate();
 
-			/* TODO: go to runtime loop */
-			cptra_ipc_enable();
+			/* Runtime ipc loop */
+			if (board->runtime_loop)
+				board->runtime_loop();
 		}
 	}
 
