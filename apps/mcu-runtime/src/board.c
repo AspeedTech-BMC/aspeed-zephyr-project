@@ -12,6 +12,8 @@
 #include <scu_ast2700.h>
 #include <ssp_tsp_ast2700.h>
 #include <manifest.h>
+#include <cptra_idevid.h>
+#include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
 #include <chip.h>
 
 LOG_MODULE_REGISTER(ast_board, CONFIG_SOC_FMC_LOG_LEVEL);
@@ -193,8 +195,11 @@ struct ast_board *ast_create_board(struct ast_chip *chip)
 	board->chip = chip;
 	board->priv = NULL;
 	//board->loader = chip->peripheral[3].priv;
+
 	board->load_image = board_load_image;
 	board->boot = board_prepare_for_boot;
+	board->populate = cptra_populate_idevid;
+	board->runtime_loop = (IS_ENABLED(CONFIG_CPTRA_IPC) ? cptra_ipc_enable : NULL);
 
 	chip->board = board;
 

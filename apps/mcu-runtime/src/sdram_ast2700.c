@@ -136,6 +136,9 @@ bool is_fpga(void)
 {
 #ifdef CONFIG_ASPEED_FPGA
 	sdramc->fpga = 1;
+#ifdef CONFIG_ASPEED_HAPS
+	sdramc->fpga = 0;
+#endif
 #else
 	sdramc->fpga = 0;
 #endif
@@ -144,6 +147,9 @@ bool is_fpga(void)
 
 bool is_ddr4(void)
 {
+#ifdef CONFIG_ASPEED_HAPS
+	return 1;
+#endif
 	if (is_fpga())
 		/* made fpga strap reverse */
 		return ((sys_read32(SCU_IO_HWSTRAP1) & IO_HWSTRAP1_DRAM_TYPE) ? 0 : 1);

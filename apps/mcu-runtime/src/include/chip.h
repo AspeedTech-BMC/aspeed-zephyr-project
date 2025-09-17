@@ -39,6 +39,9 @@ struct ast_board {
 	struct ast_loader *loader;
 	int (*load_image)(void);
 	void (*boot)(void);
+	int (*populate)(void);
+	int (*runtime_loop)(void);
+
 };
 
 struct ast_chip {
