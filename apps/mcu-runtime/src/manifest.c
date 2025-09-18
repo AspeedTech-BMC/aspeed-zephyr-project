@@ -206,11 +206,10 @@ int cptra_load_abb_image(void)
 	struct cptra_soc_manifest *man = cptra_ctx.soc_manifest;
 	struct cptra_manifest_ime *ime = &man->imc[0];
 
-	if (!cptra_ctx.hdr || !cptra_ctx.img_info || !cptra_ctx.chk ||
-	    !cptra_ctx.soc_manifest)
+	if (!man)
 		return CPTRA_ERR_ABB_LOADER_NOT_READY;
 
-	for (ime = &man->imc[0]; ime < man->imc + man->ime_count; ime++) {
+	for (ime = &man->imc[0]; ime < man->imc + man->ime_count && !ret; ime++) {
 		/* Check the whether ime denote image should be loaded */
 		if (!cptra_ime_loadable_image(&cptra_ctx, ime))
 			continue;
@@ -219,12 +218,12 @@ int cptra_load_abb_image(void)
 		if (!load_addr)
 			continue;
 
-		ret = ast_loader_load_manifest_image(ime->fw_id, load_addr,
-						     true);
+		ret = ast_loader_load_manifest_image(ime->fw_id, load_addr, true);
 		LOG_INF("Load %s image... %s (0x%x)", cptra_ime_get_image_name(ime->fw_id),
 			ret ? "fail" : "pass", ret);
 
-		board_manifest_image_post_process(ime->fw_id);
+		if (!ret)
+			board_manifest_image_post_process(ime->fw_id);
 	}
 
 	cptra_deinit_abb_loader(ret);

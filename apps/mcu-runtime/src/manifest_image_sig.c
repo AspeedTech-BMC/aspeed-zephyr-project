@@ -32,6 +32,19 @@ static bool cptra_manifest_sec_en(void)
 #endif
 }
 
+static bool cptra_manfiest_svn_en(void)
+{
+	/*
+	 * Due to the public key verified svn signature should be extract
+	 * from caliptra firmware. In recovery boot caliptra firmware is
+	 * loaded by brom, Zephyr cannot get the caliptra firmware and it
+	 * also cannot get the public key. Therefore, we disable the svn
+	 * check to prevent the boot fail in recovery boot.
+	 */
+
+	return false;
+}
+
 static int cptra_memcpy_to_be(uint32_t *dest, uint32_t *src, uint32_t size)
 {
 	int i = 0;
@@ -97,13 +110,19 @@ static void cptra_preamble_convert(struct cptra_manifest_preamble *preamble,
 
 static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 {
+	int pad_len = ROUND_UP(size, 4) - size;
 	struct hash_ctx ini = {0};
 	struct hash_pkt pkt = {0};
 	const struct device *dev = device_get_binding(CPTRA_HASH_DRV_NAME);
 
+	if (pad_len) {
+		LOG_WRN("cptra image size is not 4 byte aligned (%d, %d)", size, pad_len);
+		memset(img + size, 0x0, pad_len);
+	}
+
 	ini.flags = crypto_query_hwcaps(dev);
 	pkt.in_buf = (uint8_t *)img;
-	pkt.in_len = size;
+	pkt.in_len = size + pad_len;
 	pkt.out_buf = digest;
 
 	if (hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA384) || hash_update(&ini, &pkt) ||
@@ -209,7 +228,7 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 	struct cptra_manifest_aspeed_svn data = {0};
 	struct cptra_manifest_aspeed_preamble *preamble = &(manifest->preamble);
 
-	if (!cptra_manifest_sec_en())
+	if (!cptra_manifest_sec_en() || !cptra_manfiest_svn_en())
 		return CPTRA_SUCCESS;
 
 	data.ver = preamble->manifest_version;
@@ -251,7 +270,7 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
 	if (ret) {
 		LOG_ERR("Caliptra sha384 calculate fail.");
-		return CPTRA_ERR_SHA384_CAL;
+		return ret;
 	}
 
 	/*
