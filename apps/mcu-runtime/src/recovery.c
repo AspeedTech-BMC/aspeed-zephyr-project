@@ -20,7 +20,7 @@ struct message_info {
 };
 
 static struct message_info message[] = {
-	{0, NULL},
+	{CPTRA_MANIFEST_FW_ID, "ast2700-soc-manifest.bin"},
 	{CPTRA_FMC_FW_ID,		   "\n"},
 	{CPTRA_DDR4_IMEM_FW_ID,		"ddr4_pmu_train_imem.bin"},
 	{CPTRA_DDR4_DMEM_FW_ID,		"ddr4_pmu_train_dmem.bin"},

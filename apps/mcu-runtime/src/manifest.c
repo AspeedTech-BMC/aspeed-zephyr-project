@@ -206,13 +206,9 @@ int cptra_load_abb_image(void)
 	struct cptra_soc_manifest *man = cptra_ctx.soc_manifest;
 	struct cptra_manifest_ime *ime = &man->imc[0];
 
-	ret = cptra_init_abb_loader();
-	if (ret)
-		return ret;
-
-	ret = cptra_verify_abb_loader();
-	if (ret)
-		return ret;
+	if (!cptra_ctx.hdr || !cptra_ctx.img_info || !cptra_ctx.chk ||
+	    !cptra_ctx.soc_manifest)
+		return CPTRA_ERR_ABB_LOADER_NOT_READY;
 
 	for (ime = &man->imc[0]; ime < man->imc + man->ime_count; ime++) {
 		/* Check the whether ime denote image should be loaded */
