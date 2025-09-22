@@ -39,17 +39,17 @@ int pci_init(struct ast_chip *chip)
 		return 0;
 	}
 
-	if (efuse == 0) {
-		// setup preset for plda2
-		sys_write32(0x12600000, ASPEED_PLDA2_PRESET0);
-		sys_write32(0x00012600, ASPEED_PLDA2_PRESET1);
+	/* cpu-die pcie node 1 */
+	// setup preset for plda2
+	sys_write32(0x12600000, ASPEED_PLDA2_PRESET0);
+	sys_write32(0x00012600, ASPEED_PLDA2_PRESET1);
 
-		// clk/reset for e2m
-		setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M1);
-		k_msleep(10);
-		setbits_le32(&scu->modrst2_clr, SCU0_RST2_E2M1);
-	}
+	// clk/reset for e2m
+	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M1);
+	k_msleep(10);
+	setbits_le32(&scu->modrst2_clr, SCU0_RST2_E2M1);
 
+	/* cpu-die pcie node 0 */
 	// setup preset for plda1
 	sys_write32(0x12600000, ASPEED_PLDA1_PRESET0);
 	sys_write32(0x00012600, ASPEED_PLDA1_PRESET1);
