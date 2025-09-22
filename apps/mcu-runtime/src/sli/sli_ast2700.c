@@ -325,13 +325,14 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 		}
 	}
 
-	if (win_size == 0 && d_last_pass != -1) {
+	if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
 		win_size = d_last_pass - d_first_pass;
 		sli_log_ahb_pad_delay(data, d_first_pass, d_last_pass);
 		LOG_DBG("IOD SLIH DS coarse win: {%d, %d}\n", d_first_pass, d_last_pass);
+	} else {
+		sli_get_ahb_pad_delay(data, &d_first_pass, &d_last_pass);
 	}
 
-	sli_get_ahb_pad_delay(data, &d_first_pass, &d_last_pass);
 	dc = (d_first_pass + d_last_pass) >> 1;
 	LOG_DBG("IOD SLIH DS coarse win: {%d, %d} -> select %d", d_first_pass, d_last_pass, dc);
 
@@ -507,13 +508,14 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 			}
 		}
 
-		if (win_size == 0 && d_last_pass != -1) {
+		if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
 			win_size = d_last_pass - d_first_pass;
 			sli_log_mbus_pad_delay(data, 0, d_first_pass, d_last_pass);
 			LOG_DBG("%s SLIM DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+		} else {
+			sli_get_mbus_pad_delay(data, 0, &d_first_pass, &d_last_pass);
 		}
 
-		sli_get_mbus_pad_delay(data, 0, &d_first_pass, &d_last_pass);
 		if ((d_last_pass - d_first_pass) >= 3)
 			break;
 		LOG_DBG("%s SLIM DS win: {%d, %d} retry %d\n", die_name, d_first_pass, d_last_pass, count);
@@ -651,13 +653,14 @@ static void sli_calibrate_video_delay(struct sli_data *data, bool is_DS, bool is
 		}
 	}
 
-	if (win_size == 0 && d_last_pass != -1) {
+	if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
 		win_size = d_last_pass - d_first_pass;
 		sli_log_video_pad_delay(scu, d_first_pass, d_last_pass);
 		LOG_DBG("%s SLIV %s coarse win: {%d, %d}\n", die_name, dir_name, d_first_pass, d_last_pass);
+	} else {
+		sli_get_video_pad_delay(scu, &d_first_pass, &d_last_pass);
 	}
 
-	sli_get_video_pad_delay(scu, &d_first_pass, &d_last_pass);
 	if (d_first_pass < 0 || (d_last_pass - d_first_pass) < 4)
 		printf("%s SLIV %s margin not enough! {%d, %d}\n", die_name, dir_name, d_first_pass, d_last_pass);
 
