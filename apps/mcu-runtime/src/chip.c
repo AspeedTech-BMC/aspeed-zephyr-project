@@ -18,6 +18,7 @@
 #include <ast_loader.h>
 #include <wdt.h>
 #include <extrst.h>
+#include <usb.h>
 
 LOG_MODULE_REGISTER(ast_chip, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -31,6 +32,7 @@ static struct peripheral peri_tbl[] = {
 	{"SLI0",	sli_init_r, NULL},
 	{"DRAM",	dram_init, NULL},
 	{"PCI",		pci_init, NULL},
+	{"USB",		usb_init, NULL},
 };
 
 static struct ast_chip ast_27xx = {
