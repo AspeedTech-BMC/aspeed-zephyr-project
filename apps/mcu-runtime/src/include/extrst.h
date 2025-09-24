@@ -13,7 +13,7 @@
 
 #define SCU1_EXTRST_MASK_1_VAL  0x000093ec
 #define SCU1_EXTRST_MASK_2_VAL  0x40303801
-#define SCU1_EXTRST_MASK_3_VAL  0x003e0000
+#define SCU1_EXTRST_MASK_3_VAL  0x00320000
 
 int extrst_mask_init(struct ast_chip *chip);
 
