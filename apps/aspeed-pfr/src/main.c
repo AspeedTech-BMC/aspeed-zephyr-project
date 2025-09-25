@@ -11,6 +11,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/misc/aspeed/abr_aspeed.h>
 
+#include "aspeed_zephyr_project_version.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
@@ -59,8 +60,9 @@ K_TIMER_DEFINE(hbled_timer, hbled_tick, NULL);
 
 void main(void)
 {
-	LOG_INF("*** ASPEED_PFR version v%02d.%02d-dev Board:%s ***",
-			PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, CONFIG_BOARD);
+	LOG_INF("*** ASPEED_PFR %s (%s) Board:%s ***",
+			ASPEED_ZEPHYR_PROJECT_VERSION, ASPEED_ZEPHYR_PROJECT_BUILD_TIMESTAMP, CONFIG_BOARD);
+
 #if 0
 	// Halting for JTAG debug
 	disable_abr_wdt();
