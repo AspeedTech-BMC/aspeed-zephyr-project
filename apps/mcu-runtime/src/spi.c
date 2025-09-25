@@ -108,15 +108,38 @@ static int spi_copy(struct device *dev, uint32_t *dest, uint32_t src, uint32_t l
         return 0;
 }
 
+void spi_adjust_driving_strength(void)
+{
+	uint32_t reg;
+
+	/* FMC driving strength: SCUIO_4E0[15:0] */
+	reg = readl((void *)ASPEED_IO_FWSPI_DRIVING);
+	reg &= ~(0x0000ffff);
+	reg |= 0x0000aaaa;
+	writel(reg, (void *)ASPEED_IO_FWSPI_DRIVING);
+
+	/* SPI0 driving strength: SCUIO_4CC[11:0] */
+	reg = readl((void *)ASPEED_IO_SPI0_DRIVING);
+	reg &= ~(0x00000fff);
+	reg |= 0x00000aaa;
+	writel(reg, (void *)ASPEED_IO_SPI0_DRIVING);
+
+	/* SPI1 driving strength: SCUIO_4CC[27:16] */
+	reg = readl((void *)ASPEED_IO_SPI1_DRIVING);
+	reg &= ~(0x0fff0000);
+	reg |= 0x0aaa0000;
+	writel(reg, (void *)ASPEED_IO_SPI1_DRIVING);
+
+	/* SPI2 driving strength: SCUIO_4D0[15:0] */
+	reg = readl((void *)ASPEED_IO_SPI2_DRIVING);
+	reg &= ~(0x0000ffff);
+	reg |= 0x00002aaa;
+	writel(reg, (void *)ASPEED_IO_SPI2_DRIVING);
+}
+
 static int spi_init(struct device *dev)
 {
-//	flash_dev = device_get_binding("fmc@0");
-//	if (!flash_dev) {
-//		LOG_ERR("No device named fmc@0");
-//		return -1;
-//	}
-
-//	loader->priv = (void *)flash_dev;
+	spi_adjust_driving_strength();
 
         return 0;
 }
