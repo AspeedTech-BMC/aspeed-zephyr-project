@@ -53,7 +53,7 @@ target_sources(app PRIVATE
 	recovery.c
 	i2c.c
 	i3c.c
-	usb.c
+	usb_recovery.c
 	uart.c
 	chip.c
 	board.c
