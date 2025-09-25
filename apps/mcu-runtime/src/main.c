@@ -15,6 +15,7 @@
 #include <soc.h>
 #include <platform.h>
 #include <chip.h>
+#include <cptra_idevid.h>
 
 #include "aspeed_zephyr_project_version.h"
 
@@ -44,6 +45,9 @@ int main(void)
 			}
 
 			board->boot();
+
+			/* Populate IDEVID Certificate */
+			cptra_populate_idevid();
 
 			/* TODO: go to runtime loop */
 			cptra_ipc_enable();
