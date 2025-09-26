@@ -5,6 +5,8 @@
  */
 #include <ast_loader.h>
 #include <manifest.h>
+#include <platform.h>
+#include <scu_ast2700.h>
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/crypto/crypto.h>
@@ -21,7 +23,27 @@
 
 LOG_MODULE_REGISTER(cptra_manifest_sig, CONFIG_LOG_DEFAULT_LEVEL);
 
-static struct cptra_set_auth_manifest_ia input = {0};
+static bool cptra_manifest_sec_en(void)
+{
+#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+	return !!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_EN_SECBOOT);
+#else
+	return false;
+#endif
+}
+
+static bool cptra_manfiest_svn_en(void)
+{
+	/*
+	 * Due to the public key verified svn signature should be extract
+	 * from caliptra firmware. In recovery boot caliptra firmware is
+	 * loaded by brom, Zephyr cannot get the caliptra firmware and it
+	 * also cannot get the public key. Therefore, we disable the svn
+	 * check to prevent the boot fail in recovery boot.
+	 */
+
+	return false;
+}
 
 static int cptra_memcpy_to_be(uint32_t *dest, uint32_t *src, uint32_t size)
 {
@@ -88,13 +110,19 @@ static void cptra_preamble_convert(struct cptra_manifest_preamble *preamble,
 
 static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 {
+	int pad_len = ROUND_UP(size, 4) - size;
 	struct hash_ctx ini = {0};
 	struct hash_pkt pkt = {0};
 	const struct device *dev = device_get_binding(CPTRA_HASH_DRV_NAME);
 
+	if (pad_len) {
+		LOG_WRN("cptra image size is not 4 byte aligned (%d, %d)", size, pad_len);
+		memset(img + size, 0x0, pad_len);
+	}
+
 	ini.flags = crypto_query_hwcaps(dev);
 	pkt.in_buf = (uint8_t *)img;
-	pkt.in_len = size;
+	pkt.in_len = size + pad_len;
 	pkt.out_buf = digest;
 
 	if (hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA384) || hash_update(&ini, &pkt) ||
@@ -171,20 +199,24 @@ static int cptra_manifest_lms(uint8_t *data, uint32_t data_size, struct lms_pub_
 	return ret;
 }
 
+static struct cptra_set_auth_manifest_ia auth_input;
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest)
 {
 	struct cptra_set_auth_manifest_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
 
-	input.manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
+	if (!cptra_manifest_sec_en())
+		return CPTRA_SUCCESS;
+
+	auth_input.manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
 			      sizeof(manifest->imc);
-	input.metadata_entry_entry_count = manifest->ime_count;
+	auth_input.metadata_entry_entry_count = manifest->ime_count;
 
 	/* Convert aspeed preamble format to caliptra preamble format*/
-	cptra_preamble_convert(&(input.preamble), &(manifest->preamble));
-	memcpy(&(input.metadata_entries), manifest->imc, sizeof(manifest->imc));
+	cptra_preamble_convert(&(auth_input.preamble), &(manifest->preamble));
+	memcpy(&(auth_input.metadata_entries), manifest->imc, sizeof(manifest->imc));
 
-	return caliptra_set_auth_manifest(dev, &input, &output);
+	return caliptra_set_auth_manifest(dev, &auth_input, &output);
 }
 
 #define CPTRA_SOC_MANIFEST_VER (0)
@@ -195,6 +227,9 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 	struct lms_pub_key lms_pubk = {0};
 	struct cptra_manifest_aspeed_svn data = {0};
 	struct cptra_manifest_aspeed_preamble *preamble = &(manifest->preamble);
+
+	if (!cptra_manifest_sec_en() || !cptra_manfiest_svn_en())
+		return CPTRA_SUCCESS;
 
 	data.ver = preamble->manifest_version;
 	data.sec_ver = preamble->manifest_sec_version;
@@ -222,32 +257,51 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 	return CPTRA_SUCCESS;
 }
 
-int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_ime *ime)
+int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 {
 	int ret = 0;
 	struct cptra_authorize_and_stash_ia input = {0};
 	struct cptra_authorize_and_stash_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
 
-	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
-	if (ret)
-		return CPTRA_ERR_SHA384_CAL;
+	if (!cptra_manifest_sec_en())
+		return CPTRA_SUCCESS;
 
-	*input.fw_id = ime->fw_id;
-	input.source = ime->flags & 0x3;
+	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
+	if (ret) {
+		LOG_ERR("Caliptra sha384 calculate fail.");
+		return ret;
+	}
+
+	/*
+	 * Caliptra 1.2 only supports source = 0x1, to reduce
+	 * complexity, the source is hardcoded to 0x1
+	 */
+	*input.fw_id = fw_id;
+	input.source = 0x1;
 	ret = caliptra_authorize_and_stash(dev, &input, &output);
-	if (ret)
+	if (ret) {
+		LOG_ERR("Caliptra image authorize and stash fail.");
 		return CPTRA_ERR_IMAGE_VFY_MBOX_ERROR;
+	}
 
 	/* Mailbox error handler */
 	switch (output.auth_req_result) {
 	case AUTHORIZE_IMAGE:
-		return CPTRA_SUCCESS;
+		ret = CPTRA_SUCCESS;
+		break;
 	case IMAGE_HASH_MISMATCH:
-		return CPTRA_ERR_IMAGE_VFY_HASH_MISMATCH;
+		ret = CPTRA_ERR_IMAGE_VFY_HASH_MISMATCH;
+		break;
 	case IMAGE_NOT_AUTHORIZED:
-		return CPTRA_ERR_IMAGE_VFY_FWID_MISMATCH;
+		ret = CPTRA_ERR_IMAGE_VFY_FWID_MISMATCH;
+		break;
 	default:
-		return CPTRA_ERR_IMAGE_VFY_UNKNOWN_ERROR;
+		ret = CPTRA_ERR_IMAGE_VFY_UNKNOWN_ERROR;
+		break;
 	}
+
+	LOG_INF("Verify %s image... %s (0x%x)", cptra_ime_get_image_name(fw_id),
+		ret ? "fail" : "pass", ret);
+	return ret;
 }

@@ -9,8 +9,7 @@
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/logging/log.h>
 
-//LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
-LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_SOC_FMC_LOG_LEVEL);
+LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 
 /* Define caliptra image identifier */
 #define CPTRA_SOC_MANIFEST_HDR_ID (0x0002)
@@ -49,19 +48,34 @@ struct cptra_load_image {
 };
 
 static struct cptra_load_image image_list[] = {
-	{"mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID, CPTRA_FMC_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID, CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE},
-	{"atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID, CPTRA_ATF_LOAD_ADDR, CPTRA_LOADABLE},
-	{"optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID, CPTRA_OPTEE_LOAD_ADDR, CPTRA_LOADABLE},
-	{"uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID, CPTRA_UBOOT_LOAD_ADDR, CPTRA_LOADABLE},
-	{"ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID, CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE},
+	{ "manifest", CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID,
+	  CPTRA_FMC_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID,
+	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
+	{ "atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID,
+	  CPTRA_ATF_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID,
+	  CPTRA_OPTEE_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID,
+	  CPTRA_UBOOT_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID,
+	  CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE },
 };
 
 static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context *ctx,
@@ -113,59 +127,8 @@ static struct cptra_load_image *cptra_find_load_image(uint32_t fw_id)
 	return match != -1 ? &image_list[match] : NULL;
 }
 
-int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
-{
-	struct cptra_load_image *img = NULL;
-
-	if (!ctx || !ime)
-		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
-
-	img = cptra_find_load_image(ime->fw_id);
-	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", ime->fw_id);
-		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
-	}
-
-	return cptra_img_info_get_offset(ctx, img->identifier);
-}
-
-int cptra_soc_manifest_offset(struct cptra_image_context *ctx)
-{
-	if (!ctx)
-		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
-
-	return cptra_img_info_get_offset(ctx, CPTRA_SOC_MANIFEST_HDR_ID);
-}
-
-int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
-{
-	struct cptra_load_image *img = NULL;
-
-	if (!ctx || !ime)
-		return CPTRA_ERR_IMAGE_SIZE_INVALID;
-
-	img = cptra_find_load_image(ime->fw_id);
-	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", ime->fw_id);
-		return CPTRA_ERR_IMAGE_SIZE_INVALID;
-	}
-
-	return cptra_img_info_get_size(ctx, img->identifier);
-}
-
-char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime)
-{
-	struct cptra_load_image *img = NULL;
-
-	if (!ime)
-		return "Unknown";
-
-	img = cptra_find_load_image(ime->fw_id);
-
-	return img ? img->name : "Unknown";
-}
-
-bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime)
+bool cptra_ime_loadable_image(struct cptra_image_context *ctx,
+			      struct cptra_manifest_ime *ime)
 {
 	uint32_t img_size = 0;
 	struct cptra_load_image *img = NULL;
@@ -184,36 +147,56 @@ bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_mani
 	return true;
 }
 
-uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime)
+int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id)
 {
 	struct cptra_load_image *img = NULL;
 
-	if (!ime)
-		return (uintptr_t)NULL;
+	if (!ctx)
+		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
 
-	img = cptra_find_load_image(ime->fw_id);
+	img = cptra_find_load_image(fw_id);
 	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", ime->fw_id);
+		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
+		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
+	}
+
+	return cptra_img_info_get_offset(ctx, img->identifier);
+}
+
+char *cptra_ime_get_image_name(uint32_t fw_id)
+{
+	struct cptra_load_image *img = NULL;
+
+	img = cptra_find_load_image(fw_id);
+
+	return img ? img->name : "Unknown";
+}
+
+int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id)
+{
+	struct cptra_load_image *img = NULL;
+
+	if (!ctx)
+		return CPTRA_ERR_IMAGE_SIZE_INVALID;
+
+	img = cptra_find_load_image(fw_id);
+	if (!img) {
+		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
+		return CPTRA_ERR_IMAGE_SIZE_INVALID;
+	}
+
+	return cptra_img_info_get_size(ctx, img->identifier);
+}
+
+uintptr_t cptra_ime_get_load_addr(uint32_t fw_id)
+{
+	struct cptra_load_image *img = NULL;
+
+	img = cptra_find_load_image(fw_id);
+	if (!img) {
+		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
 		return (uintptr_t)NULL;
 	}
 
 	return img->load_addr;
-}
-
-int cptra_ime_load_image(void *img_bin, uint32_t img_size, struct cptra_manifest_ime *ime)
-{
-	uintptr_t load_addr = 0;
-
-	if (!img_bin || img_size == 0 || !ime)
-		return CPTRA_ERR_IMAGE_LOAD_INVALID_PARAM;
-
-	load_addr = cptra_ime_get_load_addr(ime);
-	if (!load_addr) {
-		LOG_ERR("Cannot find load address for fw_id 0x%x.", ime->fw_id);
-		return CPTRA_ERR_IMAGE_LOAD;
-	}
-
-	memcpy((void *)load_addr, img_bin, img_size);
-
-	return CPTRA_SUCCESS;
 }

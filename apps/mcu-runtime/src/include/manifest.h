@@ -34,6 +34,7 @@
 	(_loader)->size = 0;
 
 enum {
+	CPTRA_MANIFEST_FW_ID = 0x00,
 	CPTRA_FMC_FW_ID = 0x01,
 	CPTRA_DDR4_IMEM_FW_ID = 0x02,
 	CPTRA_DDR4_DMEM_FW_ID = 0x03,
@@ -52,8 +53,9 @@ enum {
 
 enum cptra_error_code {
 	CPTRA_SUCCESS = 0,
+	CPTRA_ERR_EXCEED_MEMORY_LIMIT,
 	CPTRA_ERR_INVALID_PARAMETER,
-	CPTRA_ERR_UNSUPPORT_BOOT_DEV,
+	CPTRA_ERR_ABB_LOADER_NOT_READY,
 	CPTRA_ERR_READ_HDR,
 	CPTRA_ERR_HDR_MAGIC_MISMATCH,
 	CPTRA_ERR_EXCEED_MAX_IMG_COUNT,
@@ -85,7 +87,7 @@ struct cptra_manifest_hdr {
 	uint32_t magic;
 	uint16_t hdr_ver;
 	uint16_t img_count;
-} __attribute__((__packed__));
+} __attribute__((__packed__, __aligned__(4)));
 
 struct cptra_checksum_info {
 	uint32_t hdr_checksum;
@@ -141,34 +143,18 @@ struct cptra_image_context {
 	struct cptra_soc_manifest *soc_manifest;
 };
 
-struct cptra_load_info {
-	uintptr_t base; /* Base address of the buffer to read/write */
-	uintptr_t limit;
-	uint32_t read_sector;  /* Number of bytes read from the device */
-	uint32_t write_sector; /* Number of bytes written to the buffer */
-	uint32_t size;         /* Size of the data to be read */
-};
-
-static inline void *cptra_manifest_buffer_addr(uint32_t offset)
-{
-	/* Return the address where the manifest buffer should be loaded */
-	return (void *)(CONFIG_SYS_LOAD_ADDR + offset);
-}
-
-bool cptra_manifest_sec_en(void);
-int cptra_load_image(void);
-int cptra_hdr_get_prebuilt(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
+int cptra_verify_abb_loader(void);
+int cptra_load_abb_image(void);
+int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
-int cptra_verify_image(uint8_t *img, uint32_t img_size, struct cptra_manifest_ime *ime);
-void board_manifest_image_post_process(struct cptra_manifest_ime *ime);
+int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id);
+void board_manifest_image_post_process(uint32_t fw_id);
 
-char *cptra_ime_get_image_name(struct cptra_manifest_ime *ime);
-int cptra_soc_manifest_offset(struct cptra_image_context *ctx);
-int cptra_ime_image_offset(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
-int cptra_ime_image_size(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
 bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
-uintptr_t cptra_ime_get_load_addr(struct cptra_manifest_ime *ime);
-int cptra_ime_load_image(void *img_bin, uint32_t img_size, struct cptra_manifest_ime *ime);
+char *cptra_ime_get_image_name(uint32_t fw_id);
+int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id);
+int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id);
+uintptr_t cptra_ime_get_load_addr(uint32_t fw_id);
 
 #endif /* _MANIFEST_H */

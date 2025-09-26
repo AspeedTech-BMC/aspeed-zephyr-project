@@ -141,12 +141,12 @@ int vga_init(struct ast2700_scu0 *scu)
 
 	LOG_DBG("%s: ENABLE 0(%d) 1(%d)", __func__, is_pcie0_enable, is_pcie1_enable);
 
-	_ast_update_e2m(scu, ram, is_64vram, is_pcie0_enable, is_pcie1_enable);
-
 	if (scu->hwstrap1 & BIT(11)) {
 		LOG_DBG("%s: Skip probe since it has been done.\n", __func__);
 		return 0;
 	}
+
+	_ast_update_e2m(scu, ram, is_64vram, is_pcie0_enable, is_pcie1_enable);
 
 	/* scratch for VGA CRAA[1:0] : 10b: 32Mbytes, 11b: 64Mbytes */
 	setbits_le32(&scu->hwstrap1, BIT(11));
@@ -212,9 +212,10 @@ int vga_init(struct ast2700_scu0 *scu)
 		packer_cpu->REG10.value  = 0x00030009;
 		val = 0x10000000 | dac_src;
 		packer_cpu->REG50.value  = val;
-		packer_cpu->REG44.value  = 0x00100000;
+		packer_cpu->REG44.value  = 0x00100010;
 		retimer_cpu->REG10.value = 0x00030009;
 		packer_io->REG10.value   = 0x00030009;
+		packer_io->REG44.value   = 0x00010002;
 		retimer_io->REG10.value  = 0x00230009;
 		retimer_io->REG44.value  = 0x00100010;
 	}

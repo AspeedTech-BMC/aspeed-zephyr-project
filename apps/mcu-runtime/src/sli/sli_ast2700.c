@@ -16,7 +16,7 @@
 #include <sli.h>
 
 #define LOG_MODULE_NAME			sli_ast2700
-LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_LOG_DEFAULT_LEVEL);
 
 #define SLIM_REG_OFFSET			0x000
 #define SLIH_REG_OFFSET			0x200
@@ -325,13 +325,14 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 		}
 	}
 
-	if (win_size == 0 && d_last_pass != -1) {
+	if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
 		win_size = d_last_pass - d_first_pass;
 		sli_log_ahb_pad_delay(data, d_first_pass, d_last_pass);
 		LOG_DBG("IOD SLIH DS coarse win: {%d, %d}\n", d_first_pass, d_last_pass);
+	} else {
+		sli_get_ahb_pad_delay(data, &d_first_pass, &d_last_pass);
 	}
 
-	sli_get_ahb_pad_delay(data, &d_first_pass, &d_last_pass);
 	dc = (d_first_pass + d_last_pass) >> 1;
 	LOG_DBG("IOD SLIH DS coarse win: {%d, %d} -> select %d", d_first_pass, d_last_pass, dc);
 
@@ -445,8 +446,9 @@ static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int be
 			}
 		}
 
-		if ((d_last_pass - d_first_pass) > 3)
+		if ((d_last_pass - d_first_pass) >= 3)
 			break;
+		LOG_DBG("%s SLIM[%d] DS win: {%d, %d} retry %d\n", die_name, index, d_first_pass, d_last_pass, count);
 	}
 
 	if (d_first_pass == -1)
@@ -467,6 +469,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 	int d_first_pass = -1;
 	int d_last_pass = -1;
 	int win_size = 0;
+	int count = 0;
 	char *die_name = (is_k_rx) ? "IOD" : "CPUD";
 	mem_addr_t kx = (is_k_rx) ? data->die1.slim : data->die0.slim;
 
@@ -478,39 +481,46 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 		clrbits_le32(kx + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
 
 	/* Find coarse delay */
-	for (dc = SLIM_COARSE_D_BEGIN; dc < SLIM_COARSE_D_END; dc++) {
-		sli_set_mbus_delay(kx, dc, dc, dc, dc, is_k_rx);
+	for (count = 0; count < 99; count++) {
+		for (dc = SLIM_COARSE_D_BEGIN; dc < SLIM_COARSE_D_END; dc++) {
+			sli_set_mbus_delay(kx, dc, dc, dc, dc, is_k_rx);
 
-		/* Reset CPU-die TX and IO-die RX */
-		sli_clear(data->die0.slim, SLI_RESET_TRIGGER);
-		sli_clear(data->die1.slim, SLI_RESET_TRIGGER);
+			/* Reset CPU-die TX and IO-die RX */
+			sli_clear(data->die0.slim, SLI_RESET_TRIGGER);
+			sli_clear(data->die1.slim, SLI_RESET_TRIGGER);
 
-		/* Check result */
-		sli_clear_interrupt_status(data->die1.slim);
-		k_busy_wait(200);
-		if (is_sli_suspend(data->die1.slim) > 0) {
-			if (d_first_pass == -1)
-				d_first_pass = dc;
+			/* Check result */
+			sli_clear_interrupt_status(data->die1.slim);
+			k_busy_wait(200);
+			if (is_sli_suspend(data->die1.slim) > 0) {
+				if (d_first_pass == -1)
+					d_first_pass = dc;
 
-			d_last_pass = dc;
-		} else if (d_last_pass != -1) {
-			if ((d_last_pass - d_first_pass) > win_size) {
-				win_size = d_last_pass - d_first_pass;
-				sli_log_mbus_pad_delay(data, 0, d_first_pass, d_last_pass);
-				LOG_DBG("%s SLIM DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+				d_last_pass = dc;
+			} else if (d_last_pass != -1) {
+				if ((d_last_pass - d_first_pass) > win_size) {
+					win_size = d_last_pass - d_first_pass;
+					sli_log_mbus_pad_delay(data, 0, d_first_pass, d_last_pass);
+					LOG_DBG("%s SLIM DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+				}
+				d_first_pass = -1;
+				d_last_pass = -1;
 			}
-			d_first_pass = -1;
-			d_last_pass = -1;
 		}
+
+		if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
+			win_size = d_last_pass - d_first_pass;
+			sli_log_mbus_pad_delay(data, 0, d_first_pass, d_last_pass);
+			LOG_DBG("%s SLIM DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+		} else {
+			sli_get_mbus_pad_delay(data, 0, &d_first_pass, &d_last_pass);
+		}
+
+		if ((d_last_pass - d_first_pass) >= 3)
+			break;
+		LOG_DBG("%s SLIM DS win: {%d, %d} retry %d\n", die_name, d_first_pass, d_last_pass, count);
 	}
 
-	if (win_size == 0 && d_last_pass != -1) {
-		win_size = d_last_pass - d_first_pass;
-		sli_log_mbus_pad_delay(data, 0, d_first_pass, d_last_pass);
-		LOG_DBG("%s SLIM DS coarse win: {%d, %d}\n", die_name, d_first_pass, d_last_pass);
-	}
-
-	sli_get_mbus_pad_delay(data, 0, &d_first_pass, &d_last_pass);
 	dc = (d_first_pass + d_last_pass) >> 1;
 	if (dc == 0)
 		dc = SLIM_DEFAULT_DELAY;
@@ -522,18 +532,20 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 	begin = MAX(dc - SLIM_FINE_MARGIN, 0);
 	end = MIN(dc + SLIM_FINE_MARGIN, 31);
 
-	/* Fine-tune per-PAD delay */
-	d0 = sli_calibrate_mbus_pad_delay(data, 0, begin, end, is_k_rx);
-	sli_set_mbus_delay_single(kx, 0, d0, is_k_rx);
+	if (win_size) {
+		/* Fine-tune per-PAD delay */
+		d0 = sli_calibrate_mbus_pad_delay(data, 0, begin, end, is_k_rx);
+		sli_set_mbus_delay_single(kx, 0, d0, is_k_rx);
 
-	d1 = sli_calibrate_mbus_pad_delay(data, 1, begin, end, is_k_rx);
-	sli_set_mbus_delay_single(kx, 1, d1, is_k_rx);
+		d1 = sli_calibrate_mbus_pad_delay(data, 1, begin, end, is_k_rx);
+		sli_set_mbus_delay_single(kx, 1, d1, is_k_rx);
 
-	d2 = sli_calibrate_mbus_pad_delay(data, 2, begin, end, is_k_rx);
-	sli_set_mbus_delay_single(kx, 2, d2, is_k_rx);
+		d2 = sli_calibrate_mbus_pad_delay(data, 2, begin, end, is_k_rx);
+		sli_set_mbus_delay_single(kx, 2, d2, is_k_rx);
 
-	d3 = sli_calibrate_mbus_pad_delay(data, 3, begin, end, is_k_rx);
-	sli_set_mbus_delay_single(kx, 3, d3, is_k_rx);
+		d3 = sli_calibrate_mbus_pad_delay(data, 3, begin, end, is_k_rx);
+		sli_set_mbus_delay_single(kx, 3, d3, is_k_rx);
+	}
 
 	/* Reset CPU-die TX and IO-die RX */
 	sli_clear(data->die0.slim, SLI_RESET_TRIGGER);
@@ -641,13 +653,14 @@ static void sli_calibrate_video_delay(struct sli_data *data, bool is_DS, bool is
 		}
 	}
 
-	if (win_size == 0 && d_last_pass != -1) {
+	if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
 		win_size = d_last_pass - d_first_pass;
 		sli_log_video_pad_delay(scu, d_first_pass, d_last_pass);
 		LOG_DBG("%s SLIV %s coarse win: {%d, %d}\n", die_name, dir_name, d_first_pass, d_last_pass);
+	} else {
+		sli_get_video_pad_delay(scu, &d_first_pass, &d_last_pass);
 	}
 
-	sli_get_video_pad_delay(scu, &d_first_pass, &d_last_pass);
 	if (d_first_pass < 0 || (d_last_pass - d_first_pass) < 4)
 		printf("%s SLIV %s margin not enough! {%d, %d}\n", die_name, dir_name, d_first_pass, d_last_pass);
 
