@@ -3,3 +3,8 @@
 # Copyright (c) 2025 ASPEED Technology Inc.
 
 rsource "sli/Kconfig"
+
+config USB_UART_PORTS
+	string "array to define uarts exposed by usb"
+	help
+		A comma-separated list of integers.

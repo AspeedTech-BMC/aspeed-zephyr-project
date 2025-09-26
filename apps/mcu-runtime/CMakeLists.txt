@@ -7,7 +7,6 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(aspeed_irot)
 
 zephyr_include_directories(lib/dtc/libfdt)
-zephyr_include_directories(lib/xyzmodem)
 zephyr_include_directories(.)
 
 add_subdirectory(src)
