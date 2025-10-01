@@ -56,7 +56,7 @@ static int cptra_get_idevid_cert(struct cptra_get_idev_cert_ia *input,
 
 		if (*p16++ == 0x0) {
 			if (i == 0) {
-				LOG_ERR("tbs is empty");
+				LOG_WRN("tbs is empty");
 				ret = -EIO;
 				goto end;
 			}
