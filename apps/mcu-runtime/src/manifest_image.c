@@ -26,6 +26,7 @@ LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 #define CPTRA_OPTEE_HDR_ID        (0x1009)
 #define CPTRA_UBOOT_HDR_ID        (0x100A)
 #define CPTRA_SSP_HDR_ID          (0x100B)
+#define CPTRA_TSP_HDR_ID          (0x100C)
 
 /* Define caliptra image load address */
 #define CPTRA_NO_LOAD_ADDR    (0x00000000)
@@ -34,6 +35,7 @@ LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 #define CPTRA_OPTEE_LOAD_ADDR (0xb0080000)
 #define CPTRA_UBOOT_LOAD_ADDR (0x80000000)
 #define CPTRA_SSP_LOAD_ADDR   (0xac000000)
+#define CPTRA_TSP_LOAD_ADDR   (0xae000000)
 
 /* Define caliptra image loadable property */
 #define CPTRA_UNLOADABLE (0)
@@ -76,6 +78,8 @@ static struct cptra_load_image image_list[] = {
 	  CPTRA_UBOOT_LOAD_ADDR, CPTRA_LOADABLE },
 	{ "ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID,
 	  CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE },
+	{"tsp", CPTRA_TSP_HDR_ID, CPTRA_TSP_FW_ID,
+	  CPTRA_TSP_LOAD_ADDR, CPTRA_UNLOADABLE},
 };
 
 static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context *ctx,
