@@ -731,7 +731,7 @@ int sli_init_f(struct ast_chip *chip)
 	data->die1.phy_clk_freq = SLI_TARGET_PHYCLK;
 
 	data->flags = 0;
-	data->scu1 = (struct ast2700_scu1 *)DT_REG_ADDR(DT_NODELABEL(syscon1));
+	data->scu1 = chip->scu1;
 
 	if (FIELD_GET(SCU0_REVISION_ID_HW, data->scu1->chip_id1) == 0)
 		data->flags |= SLI_FLAG_AST2700A0;
@@ -827,8 +827,6 @@ int sli_init_r(struct ast_chip *chip)
 {
 	struct sli_data ast2700_sli_data[1];
 	struct sli_data *data = ast2700_sli_data;
-	struct ast2700_scu0 *scu0;
-	struct ast2700_scu1 *scu1;
 	uint32_t reg_val;
 	int retry = 10;
 	bool sli0_ready = false;
@@ -838,9 +836,6 @@ int sli_init_r(struct ast_chip *chip)
 		LOG_DBG("AST2700 SLI0 ready, 25MHz");
 		return 0;
 	}
-
-	scu0 = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
-	scu1 = (struct ast2700_scu1 *)DT_REG_ADDR(DT_NODELABEL(syscon1));
 
 	/* CPU die */
 	data->die0.slim = SLI0_REG + SLIM_REG_OFFSET;
@@ -853,15 +848,15 @@ int sli_init_r(struct ast_chip *chip)
 	data->die1.sliv = SLI1_REG + SLIV_REG_OFFSET;
 
 	data->flags = 0;
-	data->scu0 = scu0;
-	data->scu1 = scu1;
+	data->scu0 = chip->scu0;
+	data->scu1 = chip->scu1;
 
-	if (scu1->scratch[31] & SCU1_SCRATCH31_SLI_SKIP_CALI) {
+	if (data->scu1->scratch[31] & SCU1_SCRATCH31_SLI_SKIP_CALI) {
 		printf("SLI0 has been initialized\n");
 		return 0;
 	}
 	while (--retry > 0) {
-		if (scu1->scratch[31] & SCU1_SCRATCH31_SLI0_READY) {
+		if (data->scu1->scratch[31] & SCU1_SCRATCH31_SLI0_READY) {
 			sli0_ready = true;
 			break;
 		}
@@ -881,7 +876,7 @@ int sli_init_r(struct ast_chip *chip)
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1b4);
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1f4);
 		k_busy_wait(200);
-		setbits_le32((mem_addr_t)&scu0->cpu_scratch[31],
+		setbits_le32((mem_addr_t)&data->scu0->cpu_scratch[31],
 			     SCU0_SCRATCH31_SLI1_READY);
 		k_busy_wait(100);
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x034);
@@ -890,7 +885,7 @@ int sli_init_r(struct ast_chip *chip)
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0f4);
 		LOG_INF("SLI0 calibration completed");
 
-		setbits_le32((mem_addr_t)&scu1->scratch[31],
+		setbits_le32((mem_addr_t)&data->scu1->scratch[31],
 			     SCU1_SCRATCH31_SLI_SKIP_CALI);
 
 		/* Reset SLIM MARB before using the SLIM */
