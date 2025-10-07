@@ -14,13 +14,9 @@
 #include <pci_ast2700.h>
 #include <scu_ast2700.h>
 #include <vga_ast2700.h>
+#include <ast_loader.h>
 
 LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
-
-static void setbits_le32(void *addr, uint32_t set)
-{
-	sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr);
-}
 
 int pci_init(struct ast_chip *chip)
 {

@@ -143,10 +143,6 @@ enum ocp_recovery_command {
 uint8_t i2c_buff[I2C_BUFFER_SIZE];
 
 #define field_prep(_mask, _val) (((_val) << (ffs(_mask) - 1)) & (_mask))
-static void clrsetbits_le32(mm_reg_t addr, uint32_t clr, uint32_t set)
-{
-	sys_write32((sys_read32(addr) & (~clr)) | set, addr);
-}
 
 static void i2c_pinctrl_setting(uint8_t index)
 {
