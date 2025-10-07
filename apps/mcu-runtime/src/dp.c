@@ -13,6 +13,7 @@
 #include <platform.h>
 #include <dp_ast2700.h>
 #include <scu_ast2700.h>
+#include <chip.h>
 
 LOG_MODULE_REGISTER(dp, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -23,7 +24,7 @@ static void setbits_le32(void *addr, uint32_t set)
 
 int dp_init(struct ast_chip *chip)
 {
-	struct ast2700_scu0 *scu = (void *)SCU0_REG;
+	struct ast2700_scu0 *scu = chip->scu0;
 	uint32_t mcu_ctrl, val;
 	uintptr_t scu_offset;
 	bool is_mcu_stop = false;

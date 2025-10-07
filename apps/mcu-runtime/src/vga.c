@@ -114,27 +114,27 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 	}
 }
 
-int vga_init(struct ast2700_scu0 *scu)
+int vga_init(struct ast_chip *chip)
 {
 	struct sdramc_regs *ram = (struct sdramc_regs *)DRAMC_BASE;
 	uint32_t val;
-	bool is_pcie0_enable = scu->pci0_misc[28] & BIT(0);
-	bool is_pcie1_enable = scu->pci1_misc[28] & BIT(0);
+	struct ast2700_scu0 *scu = chip->scu0;
+	bool is_pcie0_enable = chip->pcie0_enable;
+	bool is_pcie1_enable = chip->pcie1_enable;
 	bool is_64vram = ram->gfmcfg & BIT(0);
 	uint8_t dac_src = scu->hwstrap1 & BIT(28);
 	uint8_t dp_src = scu->hwstrap1 & BIT(29);
-	uint8_t efuse = FIELD_GET(SCU0_REVISION_ID_EFUSE, scu->chip_id1);
 
 	/* Decide feature by efuse
 	 *  0: 2750 has full function
 	 *  1: 2700 has only 1 VGA
 	 *  2: 2720 has no VGA
 	 */
-	if (efuse == 1) {
+	if (chip->efuse == 1) {
 		is_pcie1_enable = false;
 		dac_src = 0;
 		dp_src = 0;
-	} else if (efuse == 2) {
+	} else if (chip->efuse == 2) {
 		LOG_DBG("%s: 2720 has no VGA", __func__);
 		return 0;
 	}

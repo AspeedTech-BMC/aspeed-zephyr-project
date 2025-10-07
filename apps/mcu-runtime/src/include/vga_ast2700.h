@@ -349,6 +349,6 @@ struct ast2700_vga_link {
 };
 #endif
 
-int vga_init(struct ast2700_scu0 *scu);
+int vga_init(struct ast_chip *chip);
 
 #endif

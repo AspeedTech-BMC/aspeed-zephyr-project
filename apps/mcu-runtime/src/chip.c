@@ -47,6 +47,8 @@ struct ast_chip *ast_create_chip(void)
 	struct ast_chip *chip = &ast_27xx;
 
 	/* Put chip info here, for example scu */
+	chip->scu0 = (struct ast2700_scu0 *)DT_REG_ADDR(DT_NODELABEL(syscon0));
+	chip->scu1 = (struct ast2700_scu1 *)DT_REG_ADDR(DT_NODELABEL(syscon1));
 	chip->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 	chip->efuse = FIELD_GET(SCU_CPU_REVISION_ID_EFUSE, sys_read32(SCU0_REVISION_ID));
 	chip->pcie0_enable = sys_read32(SCU0_REG + 0xa00) & BIT(0);

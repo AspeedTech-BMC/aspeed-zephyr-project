@@ -24,17 +24,15 @@ static void setbits_le32(void *addr, uint32_t set)
 
 int pci_init(struct ast_chip *chip)
 {
-	struct ast2700_scu0 *scu = (void *)SCU0_REG;
-	uint8_t efuse;
+	struct ast2700_scu0 *scu = chip->scu0;
 
 	// leave works to u-boot
-	if (FIELD_GET(SCU0_REVISION_ID_HW, scu->chip_id1) == 0) {
+	if (chip->rev_id == 0) {
 		LOG_DBG("%s: Do nothing in A0\n", __func__);
 		return 0;
 	}
 
-	efuse = FIELD_GET(SCU0_REVISION_ID_EFUSE, scu->chip_id1);
-	if (efuse == 2) {
+	if (chip->efuse == 2) {
 		LOG_DBG("%s: 2720 has no PCIE\n", __func__);
 		return 0;
 	}
@@ -59,7 +57,7 @@ int pci_init(struct ast_chip *chip)
 	k_msleep(10);
 	setbits_le32(&scu->modrst2_clr, SCU0_RST2_E2M0);
 
-	vga_init(scu);
+	vga_init(chip);
 
 	return 0;
 }
