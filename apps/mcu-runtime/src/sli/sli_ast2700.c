@@ -14,6 +14,7 @@
 
 #include <zephyr/logging/log.h>
 #include <sli.h>
+#include <ast_loader.h>
 
 #define LOG_MODULE_NAME			sli_ast2700
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_LOG_DEFAULT_LEVEL);
@@ -153,21 +154,6 @@ struct sli_data {
 #define SCU1_SCRATCH31_SLI_SKIP_CALI	BIT(1)	/* skip calibration */
 #define SCU0_SCRATCH31_SLI1_READY	BIT(0)
 #define AHBC_MAX_TIMEOUT		0x1ff
-
-static void setbits_le32(mm_reg_t addr, uint32_t set)
-{
-	sys_write32(sys_read32(addr) | set, addr);
-}
-
-static void clrbits_le32(mm_reg_t addr, uint32_t clr)
-{
-	sys_write32(sys_read32(addr) & (~clr), addr);
-}
-
-static void clrsetbits_le32(mm_reg_t addr, uint32_t clr, uint32_t set)
-{
-	sys_write32((sys_read32(addr) & (~clr)) | set, addr);
-}
 
 static bool is_sli_calibrated(struct sli_data *data)
 {

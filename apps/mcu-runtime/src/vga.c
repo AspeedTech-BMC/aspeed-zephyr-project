@@ -21,11 +21,6 @@
 
 LOG_MODULE_REGISTER(vga, CONFIG_SOC_FMC_LOG_LEVEL);
 
-static void setbits_le32(void *addr, uint32_t set)
-{
-	sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr);
-}
-
 static uint32_t _ast_get_e2m_addr(struct sdramc_regs *ram, uint8_t node)
 {
 	uint32_t val;
@@ -41,14 +36,10 @@ static uint32_t _ast_get_e2m_addr(struct sdramc_regs *ram, uint8_t node)
 
 static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 {
-	uint32_t vbios_ofst;
-	uint32_t vbios_size;
 	uint32_t vbios_mem_base;
 	void *vbios_base;
 	uint32_t vbios_e2m_value;
 	uint32_t arm_dram_base = ASPEED_DRAM_BASE >> 1;
-
-	LOG_DBG("%s: vbios0 addr(%d) size(%d)", __func__, vbios_ofst, vbios_size);
 
 	if (node == 0)
 		vbios_base = (void *)VBIOS0_RESERVED_MEM_BASE;

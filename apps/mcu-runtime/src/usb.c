@@ -12,10 +12,7 @@
 #include <platform.h>
 #include <scu_ast2700.h>
 #include <usb.h>
-
-#define setbits_le32(addr, set) sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr)
-#define clrbits_le32(addr, clr) sys_write32(sys_read32((uintptr_t)addr) & (~clr), (uintptr_t)addr)
-#define clrsetbits_le32(addr, clr, set) sys_write32((sys_read32((uintptr_t)addr) & (~clr)) | set, (uintptr_t)addr);
+#include <ast_loader.h>
 
 LOG_MODULE_REGISTER(usb, CONFIG_SOC_FMC_LOG_LEVEL);
 

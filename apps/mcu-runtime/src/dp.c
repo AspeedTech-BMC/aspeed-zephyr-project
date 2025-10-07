@@ -17,11 +17,6 @@
 
 LOG_MODULE_REGISTER(dp, CONFIG_SOC_FMC_LOG_LEVEL);
 
-static void setbits_le32(void *addr, uint32_t set)
-{
-	sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr);
-}
-
 int dp_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = chip->scu0;
