@@ -490,17 +490,11 @@ static void mctp_i3c_req_timeout_callback(struct k_timer *tmr)
 	trigger_mctp_i3c_state_handler();
 }
 
-#define IBI_MDB_GROUP                           GENMASK(7, 5)
-#define   IBI_MDB_GROUP_PENDING_READ_NOTI       5
 int mctp_i3c_ibi_cb(struct i3c_device_desc *target, struct i3c_ibi_payload *payload)
 {
         if (payload->payload_len) {
 		LOG_HEXDUMP_DBG(payload->payload, payload->payload_len, "IBI payload:");
-
-                if (FIELD_GET(IBI_MDB_GROUP, payload->payload[0]) ==
-                    IBI_MDB_GROUP_PENDING_READ_NOTI) {
-			mctp_i3c_sem_give(target);
-                }
+		mctp_i3c_sem_give(target);
         }
 
         return 0;
