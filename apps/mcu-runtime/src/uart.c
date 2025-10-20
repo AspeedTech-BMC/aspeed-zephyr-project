@@ -29,7 +29,7 @@ static int uart_init(struct device *dev)
 
 static int uart_load(struct device *dev, uint32_t *dst, uint32_t *len)
 {
-	uint32_t out_sz = 0, i;
+	uint32_t out_sz = 0;
 	enum ymodem_status sts = YMODEM_OK;
 
 	if (!dev)

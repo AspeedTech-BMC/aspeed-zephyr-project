@@ -113,28 +113,28 @@ void spi_adjust_driving_strength(void)
 	uint32_t reg;
 
 	/* FMC driving strength: SCUIO_4E0[15:0] */
-	reg = readl((void *)ASPEED_IO_FWSPI_DRIVING);
+	reg = sys_read32(ASPEED_IO_FWSPI_DRIVING);
 	reg &= ~(0x0000ffff);
 	reg |= 0x0000aaaa;
-	writel(reg, (void *)ASPEED_IO_FWSPI_DRIVING);
+	sys_write32(reg, ASPEED_IO_FWSPI_DRIVING);
 
 	/* SPI0 driving strength: SCUIO_4CC[11:0] */
-	reg = readl((void *)ASPEED_IO_SPI0_DRIVING);
+	reg = sys_read32(ASPEED_IO_SPI0_DRIVING);
 	reg &= ~(0x00000fff);
 	reg |= 0x00000aaa;
-	writel(reg, (void *)ASPEED_IO_SPI0_DRIVING);
+	sys_write32(reg, ASPEED_IO_SPI0_DRIVING);
 
 	/* SPI1 driving strength: SCUIO_4CC[27:16] */
-	reg = readl((void *)ASPEED_IO_SPI1_DRIVING);
+	reg = sys_read32(ASPEED_IO_SPI1_DRIVING);
 	reg &= ~(0x0fff0000);
 	reg |= 0x0aaa0000;
-	writel(reg, (void *)ASPEED_IO_SPI1_DRIVING);
+	sys_write32(reg, ASPEED_IO_SPI1_DRIVING);
 
 	/* SPI2 driving strength: SCUIO_4D0[15:0] */
-	reg = readl((void *)ASPEED_IO_SPI2_DRIVING);
+	reg = sys_read32(ASPEED_IO_SPI2_DRIVING);
 	reg &= ~(0x0000ffff);
 	reg |= 0x00002aaa;
-	writel(reg, (void *)ASPEED_IO_SPI2_DRIVING);
+	sys_write32(reg, ASPEED_IO_SPI2_DRIVING);
 }
 
 static int spi_init(struct device *dev)
