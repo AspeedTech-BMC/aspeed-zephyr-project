@@ -12,7 +12,7 @@
 #include <zephyr/usb/usb_ch9.h>
 #include <ast_loader.h>
 #include <platform.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 
 LOG_MODULE_REGISTER(ast_usb, CONFIG_SOC_FMC_LOG_LEVEL);
 static struct bootusb_priv g_usb_hci;
@@ -20,8 +20,6 @@ static struct bootusb_priv g_usb_hci;
 #define DBG(...)
 
 /* USB VHUB register definitions */
-#define USB_VHUBA_REG             (0x12011000)
-#define USB_VHUBB_REG             (0x12021000)
 #define USB_VHUBC_REG             (0x14120000)
 #define USB_VHUBD_REG             (0x14122000)
 
@@ -135,7 +133,7 @@ enum usb_status_code {
 #define USB_DFU_DEFAULT_POLLTIMEOUT		0
 
 #define USB_DEVICE_MANUFACTURER			"ASPEED"
-#define USB_DEVICE_PRODUCT			"AST2700"
+#define USB_DEVICE_PRODUCT			"AST1040"
 #define USB_DEVICE_SN				"8000000080000000"
 #define FIRMWARE_IMAGE_0_LABEL			"SPL DFU"
 
@@ -506,8 +504,6 @@ enum usb_state {
 };
 
 enum usb_port {
-	PORT_A,
-	PORT_B,
 	PORT_C,
 	PORT_D,
 	PORT_NUM,
@@ -538,26 +534,6 @@ struct bootusb_priv {
 };
 
 static struct usb_vhub_config usb_cfg[PORT_NUM] = {
-	{
-		USB_VHUBA_REG,
-		(SCU0_REG + SCU0_USB_MULTI_CTRL),
-		(SCU0_REG + SCU_RST_CTRL),
-		(SCU0_REG + SCU0_CLK_STOP_CTRL),
-		(GENMASK(25, 24) | BIT(18) | GENMASK(3, 2)),
-		BIT(2), //vHubA1
-		BIT(0),
-		BIT(14),
-	},
-	{
-		USB_VHUBB_REG,
-		(SCU0_REG + SCU0_USB_MULTI_CTRL),
-		(SCU0_REG + SCU_RST_CTRL),
-		(SCU0_REG + SCU0_CLK_STOP_CTRL),
-		(GENMASK(29, 28) | BIT(18) | GENMASK(7, 6)),
-		(BIT(18) | BIT(6)), //vHubB1 and PortB access SRAM
-		BIT(3),
-		BIT(7),
-	},
 	{
 		USB_VHUBC_REG,
 		(SCU1_REG + SCU1_USB_MULTI_CTRL),
@@ -1203,10 +1179,7 @@ static int usb_init(struct device *dev)
 
 	/* Enable SRAM access */
 	val = sys_read32(usb->base + 0x800);
-	if (hci->usb_vhub_port == PORT_A || hci->usb_vhub_port == PORT_B)
-		/* vHUBA & vHUBB. CPU Die: BIT4 for SRAM access */
-		sys_write32(val | BIT(4), usb->base + 0x800);
-	else if (hci->usb_vhub_port == PORT_C || hci->usb_vhub_port == PORT_D)
+	if (hci->usb_vhub_port == PORT_C || hci->usb_vhub_port == PORT_D)
 		/* vHUBC & vHUBD. I/O Die: BIT10 for SRAM access, BIT5 for AHBM Addr 34 */
 		sys_write32(val | BIT(10) | BIT(5), usb->base + 0x800);
 

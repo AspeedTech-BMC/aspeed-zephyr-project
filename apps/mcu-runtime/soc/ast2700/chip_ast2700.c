@@ -57,12 +57,7 @@ static struct peripheral peri_tbl[] = {
 	{"EXTRST",	extrst_mask_init, NULL},
 	{"LOADER",	ast_loader_init, NULL},
 	{"BOOTROM",     bootrom_init, NULL},
-//	{"SLI1",	sli_init_f, NULL},
-//	{"DP",		dp_init, NULL},
-//	{"SLI0",	sli_init_r, NULL},
 	{"DRAM",	dram_init, NULL},
-//	{"PCI",		pci_init, NULL},
-//	{"USB",		usb_init, NULL},
 };
 #else
 static struct peripheral peri_tbl[] = {

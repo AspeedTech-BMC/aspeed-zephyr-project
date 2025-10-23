@@ -18,6 +18,7 @@
 #include <zephyr/logging/log.h>
 #include <ast_loader.h>
 #include <chip.h>
+#include <stor.h>
 
 LOG_MODULE_REGISTER(ast_stor, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -91,31 +92,21 @@ static int stor_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, ui
 
 int stor_init(struct ast_loader *loader)
 {
-        struct ast_loader_ops *ops;
-        int bootmode;
-        int err = -1;
+	struct ast_loader_ops *ops;
+	int err = -1;
 
-        bootmode = loader->bootmode;
+	err = stor_board_init(loader);
 
-        if (bootmode == BOOT_DEVICE_RAM)
-		err = spi_register(loader);
-        else if (bootmode == BOOT_DEVICE_MMC1)
-		err = mmc_register(loader);
-        else if (bootmode == BOOT_DEVICE_SATA)
-		err = ufs_register(loader);
-        else
-                return -1;
+	if (err) {
+			printf("Get stor udevice Failed %d.\n", err);
+			return err;
+	}
 
-        if (err) {
-                printf("Get stor udevice Failed %d.\n", err);
-                return err;
-        }
+	loader->load = stor_load;
 
-        loader->load = stor_load;
-
-        ops = ast_loader_get_ops(loader);
-        if (ops && ops->init)
-                err = ops->init(loader->dev);
+	ops = ast_loader_get_ops(loader);
+	if (ops && ops->init)
+			err = ops->init(loader->dev);
 
 	stor_get_image_info(img_info);
 

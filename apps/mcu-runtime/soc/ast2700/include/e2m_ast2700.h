@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef _E2M_AST2700_H
-#define _E2M_AST2700_H
+#ifndef _E2M_AST27XX_H
+#define _E2M_AST27XX_H
 
 #define E2M0_BASE		(0x12c21000)
 #define E2M0_VGA_RAM		(E2M0_BASE + 0x100)

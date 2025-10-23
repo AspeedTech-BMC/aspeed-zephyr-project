@@ -9,8 +9,8 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <scu_ast2700.h>
-#include <ssp_tsp_ast2700.h>
+#include <scu.h>
+#include <ssp_tsp.h>
 #include <manifest.h>
 #include <cptra_idevid.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
@@ -33,6 +33,10 @@ void board_manifest_image_post_process(uint32_t fw_id)
 	ep_arm = ((uint64_t)ep - 0x80000000) | 0x400000000ULL;
 
 	switch (fw_id) {
+	case CPTRA_SSP_FW_ID:
+		ssp_init(ep);
+		has_sspfw = true;
+		break;
 	case CPTRA_ATF_FW_ID:
 		has_pspfw = true;
 		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR0);
@@ -42,10 +46,6 @@ void board_manifest_image_post_process(uint32_t fw_id)
 		break;
 	case CPTRA_UBOOT_FW_ID:
 		sys_write64(ep_arm, SCU0_CPU_SMP_EP0);
-		break;
-	case CPTRA_SSP_FW_ID:
-		ssp_init(ep);
-		has_sspfw = true;
 		break;
 	case CPTRA_TSP_FW_ID:
 		tsp_init(ep);

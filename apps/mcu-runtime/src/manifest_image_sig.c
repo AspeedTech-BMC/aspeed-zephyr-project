@@ -6,7 +6,7 @@
 #include <ast_loader.h>
 #include <manifest.h>
 #include <platform.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/crypto/crypto.h>

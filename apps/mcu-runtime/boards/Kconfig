@@ -1,0 +1,4 @@
+rsource "Kconfig.ast1040_evb"
+rsource "Kconfig.ast2700_evb"
+rsource "Kconfig.ast2700_haps"
+rsource "Kconfig.ast2700_fpga"

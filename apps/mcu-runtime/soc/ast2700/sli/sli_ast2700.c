@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 #include <platform.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include "zephyr/arch/common/sys_io.h"
 #include "zephyr/logging/log.h"
 #include "zephyr/sys/sys_io.h"
