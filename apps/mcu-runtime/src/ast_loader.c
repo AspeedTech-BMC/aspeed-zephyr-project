@@ -10,7 +10,7 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <ast_loader.h>
 #include <chip.h>
 
@@ -98,6 +98,8 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 	struct ast_loader *loader = &g_loader;
 	uint32_t sz = 0;
 	int err = 0;
+	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, verify=%d\n",
+		__func__, type, (uint32_t)dst, (uint32_t)buf, verify);
 
 	if (loader->load) {
 		err = loader->load(loader, type, buf, &sz);

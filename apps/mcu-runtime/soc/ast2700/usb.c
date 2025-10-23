@@ -10,7 +10,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <platform.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <usb.h>
 #include <ast_loader.h>
 
