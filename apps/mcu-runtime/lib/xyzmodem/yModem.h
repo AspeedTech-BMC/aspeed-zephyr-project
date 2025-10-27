@@ -30,6 +30,12 @@ enum ymodem_status {
 	YMODEM_ERR_NOSPACE = -5,
 };
 
+enum y_state {
+	YS_WAIT_HEADER,
+	YS_RECV_DATA,
+	YS_WAIT_FINAL_HDR
+};
+
 int readc(uint8_t *buf, uint32_t len, uint32_t timeout_ms);
 void writec(char y);
 enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
