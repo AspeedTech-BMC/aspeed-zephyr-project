@@ -125,6 +125,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 	char *fname = out_name ? out_name : fname_local;
 	uint32_t fname_cap = out_name ? name_cap : sizeof(fname_local);
 	uint32_t fsize = 0, total = 0;
+	enum y_state st = YS_WAIT_HEADER;
 	int r;
 
 	if (!port || !port->read || !port->write || !buf)
@@ -175,7 +176,27 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				continue;
 			}
 
-			if (pkt_seq == 0) {
+			if (st == YS_WAIT_FINAL_HDR && pkt_seq == 0) {
+				bool all_zero = true;
+				for (size_t k = 0; k < payload_len; k++) {
+					if (payload[k] != 0) {
+						all_zero = false;
+						break;
+					}
+				}
+
+				if (all_zero) {
+					y_putc(port, ACK);
+					if (out_size)
+						*out_size = total;
+					return YMODEM_OK;
+				}
+
+				y_putc(port, NAK);
+				continue;
+			}
+
+			if (st == YS_WAIT_HEADER && pkt_seq == 0) {
 				/* header with name + size */
 				if (payload[0] == 0) {
 					y_putc(port, ACK);
@@ -199,7 +220,12 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				y_putc(port, CRC);
 				seq = 1;
 				total = 0;
-			} else if (pkt_seq == seq) {
+				st = YS_RECV_DATA;
+				continue;
+
+			}
+
+			if (st == YS_RECV_DATA && pkt_seq == seq) {
 				uint32_t to_copy = (fsize && (total + payload_len > fsize)) ?
 						 (fsize - total) : payload_len;
 
@@ -210,11 +236,22 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 					*out_size = total;
 
 				y_putc(port, ACK);
-				seq++;
-			} else {
-				y_putc(port, ACK);
+				seq = (uint8_t)(seq + 1);
+				continue;
 			}
+
+			y_putc(port, NAK);
+			continue;
+
 		} else if (mark == EOT) {
+
+			if (st != YS_RECV_DATA) {
+				k_usleep(50000);
+				y_putc(port, NAK);
+				k_usleep(50000);
+				continue;
+			}
+
 			k_usleep(50000);
 			y_putc(port, NAK);
 			k_usleep(50000);
@@ -227,6 +264,8 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				k_usleep(50000);
 				/* ask for final empty header */
 				y_putc(port, CRC);
+				st = YS_WAIT_FINAL_HDR;
+				continue;
 			}
 		} else if (mark == CAN) {
 			if (y_read_exact(port, &mark, 1, to) < 0)
@@ -235,6 +274,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 			return (mark == CAN) ? YMODEM_ERR_ABORT : YMODEM_ERR_PROTO;
 		} else {
 			/* ignore */
+			continue;
 		}
 	}
 	/* not reached */
