@@ -30,11 +30,11 @@ static struct message_info message[] = {
 	{CPTRA_DDR5_DMEM_FW_ID,		"ddr5_pmu_train_dmem.bin"},
 	{CPTRA_DP_FW_FW_ID,		"dp_fw.bin"},
 	{CPTRA_UEFI_FW_ID,		"uefi_ast2700.bin"},
-	{CPTRA_ATF_FW_ID,		"atf.bin"},
-	{CPTRA_OPTEE_FW_ID,		"optee.bin"},
+	{CPTRA_ATF_FW_ID,		"bl31.bin"},
+	{CPTRA_OPTEE_FW_ID,		"tee-raw.bin"},
 	{CPTRA_UBOOT_FW_ID,		"u-boot.bin"},
-	{CPTRA_SSP_FW_ID,		"ast2700-ssp.bin"},
-	{CPTRA_TSP_FW_ID,		"ast2700-tsp.bin"},
+	{CPTRA_SSP_FW_ID,		"zephyr-aspeed-ssp.bin"},
+	{CPTRA_TSP_FW_ID,		"zephyr-aspeed-tsp.bin"},
 };
 
 static int recovery_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, uint32_t *len)
