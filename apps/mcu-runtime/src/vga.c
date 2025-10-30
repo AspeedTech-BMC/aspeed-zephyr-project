@@ -19,6 +19,8 @@
 #define VBIOS0_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base0))
 #define VBIOS1_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base1))
 
+#define BIOS_HEADER_TAG 0xaa55
+
 LOG_MODULE_REGISTER(vga, CONFIG_SOC_FMC_LOG_LEVEL);
 
 static uint32_t _ast_get_e2m_addr(struct sdramc_regs *ram, uint8_t node)
@@ -53,8 +55,11 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	LOG_DBG("vbios_mem_base : 0x%x", vbios_mem_base);
 
 	/* Initial memory region and copy vbios into it */
-	memset((uint32_t *)vbios_base, 0x0, 0x10000);
-	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0);
+	/* If the memory region would not be loaded before */
+	if (*(uint16_t *)vbios_mem_base != BIOS_HEADER_TAG) {
+		memset((uint32_t *)vbios_base, 0x0, 0x10000);
+		ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0);
+	}
 
 	/* Remove riscv Dram base */
 	vbios_mem_base &= ~(ASPEED_DRAM_BASE);
