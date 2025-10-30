@@ -29,7 +29,7 @@
 
 #define MMC_BLK_LEN	512
 
-LOG_MODULE_REGISTER(ast_mmc, CONFIG_SOC_FMC_LOG_LEVEL);
+LOG_MODULE_REGISTER(ast_mmc, CONFIG_SDHC_LOG_LEVEL);
 
 static struct sd_card card;
 
