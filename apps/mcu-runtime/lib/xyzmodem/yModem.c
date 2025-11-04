@@ -60,35 +60,22 @@ static void y_putc(struct ymodem_port *p, char c)
 		p->write(c);
 }
 
-static int y_read_exact(struct ymodem_port *p, uint8_t *buf, uint32_t len,
-			   uint32_t to_ms)
-{
-	uint32_t got = 0;
-	int r;
-
-	while (got < len) {
-		r = p->read(buf + got, len - got, to_ms);
-		if (r <= 0)
-			return got ? (int)got : -1; /* timeout or error */
-		got += (uint32_t)r;
-	}
-
-	return (int)got;
-}
-
-/*******************
- * Public API *
- *******************/
 int readc(uint8_t *buf, uint32_t len, uint32_t timeout_ms)
 {
 
 	int64_t now_ms = k_uptime_get();
 	int i;
+	bool gotten = false;
 
 	for (i = 0; i < len; i++) {
-		while (uart_poll_in(g_uart_dev, (buf + i)) == -1) {
+		while (uart_poll_in(g_uart_dev, (buf + i)) != 0) {
 			if (k_uptime_get() - now_ms > timeout_ms)
 				return 0;
+		}
+
+		if (!gotten) {
+			timeout_ms += 2000;
+			gotten = true;
 		}
 	}
 
@@ -127,6 +114,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 	uint32_t fsize = 0, total = 0;
 	enum y_state st = YS_WAIT_HEADER;
 	int r;
+	uint8_t dummy;
 
 	if (!port || !port->read || !port->write || !buf)
 		return YMODEM_ERR_IO;
@@ -144,7 +132,6 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 			if (!retries--)
 				return YMODEM_ERR_IO;
 
-			k_usleep(500000);
 			y_putc(port, CRC);
 			continue;
 		}
@@ -153,7 +140,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 			uint32_t payload_len = (mark == SOH) ?
 					YMODEM_PACKET_128 : YMODEM_PACKET_1K;
 
-			if (y_read_exact(port, hdr, 2, to) < 0)
+			if (port->read(hdr, 2, to) <= 0)
 				return YMODEM_ERR_IO;
 
 			pkt_seq = hdr[0];
@@ -163,10 +150,10 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				continue;
 			}
 
-			if (y_read_exact(port, payload, payload_len, to) < 0)
+			if (port->read(payload, payload_len, to) <= 0)
 				return YMODEM_ERR_IO;
 
-			if (y_read_exact(port, crc_b, 2, to) < 0)
+			if (port->read(crc_b, 2, to) <= 0)
 				return YMODEM_ERR_IO;
 
 			recv_crc = ((uint16_t)crc_b[0] << 8) | crc_b[1];
@@ -216,13 +203,16 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				while (i < payload_len && payload[i])
 					fsize = fsize * 10 + (payload[i++] - '0');
 
+				while (uart_poll_in(g_uart_dev, &dummy) == 0);
+				k_usleep(50000);
+				while (uart_poll_in(g_uart_dev, &dummy) == 0);
+
 				y_putc(port, ACK);
 				y_putc(port, CRC);
 				seq = 1;
 				total = 0;
 				st = YS_RECV_DATA;
 				continue;
-
 			}
 
 			if (st == YS_RECV_DATA && pkt_seq == seq) {
@@ -246,20 +236,17 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 		} else if (mark == EOT) {
 
 			if (st != YS_RECV_DATA) {
-				k_usleep(50000);
 				y_putc(port, NAK);
 				k_usleep(50000);
 				continue;
 			}
 
-			k_usleep(50000);
 			y_putc(port, NAK);
 			k_usleep(50000);
-			if (y_read_exact(port, &mark, 1, to) < 0)
+			if (port->read(&mark, 1, to) <= 0)
 				return YMODEM_ERR_IO;
 
 			if (mark == EOT) {
-				k_usleep(50000);
 				y_putc(port, ACK);
 				k_usleep(50000);
 				/* ask for final empty header */
@@ -268,7 +255,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				continue;
 			}
 		} else if (mark == CAN) {
-			if (y_read_exact(port, &mark, 1, to) < 0)
+			if (port->read(&mark, 1, to) <= 0)
 				return YMODEM_ERR_ABORT;
 
 			return (mark == CAN) ? YMODEM_ERR_ABORT : YMODEM_ERR_PROTO;
