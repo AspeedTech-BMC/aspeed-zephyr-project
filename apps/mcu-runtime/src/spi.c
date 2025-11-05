@@ -41,56 +41,6 @@
 
 LOG_MODULE_REGISTER(ast_spi, CONFIG_SOC_FMC_LOG_LEVEL);
 
-//static void aspeed_memmove_spi_dma_op(void *dest, const void *src, uint32_t count)
-//{
-//	uint32_t dma_busy = 0;
-//
-//	if (dest == src)
-//		return;
-//
-//	if ((uint32_t)dest % 4 != 0 || (uint32_t)src % 4 != 0) {
-//		memcpy(dest, src, count);
-//		return;
-//	}
-//
-//	if ((uint32_t)src >= ASPEED_FMC_CS0_BASE &&
-//	    (uint32_t)src < (ASPEED_FMC_CS0_BASE + ASPEED_FMC_CS0_SIZE) &&
-//	    (uint32_t)dest >= ASPEED_DRAM_BASE) {
-//
-//		*((volatile uint32_t *)DRAM_HI_ADDR) = 0x4;
-//
-//		*((volatile uint32_t *)DMA_RAM_ADDR) = (uint32_t)dest - ASPEED_DRAM_BASE;
-//		*((volatile uint32_t *)DMA_FLASH_ADDR) = (uint32_t)src - ASPEED_FMC_CS0_BASE;
-//		*((volatile uint32_t *)DMA_LEN) = (uint32_t)count - 1;
-//		*((volatile uint32_t *)DMA_CTRL) = (uint32_t)DMA_ENABLE;
-//
-//		do {
-//			dma_busy = (*((volatile uint32_t *)INTR_CTRL)) & SPI_DMA_DONE;
-//		} while (dma_busy == 0);
-//
-//		*((volatile uint32_t *)DMA_CTRL) = 0x0;
-//	} else {
-//		memcpy(dest, src, count);
-//	}
-//}
-//
-//uint32_t fit_ram_load_read(struct fit_load_info *load, uint32_t sector,
-//			       uint32_t count, void *buf)
-//{
-//	uint32_t addr;
-//
-//	LOG_DBG("%s: sector %x, count %x, buf %x",
-//	      __func__, sector, count, (uint32_t)buf);
-//
-//	addr = CONFIG_SOC_FMC_LOAD_FIT_ADDRESS + sector;// + aspeed_spi_abr_offset();
-////	  if (CONFIG_IS_ENABLED(IMAGE_PRE_LOAD))
-////		  addr += image_load_offset;
-//
-//	aspeed_memmove_spi_dma_op(buf, (void *)addr, count);
-//
-//	return count;
-//}
-
 static int spi_copy(struct device *dev, uint32_t *dest, uint32_t src, uint32_t len)
 {
 	int ret;
