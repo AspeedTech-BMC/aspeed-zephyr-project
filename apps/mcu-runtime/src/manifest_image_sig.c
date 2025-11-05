@@ -279,6 +279,11 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 	 */
 	*input.fw_id = fw_id;
 	input.source = 0x1;
+
+	/* Skip stash for UEFI firmware since PL0_DPE_ACTIVE_CONTEXT_THRESHOLD is 16 */
+	if (fw_id == CPTRA_UEFI_FW_ID)
+		input.flags = AUTHORIZE_AND_STASH_FLAGS_SKIP_STASH;
+
 	ret = caliptra_authorize_and_stash(dev, &input, &output);
 	if (ret) {
 		LOG_ERR("Caliptra image authorize and stash fail.");
