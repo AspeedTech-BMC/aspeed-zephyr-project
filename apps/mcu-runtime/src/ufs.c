@@ -1317,7 +1317,7 @@ static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t le
 
 static int ufs_init(struct device *dev)
 {
-	int lun = (1 << abr_get_id());
+	int lun = (1 << abr_get_ind());
 	int err = 0;
 
 	err = ufs_connection_test(lun);

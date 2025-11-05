@@ -57,7 +57,7 @@ static int mmc_init(struct device *dev)
 		return -ENODEV;
 	}
 
-	ret = mmc_switch_part(&card, 1 << abr_get_id());
+	ret = mmc_switch_part(&card, 1 << abr_get_ind());
 	if (ret) {
 		LOG_ERR("cannot switch part\n");
 		return -1;

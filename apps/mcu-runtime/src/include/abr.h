@@ -13,6 +13,6 @@
 #define ABR_MODE                BIT(29)
 
 bool abr_enabled(void);
-uint32_t abr_get_id(void);
+uint32_t abr_get_ind(void);
 
 #endif
