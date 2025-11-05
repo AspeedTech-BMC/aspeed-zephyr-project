@@ -16,7 +16,7 @@ bool abr_enabled(void)
 	return (sys_read32(ABR_REG) & ABR_EN);
 }
 
-uint32_t abr_get_id(void)
+uint32_t abr_get_ind(void)
 {
 	uint32_t val;
 
