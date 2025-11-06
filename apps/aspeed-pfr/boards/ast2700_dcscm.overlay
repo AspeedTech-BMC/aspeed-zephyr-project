@@ -115,6 +115,7 @@
 		msg-size = <128>;
 		num-of-msgs = <8>;
 		mandatory-data-byte = <0xae>;
+		ibi-append-pec = <0>;
 		status = "okay";
 	};
 };
