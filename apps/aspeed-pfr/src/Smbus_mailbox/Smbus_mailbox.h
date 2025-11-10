@@ -97,7 +97,7 @@ typedef enum _UPDATE_INTENT {
 	BmcActiveUpdate                         = 0x08,
 	BmcRecoveryUpdate                       = 0x10,
 	HROTRecoveryUpdate                      = 0x20,
-	DymanicUpdate                           = 0x40,
+	DynamicUpdate                           = 0x40,
 	UpdateAtReset                           = 0x80,
 	PchActiveAndRecoveryUpdateAtReset       = 0x83,
 	PchActiveDynamicUpdate                  = 0x41,
