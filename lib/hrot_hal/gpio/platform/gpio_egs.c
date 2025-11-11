@@ -25,9 +25,11 @@ static void pch_rst_enable_ctrl(bool enable)
 						pch_rst_ctrl_out_gpios, 0);
 
 	if (enable) {
+		LOG_INF("[PFR->CPLD] PCH_RST Assert[%s %d]", rst_gpio.port->name, rst_gpio.pin);
 		gpio_pin_set(rst_gpio.port, rst_gpio.pin, 0);
 	} else {
 		gpio_pin_set(rst_gpio.port, rst_gpio.pin, 1);
+		LOG_INF("[PFR->CPLD] PCH_RST De-assert[%s %d]", rst_gpio.port->name, rst_gpio.pin);
 	}
 
 	ret = gpio_pin_configure_dt(&rst_gpio, GPIO_OUTPUT);

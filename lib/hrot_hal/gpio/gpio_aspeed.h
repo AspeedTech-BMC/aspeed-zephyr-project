@@ -40,3 +40,4 @@ void RSTPlatformReset(bool assert);
 void switch_i3c_mng_owner(int owner);
 int get_i3c_mng_owner(void);
 #endif
+int switch_spim_mux(const char *dev_name, enum spim_ext_mux_sel mux_sel);

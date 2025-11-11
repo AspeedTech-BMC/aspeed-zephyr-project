@@ -830,6 +830,9 @@ void SetPlatformState(byte PlatformStateData)
 
 	for (uint8_t bit = 0; bit < 8; ++bit) {
 		gpio_pin_configure_dt(&leds[bit], GPIO_OUTPUT);
+		LOG_INF("[PFR->CPLD] Platform State [%s %d] = %d",
+			leds[bit].port->name, leds[bit].pin,
+			!(PlatformStateData & BIT(bit)));
 		gpio_pin_set(leds[bit].port, leds[bit].pin, !(PlatformStateData & BIT(bit)));
 	}
 #endif

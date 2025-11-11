@@ -1263,11 +1263,10 @@ void handle_provision_image(void *o)
 			sizeof(CPLD_STATUS));
 	memcpy(&cpld_update_status, &cached_status, sizeof(CPLD_STATUS));
 
-	const struct device *dev_m = device_get_binding(BMC_SPI_MONITOR);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(BMC_SPI_MONITOR, SPIM_EXT_MUX_ROT);
+
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(BMC_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
 #endif
 	ret = update_firmware_image(image_type, ao_data_wrap, &evt_ctx_wrap, &cpld_update_status, evt_ctx);
 
@@ -1275,11 +1274,9 @@ void handle_provision_image(void *o)
 		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	}
 
-	dev_m = device_get_binding(BMC_SPI_MONITOR);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(BMC_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(BMC_SPI_MONITOR_2, SPIM_EXT_MUX_BMC_PCH);
 #endif
 
 	LOG_INF("Provision result = %d", ret);
@@ -1810,7 +1807,6 @@ void handle_seamless_update_requested(void *o)
 
 void handle_seamless_update_verification(void *o)
 {
-	const struct device *dev_m = NULL;
 	int ret;
 
 	EVENT_CONTEXT evt_wrap;
@@ -1820,11 +1816,9 @@ void handle_seamless_update_verification(void *o)
 	evt_wrap.flash = PRIMARY_FLASH_REGION;
 
 	LOG_INF("Switch PCH SPI MUX to ROT");
-	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_ROT);
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
 #endif
 
 	ret = authentication_image(NULL, &evt_wrap);
@@ -1843,11 +1837,9 @@ void handle_seamless_update_verification(void *o)
 	}
 
 	LOG_INF("Switch PCH SPI MUX to PCH");
-	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_BMC_PCH);
 #endif
 }
 #endif
