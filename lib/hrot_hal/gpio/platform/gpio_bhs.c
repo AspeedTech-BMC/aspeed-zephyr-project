@@ -118,6 +118,10 @@ void BhsSwitchI3cMng(int owner)
 
 	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
 	LOG_INF("Switch I3C MNG Owner to %s", owner == I3C_MNG_OWNER_BMC ? "BMC" : "ROT");
+	LOG_INF("[PFR->MUX] I3C_MNG [%s %d] = %d",
+		i3c_mng_owner.port->name,
+		i3c_mng_owner.pin,
+		owner);
 	gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, owner);
 	i3c_mng_mux_owner = owner;
 }

@@ -25,6 +25,21 @@
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 static bool first_time_boot = true;
 
+struct aspeed_spim_config {
+	mm_reg_t ctrl_base;
+	uint32_t irq_num;
+	uint32_t irq_priority;
+	uint32_t ctrl_idx;
+	uint32_t ext_mux_sel_default;
+	bool extra_clk_en;
+	bool force_rel_flash_rst;
+	const struct device *parent;
+	const struct gpio_dt_spec *ext_mux_sel_gpios;
+	uint32_t ext_mux_sel_gpio_num;
+	uint32_t ext_mux_sel_delay_us;
+	const struct pinctrl_dev_config *pcfg;
+};
+
 static void bmc_srst_enable_ctrl(bool enable)
 {
 	int ret;
@@ -32,10 +47,13 @@ static void bmc_srst_enable_ctrl(bool enable)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common),
 						bmc_srst_ctrl_out_gpios, 0);
 
-	if (enable)
+	if (enable) {
+		LOG_INF("[PFR->BMC] BMC_SRST Assert[%s %d]", srst_gpio.port->name, srst_gpio.pin);
 		gpio_pin_set(srst_gpio.port, srst_gpio.pin, 0);
-	else
+	} else {
+		LOG_INF("[PFR->BMC] BMC_SRST De-assert[%s %d]", srst_gpio.port->name, srst_gpio.pin);
 		gpio_pin_set(srst_gpio.port, srst_gpio.pin, 1);
+	}
 
 	ret = gpio_pin_configure_dt(&srst_gpio, GPIO_OUTPUT);
 	if (ret)
@@ -51,10 +69,13 @@ static void bmc_extrst_enable_ctrl(bool enable)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common),
 						bmc_extrst_ctrl_out_gpios, 0);
 
-	if (enable)
+	if (enable) {
+		LOG_INF("[PFR->BMC] BMC_EXTRST Assert[%s %d]", extrst_gpio.port->name, extrst_gpio.pin);
 		gpio_pin_set(extrst_gpio.port, extrst_gpio.pin, 0);
-	else
+	} else {
+		LOG_INF("[PFR->BMC] BMC_EXTRST De-assert[%s %d]", extrst_gpio.port->name, extrst_gpio.pin);
 		gpio_pin_set(extrst_gpio.port, extrst_gpio.pin, 1);
+	}
 
 	ret = gpio_pin_configure_dt(&extrst_gpio, GPIO_OUTPUT);
 	if (ret)
@@ -65,7 +86,6 @@ static void bmc_extrst_enable_ctrl(bool enable)
 
 int BMCBootHold(void)
 {
-	const struct device *dev_m = NULL;
 	const struct device *flash_dev = NULL;
 
 	/* Hold BMC Reset */
@@ -74,9 +94,8 @@ int BMCBootHold(void)
 	// VGA function.
 	if (first_time_boot)
 		bmc_srst_enable_ctrl(true);
-	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	/* config spi monitor as master mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(BMC_SPI_MONITOR, SPIM_EXT_MUX_ROT);
 	flash_dev = device_get_binding("spi1@0");
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
@@ -84,9 +103,8 @@ int BMCBootHold(void)
 		LOG_ERR("Failed to bind spi1@0");
 	}
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	/* config spi monitor as master mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(BMC_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
 	flash_dev = device_get_binding("spi1@1");
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
@@ -100,7 +118,6 @@ int BMCBootHold(void)
 
 int PCHBootHold(void)
 {
-	const struct device *dev_m = NULL;
 	const struct device *flash_dev = NULL;
 	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
 
@@ -111,9 +128,8 @@ int PCHBootHold(void)
 		return -1;
 	}
 
-	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	/* config spi monitor as master mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_ROT);
 	flash_dev = device_get_binding("spi2@0");
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
@@ -122,9 +138,8 @@ int PCHBootHold(void)
 	}
 
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
 	/* config spi monitor as master mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
 	flash_dev = device_get_binding("spi2@1");
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
@@ -150,7 +165,7 @@ int BMCBootRelease(void)
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(BMC_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_BMC_DUAL_FLASH)
 	flash_dev = device_get_binding("spi1@1");
 	if (flash_dev) {
@@ -161,7 +176,7 @@ int BMCBootRelease(void)
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(BMC_SPI_MONITOR_2, SPIM_EXT_MUX_BMC_PCH);
 #endif
 	if (first_time_boot) {
 		bmc_srst_enable_ctrl(false);
@@ -188,7 +203,7 @@ int PCHBootRelease(void)
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 
 #if defined(CONFIG_CPU_DUAL_FLASH)
 	flash_dev = device_get_binding("spi2@1");
@@ -200,7 +215,7 @@ int PCHBootRelease(void)
 	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_BMC_PCH);
 #endif
 
 	if (gpio_ops->pch_release) {
@@ -254,3 +269,27 @@ int get_i3c_mng_owner(void)
 }
 #endif
 
+int switch_spim_mux(const char *dev_name, enum spim_ext_mux_sel mux_sel)
+{
+	const struct device *dev_m = NULL;
+	const struct aspeed_spim_config *config;
+
+	dev_m = device_get_binding(dev_name);
+	if (dev_m == NULL) {
+		printk("%s: unable to bind %s\n", __FUNCTION__, dev_name);
+		return -1;
+	}
+	config = dev_m->config;
+	if (config->ext_mux_sel_gpio_num) {
+		for (uint32_t i = 0;  i < config->ext_mux_sel_gpio_num; i++) {
+			LOG_INF("[%s] EXT_MUXSEL [%s %d] = %d", dev_name,
+				config->ext_mux_sel_gpios[i].port->name,
+				config->ext_mux_sel_gpios[i].pin,
+				(mux_sel == SPIM_EXT_MUX_SEL_1) ? 1 : 0);
+		}
+	}
+
+	spim_ext_mux_config(dev_m, mux_sel);
+
+	return 0;
+}

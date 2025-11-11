@@ -101,39 +101,16 @@ void ProtRTCRSTControl(bool assert)
 		gpio_pin_configure_dt(&rtc_rst_cpu1, GPIO_OUTPUT);
 }
 
-static void pch_rst_enable_ctrl(bool enable)
-{
-	int ret;
-	const struct gpio_dt_spec rst_gpio =
-		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common),
-						pch_rst_ctrl_out_gpios, 0);
-
-	if (enable) {
-		gpio_pin_set(rst_gpio.port, rst_gpio.pin, 0);
-	} else {
-		gpio_pin_set(rst_gpio.port, rst_gpio.pin, 1);
-	}
-
-	ret = gpio_pin_configure_dt(&rst_gpio, GPIO_OUTPUT);
-	if (ret)
-		return;
-
-	k_busy_wait(10000); /* 10ms */
-}
-
-
 static void ProtPchHold(void)
 {
 	ProtRSTPlatformReset(true);
 	AUXPowerGoodControl(false);
-	pch_rst_enable_ctrl(true);
 }
 
 static void ProtPchRelease(void)
 {
 	/* De-assert AUX_PWRGD_CPU0 and AUX_PWRGD_CPU1 */
 	AUXPowerGoodControl(true);
-	pch_rst_enable_ctrl(false);
 }
 
 static const struct platform_gpio_ctrl_ops bhs_prot_gpio_ops = {

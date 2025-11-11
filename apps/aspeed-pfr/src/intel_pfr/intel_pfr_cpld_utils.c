@@ -280,6 +280,8 @@ int intel_rsu_hide_rsu(void)
 	struct gpio_dt_spec hide_rsu_dt_spec =
 			GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs),
 					scm_rsu_hide_out_gpios, 0);
+	LOG_INF("[PFR->CPLD] Hide RSU IP[%s %d]", hide_rsu_dt_spec.port->name,
+			hide_rsu_dt_spec.pin);
 	gpio_pin_set(hide_rsu_dt_spec.port, hide_rsu_dt_spec.pin, 1);
 	LOG_DBG("Hide RSU IP");
 	return 0;
@@ -290,6 +292,8 @@ int intel_rsu_unhide_rsu(void)
 	struct gpio_dt_spec hide_rsu_dt_spec =
 			GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_bhs),
 					scm_rsu_hide_out_gpios, 0);
+	LOG_INF("[PFR->CPLD] Unhide RSU IP[%s %d]", hide_rsu_dt_spec.port->name,
+			hide_rsu_dt_spec.pin);
 	gpio_pin_set(hide_rsu_dt_spec.port, hide_rsu_dt_spec.pin, 0);
 	LOG_DBG("Unhide RSU IP");
 	return 0;

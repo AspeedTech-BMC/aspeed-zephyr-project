@@ -973,7 +973,6 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 	uint32_t address = 0;
 	uint32_t pc_type_status = 0;
 	CPLD_STATUS cpld_update_status;
-	const struct device *dev_m = NULL;
 #if defined(CONFIG_BMC_DUAL_FLASH)
 	const struct device *flash_dev = device_get_binding("spi1@0");
 	uint32_t flash_size = flash_get_flash_size(flash_dev);
@@ -1010,11 +1009,9 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 		return Failure;
 
 	LOG_INF("Switch PCH SPI MUX to ROT");
-	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_ROT);
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
 #endif
 
 	if (cpld_update_status.BmcToPchStatus == 1) {
@@ -1032,15 +1029,16 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 
 		LOG_INF("Switch BMC SPI MUX to ROT");
 #if defined(CONFIG_BMC_DUAL_FLASH)
+		char *dev_name;
 		staging_start_addr = address;
 		if (staging_start_addr >= flash_size)
-			dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+			dev_name = BMC_SPI_MONITOR_2;
 		else
-			dev_m = device_get_binding(BMC_SPI_MONITOR);
+			dev_name = BMC_SPI_MONITOR;
 #else
-		dev_m = device_get_binding(BMC_SPI_MONITOR);
+		char *dev_name = BMC_SPI_MONITOR;
 #endif
-		spim_ext_mux_config(dev_m, SPIM_EXT_MUX_ROT);
+		switch_spim_mux(dev_name, SPIM_EXT_MUX_ROT);
 
 		pfr_manifest->image_type = BMC_TYPE;
 		pfr_manifest->address = address;
@@ -1060,7 +1058,7 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 		// Release BMC SPI after copying capsule to PCH's flash.
 		// PCH SPI will be release after firmware update completed.
 		LOG_INF("Switch BMC SPI MUX to BMC");
-		spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+		switch_spim_mux(dev_name, SPIM_EXT_MUX_BMC_PCH);
 	} else {
 		pc_type_status = check_rot_capsule_type(pfr_manifest);
 		// Checking for key cancellation
@@ -1098,21 +1096,20 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 release_both_muxes:
 	LOG_INF("Switch BMC SPI MUX to BMC");
 #if defined(CONFIG_BMC_DUAL_FLASH)
+	char *dev_name;
 	if (staging_start_addr >= flash_size)
-		dev_m = device_get_binding(BMC_SPI_MONITOR_2);
+		dev_name = BMC_SPI_MONITOR_2;
 	else
-		dev_m = device_get_binding(BMC_SPI_MONITOR);
+		dev_name = BMC_SPI_MONITOR;
 #else
-	dev_m = device_get_binding(BMC_SPI_MONITOR);
+	char *dev_name = BMC_SPI_MONITOR;
 #endif
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(dev_name, SPIM_EXT_MUX_BMC_PCH);
 release_pch_mux:
 	LOG_INF("Switch PCH SPI MUX to PCH");
-	dev_m = device_get_binding(PCH_SPI_MONITOR);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
-	spim_ext_mux_config(dev_m, SPIM_EXT_MUX_BMC_PCH);
+	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_BMC_PCH);
 #endif
 
 	return status;
