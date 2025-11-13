@@ -25,6 +25,8 @@
 #include <spi.h>
 
 #define ASPEED_FMC_REG_BASE	0x14000000
+#define ASPEED_SPI0_REG_BASE	0x14010000
+#define ASPEED_SPI1_REG_BASE	0x14020000
 #define INTR_CTRL		(ASPEED_FMC_REG_BASE + 0x008)
 #define DRAM_HI_ADDR		(ASPEED_FMC_REG_BASE + 0x07C)
 #define DMA_CTRL		(ASPEED_FMC_REG_BASE + 0x080)
@@ -35,6 +37,12 @@
 #define SPI_DMA_MAX_LEN		0x02000000
 #define SPI_DMA_DONE		0x00000800
 #define DMA_ENABLE		0x00000001
+
+#define MISC_CTRL_REG			0x54
+#define   SPI_USER_CMD_MODE		BIT(27)
+#define   SPI_CS_TO_DIS			BIT(26)
+#define   SPI_UNALGNED_ACCESS		BIT(24)
+#define   SPI_CS_CONTINUOUS		BIT(16)
 
 #define ASPEED_IO_FWSPI_DRIVING         (SCU1_REG + 0x4E0)
 #define ASPEED_IO_SPI0_DRIVING          (SCU1_REG + 0x4CC)
@@ -150,9 +158,25 @@ void spi_adjust_driving_strength(void)
 	sys_write32(reg, ASPEED_IO_SPI2_DRIVING);
 }
 
+static void hspi_init(void)
+{
+	uint32_t reg;
+
+	reg = sys_read32(ASPEED_SPI0_REG_BASE + MISC_CTRL_REG);
+	reg |= SPI_USER_CMD_MODE | SPI_UNALGNED_ACCESS;
+	reg &= ~SPI_CS_CONTINUOUS;
+	sys_write32(reg, ASPEED_SPI0_REG_BASE + MISC_CTRL_REG);
+
+	reg = sys_read32(ASPEED_SPI1_REG_BASE + MISC_CTRL_REG);
+	reg |= SPI_USER_CMD_MODE | SPI_UNALGNED_ACCESS;
+	reg &= ~SPI_CS_CONTINUOUS;
+	sys_write32(reg, ASPEED_SPI1_REG_BASE + MISC_CTRL_REG);
+}
+
 static int spi_init(struct device *dev)
 {
 	spi_adjust_driving_strength();
+	hspi_init();
 
         return 0;
 }
