@@ -184,7 +184,7 @@
 };
 
 &spim1 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <pinctrl_spim1_quad_default>;
 	pinctrl-names = "default";
@@ -194,7 +194,7 @@
 };
 
 &spim2 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <pinctrl_spim2_quad_default>;
 	pinctrl-names = "default";
@@ -204,7 +204,7 @@
 };
 
 &spim3 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pin_spim3csin &pin_spim3clkin &pin_spim3mosiin &pin_spim3misoin
 		&pin_spim3csout &pin_spim3io2in &pin_spim3io3in &pin_spim3clkout
@@ -217,7 +217,7 @@
 };
 
 &spim4 {
-	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec];
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	log-ram-size = <0x200>;
 	pinctrl-0 = <&pin_spim4csin &pin_spim4clkin &pin_spim4mosiin &pin_spim4misoin
 		&pin_spim4csout &pin_spim4io2in &pin_spim4io3in &pin_spim4clkout
