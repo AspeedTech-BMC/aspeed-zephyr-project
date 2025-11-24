@@ -632,11 +632,6 @@ struct i3c_hci {
 	uint8_t data[128];
 };
 
-static void clrsetbits_le32(mm_reg_t addr, uint32_t clr, uint32_t set)
-{
-	sys_write32((sys_read32(addr) & (~clr)) | set, addr);
-}
-
 static int hci_extcap_vendor_ASPEED(struct i3c_hci *hci, mem_addr_t base)
 {
 	uint32_t regs_offset;

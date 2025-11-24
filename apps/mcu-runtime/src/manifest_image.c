@@ -26,6 +26,7 @@ LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 #define CPTRA_OPTEE_HDR_ID        (0x1009)
 #define CPTRA_UBOOT_HDR_ID        (0x100A)
 #define CPTRA_SSP_HDR_ID          (0x100B)
+#define CPTRA_TSP_HDR_ID          (0x100C)
 
 /* Define caliptra image load address */
 #define CPTRA_NO_LOAD_ADDR    (0x00000000)
@@ -34,48 +35,36 @@ LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 #define CPTRA_OPTEE_LOAD_ADDR (0xb0080000)
 #define CPTRA_UBOOT_LOAD_ADDR (0x80000000)
 #define CPTRA_SSP_LOAD_ADDR   (0xac000000)
+#define CPTRA_TSP_LOAD_ADDR   (0xae000000)
 
 /* Define caliptra image loadable property */
-#define CPTRA_UNLOADABLE (0)
-#define CPTRA_LOADABLE   (1)
+#define CPTRA_LOADABLE_MASK GENMASK(31, 30)
+#define CPTRA_BOOTMCU_LOADABLE (1)
+#define CPTRA_SSP_LOADABLE (2)
 
 struct cptra_load_image {
 	char *name;
 	uint32_t identifier;
 	uint32_t fw_id;
 	uintptr_t load_addr;
-	bool loadable;
 };
 
 static struct cptra_load_image image_list[] = {
-	{ "manifest", CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID,
-	  CPTRA_FMC_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID,
-	  CPTRA_NO_LOAD_ADDR, CPTRA_UNLOADABLE },
-	{ "atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID,
-	  CPTRA_ATF_LOAD_ADDR, CPTRA_LOADABLE },
-	{ "optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID,
-	  CPTRA_OPTEE_LOAD_ADDR, CPTRA_LOADABLE },
-	{ "uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID,
-	  CPTRA_UBOOT_LOAD_ADDR, CPTRA_LOADABLE },
-	{ "ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID,
-	  CPTRA_SSP_LOAD_ADDR, CPTRA_LOADABLE },
+	{ "manifest", CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID, CPTRA_FMC_LOAD_ADDR},
+	{ "ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID, CPTRA_ATF_LOAD_ADDR},
+	{ "optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID, CPTRA_OPTEE_LOAD_ADDR},
+	{ "uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID, CPTRA_UBOOT_LOAD_ADDR},
+	{ "ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID, CPTRA_SSP_LOAD_ADDR},
+	{ "tsp", CPTRA_TSP_HDR_ID, CPTRA_TSP_FW_ID, CPTRA_TSP_LOAD_ADDR},
 };
 
 static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context *ctx,
@@ -130,21 +119,13 @@ static struct cptra_load_image *cptra_find_load_image(uint32_t fw_id)
 bool cptra_ime_loadable_image(struct cptra_image_context *ctx,
 			      struct cptra_manifest_ime *ime)
 {
-	uint32_t img_size = 0;
-	struct cptra_load_image *img = NULL;
-
 	if (!ime)
 		return false;
 
-	img = cptra_find_load_image(ime->fw_id);
-	if (!img || img->loadable == CPTRA_UNLOADABLE)
-		return false;
+	if (FIELD_GET(CPTRA_LOADABLE_MASK, ime->flags) == CPTRA_BOOTMCU_LOADABLE)
+		return true;
 
-	img_size = cptra_img_info_get_size(ctx, img->identifier);
-	if (img_size == 0)
-		return false;
-
-	return true;
+	return false;
 }
 
 int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id)

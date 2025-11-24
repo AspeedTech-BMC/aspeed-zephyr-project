@@ -19,12 +19,9 @@
 #define VBIOS0_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base0))
 #define VBIOS1_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base1))
 
-LOG_MODULE_REGISTER(vga, CONFIG_SOC_FMC_LOG_LEVEL);
+#define BIOS_HEADER_TAG 0xaa55
 
-static void setbits_le32(void *addr, uint32_t set)
-{
-	sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr);
-}
+LOG_MODULE_REGISTER(vga, CONFIG_SOC_FMC_LOG_LEVEL);
 
 static uint32_t _ast_get_e2m_addr(struct sdramc_regs *ram, uint8_t node)
 {
@@ -41,14 +38,10 @@ static uint32_t _ast_get_e2m_addr(struct sdramc_regs *ram, uint8_t node)
 
 static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 {
-	uint32_t vbios_ofst;
-	uint32_t vbios_size;
 	uint32_t vbios_mem_base;
 	void *vbios_base;
 	uint32_t vbios_e2m_value;
 	uint32_t arm_dram_base = ASPEED_DRAM_BASE >> 1;
-
-	LOG_DBG("%s: vbios0 addr(%d) size(%d)", __func__, vbios_ofst, vbios_size);
 
 	if (node == 0)
 		vbios_base = (void *)VBIOS0_RESERVED_MEM_BASE;
@@ -62,8 +55,11 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	LOG_DBG("vbios_mem_base : 0x%x", vbios_mem_base);
 
 	/* Initial memory region and copy vbios into it */
-	memset((uint32_t *)vbios_base, 0x0, 0x10000);
-	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0);
+	/* If the memory region would not be loaded before */
+	if (*(uint16_t *)vbios_mem_base != BIOS_HEADER_TAG) {
+		memset((uint32_t *)vbios_base, 0x0, 0x10000);
+		ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0);
+	}
 
 	/* Remove riscv Dram base */
 	vbios_mem_base &= ~(ASPEED_DRAM_BASE);
@@ -114,27 +110,27 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 	}
 }
 
-int vga_init(struct ast2700_scu0 *scu)
+int vga_init(struct ast_chip *chip)
 {
 	struct sdramc_regs *ram = (struct sdramc_regs *)DRAMC_BASE;
 	uint32_t val;
-	bool is_pcie0_enable = scu->pci0_misc[28] & BIT(0);
-	bool is_pcie1_enable = scu->pci1_misc[28] & BIT(0);
+	struct ast2700_scu0 *scu = chip->scu0;
+	bool is_pcie0_enable = chip->pcie0_enable;
+	bool is_pcie1_enable = chip->pcie1_enable;
 	bool is_64vram = ram->gfmcfg & BIT(0);
 	uint8_t dac_src = scu->hwstrap1 & BIT(28);
 	uint8_t dp_src = scu->hwstrap1 & BIT(29);
-	uint8_t efuse = FIELD_GET(SCU0_REVISION_ID_EFUSE, scu->chip_id1);
 
 	/* Decide feature by efuse
 	 *  0: 2750 has full function
 	 *  1: 2700 has only 1 VGA
 	 *  2: 2720 has no VGA
 	 */
-	if (efuse == 1) {
+	if (chip->efuse == 1) {
 		is_pcie1_enable = false;
 		dac_src = 0;
 		dp_src = 0;
-	} else if (efuse == 2) {
+	} else if (chip->efuse == 2) {
 		LOG_DBG("%s: 2720 has no VGA", __func__);
 		return 0;
 	}

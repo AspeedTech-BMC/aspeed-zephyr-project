@@ -13,8 +13,11 @@
 #define ast_loader_get_ops(loader) \
                 ((struct ast_loader_ops *)(loader)->ops)
 
-#define readl(addr) (sys_read32((void *)(addr)))
-#define writel(val, addr) (sys_write32((val), (void *)(addr)))
+#define readl(addr) (sys_read32((uintptr_t)(addr)))
+#define writel(val, addr) (sys_write32((val), (uintptr_t)(addr)))
+#define setbits_le32(addr, set) sys_write32(sys_read32((uintptr_t)(addr)) | (set), (uintptr_t)(addr))
+#define clrbits_le32(addr, clr) sys_write32(sys_read32((uintptr_t)(addr)) & (~(clr)), (uintptr_t)(addr))
+#define clrsetbits_le32(addr, clr, set) sys_write32((sys_read32((uintptr_t)(addr)) & (~(clr))) | (set), (uintptr_t)(addr));
 
 struct udevice {
 

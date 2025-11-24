@@ -12,9 +12,7 @@
 #include <platform.h>
 #include <scu_ast2700.h>
 #include <usb.h>
-
-#define setbits_le32(addr, set) sys_write32(sys_read32((uintptr_t)addr) | set, (uintptr_t)addr)
-#define clrbits_le32(addr, clr) sys_write32(sys_read32((uintptr_t)addr) & (~clr), (uintptr_t)addr)
+#include <ast_loader.h>
 
 LOG_MODULE_REGISTER(usb, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -58,6 +56,7 @@ static int usb_uart_init(struct ast_chip *chip)
 	setbits_le32(&scu->clkgate_clr2, SCU1_CLKGATE2_USB2C);
 	k_msleep(10);
 	setbits_le32(&scu->modrst2_clr, SCU1_RSTCTL2_USB2C);
+	k_usleep(1);
 
 	// Clear USB_CTRL[1:0] to enable vHub + USB2UART on portc
 	clrbits_le32(&scu->usb_ctrl, 0x3);
@@ -93,7 +92,32 @@ static int usb_uart_init(struct ast_chip *chip)
 
 int usb_init(struct ast_chip *chip)
 {
+	struct ast2700_scu0 *scu = (void *)SCU0_REG;
+
 	usb_uart_init(chip);
+
+	if (chip->rev_id == 0) {
+		LOG_DBG("Do nothing in A0.");
+		return 0;
+	}
+
+	/* clk/reset for vhuba1 (including PortA 2.0 PHY) */
+	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_USBA);
+	k_msleep(10);
+	setbits_le32(&scu->modrst2_clr, SCU0_RST2_USBA_VHUB);
+	k_usleep(1);
+
+	/* Set PortA PHY2 Pre-emphasis current {PHYA_B08} [22:21] = b'10 */
+	clrsetbits_le32(ASPEED_VHUBA1_PHY_CTL_3, GENMASK(22, 21), 2 << 21);
+
+	/* clk/reset for vhubb1 (including PortB 2.0 PHY) */
+	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_USBB);
+	k_msleep(10);
+	setbits_le32(&scu->modrst2_clr, SCU0_RST2_USBB_VHUB);
+	k_usleep(1);
+
+	/* Set PortB PHY2 Pre-emphasis current {PHYA_B08} [22:21] = b'10 */
+	clrsetbits_le32(ASPEED_VHUBB1_PHY_CTL_3, GENMASK(22, 21), 2 << 21);
 
 	return 0;
 }

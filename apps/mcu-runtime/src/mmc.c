@@ -29,7 +29,7 @@
 
 #define MMC_BLK_LEN	512
 
-LOG_MODULE_REGISTER(ast_mmc, CONFIG_SOC_FMC_LOG_LEVEL);
+LOG_MODULE_REGISTER(ast_mmc, CONFIG_SDHC_LOG_LEVEL);
 
 static struct sd_card card;
 
@@ -57,7 +57,7 @@ static int mmc_init(struct device *dev)
 		return -ENODEV;
 	}
 
-	ret = mmc_switch_part(&card, 1 << abr_get_id());
+	ret = mmc_switch_part(&card, 1 << abr_get_ind());
 	if (ret) {
 		LOG_ERR("cannot switch part\n");
 		return -1;

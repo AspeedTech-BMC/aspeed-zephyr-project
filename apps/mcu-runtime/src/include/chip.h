@@ -39,6 +39,9 @@ struct ast_board {
 	struct ast_loader *loader;
 	int (*load_image)(void);
 	void (*boot)(void);
+	int (*populate)(void);
+	int (*runtime_loop)(void);
+
 };
 
 struct ast_chip {
@@ -55,6 +58,8 @@ struct ast_chip {
 	uint32_t efuse;
 	uint32_t pcie0_enable;
 	uint32_t pcie1_enable;
+	struct ast2700_scu0 *scu0;
+	struct ast2700_scu1 *scu1;
 };
 
 struct ast_chip *ast_create_chip(void);

@@ -136,6 +136,9 @@ bool is_fpga(void)
 {
 #ifdef CONFIG_ASPEED_FPGA
 	sdramc->fpga = 1;
+#ifdef CONFIG_ASPEED_HAPS
+	sdramc->fpga = 0;
+#endif
 #else
 	sdramc->fpga = 0;
 #endif
@@ -144,6 +147,9 @@ bool is_fpga(void)
 
 bool is_ddr4(void)
 {
+#ifdef CONFIG_ASPEED_HAPS
+	return 1;
+#endif
 	if (is_fpga())
 		/* made fpga strap reverse */
 		return ((sys_read32(SCU_IO_HWSTRAP1) & IO_HWSTRAP1_DRAM_TYPE) ? 0 : 1);
@@ -1053,6 +1059,35 @@ static void sdramc_get_property(struct sdramc *sdramc)
 #endif
 }
 
+static void sdramc_qos_init(struct sdramc *sdramc)
+{
+        /* raise SLI write/read priority */
+        sys_write32(QOS_SLI_LEVEL(10),
+               (uint32_t)&sdramc->regs->port[4].write_qos);
+        sys_write32(QOS_SLI_LEVEL(9),
+               (uint32_t)&sdramc->regs->port[4].read_qos);
+        sys_write32(DRAMC_PORT_CFG_RDQOS_EN | DRAMC_PORT_CFG_WRQOS_EN | DEFAULT_RDQOS_LEVEL,
+               (uint32_t)&sdramc->regs->port[4].cfg);
+
+        /* raise usb 2.0 B1/B2, vga1 priority */
+        sys_write32(QOS_USB2_B1_LEVEL(9) | QOS_USB2_B2_LEVEL(9) | QOS_VGA1_CR_LEVEL(9),
+               (uint32_t)&sdramc->regs->port[2].read_qos);
+        sys_write32(DRAMC_PORT_CFG_RDQOS_EN | DRAMC_PORT_CFG_WRQOS_EN | DEFAULT_RDQOS_LEVEL,
+               (uint32_t)&sdramc->regs->port[2].cfg);
+
+        /* raise vga2 priority */
+        sys_write32(QOS_VGA2_CR_LEVEL(9),
+               (uint32_t)&sdramc->regs->port[3].read_qos);
+        sys_write32(DRAMC_PORT_CFG_RDQOS_EN | DRAMC_PORT_CFG_WRQOS_EN | DEFAULT_RDQOS_LEVEL,
+               (uint32_t)&sdramc->regs->port[3].cfg);
+
+        /* raise u2 A1/A2 priority */
+        sys_write32(QOS_USB2_A1_LEVEL(9) | QOS_USB2_A2_LEVEL(9),
+               (uint32_t)&sdramc->regs->port[1].read_qos);
+        sys_write32(DRAMC_PORT_CFG_RDQOS_EN | DRAMC_PORT_CFG_WRQOS_EN | DEFAULT_RDQOS_LEVEL,
+               (uint32_t)&sdramc->regs->port[1].cfg);
+}
+
 int dram_init(struct ast_chip *chip)
 {
 	struct sdramc_ac_timing *ac;
@@ -1101,6 +1136,8 @@ int dram_init(struct ast_chip *chip)
 
 	sdramc_init_mpu(sdramc);
 	sdramc_mpu_enable(sdramc);
+
+	sdramc_qos_init(sdramc);
 
 	LOG_DBG("%s is successfully initialized\n", ac->desc);
 	sdramc_set_flag(DRAMC_INIT_DONE);
