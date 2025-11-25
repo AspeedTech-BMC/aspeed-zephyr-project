@@ -229,6 +229,7 @@ void mctp_i3c_target_intf_init(void)
 		}
 		mctp_instance->medium_conf.i3c_conf.bus = i3c_dev_p->i3c_conf.bus;
 		mctp_instance->medium_conf.i3c_conf.addr = i3c_dev_p->i3c_conf.addr;
+		mctp_instance->medium_conf.i3c_conf.dest_eid = i3c_dev_p->i3c_conf.dest_eid;
 		mctp_channel_id = CMD_CHANNEL_I3C_BASE | CMD_CHANNEL_I3C_TARGET |
 			mctp_instance->medium_conf.i3c_conf.bus;
 		rc = cmd_channel_mctp_init(&mctp_instance->mctp_cmd_channel,
