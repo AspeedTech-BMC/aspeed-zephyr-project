@@ -44,11 +44,6 @@
 #define   SPI_UNALGNED_ACCESS		BIT(24)
 #define   SPI_CS_CONTINUOUS		BIT(16)
 
-#define ASPEED_IO_FWSPI_DRIVING         (SCU1_REG + 0x4E0)
-#define ASPEED_IO_SPI0_DRIVING          (SCU1_REG + 0x4CC)
-#define ASPEED_IO_SPI1_DRIVING          (SCU1_REG + 0x4CC)
-#define ASPEED_IO_SPI2_DRIVING          (SCU1_REG + 0x4D0)
-
 LOG_MODULE_REGISTER(ast_spi, CONFIG_SOC_FMC_LOG_LEVEL);
 
 /*
@@ -129,35 +124,6 @@ static int spi_copy(struct device *dev, uint32_t *dest, uint32_t src, uint32_t l
         return 0;
 }
 
-void spi_adjust_driving_strength(void)
-{
-	uint32_t reg;
-
-	/* FMC driving strength: SCUIO_4E0[15:0] */
-	reg = sys_read32(ASPEED_IO_FWSPI_DRIVING);
-	reg &= ~(0x0000ffff);
-	reg |= 0x0000aaaa;
-	sys_write32(reg, ASPEED_IO_FWSPI_DRIVING);
-
-	/* SPI0 driving strength: SCUIO_4CC[11:0] */
-	reg = sys_read32(ASPEED_IO_SPI0_DRIVING);
-	reg &= ~(0x00000fff);
-	reg |= 0x00000aaa;
-	sys_write32(reg, ASPEED_IO_SPI0_DRIVING);
-
-	/* SPI1 driving strength: SCUIO_4CC[27:16] */
-	reg = sys_read32(ASPEED_IO_SPI1_DRIVING);
-	reg &= ~(0x0fff0000);
-	reg |= 0x0aaa0000;
-	sys_write32(reg, ASPEED_IO_SPI1_DRIVING);
-
-	/* SPI2 driving strength: SCUIO_4D0[15:0] */
-	reg = sys_read32(ASPEED_IO_SPI2_DRIVING);
-	reg &= ~(0x0000ffff);
-	reg |= 0x00002aaa;
-	sys_write32(reg, ASPEED_IO_SPI2_DRIVING);
-}
-
 static void hspi_init(void)
 {
 	uint32_t reg;
@@ -175,7 +141,6 @@ static void hspi_init(void)
 
 static int spi_init(struct device *dev)
 {
-	spi_adjust_driving_strength();
 	hspi_init();
 
         return 0;
