@@ -118,6 +118,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_LOG_DEFAULT_LEVEL);
 
 #define SLI_MAX_POLL_CNT_CLEAR		10
 #define SLI_MAX_POLL_CNT_SUSPEND	10
+#define SLIM_RETRY_COUNT		50
 
 struct sli_config {
 	mm_reg_t slim; /* SLI MBUS */
@@ -154,6 +155,18 @@ struct sli_data {
 #define SCU1_SCRATCH31_SLI_SKIP_CALI	BIT(1)	/* skip calibration */
 #define SCU0_SCRATCH31_SLI1_READY	BIT(0)
 #define AHBC_MAX_TIMEOUT		0x1ff
+
+static void trigger_reset(void)
+{
+	// Add SLI + DRAM reset
+	setbits_le32((void *)0x14c3701c, BIT(2) | BIT(1));
+	setbits_le32((void *)0x14c37028, BIT(3));
+
+	// trigger reset
+	sys_write32(0x200, (void *)0x14c37004);
+	sys_write32(0x4755, (void *)0x14c37008);
+	sys_write32(0x13, (void *)0x14c3700c);
+}
 
 static bool is_sli_calibrated(struct sli_data *data)
 {
@@ -411,7 +424,7 @@ static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int be
 	char *die_name = (is_k_rx) ? "IOD" : "CPUD";
 	mem_addr_t kx = (is_k_rx) ? data->die1.slim : data->die0.slim;
 
-	for (count = 0; count < 99; count++) {
+	for (count = 0; count < SLIM_RETRY_COUNT; count++) {
 		for (d = begin; d < end; d++) {
 			sli_set_mbus_delay_single(kx, index, d, is_k_rx);
 
@@ -438,7 +451,7 @@ static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int be
 	}
 
 	if (d_first_pass == -1)
-		d = SLIM_DEFAULT_DELAY;
+		d = (begin + end) >> 1;
 	else
 		d = (d_first_pass + d_last_pass) >> 1;
 
@@ -467,7 +480,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 		clrbits_le32(kx + SLI_CTRL_I, SLI_RX_PHY_LAH_SEL_NEG);
 
 	/* Find coarse delay */
-	for (count = 0; count < 99; count++) {
+	for (count = 0; count < SLIM_RETRY_COUNT; count++) {
 		for (dc = SLIM_COARSE_D_BEGIN; dc < SLIM_COARSE_D_END; dc++) {
 			sli_set_mbus_delay(kx, dc, dc, dc, dc, is_k_rx);
 
@@ -505,6 +518,11 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_k_rx)
 		if ((d_last_pass - d_first_pass) >= 3)
 			break;
 		LOG_DBG("%s SLIM DS win: {%d, %d} retry %d\n", die_name, d_first_pass, d_last_pass, count);
+	}
+
+	if (count == SLIM_RETRY_COUNT) {
+		LOG_WRN("%s SLIM DS calibration failed, {%d, %d}\n", die_name, d_first_pass, d_last_pass);
+		trigger_reset();
 	}
 
 	dc = (d_first_pass + d_last_pass) >> 1;
