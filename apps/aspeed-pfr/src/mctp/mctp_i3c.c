@@ -231,8 +231,8 @@ int mctp_i3c_send_eid_announcement(mctp *mctp_instance, int *duration)
 		return status;
 	}
 
-	uint8_t req_buf[14] = {MCTP_BASE_PROTOCOL_MSG_TYPE_VENDOR_DEF, 0x80, 0x86, 0x80, 0x0a, 0x00,
-		0x00, 0x00, 0x00, MCTP_DOE_REGISTRATION_CMD, 0x00, 0x00, 0x01, (uint8_t)src_eid};
+	uint8_t req_buf[21] = {MCTP_BASE_PROTOCOL_MSG_TYPE_VENDOR_DEF, 0x80, 0x86, 0x80, 0x0a, 0x00,
+		0x00, 0x00, 0x00, MCTP_DOE_REGISTRATION_CMD, 0x00, 0x00, 0x01, (uint8_t)src_eid, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 	if (mctp_instance == mctp_i3c_bmc_inst.mctp_inst) {
 		dest_eid = MCTP_I3C_REGISTRATION_EID;

@@ -74,16 +74,16 @@
 	};
 
 	// cpu0
-	i3cdev@20a0000000f {
+	i3cdev@20a012900ef {
 		compatible = "i3c-dummy-device";
-		reg = <0x0 0x20a 0x0000000f>;
+		reg = <0x0 0x20a 0x012900ef>;
 		status = "okay";
 	};
 
 	// cpu1
-	i3cdev@20a0000100f {
+	i3cdev@20a012910ef {
 		compatible = "i3c-dummy-device";
-		reg = <0x0 0x20a 0x0000100f>;
+		reg = <0x0 0x20a 0x012910ef>;
 		status = "okay";
 	};
 };
