@@ -848,6 +848,17 @@ int sli_init_f(struct ast_chip *chip)
 	return 0;
 }
 
+static void _mac_hotfix(struct sli_data *data)
+{
+	uint32_t val = readl((void *)data->die1.slim + 0xb8) & 0xe00;
+
+	if (!val)
+		return;
+
+	writel(val, (void *)data->die1.slim + 0x68);
+	setbits_le32(data->die1.slim + 0x60, BIT(5));
+}
+
 int sli_init_r(struct ast_chip *chip)
 {
 	struct sli_data ast2700_sli_data[1];
@@ -878,6 +889,7 @@ int sli_init_r(struct ast_chip *chip)
 
 	if (data->scu1->scratch[31] & SCU1_SCRATCH31_SLI_SKIP_CALI) {
 		printf("SLI0 has been initialized\n");
+		_mac_hotfix(data);
 		return 0;
 	}
 	while (--retry > 0) {
