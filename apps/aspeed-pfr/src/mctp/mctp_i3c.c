@@ -906,6 +906,9 @@ void mctp_i3c_configure_cpu_i3c_devs(void)
 {
 	if (!is_pltrst_sync())
 		return;
+#if defined(CONFIG_PFR_MCTP_I3C_5_0)
+	mctp_i3c_target_mctp_rerun_daa();
+#else
 	if (get_i3c_mng_owner() == I3C_MNG_OWNER_ROT) {
 		LOG_INF("Enable CPU i3c");
 		if (!i3c_hub_configured) {
@@ -915,6 +918,12 @@ void mctp_i3c_configure_cpu_i3c_devs(void)
 				return;
 			i3c_hub_configured = true;
 		}
+
+		mctp_i3c_detach_slave_dev(CONFIG_PFR_SPDM_CPU_I3C_BUS,
+				CONFIG_PFR_SPDM_I3C_CPU0_DEV_PID);
+		mctp_i3c_detach_slave_dev(CONFIG_PFR_SPDM_CPU_I3C_BUS,
+				CONFIG_PFR_SPDM_I3C_CPU1_DEV_PID);
+
 		mctp_i3c_send_rstdaa(CONFIG_PFR_SPDM_CPU_I3C_BUS);
 		mctp_i3c_send_entdaa(CONFIG_PFR_SPDM_CPU_I3C_BUS);
 
@@ -923,4 +932,5 @@ void mctp_i3c_configure_cpu_i3c_devs(void)
 		mctp_i3c_attach_target_dev(CONFIG_PFR_SPDM_CPU_I3C_BUS,
 				CONFIG_PFR_SPDM_I3C_CPU1_DEV_PID);
 	}
+#endif
 }
