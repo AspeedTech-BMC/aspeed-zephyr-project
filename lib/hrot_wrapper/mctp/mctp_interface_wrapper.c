@@ -128,7 +128,7 @@ int mctp_i3c_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uint8_t r
 	}
 
 	status = cmd_interface_mctp_control_init(&mctp_wrapper->cmd_mctp_control,
-			device_mgr, CERBERUS_PROTOCOL_INTEL_PFR_PCI_VID, 0x01);
+			device_mgr, CERBERUS_PROTOCOL_INTEL_PFR_PCI_VID, 0x05);
 	if (status != 0) {
 		LOG_ERR("mctp control command interface init failed");
 		goto error_device_mgr;

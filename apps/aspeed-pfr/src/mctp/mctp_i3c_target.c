@@ -165,6 +165,31 @@ uint8_t mctp_i3c_target_mctp_stop(void)
 	return 0;
 }
 
+uint8_t mctp_i3c_target_mctp_rerun_daa(void)
+{
+	int i;
+	mctp_i3c_dev *i3c_dev_p;
+	mctp_i3c *mctp_i3c_inst;
+	mctp *mctp_inst;
+	struct mctp_interface_wrapper *mctp_wrapper;
+	struct device_manager *device_mgr;
+
+	for (i = 0; i < ARRAY_SIZE(i3c_devs); i++) {
+		i3c_dev_p = &i3c_devs[i];
+		mctp_i3c_inst = &i3c_dev_p->mctp_i3c_inst;
+		if (mctp_i3c_inst->state != MCTP_I3C_TARGET_ATTACHED)
+			return 0;
+
+		mctp_inst = mctp_i3c_inst->mctp_inst;
+		mctp_wrapper = &mctp_inst->mctp_wrapper;
+		device_mgr = mctp_wrapper->mctp_interface.device_manager;
+		device_manager_update_device_state(device_mgr,
+				DEVICE_MANAGER_SELF_DEVICE_NUM, DEVICE_MANAGER_SEND_DISCOVERY_NOTIFY);
+		k_timer_start(&mctp_i3c_inst->i3c_state_timer, K_SECONDS(12), K_NO_WAIT);
+	}
+	return 0;
+}
+
 uint8_t mctp_i3c_target_get_dev_counts(void)
 {
 	return(ARRAY_SIZE(i3c_devs));

@@ -29,7 +29,6 @@ static void platform_bhs_reset_handler(const struct device *dev, struct gpio_cal
 	if (ret == 0) {
 		RSTPlatformReset(true);
 	} else {
-		RSTPlatformReset(false);
 		extern bool pltrst_sync;
 		pltrst_sync = true;
 #if defined(CONFIG_PFR_MCTP_I3C)
