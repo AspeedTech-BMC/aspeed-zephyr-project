@@ -15,14 +15,41 @@
 #include <scu.h>
 #include <vga_ast2700.h>
 #include <ast_loader.h>
+#include <string.h>
 
 #define AST2700A2 0x2
 
 LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 
+#define CHECK_EXIST(node, prop) \
+	(strcmp(DT_PROP_OR(node, prop, "None"), "None") ? 1 : 0)
+
+#define PCIE_CONF(node) \
+	((CHECK_EXIST(node, vga)        << 0) | \
+	 (CHECK_EXIST(node, bmc_device) << 1) | \
+	 (CHECK_EXIST(node, ehci)       << 2) | \
+	 (CHECK_EXIST(node, xhci)       << 3))
+
+#define CHECK_INTx(node, prop) \
+	(strcmp(DT_PROP_OR(node, prop, "INTx"), "MSI") ? 0 : 1)
+
+#define PCIE_INTx(node) \
+	((CHECK_INTx(node, vga)        << 0) | \
+	 (CHECK_INTx(node, bmc_device) << 1) | \
+	 (CHECK_INTx(node, ehci)       << 2) | \
+	 (CHECK_INTx(node, xhci)       << 3))
+
 int pci_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = chip->scu0;
+	uint8_t pcie0_en = PCIE_CONF(DT_PATH(soc0, pcie0));
+	uint8_t pcie1_en = PCIE_CONF(DT_PATH(soc0, pcie1));
+	uint8_t pcie0_intx = PCIE_INTx(DT_PATH(soc0, pcie0));
+	uint8_t pcie1_intx = PCIE_INTx(DT_PATH(soc0, pcie1));
+
+	sys_write32(pcie0_en * 0x010101 | (pcie0_intx << 24), &scu->pci0_misc[28]);
+	sys_write32(pcie1_en * 0x010101 | (pcie1_intx << 24), &scu->pci1_misc[28]);
+	LOG_DBG("%s: PCIE0 en=0x%02x int=0x%02x, PCIE1 en=0x%02x int=0x%02x\n", __func__, pcie0_en, pcie0_intx, pcie1_en, pcie1_intx);
 
 	// leave works to u-boot
 	if (chip->rev_id == 0) {
