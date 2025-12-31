@@ -20,6 +20,15 @@
 #define CPTRA_OWNER_CPTRA_ECC_PUBK_Y_OFFSET (0xE74)
 #define CPTRA_OWNER_CPTRA_LMS_PUBK_OFFSET   (0xEA4)
 
+#define CPTRA_AUTH_MANIFEST_MARKER_1X 0x41544D4E /* "ATMN" in big endian*/
+#define CPTRA_AUTH_MANIFEST_MARKER_2X 0x324D5441 /* 'ATM2' in little endian*/
+
+#ifdef CONFIG_CPTRA_2X_LAYOUT
+#define CPTRA_AUTH_MANIFEST_MARKER CPTRA_AUTH_MANIFEST_MARKER_2X
+#else
+#define CPTRA_AUTH_MANIFEST_MARKER CPTRA_AUTH_MANIFEST_MARKER_1X
+#endif
+
 #define CPTRA_ECDSA384_VFY_PKT(_r, _s)                                                             \
 	.r = (char *)(_r), .s = (char *)(_s), .m_len = 48, .r_len = 48, .s_len = 48,
 
@@ -83,6 +92,7 @@ enum cptra_error_code {
 	CPTRA_ERR_IMAGE_OFFSET_INVALID = -2,
 };
 
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 struct cptra_manifest_hdr {
 	uint32_t magic;
 	uint16_t hdr_ver;
@@ -121,6 +131,51 @@ struct cptra_manifest_aspeed_preamble {
 	uint32_t metadata_owner_ecc384_sig[24];
 	uint32_t metadata_owner_LMS_sig[405];
 } __attribute__((__packed__, __aligned__(4)));
+#else
+struct cptra_manifest_hdr {
+	uint32_t magic;
+	uint16_t hdr_ver;
+	uint16_t img_count;
+	uint32_t image_headers_offset;
+} __attribute__((__packed__, __aligned__(4)));
+
+struct cptra_checksum_info {
+	uint32_t hdr_checksum;
+} __attribute__((__packed__));
+
+struct cptra_image_info {
+	uint32_t identifier;
+	uint32_t offset;
+	uint32_t size;
+	uint32_t image_checksum;
+	uint32_t image_info_checksum;
+} __attribute__((__packed__));
+
+struct cptra_manifest_aspeed_preamble {
+	uint32_t manifest_marker;
+	uint32_t preamble_size;
+	uint32_t manifest_version;
+	uint32_t manifest_sec_version;
+	uint32_t manifest_flags;
+	uint32_t manifest_vendor_ecc384_key[24];
+	uint32_t manifest_vendor_pqc_key[648];
+
+	uint32_t manifest_vendor_ecc384_sig[24];
+	uint32_t manifest_vendor_pqc_sig[1157];
+
+	uint32_t manifest_owner_ecc384_key[24];
+	uint32_t manifest_owner_pqc_key[648];
+
+	uint32_t manifest_owner_ecc384_sig[24];
+	uint32_t manifest_owner_pqc_sig[1157];
+
+	uint32_t metadata_vendor_ecc384_sig[24];
+	uint32_t metadata_vendor_pqc_sig[1157];
+	uint32_t metadata_owner_ecc384_sig[24];
+	uint32_t metadata_owner_pqc_sig[1157];
+} __attribute__((__packed__, __aligned__(4)));
+
+#endif
 
 struct cptra_manifest_aspeed_svn {
 	uint32_t ver;
@@ -134,6 +189,9 @@ struct cptra_soc_manifest {
 	struct cptra_manifest_aspeed_preamble preamble;
 	uint32_t ime_count;
 	struct cptra_manifest_ime imc[CPTRA_IMC_ENTRY_COUNT];
+#ifdef CONFIG_CPTRA_2X_LAYOUT
+	uint8_t reserved[104]; // padding to make size aligned to 256 bytes
+#endif
 } __attribute__((__packed__, __aligned__(4)));
 
 struct cptra_image_context {
@@ -156,5 +214,6 @@ char *cptra_ime_get_image_name(uint32_t fw_id);
 int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id);
 int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id);
 uintptr_t cptra_ime_get_load_addr(uint32_t fw_id);
+bool cptra_find_fw_id_by_man_identifier(uint32_t identifier, uint32_t *fw_id);
 
 #endif /* _MANIFEST_H */

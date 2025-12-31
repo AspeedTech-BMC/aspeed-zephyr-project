@@ -22,13 +22,30 @@ __weak int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 	return flash_read(dev, src, dst, len);
 }
 
+#ifdef CONFIG_CPTRA_2X_LAYOUT
+static uint32_t calc_additive_checksum(const uint8_t *data, size_t length)
+{
+    uint32_t sum = 0;
+
+    for (size_t i = 0; i < length; i++) {
+        sum = sum + data[i];
+    }
+
+    return (uint32_t)(0 - sum);
+}
+#endif
+
 static int cptra_crc32_check(struct cptra_image_context *ctx)
 {
 #ifdef CONFIG_CRC
 	uint32_t hdr_crc32 = 0;
 
 	/* Check the flash image header crc checksum */
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 	hdr_crc32 = crc32_ieee((uint8_t *)ctx->hdr, sizeof(struct cptra_manifest_hdr));
+#else
+	hdr_crc32 = calc_additive_checksum((uint8_t *)ctx->hdr, sizeof(struct cptra_manifest_hdr));
+#endif
 	if (hdr_crc32 != ctx->chk->hdr_checksum) {
 		LOG_ERR("Check flash image header checksum ...fail.");
 		return CPTRA_ERR_HDR_CHKSUM;
@@ -133,10 +150,11 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 	if (ret)
 		return CPTRA_ERR_SOC_MANIFEST_READ_ERROR;
 
-	if (soc_manifest.preamble.manifest_marker !=
-	    CPTRA_MBCMD_SET_AUTH_MANIFEST)
+	if (soc_manifest.preamble.manifest_marker != CPTRA_AUTH_MANIFEST_MARKER) {
+		LOG_ERR("Soc manifest magic mismatch: 0x%x.",
+			soc_manifest.preamble.manifest_marker);
 		return CPTRA_ERR_SOC_MANIFEST_MAGIC_MISMATCH;
-
+	}
 	ctx->soc_manifest = &soc_manifest;
 
 	LOG_INF("ver: %x, flags: %x, soc_ver: %x",
@@ -205,6 +223,7 @@ int cptra_load_abb_image(void)
 	uint32_t *load_addr = 0;
 	struct cptra_soc_manifest *man = cptra_ctx.soc_manifest;
 	struct cptra_manifest_ime *ime = &man->imc[0];
+	uint32_t fw_id;
 
 	if (!man)
 		return CPTRA_ERR_ABB_LOADER_NOT_READY;
@@ -214,16 +233,21 @@ int cptra_load_abb_image(void)
 		if (!cptra_ime_loadable_image(&cptra_ctx, ime))
 			continue;
 
-		load_addr = (uint32_t *)cptra_ime_get_load_addr(ime->fw_id);
+		fw_id = ime->fw_id;
+#ifdef CONFIG_CPTRA_2X_LAYOUT
+		if (!cptra_find_fw_id_by_man_identifier(ime->fw_id, &fw_id))
+			continue;
+#endif
+		load_addr = (uint32_t *)cptra_ime_get_load_addr(fw_id);
 		if (!load_addr)
 			continue;
 
-		ret = ast_loader_load_manifest_image(ime->fw_id, load_addr, true);
-		LOG_INF("Load %s image... %s (0x%x)", cptra_ime_get_image_name(ime->fw_id),
+		ret = ast_loader_load_manifest_image(fw_id, load_addr, true);
+		LOG_INF("Load %s image... %s (0x%x)", cptra_ime_get_image_name(fw_id),
 			ret ? "fail" : "pass", ret);
 
 		if (!ret)
-			board_manifest_image_post_process(ime->fw_id);
+			board_manifest_image_post_process(fw_id);
 	}
 
 	cptra_deinit_abb_loader(ret);

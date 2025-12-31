@@ -32,6 +32,7 @@ static bool cptra_manifest_sec_en(void)
 #endif
 }
 
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 static bool cptra_manfiest_svn_en(void)
 {
 	/*
@@ -107,6 +108,7 @@ static void cptra_preamble_convert(struct cptra_manifest_preamble *preamble,
 	memcpy(preamble->metadata_owner_LMS_sig, aspeed_preamble->metadata_owner_LMS_sig,
 	       sizeof(preamble->metadata_owner_LMS_sig));
 }
+#endif
 
 static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 {
@@ -134,6 +136,7 @@ static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 	return CPTRA_SUCCESS;
 }
 
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 static int cptra_manifest_ecdsa384(uint8_t *data, uint32_t data_size, uint32_t *x, uint32_t *y,
 				   uint32_t *r, uint32_t *s)
 {
@@ -256,6 +259,7 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 
 	return CPTRA_SUCCESS;
 }
+#endif
 
 int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 {
