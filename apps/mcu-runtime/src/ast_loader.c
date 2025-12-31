@@ -27,6 +27,8 @@ static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 	if (type != CPTRA_MANIFEST_FW_ID) {
 		err = cptra_verify_image((uint8_t *)message, len, type);
 	} else {
+
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 		err = cptra_verify_soc_manifest(
 			(struct cptra_soc_manifest *)message);
 		if (err)
@@ -34,6 +36,7 @@ static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 
 		err = cptra_verify_soc_manifest_ver(
 			(struct cptra_soc_manifest *)message);
+#endif
 	}
 
 end:
@@ -152,11 +155,14 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 	if (err == -1)
 		err = recovery_init(loader);
 
-	if (err)
+	if (err) {
+		LOG_ERR("Loader init failed %d.\n", err);
 		return err;
+	}
 
 	loader->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+	LOG_INF("Registering manifest verifier...\n");
 	loader->verify = ast_loader_verify;
 #endif
 

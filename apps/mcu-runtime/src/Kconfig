@@ -79,3 +79,9 @@ config CPTRA_MANIFEST_OFFSET
 	default 0x20000000
 	help
 	  Set the address to load the manifest file for FMC
+
+config CPTRA_2X_LAYOUT
+	bool "Enable CPTRA 2x image format & soc manifest"
+	default n
+	help
+	  This option enable the CPTRA 2X image parsing rule.

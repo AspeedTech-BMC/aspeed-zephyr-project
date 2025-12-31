@@ -57,7 +57,7 @@ static int stor_get_image_info(struct image_info *info)
 		return -1;
 	}
 
-	for (int i = 0; i < CPTRA_TSP_FW_ID + 1; i++) {
+	for (int i = 0; i < sizeof(img_info) / sizeof(img_info[0]); i++) {
 		/* Call cptra's service to get the image info */
 		err = cptra_get_abb_imginfo(info[i].id, &offset, &sz);
 		if (err) {
