@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include <manifest.h>
+#include <platform.h>
 #include <spi.h>
 
 #include <zephyr/drivers/cptra.h>
@@ -20,6 +21,16 @@ __weak int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 	const struct device *dev = device_get_binding("fmc@0");
 
 	return flash_read(dev, src, dst, len);
+}
+
+uint32_t cptra_manifest_start_offset(void)
+{
+	/* AST2700-A1 */
+	if (FIELD_GET(0x000000ff, sys_read32(SCU1_REVISION_ID)) == 3 &&
+	    FIELD_GET(0x00ff0000, sys_read32(SCU1_REVISION_ID)) == 1)
+		return 0x00100000;
+
+	return 0x0;
 }
 
 #ifdef CONFIG_CPTRA_2X_LAYOUT
@@ -62,10 +73,11 @@ static int cptra_crc32_check(struct cptra_image_context *ctx)
 static int cptra_read_header(struct cptra_image_context *ctx)
 {
 	int ret = 0;
+	uint32_t manifest_flash_ofst = cptra_manifest_start_offset();
 	static struct cptra_manifest_hdr hdr = { 0 };
 
 	/* Read the manfiest header */
-	ret = ast_loader_read((uint32_t *)&hdr, CPTRA_MANIFEST_OFFSET,
+	ret = ast_loader_read((uint32_t *)&hdr, manifest_flash_ofst,
 			      sizeof(struct cptra_manifest_hdr));
 	if (ret) {
 		LOG_ERR("Failed to read manifest header.");
@@ -92,6 +104,7 @@ static int cptra_read_header(struct cptra_image_context *ctx)
 static int cptra_read_chk_img_info(struct cptra_image_context *ctx)
 {
 	int ret = 0;
+	uint32_t manifest_flash_ofst = cptra_manifest_start_offset();
 	int img_num = ctx->hdr->img_count;
 	static uint8_t chk_img[sizeof(struct cptra_checksum_info) +
 			       sizeof(struct cptra_image_info) *
@@ -104,7 +117,7 @@ static int cptra_read_chk_img_info(struct cptra_image_context *ctx)
 
 	size = sizeof(struct cptra_checksum_info);
 	size += sizeof(struct cptra_image_info) * img_num;
-	ret = ast_loader_read((uint32_t *)chk_img, CPTRA_MANIFEST_OFFSET + ofst,
+	ret = ast_loader_read((uint32_t *)chk_img, manifest_flash_ofst + ofst,
 			      size);
 	if (ret)
 		return CPTRA_ERR_READ_IMG_INFO;
