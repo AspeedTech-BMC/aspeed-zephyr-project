@@ -18,6 +18,7 @@
 #include <zephyr/logging/log.h>
 #include <ast_loader.h>
 #include <chip.h>
+#include <manifest.h>
 #include <stor.h>
 
 LOG_MODULE_REGISTER(ast_stor, CONFIG_SOC_FMC_LOG_LEVEL);
@@ -48,7 +49,7 @@ static struct image_info img_info[] = {
 
 static int stor_get_image_info(struct image_info *info)
 {
-	uint32_t manifest_base = CPTRA_MANIFEST_OFFSET;
+	uint32_t manifest_base = cptra_manifest_start_offset();
 	uint32_t offset, sz;
 	int err;
 

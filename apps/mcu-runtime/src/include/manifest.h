@@ -15,7 +15,6 @@
 #define CPTRA_SYS_LOAD_ADDR     (void *)(CONFIG_SYS_LOAD_ADDR)
 #define CPTRA_SYS_LOAD_SIZE     (0x400000)
 #define CPTRA_SRAM_BUF_SIZE     (16 * 1024)
-#define CPTRA_MANIFEST_OFFSET   (CONFIG_CPTRA_MANIFEST_OFFSET & 0x0fffffff)
 #define CPTRA_OWNER_CPTRA_ECC_PUBK_X_OFFSET (0xE44)
 #define CPTRA_OWNER_CPTRA_ECC_PUBK_Y_OFFSET (0xE74)
 #define CPTRA_OWNER_CPTRA_LMS_PUBK_OFFSET   (0xEA4)
@@ -201,6 +200,7 @@ struct cptra_image_context {
 	struct cptra_soc_manifest *soc_manifest;
 };
 
+uint32_t cptra_manifest_start_offset(void);
 int cptra_verify_abb_loader(void);
 int cptra_load_abb_image(void);
 int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
