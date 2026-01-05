@@ -597,7 +597,8 @@ struct ast2700_scu0 {
 	uint32_t vga1_scratch1[4];	/* 0x910 ~ 0x91C */
 	uint32_t vga0_scratch2[8];	/* 0x920 ~ 0x93C */
 	uint32_t vga1_scratch2[8];	/* 0x940 ~ 0x95C */
-	uint32_t pci_cfg1[3];		/* 0x960 ~ 0x968 */
+	uint32_t raw_config;		/* 0x960 */
+	uint32_t pci_cfg1[2];		/* 0x964 ~ 0x968 */
 	uint32_t rsv_0x96c;		/* 0x96C */
 	uint32_t pcie_cfg1;		/* 0x970 */
 	uint32_t mmio_decode1;		/* 0x974 */
