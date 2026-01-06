@@ -349,6 +349,6 @@ struct ast2700_vga_link {
 };
 #endif
 
-int vga_init(struct ast_chip *chip);
+int vga_init(struct ast_chip *chip, bool open_codec);
 
 #endif

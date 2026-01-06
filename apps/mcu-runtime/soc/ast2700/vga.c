@@ -110,7 +110,7 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 	}
 }
 
-int vga_init(struct ast_chip *chip)
+int vga_init(struct ast_chip *chip, bool open_codec)
 {
 	struct sdramc_regs *ram = (struct sdramc_regs *)DRAMC_BASE;
 	uint32_t val;
@@ -205,7 +205,13 @@ int vga_init(struct ast_chip *chip)
 		packer_io = (struct ast2700_vga_link *)VGA_PACKER_IO_BASE;
 		retimer_io = (struct ast2700_vga_link *)VGA_RETIMER_IO_BASE;
 
-		packer_cpu->REG10.value  = 0x00030009;
+		/* codec setting for vlink */
+		if (open_codec) {
+			packer_cpu->REG10.value  = 0x00020009;
+			packer_cpu->REG1C.value  = 0x80F0F002;
+		} else {
+			packer_cpu->REG10.value  = 0x00030009;
+		}
 		val = 0x10000000 | dac_src;
 		packer_cpu->REG50.value  = val;
 		packer_cpu->REG44.value  = 0x00100010;
