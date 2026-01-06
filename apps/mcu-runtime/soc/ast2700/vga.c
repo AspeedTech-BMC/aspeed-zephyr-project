@@ -20,7 +20,6 @@
 #define VBIOS1_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base1))
 
 #define BIOS_HEADER_TAG 0xaa55
-#define AST2700A2 0x2
 
 LOG_MODULE_REGISTER(vga, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -87,15 +86,10 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 {
 	uint32_t val, vram_size;
 	uint8_t vram_size_cfg;
-	bool is_e2m_raw_disable = false;
 
 	vram_size_cfg = is_64vram ? 0xf : 0xe;
 	vram_size = 2 << (vram_size_cfg + 10);
 	LOG_DBG("%s: VRAM size(%x) cfg(%x)\n", __func__, vram_size, vram_size_cfg);
-
-	/* the aws of e2m need to disable under AST2700 A2 */
-	if (FIELD_GET(SCU0_REVISION_ID_HW, scu->chip_id1) == AST2700A2)
-		is_e2m_raw_disable = true;
 
 	if (is_pcie0_enable) {
 		LOG_DBG("pcie0 e2m addr(%x)", _ast_get_e2m_addr(ram, 0));
@@ -104,8 +98,6 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 		LOG_DBG("pcie0 debug reg(%x)", val);
 		sys_write32(val, E2M0_VGA_RAM);
 		sys_write32(val, (uintptr_t)&scu->pci0_misc[3]);
-		if (is_e2m_raw_disable)
-			setbits_le32(&scu->raw_config, BIT(2));
 	}
 
 	if (is_pcie1_enable) {
@@ -115,8 +107,6 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 		LOG_DBG("pcie1 debug reg(%x)", val);
 		sys_write32(val, E2M1_VGA_RAM);
 		sys_write32(val, (uintptr_t)&scu->pci1_misc[3]);
-		if (is_e2m_raw_disable)
-			setbits_le32(&scu->raw_config, BIT(13));
 	}
 }
 
