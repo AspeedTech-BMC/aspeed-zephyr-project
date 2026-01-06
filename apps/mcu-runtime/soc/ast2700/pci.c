@@ -16,6 +16,8 @@
 #include <vga_ast2700.h>
 #include <ast_loader.h>
 
+#define AST2700A2 0x2
+
 LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 
 int pci_init(struct ast_chip *chip)
@@ -63,6 +65,10 @@ int pci_init(struct ast_chip *chip)
 	clrbits_le32((void *)ASPEED_PLDA3_MSI_CAP, BIT(3));
 	// Set Bridge3 INTA
 	clrsetbits_le32((void *)ASPEED_PLDA3_MSI_CAP, GENMASK(2, 0), 0x1);
+
+	/* the raw of e2m need to disable under AST2700 A2 */
+	if (FIELD_GET(SCU0_REVISION_ID_HW, scu->chip_id1) == AST2700A2)
+		setbits_le32(&scu->raw_config, BIT(2)|BIT(13));
 
 	vga_init(chip);
 
