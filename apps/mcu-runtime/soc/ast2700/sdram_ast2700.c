@@ -81,9 +81,9 @@ struct sdramc_ac_timing ac_table[] = {
 	{
 		DRAM_TYPE_4,
 		"DDR4 3200",
-		20, 16, 8,
+		22, 16, 8,
 	/*     rcd, rp, ras, rrd, rrd_l, faw, rtp */
-		20, 20, 52, 9, 11, 48, 12,
+		22, 22, 52, 9, 11, 48, 12,
 		4,	/* t_wtr */
 		12,	/* t_wtr_l */
 		0,	/* t_wtr_a */
