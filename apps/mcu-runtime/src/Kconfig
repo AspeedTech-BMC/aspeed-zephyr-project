@@ -19,6 +19,12 @@ config ASPEED_DDR_3200
 	help
 		Choose DDR3200 data rate
 
+config ASPEED_PHY_TRAINING_MESSAGE
+	default n
+	bool "Enable DDR PHY TRAINING MESSAGE"
+	help
+		Enable DDR PHY TRAINING MESSAGE for eye diagram debug
+
 config SYS_LOAD_ADDR
 	default 0
 	hex "Address in memory to use by default"
