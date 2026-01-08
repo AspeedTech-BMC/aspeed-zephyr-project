@@ -1,5 +1,5 @@
 # Introduction
-This repository provides fimware applications for AST1030 and AST1060, these
+This repository provides fimware applications for AST1030/AST1060/AST2700-SSP, these
 applications are developing on top of [Zephyr BSP](https://github.com/AspeedTech-BMC/zephyr).
 
 
@@ -73,6 +73,13 @@ west build -b ast1060_dcscm_dice -p auto aspeed-zephyr-project/apps/preload-fw
 ```
 imgtool sign --version 1.1.1 --align 8 --header-size 1024 --slot-size 393216 --load-addr 196608 --key bootloader/mcuboot/root-rsa-2048.pem ./zephyr.bin ./zephyr.signed.bin
 ```
+
+# Building ASPEED-IROT Firmware
+
+```
+west build -b ast2700_evb/ast2700/ssp -p auto aspeed-zephyr-project/apps/aspeed-irot
+```
+
 
 # Building DMTF/LibSPDM Emulator
 This spdm emualtor will create two threads as a requester and a responder.
