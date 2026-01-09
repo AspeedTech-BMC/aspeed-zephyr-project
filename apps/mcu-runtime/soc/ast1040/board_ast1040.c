@@ -29,10 +29,6 @@ void board_manifest_image_post_process(uint32_t fw_id)
 	ep_arm = ((uint64_t)ep - 0x80000000) | 0x400000000ULL;
 
 	switch (fw_id) {
-	case CPTRA_SSP_FW_ID:
-		ssp_init(ep);
-		has_sspfw = true;
-		break;
 	default:
 		break;
 	}
