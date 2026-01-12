@@ -182,7 +182,7 @@ static int cptra_manifest_lms(uint8_t *data, uint32_t data_size, struct lms_pub_
 	const struct device *dev = device_get_binding(CPTRA_LMS_DRV_NAME);
 
 	/* Setup the to be verified signature */
-	pkt.sig.q = sys_cpu_to_be32(sig->q);
+	pkt.sig.q = sig->q; // big endian already
 	pkt.sig.tree_type = sys_cpu_to_be32(sig->tree_type);
 	memcpy(pkt.sig.ots, sig->ots, LMS_SIG_OTS_LEN);
 	memcpy(pkt.sig.tree_path, sig->tree_path, LMS_SIG_TREE_PATH);
