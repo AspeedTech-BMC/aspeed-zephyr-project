@@ -6,6 +6,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include "Smbus_mailbox/Smbus_mailbox.h"
+#include <zephyr/drivers/i2c/pfr/swmbx.h>
 #include "gpio/gpio_aspeed.h"
 #include "platform_monitor_ctrl.h"
 
@@ -15,6 +17,7 @@ extern struct k_sem pltrst_sem;
 
 static struct gpio_callback rst_pltrst_cb_data;
 extern bool i3c_hub_configured;
+extern struct device *gSwMbxDev;
 
 /**
  * Arm the ACM watchdog timer when ROT firmware detects a platform reset
@@ -22,6 +25,7 @@ extern bool i3c_hub_configured;
  */
 static void platform_bhs_reset_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
+	uint8_t data = 0;
 	uint8_t gpio_pin = 31 - __builtin_clz(pins);
 	int ret = gpio_pin_get(dev, gpio_pin);
 	LOG_INF("[CPU->PFR] PLTRST_SYNC[%s %d] = %d", dev->name, gpio_pin, ret);
@@ -29,6 +33,11 @@ static void platform_bhs_reset_handler(const struct device *dev, struct gpio_cal
 	if (ret == 0) {
 		RSTPlatformReset(true);
 	} else {
+		swmbx_read(gSwMbxDev, false, UfmStatusValue, &data);
+		if (!(data & UFM_PROVISIONED)) {
+			RSTPlatformReset(false);
+		}
+
 		extern bool pltrst_sync;
 		pltrst_sync = true;
 #if defined(CONFIG_PFR_MCTP_I3C)

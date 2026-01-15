@@ -51,13 +51,10 @@ mctp_i3c mctp_i3c_cpu0_inst = {0};
 mctp_i3c mctp_i3c_cpu1_inst = {0};
 bool i3c_hub_configured = false;
 
-static void mctp_i3c_req_timeout_callback(struct k_timer *tmr);
-K_TIMER_DEFINE(mctp_i3c_req_timer, mctp_i3c_req_timeout_callback, NULL);
 K_SEM_DEFINE(ibi_complete, 0, 1);
 K_SEM_DEFINE(cpu0_ibi_complete, 0, 1);
 K_SEM_DEFINE(cpu1_ibi_complete, 0, 1);
 K_SEM_DEFINE(hub_ibi_complete, 0, 1);
-K_SEM_DEFINE(mctp_i3c_sem, 0, 1);
 
 
 static int mctp_i3c_sem_give(struct i3c_device_desc *target)
@@ -122,23 +119,14 @@ const struct device *get_mctp_i3c_dev(uint8_t bus_num)
 	return NULL;
 }
 
-void trigger_mctp_i3c_state_handler(void)
-{
-	k_sem_give(&mctp_i3c_sem);
-}
-
 void mctp_i3c_stop_discovery_notify(struct device_manager *mgr)
 {
 	int status;
-	k_timer_stop(&mctp_i3c_req_timer);
 	status = device_manager_update_device_state(mgr,
 			DEVICE_MANAGER_SELF_DEVICE_NUM,
 			DEVICE_MANAGER_EID_ANNOUNCEMENT);
 	if (status != 0)
 		LOG_ERR("update self device state failed");
-
-	// Start eid announcement
-	k_timer_start(&mctp_i3c_req_timer, K_SECONDS(2), K_NO_WAIT);
 }
 
 void mctp_i3c_pre_attestation(struct device_manager *mgr, int *duration)
@@ -161,13 +149,9 @@ void mctp_i3c_pre_attestation(struct device_manager *mgr, int *duration)
 			device_manager_update_device_state(mgr,
 				      DEVICE_MANAGER_SELF_DEVICE_NUM,
 				      DEVICE_MANAGER_RUNTIME);
-			k_sem_give(&mctp_i3c_sem);
-			*duration = 0;
-		} else {
-			*duration = 1;
 		}
+		*duration = 1;
 	}
-
 }
 
 void mctp_i3c_attestation(struct device_manager *mgr, int *duration)
@@ -186,7 +170,6 @@ void mctp_i3c_attestation(struct device_manager *mgr, int *duration)
 			device_manager_update_device_state(mgr,
 				      DEVICE_MANAGER_SELF_DEVICE_NUM,
 				      DEVICE_MANAGER_RUNTIME);
-			k_sem_give(&mctp_i3c_sem);
 		}
 	} else {
 
@@ -194,7 +177,6 @@ void mctp_i3c_attestation(struct device_manager *mgr, int *duration)
 		device_manager_update_device_state(mgr,
 				     DEVICE_MANAGER_SELF_DEVICE_NUM,
 				     DEVICE_MANAGER_RUNTIME);
-		k_sem_give(&mctp_i3c_sem);
 
 	}
 }
@@ -317,7 +299,11 @@ void mctp_i3c_state_handler(void *a, void *b, void *c)
 			mctp_i3c_attestation(device_mgr, &duration);
 		} else if (dev_state == DEVICE_MANAGER_RUNTIME) {
 			/* TODO: Start S3M attestation then release PLTRST_CPU0_N */
-			RSTPlatformReset(false);
+
+			uint8_t provision_state = GetUfmStatusValue();
+			if (provision_state & UFM_PROVISIONED) {
+				RSTPlatformReset(false);
+			}
 			duration = 0;
 		}
 #endif
@@ -483,11 +469,6 @@ int mctp_i3c_detach_slave_dev(uint8_t bus, uint64_t pid)
 	return 0;
 error:
 	return -1;
-}
-
-static void mctp_i3c_req_timeout_callback(struct k_timer *tmr)
-{
-	trigger_mctp_i3c_state_handler();
 }
 
 int mctp_i3c_ibi_cb(struct i3c_device_desc *target, struct i3c_ibi_payload *payload)
