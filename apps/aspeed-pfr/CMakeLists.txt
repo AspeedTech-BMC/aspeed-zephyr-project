@@ -5,9 +5,10 @@ cmake_minimum_required(VERSION 3.13.1)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(aspeed-pfr VERSION 03.02 LANGUAGES C)
-
-set(PROJECT_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
-set(PROJECT_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
+# Uncomment the following lines to use a custom project version.
+# This will take precedence over the version info retrieved from git.
+#set(PFR_PROJECT_VERSION_MAJOR ${CMAKE_PROJECT_VERSION_MAJOR})
+#set(PFR_PROJECT_VERSION_MINOR ${CMAKE_PROJECT_VERSION_MINOR})
 
 configure_file(build_config.h.in build_config.h)
 set(ASPEED_PFR_ROOT ${CMAKE_CURRENT_LIST_DIR})

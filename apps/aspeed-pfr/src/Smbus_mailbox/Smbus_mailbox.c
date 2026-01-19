@@ -34,6 +34,7 @@
 #include "watchdog_timer/wdt_handler.h"
 #include "cmd_interface/cmd_channel.h"
 #include "SPDM/Certificates/certificate_utils.h"
+#include "aspeed_zephyr_project_version.h"
 
 LOG_MODULE_REGISTER(mailbox, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -551,7 +552,7 @@ void InitializeSmbusMailbox(void)
 	ResetMailBox();
 
 	SetCpldIdentifier(0xDE);
-	SetCpldReleaseVersion((PROJECT_VERSION_MAJOR << 4) | PROJECT_VERSION_MINOR);
+	SetCpldReleaseVersion((PFR_PROJECT_VERSION_MAJOR << 4) | PFR_PROJECT_VERSION_MINOR);
 	policy_svn = get_ufm_svn(SVN_POLICY_FOR_CPLD_UPDATE);
 	SetCpldRotSvn(policy_svn);
 
