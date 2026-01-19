@@ -18,6 +18,10 @@
 #include <string.h>
 
 #define AST2700A2 0x2
+#define DISCPUE2M0RAW  BIT(2)
+#define DISCPUE2M1RAW  BIT(13)
+#define DISIOE2MRAW  BIT(6)
+
 
 LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -101,10 +105,11 @@ int pci_init(struct ast_chip *chip)
 	// Set Bridge3 INTA
 	clrsetbits_le32((void *)ASPEED_PLDA3_MSI_CAP, GENMASK(2, 0), 0x1);
 
-	/* the raw of e2m need to disable under AST2700 A2 */
+	/* the raw of e2m need to disable under AST2700 A2 CPU / IO die */
 	/* turn on vlink codec under AST2700 A2 */
 	if (FIELD_GET(SCU0_REVISION_ID_HW, scu->chip_id1) == AST2700A2) {
-		setbits_le32(&scu->raw_config, BIT(2)|BIT(13));
+		setbits_le32(&scu->raw_config, DISCPUE2M0RAW|DISCPUE2M1RAW);
+		setbits_le32(SCU1_RAW_CONFIG, DISIOE2MRAW);
 		vga_init(chip, true);
 	} else {
 		vga_init(chip, false);

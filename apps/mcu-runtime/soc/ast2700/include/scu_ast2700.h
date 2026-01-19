@@ -156,6 +156,7 @@
 #define SCU1_RNG_CTRL				(SCU1_REG + 0x0f0)
 #define   SCU1_RNG_CTRL_VLD			BIT(31)
 #define SCU1_RNG_DATA				(SCU1_REG + 0x0f4)
+#define SCU1_RAW_CONFIG			(SCU1_REG + 0x1ec)
 #define SCU1_RSTCTL1				(SCU1_REG + 0x200)
 #define   SCU1_RSTCTL1_I3C(x)			(BIT(16) << (x))
 #define SCU1_RSTCTL1_CLR			(SCU1_REG + 0x204)
