@@ -56,8 +56,8 @@ int pci_init(struct ast_chip *chip)
 		return 0;
 	}
 
-	sys_write32(pcie0_en * 0x010101 | (pcie0_intx << 24), &scu->pci0_misc[28]);
-	sys_write32(pcie1_en * 0x010101 | (pcie1_intx << 24), &scu->pci1_misc[28]);
+	scu->pci0_misc[28] = pcie0_en * 0x010101 | (pcie0_intx << 24);
+	scu->pci1_misc[28] = pcie1_en * 0x010101 | (pcie1_intx << 24);
 	LOG_DBG("%s: PCIE0 en=0x%02x int=0x%02x, PCIE1 en=0x%02x int=0x%02x\n", __func__, pcie0_en, pcie0_intx, pcie1_en, pcie1_intx);
 
 	// leave works to u-boot

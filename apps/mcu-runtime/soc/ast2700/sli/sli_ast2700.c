@@ -833,12 +833,12 @@ int sli_init_f(struct ast_chip *chip)
 
 static void _mac_hotfix(struct sli_data *data)
 {
-	uint32_t val = readl((void *)data->die1.slim + 0xb8) & 0xe00;
+	uint32_t val = readl((uintptr_t)data->die1.slim + 0xb8) & 0xe00;
 
 	if (!val)
 		return;
 
-	writel(val, (void *)data->die1.slim + 0x68);
+	writel(val, (uintptr_t)data->die1.slim + 0x68);
 	setbits_le32(data->die1.slim + 0x60, BIT(5));
 }
 
