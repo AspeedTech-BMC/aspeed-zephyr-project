@@ -3,8 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef _ASM_ARCH_SSP_TSP_AST2700_H
-#define _ASM_ARCH_SSP_TSP_AST2700_H
+#ifndef _ASM_ARCH_SSP_TSP_H
+#define _ASM_ARCH_SSP_TSP_H
 
 #include <zephyr/sys/sys_io.h>
 

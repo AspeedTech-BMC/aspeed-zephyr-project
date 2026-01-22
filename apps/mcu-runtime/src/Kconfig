@@ -2,9 +2,92 @@
 #
 # Copyright (c) 2025 ASPEED Technology Inc.
 
-rsource "sli/Kconfig"
-
 config USB_UART_PORTS
 	string "array to define uarts exposed by usb"
 	help
 		A comma-separated list of integers.
+
+config ASPEED_DDR_1600
+	default n
+	bool "ASPEED DDR data rate"
+	help
+		Choose DDR1600 data rate
+
+config ASPEED_DDR_3200
+	default y
+	bool "ASPEED DDR data rate"
+	help
+		Choose DDR3200 data rate
+
+config ASPEED_PHY_TRAINING_MESSAGE
+	default n
+	bool "Enable DDR PHY TRAINING MESSAGE"
+	help
+		Enable DDR PHY TRAINING MESSAGE for eye diagram debug
+
+config SYS_LOAD_ADDR
+	default 0
+	hex "Address in memory to use by default"
+	help
+	  Address in memory to use as the default safe load address.
+
+config FMC_LOAD_ADDR
+	default 0
+	hex "Address in memory for FMC firmware"
+	help
+	  Address in memory to use as the default safe load address for FMC.
+
+config ATF_LOAD_ADDR
+	default 0
+	hex "Address in memory for ATF firmware"
+	help
+	  Address in memory to use as the default safe load address for ATF.
+
+config OPTEE_LOAD_ADDR
+	default 0
+	hex "Address in memory for OPTEE firmware"
+	help
+	  Address in memory to use as the default safe load address for OPTEE.
+
+config UBOOT_LOAD_ADDR
+	default 0
+	hex "Address in memory for UBOOT firmware"
+	help
+	  Address in memory to use as the default safe load address for UBOOT.
+
+config SSP_LOAD_ADDR
+	default 0
+	hex "Address in memory for SSP firmware"
+	help
+	  Address in memory to use as the default safe load address for SSP.
+
+config TSP_LOAD_ADDR
+	default 0
+	hex "Address in memory for TSP firmware"
+	help
+	  Address in memory to use as the default safe load address for TSP.
+
+config CPTRA_MANIFEST
+	bool "Enable CPTRA manifest image loader"
+	default n
+	help
+	  This option enable the CPTRA manifest image loader.
+
+config CPTRA_MANIFEST_SIGNATURE
+	bool "Enable CPTRA manifest image signature verification"
+	default n
+	help
+	  This option enables signature verification of CPTRA manifest images,
+	  using a hash signed and verified using ECC.
+
+config CPTRA_MANIFEST_OFFSET
+	hex "FMC load manifest address"
+	default 0x20000000
+	help
+	  Set the address to load the manifest file for FMC
+
+config CPTRA_2X_LAYOUT
+	bool "Enable CPTRA 2x image format & soc manifest"
+	default n
+	help
+	  This option enable the CPTRA 2X image parsing rule.

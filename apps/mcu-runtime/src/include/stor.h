@@ -6,5 +6,8 @@
 #ifndef _STOR_H
 #define _STOR_H
 
+#include "ast_loader.h"
+
+int stor_board_init(struct ast_loader *loader);
 enum boot_mode_type boot_mode(void);
 #endif

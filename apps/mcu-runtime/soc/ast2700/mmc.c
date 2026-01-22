@@ -9,7 +9,7 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <zephyr/sd/mmc.h>
 #include <ast_loader.h>
 #include <abr.h>

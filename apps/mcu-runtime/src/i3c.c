@@ -13,7 +13,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/byteorder.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <ast_loader.h>
 #include <aspeed_util.h>
 

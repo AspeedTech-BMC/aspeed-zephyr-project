@@ -12,8 +12,13 @@
 LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 
 /* Define caliptra image identifier */
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 #define CPTRA_SOC_MANIFEST_HDR_ID (0x0002)
 #define CPTRA_FMC_HDR_ID          (0x0003)
+#else
+#define CPTRA_SOC_MANIFEST_HDR_ID (0x0001)
+#define CPTRA_FMC_HDR_ID          (0x0002)
+#endif
 #define CPTRA_DDR4_IMEM_HDR_ID    (0x1000)
 #define CPTRA_DDR4_DMEM_HDR_ID    (0x1001)
 #define CPTRA_DDR4_2D_IMEM_HDR_ID (0x1002)
@@ -30,12 +35,12 @@ LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 
 /* Define caliptra image load address */
 #define CPTRA_NO_LOAD_ADDR    (0x00000000)
-#define CPTRA_FMC_LOAD_ADDR   (0x00000000)
-#define CPTRA_ATF_LOAD_ADDR   (0xb0000000)
-#define CPTRA_OPTEE_LOAD_ADDR (0xb0080000)
-#define CPTRA_UBOOT_LOAD_ADDR (0x80000000)
-#define CPTRA_SSP_LOAD_ADDR   (0xac000000)
-#define CPTRA_TSP_LOAD_ADDR   (0xae000000)
+#define CPTRA_FMC_LOAD_ADDR   (CONFIG_FMC_LOAD_ADDR)
+#define CPTRA_ATF_LOAD_ADDR   (CONFIG_ATF_LOAD_ADDR)
+#define CPTRA_OPTEE_LOAD_ADDR (CONFIG_OPTEE_LOAD_ADDR)
+#define CPTRA_UBOOT_LOAD_ADDR (CONFIG_UBOOT_LOAD_ADDR)
+#define CPTRA_SSP_LOAD_ADDR   (CONFIG_SSP_LOAD_ADDR)
+#define CPTRA_TSP_LOAD_ADDR   (CONFIG_TSP_LOAD_ADDR)
 
 /* Define caliptra image loadable property */
 #define CPTRA_LOADABLE_MASK GENMASK(31, 30)
@@ -116,14 +121,41 @@ static struct cptra_load_image *cptra_find_load_image(uint32_t fw_id)
 	return match != -1 ? &image_list[match] : NULL;
 }
 
+bool cptra_find_fw_id_by_man_identifier(uint32_t identifier, uint32_t *fw_id)
+{
+	int i = 0;
+
+	if(fw_id == NULL)
+		return false;
+
+	for (i = 0; i < ARRAY_SIZE(image_list); i++) {
+		if (image_list[i].identifier == identifier) {
+			*fw_id = image_list[i].fw_id;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+
 bool cptra_ime_loadable_image(struct cptra_image_context *ctx,
 			      struct cptra_manifest_ime *ime)
 {
 	if (!ime)
 		return false;
 
+#ifdef CONFIG_CPTRA_2X_LAYOUT
+	if (ime->fw_id == CPTRA_ATF_HDR_ID ||
+		ime->fw_id == CPTRA_OPTEE_HDR_ID ||
+		ime->fw_id == CPTRA_UBOOT_HDR_ID ||
+		ime->fw_id == CPTRA_SSP_HDR_ID ||
+		ime->fw_id == CPTRA_TSP_HDR_ID)
+		return true;
+#else
 	if (FIELD_GET(CPTRA_LOADABLE_MASK, ime->flags) == CPTRA_BOOTMCU_LOADABLE)
 		return true;
+#endif
 
 	return false;
 }

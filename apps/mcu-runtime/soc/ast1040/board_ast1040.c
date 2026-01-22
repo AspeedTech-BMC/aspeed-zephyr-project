@@ -9,8 +9,8 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <scu_ast2700.h>
-#include <ssp_tsp_ast2700.h>
+#include <scu.h>
+#include <ssp_tsp.h>
 #include <manifest.h>
 #include <cptra_idevid.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
@@ -18,11 +18,7 @@
 
 LOG_MODULE_REGISTER(ast_board, CONFIG_SOC_FMC_LOG_LEVEL);
 
-#define ASPEED_UFS_PATH_AXI	(0x12c080e4)
-
-static bool has_pspfw;
 static bool has_sspfw;
-static bool has_tspfw;
 
 void board_manifest_image_post_process(uint32_t fw_id)
 {
@@ -33,24 +29,6 @@ void board_manifest_image_post_process(uint32_t fw_id)
 	ep_arm = ((uint64_t)ep - 0x80000000) | 0x400000000ULL;
 
 	switch (fw_id) {
-	case CPTRA_ATF_FW_ID:
-		has_pspfw = true;
-		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR0);
-		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR1);
-		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR2);
-		sys_write32(ep_arm >> 4, SCU0_CA35_RVBAR3);
-		break;
-	case CPTRA_UBOOT_FW_ID:
-		sys_write64(ep_arm, SCU0_CPU_SMP_EP0);
-		break;
-	case CPTRA_SSP_FW_ID:
-		ssp_init(ep);
-		has_sspfw = true;
-		break;
-	case CPTRA_TSP_FW_ID:
-		tsp_init(ep);
-		has_tspfw = true;
-		break;
 	default:
 		break;
 	}
@@ -67,31 +45,14 @@ static int board_load_image(void)
 
 static void board_prepare_for_boot(void)
 {
-	/* for v7 FPGA only to switch to uart12. */
-	if (IS_ENABLED(CONFIG_ASPEED_FPGA)) {
-		sys_write32(SCU0_HWSTRAP_DIS_CPU, SCU0_HW_STRAP1_CLR);
-	}
-
-	sys_write32(1, ASPEED_UFS_PATH_AXI);
-
-	if (has_pspfw) {
-		/* clean up secondary entries */
-		sys_write64(0x0, SCU0_CPU_SMP_EP1);
-		sys_write64(0x0, SCU0_CPU_SMP_EP2);
-		sys_write64(0x0, SCU0_CPU_SMP_EP3);
-
-		/* release CA35 reset */
-		sys_write32(0x1, SCU0_CA35_REL);
-	}
+	// /* for v7 FPGA only to switch to uart12. */
+	// if (IS_ENABLED(CONFIG_ASPEED_FPGA)) {
+	// 	sys_write32(SCU0_HWSTRAP_DIS_CPU, SCU0_HW_STRAP1_CLR);
+	// }
 
 	/* release SSP reset */
 	if (has_sspfw) {
 		ssp_enable();
-	}
-
-	/* release TSP reset */
-	if (has_tspfw) {
-		tsp_enable();
 	}
 }
 

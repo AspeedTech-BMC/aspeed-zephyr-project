@@ -4,8 +4,8 @@
 		zephyr,shell-uart = &uart12;
 	};
 
-	sram: memory@14b80000 {
-		reg = <0x14b80000 0x2f800>;
+	sram: memory@14b80a00 {
+		reg = <0x14b80a00 0x2ee00>;
 	};
 
 	reserved-memory {
@@ -79,4 +79,27 @@
 
 &emmc {
 	status = "okay";
+};
+
+&fmc {
+	status = "okay";
+	timing-calibration-disabled;
+};
+
+&fmc_cs0 {
+	status = "okay";
+	spi-max-buswidth = <1>;
+	spi-max-frequency = <25000000>;
+};
+
+&spi0 {
+	status = "okay";
+	timing-calibration-disabled;
+	spi-ctrl-fifo-enabled;
+};
+
+&spi0_cs0 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <25000000>;
 };

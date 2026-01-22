@@ -10,7 +10,7 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <ast_loader.h>
 #include <chip.h>
 
@@ -27,6 +27,8 @@ static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 	if (type != CPTRA_MANIFEST_FW_ID) {
 		err = cptra_verify_image((uint8_t *)message, len, type);
 	} else {
+
+#ifndef CONFIG_CPTRA_2X_LAYOUT
 		err = cptra_verify_soc_manifest(
 			(struct cptra_soc_manifest *)message);
 		if (err)
@@ -34,6 +36,7 @@ static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 
 		err = cptra_verify_soc_manifest_ver(
 			(struct cptra_soc_manifest *)message);
+#endif
 	}
 
 end:
@@ -98,6 +101,8 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 	struct ast_loader *loader = &g_loader;
 	uint32_t sz = 0;
 	int err = 0;
+	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, verify=%d\n",
+		__func__, type, (uint32_t)dst, (uint32_t)buf, verify);
 
 	if (loader->load) {
 		err = loader->load(loader, type, buf, &sz);
@@ -150,11 +155,14 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 	if (err == -1)
 		err = recovery_init(loader);
 
-	if (err)
+	if (err) {
+		LOG_ERR("Loader init failed %d.\n", err);
 		return err;
+	}
 
 	loader->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+	LOG_INF("Registering manifest verifier...\n");
 	loader->verify = ast_loader_verify;
 #endif
 

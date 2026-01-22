@@ -11,5 +11,6 @@ zephyr_include_directories(lib/xyzmodem)
 zephyr_include_directories(.)
 
 add_subdirectory(src)
+add_subdirectory(soc)
 add_subdirectory(lib)
 

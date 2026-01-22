@@ -6,7 +6,7 @@
 #ifndef _VGA_AST2700_H
 #define _VGA_AST2700_H
 
-#include <scu_ast2700.h>
+#include <scu.h>
 
 #define VGA_PACKER_CPU_BASE	(0x12c1d000)
 #define VGA_RETIMER_CPU_BASE	(0x12c1d100)
@@ -349,6 +349,6 @@ struct ast2700_vga_link {
 };
 #endif
 
-int vga_init(struct ast_chip *chip);
+int vga_init(struct ast_chip *chip, bool open_codec);
 
 #endif

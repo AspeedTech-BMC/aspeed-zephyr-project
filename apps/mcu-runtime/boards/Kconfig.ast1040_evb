@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (c) 2025 ASPEED Technology Inc.
+
+# Note: This file should be placed to BSP after SLI move to driver layer
+
+if BOARD_AST1040_EVB
+
+endif

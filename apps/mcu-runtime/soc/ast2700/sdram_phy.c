@@ -152,7 +152,7 @@ void dwc_ddrphy_phyinit_userCustom_E_setDfiClk(int a)
 #if defined(CONFIG_ASPEED_PHY_TRAINING_MESSAGE)
 void dwc_decode_streaming_message(void)
 {
-	u32 str, msg, msg2, count, i;
+	uint32_t str, msg, msg2, count, i;
 
 	dwc_get_mailbox(1, &msg);
 

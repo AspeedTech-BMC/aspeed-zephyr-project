@@ -9,7 +9,7 @@
 #include <string.h>
 #include <strings.h>
 #include <zephyr/logging/log.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <ast_loader.h>
 
 LOG_MODULE_REGISTER(ast_i2c, CONFIG_SOC_FMC_LOG_LEVEL);

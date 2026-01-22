@@ -12,7 +12,7 @@
 #include <zephyr/logging/log.h>
 #include <platform.h>
 #include <dp_ast2700.h>
-#include <scu_ast2700.h>
+#include <scu.h>
 #include <chip.h>
 
 LOG_MODULE_REGISTER(dp, CONFIG_SOC_FMC_LOG_LEVEL);
@@ -35,15 +35,15 @@ int dp_init(struct ast_chip *chip)
 		LOG_DBG("%s: reset DP & MCU", __func__);
 		setbits_le32(&scu->modrst1_ctrl, SCU0_RST_DP);
 		setbits_le32(&scu->modrst1_ctrl, SCU0_RST_DPMCU);
-		k_usleep(100);
+		k_busy_wait(100);
 
 		// enable clk
 		setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_DP);
-		k_msleep(10);
+		k_busy_wait(10);
 
 		setbits_le32(&scu->modrst1_clr, SCU0_RST_DP);
 		setbits_le32(&scu->modrst1_clr, SCU0_RST_DPMCU);
-		k_usleep(1);
+		k_busy_wait(1);
 	}
 
 	val = sys_read32(DP_VERSION);
