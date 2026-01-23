@@ -48,8 +48,8 @@ int main(void)
 				board->boot();
 
 			/* Populate IDEVID Certificate */
-			// if (board->populate)
-			// 	board->populate();
+			if (board->populate)
+				board->populate();
 
 			/* Runtime ipc loop */
 			if (board->runtime_loop)
