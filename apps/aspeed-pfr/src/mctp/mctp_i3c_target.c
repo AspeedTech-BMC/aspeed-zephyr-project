@@ -184,7 +184,7 @@ uint8_t mctp_i3c_target_mctp_rerun_daa(void)
 		mctp_wrapper = &mctp_inst->mctp_wrapper;
 		device_mgr = mctp_wrapper->mctp_interface.device_manager;
 		device_manager_update_device_state(device_mgr,
-				DEVICE_MANAGER_SELF_DEVICE_NUM, DEVICE_MANAGER_SEND_DISCOVERY_NOTIFY);
+				DEVICE_MANAGER_SELF_DEVICE_NUM, DEVICE_MANAGER_EID_ANNOUNCEMENT);
 		k_timer_start(&mctp_i3c_inst->i3c_state_timer, K_SECONDS(12), K_NO_WAIT);
 	}
 	return 0;
