@@ -300,10 +300,10 @@ void mctp_i3c_state_handler(void *a, void *b, void *c)
 		} else if (dev_state == DEVICE_MANAGER_RUNTIME) {
 			/* TODO: Start S3M attestation then release PLTRST_CPU0_N */
 
-			uint8_t provision_state = GetUfmStatusValue();
-			if (provision_state & UFM_PROVISIONED) {
+			if (is_pltrst_sync())
 				RSTPlatformReset(false);
-			}
+			else
+				LOG_WRN("PLTRST_SYNC# not asserted yet");
 			duration = 0;
 		}
 #endif
@@ -912,6 +912,13 @@ void mctp_i3c_configure_cpu_i3c_devs(void)
 				CONFIG_PFR_SPDM_I3C_CPU0_DEV_PID);
 		mctp_i3c_attach_target_dev(CONFIG_PFR_SPDM_CPU_I3C_BUS,
 				CONFIG_PFR_SPDM_I3C_CPU1_DEV_PID);
+	} else {
+		// In pfr4.0 BMC bridge mode, a mechanism should exist to
+		// rerun the CPU DAA flow and release CPU reset.
+		// However, since Aspeed OpenBMC only supports bridge mode in pfr5.0,
+		// this is not implemented in pfr4.0.
+		// Therefore, simply release the CPU reset here.
+		RSTPlatformReset(false);
 	}
 #endif
 }

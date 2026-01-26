@@ -25,20 +25,15 @@ extern struct device *gSwMbxDev;
  */
 static void platform_bhs_reset_handler(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
-	uint8_t data = 0;
 	uint8_t gpio_pin = 31 - __builtin_clz(pins);
 	int ret = gpio_pin_get(dev, gpio_pin);
+	extern bool pltrst_sync;
 	LOG_INF("[CPU->PFR] PLTRST_SYNC[%s %d] = %d", dev->name, gpio_pin, ret);
 
 	if (ret == 0) {
+		pltrst_sync = false;
 		RSTPlatformReset(true);
 	} else {
-		swmbx_read(gSwMbxDev, false, UfmStatusValue, &data);
-		if (!(data & UFM_PROVISIONED)) {
-			RSTPlatformReset(false);
-		}
-
-		extern bool pltrst_sync;
 		pltrst_sync = true;
 #if defined(CONFIG_PFR_MCTP_I3C)
 		k_sem_give(&pltrst_sem);
