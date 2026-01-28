@@ -34,6 +34,10 @@ int main(void)
 		board = ast_create_board(chip);
 
 		if (board) {
+			/* Populate IDEVID Certificate */
+			if (board->populate)
+				board->populate();
+
 			printf("Trying to boot from %s\n", board->bootmodestr);
 
 			if (board->load_image) {
@@ -46,10 +50,6 @@ int main(void)
 
 			if (board->boot)
 				board->boot();
-
-			/* Populate IDEVID Certificate */
-			if (board->populate)
-				board->populate();
 
 			/* Runtime ipc loop */
 			if (board->runtime_loop)
