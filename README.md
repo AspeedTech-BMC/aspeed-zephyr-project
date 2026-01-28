@@ -17,6 +17,18 @@ west update
 west build -b ast2700_dcscm -p auto aspeed-zephyr-project/apps/aspeed-pfr
 ```
 
+## AST2700 DCSCM board for AMD
+
+```
+west build -b ast2700_dcscm_amd -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
+## AST2700 Dual Flash (for AMD CRB Kenya)
+
+```
+west build -b ast2700_dual_flash_amd -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
 ## AST2600 DCSCM board
 
 ```

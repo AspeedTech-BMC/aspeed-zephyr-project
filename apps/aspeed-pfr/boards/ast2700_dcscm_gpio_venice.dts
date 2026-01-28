@@ -1,0 +1,11 @@
+/ {
+	/* TODO: The Kenya platform does not have a PLTRST pin for PFR. Waiting for AMD's rework result. */
+	pfr_gpio_venice {
+		compatible = "aspeed,pfr-gpio-venice";
+		rst-pltrst-in-gpios = <&gpio0_m_p 1 0>; /* GPIO_M1 */
+	};
+	/* TODO: The current CRB uses the BMC SRST pin. The expected pin should be EXTRST. */
+	pfr_gpio_common {
+		bmc-extrst-ctrl-out-gpios = <&gpio0_m_p 5 0>; /* GPIO_M5 */
+	};
+};

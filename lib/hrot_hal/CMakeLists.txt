@@ -35,6 +35,10 @@ if (CONFIG_HROT_HAL)
 		zephyr_library_sources(
 			${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_oks.c
 		)
+	elseif (CONFIG_DT_HAS_ASPEED_PFR_GPIO_VENICE_ENABLED)
+		zephyr_library_sources(
+			${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_venice.c
+		)
 	endif()
 	zephyr_library_sources(
 	    ${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed.c

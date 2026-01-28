@@ -1,0 +1,5 @@
+board:
+  name: ast2700_dual_flash_amd
+  vendor: aspeed
+  socs:
+    - name: ast1060
