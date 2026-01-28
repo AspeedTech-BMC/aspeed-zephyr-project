@@ -41,28 +41,6 @@
 	(_loader)->write_sector = 0;                                                               \
 	(_loader)->size = 0;
 
-/* Define caliptra image identifier */
-#ifndef CONFIG_CPTRA_2X_LAYOUT
-#define CPTRA_SOC_MANIFEST_HDR_ID (0x0002)
-#define CPTRA_FMC_HDR_ID          (0x0003)
-#else
-#define CPTRA_SOC_MANIFEST_HDR_ID (0x0001)
-#define CPTRA_FMC_HDR_ID          (0x0002)
-#endif
-#define CPTRA_DDR4_IMEM_HDR_ID    (0x1000)
-#define CPTRA_DDR4_DMEM_HDR_ID    (0x1001)
-#define CPTRA_DDR4_2D_IMEM_HDR_ID (0x1002)
-#define CPTRA_DDR4_2D_DMEM_HDR_ID (0x1003)
-#define CPTRA_DDR5_IMEM_HDR_ID    (0x1004)
-#define CPTRA_DDR5_DMEM_HDR_ID    (0x1005)
-#define CPTRA_DP_FW_HDR_ID        (0x1006)
-#define CPTRA_UEFI_HDR_ID         (0x1007)
-#define CPTRA_ATF_HDR_ID          (0x1008)
-#define CPTRA_OPTEE_HDR_ID        (0x1009)
-#define CPTRA_UBOOT_HDR_ID        (0x100A)
-#define CPTRA_SSP_HDR_ID          (0x100B)
-#define CPTRA_TSP_HDR_ID          (0x100C)
-
 enum {
 	CPTRA_MANIFEST_FW_ID = 0x00,
 	CPTRA_FMC_FW_ID = 0x01,
@@ -231,13 +209,11 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
 int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id);
 void board_manifest_image_post_process(uint32_t fw_id);
 
-bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime);
+bool cptra_ime_loadable_image(struct cptra_image_context *ctx, struct cptra_manifest_ime *ime);
 char *cptra_ime_get_image_name(uint32_t fw_id);
 int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id);
 int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id);
 uintptr_t cptra_ime_get_load_addr(uint32_t fw_id);
-bool cptra_find_fw_id_by_identifier(uint32_t identifier, uint32_t *fw_id);
-struct cptra_manifest_ime *cptra_get_ime_by_fw_id(struct cptra_soc_manifest *man,
-												  uint32_t fw_id);
+bool cptra_find_fw_id_by_man_identifier(uint32_t identifier, uint32_t *fw_id);
 
 #endif /* _MANIFEST_H */
