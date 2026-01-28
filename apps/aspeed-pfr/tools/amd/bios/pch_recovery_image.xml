@@ -1,0 +1,41 @@
+<RecoveryImage version="08.03" platform="Server-BMC" type="1">
+  <RecoverySection>
+    <WriteAddress>0x00000000</WriteAddress>
+    <Region>
+      <StartAddr>0x00000000</StartAddr>
+      <EndAddr>0xb9ffff</EndAddr>
+    </Region>
+  </RecoverySection>
+
+  <RecoverySection>
+    <WriteAddress>0xba0000</WriteAddress> <!-- pfm -->
+    <Region>
+      <StartAddr>0x00ba0000</StartAddr>
+      <EndAddr>0x00BBFFFF</EndAddr>
+    </Region>
+  </RecoverySection>
+
+  <RecoverySection>
+    <WriteAddress>0x00BC0000</WriteAddress>
+    <Region>
+      <StartAddr>0x00BC0000</StartAddr>
+      <EndAddr>0x0101FFFF</EndAddr>
+    </Region>
+  </RecoverySection>
+
+  <RecoverySection>
+    <WriteAddress>0x01020000</WriteAddress>
+    <Region>
+      <StartAddr>0x01020000</StartAddr>
+      <EndAddr>0x01023FFF</EndAddr>
+    </Region>
+  </RecoverySection>
+
+  <RecoverySection>
+    <WriteAddress>0x01024000</WriteAddress>
+    <Region>
+      <StartAddr>0x01024000</StartAddr>
+      <EndAddr>0x01FFBFFF</EndAddr>
+    </Region>
+  </RecoverySection>
+</RecoveryImage>

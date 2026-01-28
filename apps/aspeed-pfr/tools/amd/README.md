@@ -58,3 +58,92 @@ python3 key_management_tool.py decommission_image_generator.config
 
 decommission_image.bin is the signed ROT decommission image.
 
+# Create BIOS firmware recovery/update image
+
+All sample configuration files are stored in
+`aspeed-zephyr-project/apps/aspeed-pfr/tools/amd/bios`.
+
+Users could modify the sample files based on their requirements.
+The AMD BIOS file can be downloaded from the AMD Support Site.
+
+## Create BIOS PFM
+
+### pch_pfm_generator.config
+
+-   Xml: `pch_cerberus_pfm.xml`
+-   InputImage: `AMD BIOS file`
+-   Output: `output_pch_pfm.bin`
+
+## Run
+
+-   Copy your AMD BIOS file to
+    `aspeed-zephyr-project/apps/aspeed-pfr/tools/amd/bios`.
+-   Copy keys, config and xml from cerberus tools to the same directory.
+-   Generate BIOS PFM.
+
+```
+    python3 <PATH of cerberus>/tools/manifest_tools/pfm_generator.py pch_pfm_generator.config
+```
+
+`output_pch_pfm.bin` is the generated BIOS PFM.
+
+## Insert PFM to BIOS file
+
+In this example, the PFM is inserted to offset `0xba0000`. If another
+offset is used, update the `seek` value.
+
+    dd if=./output_pch_pfm.bin bs=1 seek=12189696 conv=notrunc of=<AMD BIOS file>
+
+## Create BIOS recovery image
+
+### pch_recovery_image_generator.config
+
+-   Xml: `pch_recovery_image.xml`
+-   InputImage: `AMD BIOS file with PFM`
+-   Output: `pch_recovery_image.bin`
+
+## Run
+
+-   Copy your AMD BIOS file (with PFM) to
+    `aspeed-zephyr-project/apps/aspeed-pfr/tools/amd/bios`.
+-   Copy keys, config and xml from cerberus tools to the same directory.
+-   Generate BIOS recovery image.
+
+```
+    python3 <PATH of cerberus>/tools/recovery_tools/recovery_image_generator.py pch_recovery_image_generator.config
+```
+
+`pch_recovery_image.bin` is the signed BIOS recovery image.
+
+## Partition layout
+
+The below layout is based on 128MB BIOS flash.
+
+``` text
++----------------------------+ <--- 0x00000000
+|   Active Region (32MB)     |
++----------------------------+ <--- 0x02000000
+|   Recovery Region (32MB)   |
++----------------------------+ <--- 0x04000000
+|   Staging Region (32MB)    |
++----------------------------+ <--- 0x06000000
+|   Reserved                 |
++----------------------------+
+```
+
+## Note
+
+-   In the AMD CRB platform, two BIOS flashes (64MB each) are used for
+    the two CPUs. In this example, they are combined into a single 128MB
+    image.
+-   The Venice platform supports converting a 2*1 platform to a 1*2
+    platform. When PFR is enabled, this conversion is not supported
+    because two PFR instances are required to manage the firmware and
+    flash for the two CPUs.
+-   The default AMD BIOS image size is 32MB. The recovery image will add
+    some overhead and cause the final image size to exceed 32MB.
+    In this example, the BIOS image is truncated slightly to fit the
+    flash layout because the BIOS source code is not available.
+-   The proper way to handle this is to adjust the BIOS image size
+    through BIOS code so that the final image fits the flash layout.
+

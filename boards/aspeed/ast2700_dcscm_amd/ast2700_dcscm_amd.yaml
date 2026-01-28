@@ -1,0 +1,14 @@
+identifier: ast2700_dcscm_amd
+name: AST2700-DCSCM-AMD
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+supported:
+  - i2c
+  - spi
+  - serial
+testing:
+  default: true
+ram: 768
+flash: 512
