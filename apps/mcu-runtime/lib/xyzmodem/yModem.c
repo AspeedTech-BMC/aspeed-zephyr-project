@@ -175,7 +175,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				if (all_zero) {
 					y_putc(port, ACK);
 					if (out_size)
-						*out_size = total;
+						*out_size = fsize;
 					return YMODEM_OK;
 				}
 
@@ -200,7 +200,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 					fname[j] = 0;
 				i++;
 				fsize = 0;
-				while (i < payload_len && payload[i])
+				while (i < payload_len && payload[i] != 0x20)
 					fsize = fsize * 10 + (payload[i++] - '0');
 
 				while (uart_poll_in(g_uart_dev, &dummy) == 0);
