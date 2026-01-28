@@ -11,6 +11,28 @@
 
 LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 
+/* Define caliptra image identifier */
+#ifndef CONFIG_CPTRA_2X_LAYOUT
+#define CPTRA_SOC_MANIFEST_HDR_ID (0x0002)
+#define CPTRA_FMC_HDR_ID          (0x0003)
+#else
+#define CPTRA_SOC_MANIFEST_HDR_ID (0x0001)
+#define CPTRA_FMC_HDR_ID          (0x0002)
+#endif
+#define CPTRA_DDR4_IMEM_HDR_ID    (0x1000)
+#define CPTRA_DDR4_DMEM_HDR_ID    (0x1001)
+#define CPTRA_DDR4_2D_IMEM_HDR_ID (0x1002)
+#define CPTRA_DDR4_2D_DMEM_HDR_ID (0x1003)
+#define CPTRA_DDR5_IMEM_HDR_ID    (0x1004)
+#define CPTRA_DDR5_DMEM_HDR_ID    (0x1005)
+#define CPTRA_DP_FW_HDR_ID        (0x1006)
+#define CPTRA_UEFI_HDR_ID         (0x1007)
+#define CPTRA_ATF_HDR_ID          (0x1008)
+#define CPTRA_OPTEE_HDR_ID        (0x1009)
+#define CPTRA_UBOOT_HDR_ID        (0x100A)
+#define CPTRA_SSP_HDR_ID          (0x100B)
+#define CPTRA_TSP_HDR_ID          (0x100C)
+
 /* Define caliptra image load address */
 #define CPTRA_NO_LOAD_ADDR    (0x00000000)
 #define CPTRA_FMC_LOAD_ADDR   (CONFIG_FMC_LOAD_ADDR)
@@ -99,7 +121,7 @@ static struct cptra_load_image *cptra_find_load_image(uint32_t fw_id)
 	return match != -1 ? &image_list[match] : NULL;
 }
 
-bool cptra_find_fw_id_by_identifier(uint32_t identifier, uint32_t *fw_id)
+bool cptra_find_fw_id_by_man_identifier(uint32_t identifier, uint32_t *fw_id)
 {
 	int i = 0;
 
@@ -117,12 +139,12 @@ bool cptra_find_fw_id_by_identifier(uint32_t identifier, uint32_t *fw_id)
 }
 
 
-bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime)
+bool cptra_ime_loadable_image(struct cptra_image_context *ctx,
+			      struct cptra_manifest_ime *ime)
 {
-	if (!ime) {
-		LOG_WRN("IME is NULL, skip loadable check.");
-		return true;
-	}
+	if (!ime)
+		return false;
+
 #ifdef CONFIG_CPTRA_2X_LAYOUT
 	if (ime->fw_id == CPTRA_ATF_HDR_ID ||
 		ime->fw_id == CPTRA_OPTEE_HDR_ID ||
@@ -190,32 +212,4 @@ uintptr_t cptra_ime_get_load_addr(uint32_t fw_id)
 	}
 
 	return img->load_addr;
-}
-
-struct cptra_manifest_ime *cptra_get_ime_by_fw_id(struct cptra_soc_manifest *man,
-						  uint32_t fw_id)
-{
-	struct cptra_manifest_ime *ime = NULL;
-	struct cptra_load_image *img = NULL;
-	uint32_t i;
-
-	if (!man)
-		return NULL;
-
-	img = cptra_find_load_image(fw_id);
-	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
-		return (uintptr_t)NULL;
-	}
-
-	for (i = 0;	 i < man->ime_count; i++) {
-		ime = &man->imc[i];
-#ifndef CONFIG_CPTRA_2X_LAYOUT
-		if (ime->fw_id == img->fw_id)
-#else
-		if (ime->fw_id == img->identifier)
-#endif
-			return ime;
-	}
-	return NULL;
 }
