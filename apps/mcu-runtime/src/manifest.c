@@ -158,6 +158,13 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 	int ret = 0;
 	static struct cptra_soc_manifest soc_manifest;
 
+#ifndef CONFIG_CPTRA_2X_LAYOUT
+	if (!(sys_read32(SCU1_REG + SCU1_CPTRA) & SCU1_CPTRA_RDY_FOR_RT)) {
+		LOG_WRN("Caliptra is unavailable");
+		return CPTRA_SUCCESS;
+	}
+#endif
+
 	ret = ast_loader_load_image(CPTRA_MANIFEST_FW_ID,
 				    (uint32_t *)&soc_manifest, true);
 	if (ret)
@@ -235,22 +242,31 @@ int cptra_load_abb_image(void)
 	int ret = 0;
 	uint32_t *load_addr = 0;
 	struct cptra_soc_manifest *man = cptra_ctx.soc_manifest;
-	struct cptra_manifest_ime *ime = &man->imc[0];
+	struct cptra_image_info *img_info = cptra_ctx.img_info;
+	uint32_t image_count = cptra_ctx.hdr->img_count;
+	struct cptra_manifest_ime *ime = NULL;
 	uint32_t fw_id;
+	uint32_t identifier;
+	uint32_t i;
 
-	if (!man)
+	if (img_info == NULL)
 		return CPTRA_ERR_ABB_LOADER_NOT_READY;
 
-	for (ime = &man->imc[0]; ime < man->imc + man->ime_count && !ret; ime++) {
-		/* Check the whether ime denote image should be loaded */
-		if (!cptra_ime_loadable_image(&cptra_ctx, ime))
+	for (i = 0; i < image_count && !ret; i++) {
+		identifier = img_info[i].identifier;
+		if (identifier <= CPTRA_FMC_HDR_ID) {
+			continue;
+		}
+
+		if (!cptra_find_fw_id_by_identifier(identifier, &fw_id))
 			continue;
 
-		fw_id = ime->fw_id;
-#ifdef CONFIG_CPTRA_2X_LAYOUT
-		if (!cptra_find_fw_id_by_man_identifier(ime->fw_id, &fw_id))
+		/* Check the whether ime denote image should be loaded */
+		/* if ime is NULL, then no check */
+		ime = cptra_get_ime_by_fw_id(man, fw_id);
+		if (!cptra_ime_loadable_image(ime))
 			continue;
-#endif
+
 		load_addr = (uint32_t *)cptra_ime_get_load_addr(fw_id);
 		if (!load_addr)
 			continue;
