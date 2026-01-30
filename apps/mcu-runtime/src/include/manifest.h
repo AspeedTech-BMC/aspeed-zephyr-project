@@ -63,7 +63,8 @@
 #define CPTRA_SSP_HDR_ID          (0x100B)
 #define CPTRA_TSP_HDR_ID          (0x100C)
 
-#define AST_HASH_BUFFER            (0x14baf400) /* 0x14bb0000 - 0x800 (2k csr) - 0x400 (1k imc) */
+/* 0x14bc0000(sram end) - 0x800 (2k csr) - 0x400 (1k imc for 2700 A2) -0x10000 (64k for Hash buffer)*/
+#define AST_HASH_BUFFER (0x14baf400)
 
 enum {
 	CPTRA_MANIFEST_FW_ID = 0x00,
