@@ -25,6 +25,8 @@ LOG_MODULE_REGISTER(cptra_manifest_image, CONFIG_LOG_DEFAULT_LEVEL);
 #define CPTRA_BOOTMCU_LOADABLE (1)
 #define CPTRA_SSP_LOADABLE (2)
 
+#define CPTRA_IMC_STORED_ADDR (0x14bbf400) /*FOR 2700 A2 ROM*/
+
 struct cptra_load_image {
 	char *name;
 	uint32_t identifier;
@@ -116,11 +118,16 @@ bool cptra_find_fw_id_by_identifier(uint32_t identifier, uint32_t *fw_id)
 	return false;
 }
 
-
-bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime)
+bool cptra_ime_loadable_image(struct cptra_soc_manifest *man,
+							  uint32_t fw_id)
 {
+	struct cptra_manifest_ime *ime = NULL;
+
+	/* if ime is NULL, then no check */
+	ime = cptra_rt_ready() ? cptra_get_ime_by_fw_id(man, fw_id) : NULL;
+
 	if (!ime) {
-		LOG_WRN("IME is NULL, skip loadable check.");
+		LOG_WRN("IME is NULL, skip load chk.");
 		return true;
 	}
 #ifdef CONFIG_CPTRA_2X_LAYOUT
@@ -147,7 +154,7 @@ int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id)
 
 	img = cptra_find_load_image(fw_id);
 	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
+		LOG_ERR("Can't find img with fw_id 0x%x.", fw_id);
 		return CPTRA_ERR_IMAGE_OFFSET_INVALID;
 	}
 
@@ -172,7 +179,7 @@ int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id)
 
 	img = cptra_find_load_image(fw_id);
 	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
+		LOG_ERR("Can't find img with fw_id 0x%x.", fw_id);
 		return CPTRA_ERR_IMAGE_SIZE_INVALID;
 	}
 
@@ -185,11 +192,35 @@ uintptr_t cptra_ime_get_load_addr(uint32_t fw_id)
 
 	img = cptra_find_load_image(fw_id);
 	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
+		LOG_ERR("Can't find img with fw_id 0x%x.", fw_id);
 		return (uintptr_t)NULL;
 	}
 
 	return img->load_addr;
+}
+
+// FOR 2700 A2
+static uint32_t cptra_get_imc_stored_image_count(void)
+{
+	return *((uint32_t *)CPTRA_IMC_STORED_ADDR);
+}
+
+static struct cptra_manifest_ime *cptra_get_imc_stored(void)
+{
+	return (struct cptra_manifest_ime *)(CPTRA_IMC_STORED_ADDR + 4);
+}
+
+static bool cptra_imc_stored_valid(void)
+{
+    const uint32_t count = cptra_get_imc_stored_image_count();
+    const struct cptra_manifest_ime *imc_stored = cptra_get_imc_stored();
+
+    for (uint32_t i = 0; i < count; ++i) {
+        if (imc_stored[i].fw_id != (uint32_t)(i + 1)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 struct cptra_manifest_ime *cptra_get_ime_by_fw_id(struct cptra_soc_manifest *man,
@@ -197,19 +228,31 @@ struct cptra_manifest_ime *cptra_get_ime_by_fw_id(struct cptra_soc_manifest *man
 {
 	struct cptra_manifest_ime *ime = NULL;
 	struct cptra_load_image *img = NULL;
-	uint32_t i;
+	uint32_t image_count = 0;
+	struct cptra_manifest_ime *imc_stored = cptra_get_imc_stored();
 
-	if (!man)
+	if (!is_ast2700_a2() && !man)
 		return NULL;
+
+	if (is_ast2700_a2() && !cptra_imc_stored_valid()) {
+		LOG_WRN("IMC stored invalid, skip ime lookup.");
+		return NULL;
+	}
 
 	img = cptra_find_load_image(fw_id);
 	if (!img) {
-		LOG_ERR("Cannot find image with fw_id 0x%x.", fw_id);
-		return (uintptr_t)NULL;
+		LOG_ERR("Can't find img with fw_id 0x%x.", fw_id);
+		return NULL;
 	}
 
-	for (i = 0;	 i < man->ime_count; i++) {
-		ime = &man->imc[i];
+	image_count = is_ast2700_a2() ? cptra_get_imc_stored_image_count() : man->ime_count;
+	if (image_count > CPTRA_IMC_ENTRY_COUNT) {
+		LOG_ERR("Invalid ime_cnt %d.", image_count);
+		return NULL;
+	}
+
+	for (uint32_t i = 0; i < image_count; i++) {
+		ime = is_ast2700_a2() ? &(imc_stored[i]) : &man->imc[i];
 #ifndef CONFIG_CPTRA_2X_LAYOUT
 		if (ime->fw_id == img->fw_id)
 #else

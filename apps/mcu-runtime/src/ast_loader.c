@@ -16,7 +16,6 @@
 
 LOG_MODULE_REGISTER(ast_loader, CONFIG_SOC_FMC_LOG_LEVEL);
 
-#define AST_HASH_BUFFER            0x14baf800
 struct ast_loader g_loader;
 
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
@@ -152,6 +151,7 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 	LOG_DBG("%s: bootmode=%d\n", __func__, loader->bootmode);
 
 	err = stor_init(loader);
+
 	if (err == -1)
 		err = recovery_init(loader);
 
@@ -167,7 +167,9 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 #endif
 
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-	err = cptra_verify_abb_loader();
+	if (is_ast2700_a1()) {
+		err = cptra_verify_abb_loader();
+	}
 #endif
 	return err;
 }
