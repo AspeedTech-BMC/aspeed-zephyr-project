@@ -63,6 +63,8 @@
 #define CPTRA_SSP_HDR_ID          (0x100B)
 #define CPTRA_TSP_HDR_ID          (0x100C)
 
+#define AST_HASH_BUFFER            (0x14baf400) /* 0x14bb0000 - 0x800 (2k csr) - 0x400 (1k imc) */
+
 enum {
 	CPTRA_MANIFEST_FW_ID = 0x00,
 	CPTRA_FMC_FW_ID = 0x01,
@@ -230,8 +232,12 @@ int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
 int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id);
 void board_manifest_image_post_process(uint32_t fw_id);
+bool is_ast2700_a1(void);
+bool is_ast2700_a2(void);
+bool cptra_rt_ready(void);
 
-bool cptra_ime_loadable_image(struct cptra_manifest_ime *ime);
+bool cptra_ime_loadable_image(struct cptra_soc_manifest *man,
+							  uint32_t fw_id);
 char *cptra_ime_get_image_name(uint32_t fw_id);
 int cptra_ime_image_offset(struct cptra_image_context *ctx, uint32_t fw_id);
 int cptra_ime_image_size(struct cptra_image_context *ctx, uint32_t fw_id);

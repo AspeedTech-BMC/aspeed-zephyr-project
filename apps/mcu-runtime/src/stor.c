@@ -75,20 +75,20 @@ static int stor_get_image_info(struct image_info *info)
 
 static int stor_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, uint32_t *len)
 {
-        struct ast_loader_ops *ops;
-        uint32_t src, sz = 0;
-        int err = 0;
+	struct ast_loader_ops *ops;
+	uint32_t src, sz = 0;
+	int err = 0;
 
-        src = img_info[type].offset;
+	src = img_info[type].offset;
 	sz = img_info[type].size;
 
-        ops = ast_loader_get_ops(loader);
-        if (ops && ops->copy)
-                err = ops->copy(loader->dev, dst, src, sz);
+	ops = ast_loader_get_ops(loader);
+	if (ops && ops->copy)
+		err = ops->copy(loader->dev, dst, src, sz);
 
-        *len = sz;
+	*len = sz;
 
-        return err;
+	return err;
 }
 
 int stor_init(struct ast_loader *loader)

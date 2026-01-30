@@ -23,11 +23,23 @@ __weak int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 	return flash_read(dev, src, dst, len);
 }
 
-uint32_t cptra_manifest_start_offset(void)
+bool is_ast2700_a1(void)
 {
 	/* AST2700-A1 */
-	if (FIELD_GET(0x000000ff, sys_read32(SCU1_REVISION_ID)) == 3 &&
-	    FIELD_GET(0x00ff0000, sys_read32(SCU1_REVISION_ID)) == 1)
+	return FIELD_GET(0x000000ff, sys_read32(SCU1_REVISION_ID)) == 3 &&
+		   FIELD_GET(0x00ff0000, sys_read32(SCU1_REVISION_ID)) == 1;
+}
+
+bool is_ast2700_a2(void)
+{
+	/* AST2700-A2 */
+	return FIELD_GET(0x000000ff, sys_read32(SCU1_REVISION_ID)) == 3 &&
+		   FIELD_GET(0x00ff0000, sys_read32(SCU1_REVISION_ID)) == 2;
+}
+
+uint32_t cptra_manifest_start_offset(void)
+{
+	if (is_ast2700_a1())
 		return 0x00100000;
 
 	return 0x0;
@@ -58,13 +70,13 @@ static int cptra_crc32_check(struct cptra_image_context *ctx)
 	hdr_crc32 = calc_additive_checksum((uint8_t *)ctx->hdr, sizeof(struct cptra_manifest_hdr));
 #endif
 	if (hdr_crc32 != ctx->chk->hdr_checksum) {
-		LOG_ERR("Check flash image header checksum ...fail.");
+		LOG_ERR("Check flash image header chksum ...fail.");
 		return CPTRA_ERR_HDR_CHKSUM;
 	}
 
-	LOG_INF("Check flash image checksum ...pass.");
+	LOG_INF("Check flash image chksum ...ok.");
 #else
-	LOG_INF("Check flash image checksum ...bypass.");
+	LOG_INF("Check flash image chksum ...bypass.");
 #endif
 
 	return CPTRA_SUCCESS;
@@ -80,17 +92,17 @@ static int cptra_read_header(struct cptra_image_context *ctx)
 	ret = ast_loader_read((uint32_t *)&hdr, manifest_flash_ofst,
 			      sizeof(struct cptra_manifest_hdr));
 	if (ret) {
-		LOG_ERR("Failed to read manifest header.");
+		LOG_ERR("Failed to read man hdr.");
 		return CPTRA_ERR_READ_HDR;
 	}
 
 	if (hdr.magic != CPTRA_FLASH_IMG_MAGIC) {
-		LOG_ERR("Manifest header magic mismatch: 0x%x.", hdr.magic);
+		LOG_ERR("Man hdr magic mismatch: 0x%x.", hdr.magic);
 		return CPTRA_ERR_HDR_MAGIC_MISMATCH;
 	}
 
 	if (hdr.img_count > CPTRA_IMC_ENTRY_COUNT) {
-		LOG_ERR("Manifest image count exceeds maximum limit: %d.",
+		LOG_ERR("Man img cnt exceeds max limit: %d.",
 			hdr.img_count);
 		return CPTRA_ERR_EXCEED_MAX_IMG_COUNT;
 	}
@@ -153,22 +165,31 @@ fail:
 	return ret;
 }
 
+bool cptra_rt_ready(void)
+{
+	return (sys_read32(SCU1_REG + SCU1_CPTRA) & SCU1_CPTRA_RDY_FOR_RT);
+}
+
 static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 {
 	int ret = 0;
 	static struct cptra_soc_manifest soc_manifest;
 
 #ifndef CONFIG_CPTRA_2X_LAYOUT
-	if (!(sys_read32(SCU1_REG + SCU1_CPTRA) & SCU1_CPTRA_RDY_FOR_RT)) {
+	if (!cptra_rt_ready()) {
 		LOG_WRN("Caliptra is unavailable");
 		return CPTRA_SUCCESS;
 	}
 #endif
 
 	ret = ast_loader_load_image(CPTRA_MANIFEST_FW_ID,
-				    (uint32_t *)&soc_manifest, true);
+				    (uint32_t *)AST_HASH_BUFFER, true);
 	if (ret)
 		return CPTRA_ERR_SOC_MANIFEST_READ_ERROR;
+
+	// to avoid overwrite issue, to make sure size is correct
+	memcpy(&soc_manifest, (uint8_t *)AST_HASH_BUFFER,
+	       sizeof(struct cptra_soc_manifest));
 
 	if (soc_manifest.preamble.manifest_marker != CPTRA_AUTH_MANIFEST_MARKER) {
 		LOG_ERR("Soc manifest magic mismatch: 0x%x.",
@@ -181,9 +202,9 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 		soc_manifest.preamble.manifest_version,
 		soc_manifest.preamble.manifest_flags,
 		soc_manifest.preamble.manifest_sec_version);
-	LOG_INF("manfiest vendor pubk: 0x%08x",
+	LOG_INF("man vnd pubk: 0x%08x",
 		soc_manifest.preamble.manifest_vendor_ecc384_key[0]);
-	LOG_INF("manfiest owner pubk: 0x%08x",
+	LOG_INF("man own pubk: 0x%08x",
 		soc_manifest.preamble.manifest_owner_ecc384_key[0]);
 
 	return CPTRA_SUCCESS;
@@ -217,7 +238,7 @@ static int cptra_init_abb_loader(void)
 		return ret;
 
 	ret = cptra_read_abb_header(&cptra_ctx);
-	LOG_INF("Read abb header... %s (0x%x)", ret ? "fail" : "pass", ret);
+	LOG_INF("Read abb header... %s (0x%x)", ret ? "fail" : "ok", ret);
 
 	cptra_deinit_abb_loader(ret);
 	return ret;
@@ -231,7 +252,7 @@ int cptra_verify_abb_loader(void)
 		return ret;
 
 	ret = cptra_read_abb_soc_manifest(&cptra_ctx);
-	LOG_INF("Read soc manifest... %s (0x%x)", ret ? "fail" : "pass", ret);
+	LOG_INF("Read soc man... %s (0x%x)", ret ? "fail" : "ok", ret);
 
 	cptra_deinit_abb_loader(ret);
 	return ret;
@@ -243,16 +264,30 @@ int cptra_load_abb_image(void)
 	uint32_t *load_addr = 0;
 	struct cptra_soc_manifest *man = cptra_ctx.soc_manifest;
 	struct cptra_image_info *img_info = cptra_ctx.img_info;
-	uint32_t image_count = cptra_ctx.hdr->img_count;
-	struct cptra_manifest_ime *ime = NULL;
+
+	uint32_t image_count = 0;
 	uint32_t fw_id;
 	uint32_t identifier;
-	uint32_t i;
 
-	if (img_info == NULL)
-		return CPTRA_ERR_ABB_LOADER_NOT_READY;
+	struct cptra_image_info default_image_info[] = {
+		{CPTRA_ATF_HDR_ID, 0x0, 0x0},
+		{CPTRA_OPTEE_HDR_ID, 0x0, 0x0},
+		{CPTRA_UBOOT_HDR_ID, 0x0, 0x0},
+		{CPTRA_SSP_HDR_ID, 0x0, 0x0},
+		{CPTRA_TSP_HDR_ID, 0x0, 0x0},
+	};
 
-	for (i = 0; i < image_count && !ret; i++) {
+	LOG_DBG("Start to load ABB images...,hdr exist=%d, image_info exist=%d, man exist=%d",
+			cptra_ctx.hdr != NULL, img_info != NULL, man != NULL);
+	if (cptra_ctx.img_info == NULL || cptra_ctx.hdr == NULL) {
+		LOG_WRN("ABB not init, use def init.");
+		image_count = ARRAY_SIZE(default_image_info);
+		img_info = default_image_info;
+	} else {
+		image_count = cptra_ctx.hdr->img_count;
+	}
+
+	for (uint32_t i = 0; i < image_count && !ret; i++) {
 		identifier = img_info[i].identifier;
 		if (identifier <= CPTRA_FMC_HDR_ID) {
 			continue;
@@ -261,10 +296,10 @@ int cptra_load_abb_image(void)
 		if (!cptra_find_fw_id_by_identifier(identifier, &fw_id))
 			continue;
 
+		LOG_DBG("Found fw_id 0x%x for identifier 0x%x", fw_id, identifier);
+
 		/* Check the whether ime denote image should be loaded */
-		/* if ime is NULL, then no check */
-		ime = cptra_get_ime_by_fw_id(man, fw_id);
-		if (!cptra_ime_loadable_image(ime))
+		if (!cptra_ime_loadable_image(man, fw_id))
 			continue;
 
 		load_addr = (uint32_t *)cptra_ime_get_load_addr(fw_id);
