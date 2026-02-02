@@ -271,6 +271,13 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 	if (!cptra_manifest_sec_en())
 		return CPTRA_SUCCESS;
 
+#ifndef CONFIG_CPTRA_2X_LAYOUT
+	if (!cptra_rt_ready()) {
+		LOG_ERR("Caliptra is unavailable");
+		return CPTRA_ERR_IMAGE_VFY_CPTRA_RT_NOT_READY;
+	}
+#endif
+
 	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
 	if (ret) {
 		LOG_ERR("Cptra sha384 calcu fail.");
