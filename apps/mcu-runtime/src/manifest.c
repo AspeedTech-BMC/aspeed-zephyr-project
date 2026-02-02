@@ -178,7 +178,7 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 #ifndef CONFIG_CPTRA_2X_LAYOUT
 	if (!cptra_rt_ready()) {
 		LOG_WRN("Caliptra is unavailable");
-		return CPTRA_SUCCESS;
+		return CPTRA_ERR_SOC_MANIFEST_CPTRA_RT_NOT_READY;
 	}
 #endif
 
@@ -254,7 +254,8 @@ int cptra_verify_abb_loader(void)
 	ret = cptra_read_abb_soc_manifest(&cptra_ctx);
 	LOG_INF("Read soc man... %s (0x%x)", ret ? "fail" : "ok", ret);
 
-	cptra_deinit_abb_loader(ret);
+	// let boot continue even read soc manifest fail
+	// cptra_deinit_abb_loader(ret);
 	return ret;
 }
 
