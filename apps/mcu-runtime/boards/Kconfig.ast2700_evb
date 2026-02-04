@@ -11,6 +11,13 @@ config SLI_AST2700
 	help
 	  This option enables AST2700 IO-die SLI calibration.
 
+config FORCE_ABB_OFFSET
+	bool "FORCE ABB OFFSET TO 0X0000_0000"
+	depends on SOC_AST2700_BOOTMCU
+	default n
+	help
+	  This option forces abb offset to 0X0000_0000.
+
 endif
 
 
