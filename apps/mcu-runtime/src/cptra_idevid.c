@@ -114,7 +114,7 @@ int cptra_populate_idevid(void)
 #if defined(CONFIG_CPTRA_DICE)
 	const struct device *dev = device_get_binding(CPTRA_DICE_DRV_NAME);
 #else
-	const struct device *dev = NULL;
+	return -ENODEV;
 #endif
 	struct cptra_get_idev_cert_ia input;
 	struct cptra_get_idev_cert_oa output;
