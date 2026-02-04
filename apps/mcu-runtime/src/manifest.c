@@ -176,13 +176,6 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 	int ret = 0;
 	static struct cptra_soc_manifest soc_manifest;
 
-#ifndef CONFIG_CPTRA_2X_LAYOUT
-	if (!cptra_rt_ready()) {
-		LOG_WRN("Caliptra is unavailable");
-		return CPTRA_ERR_SOC_MANIFEST_CPTRA_RT_NOT_READY;
-	}
-#endif
-
 	ret = ast_loader_load_image(CPTRA_MANIFEST_FW_ID,
 				    (uint32_t *)AST_HASH_BUFFER, true);
 	if (ret)
@@ -251,6 +244,13 @@ int cptra_verify_abb_loader(void)
 
 	if (cptra_ctx.soc_manifest)
 		return ret;
+
+#ifndef CONFIG_CPTRA_2X_LAYOUT
+	if (!cptra_rt_ready()) {
+		LOG_WRN("Cptra not ready, bypass read soc man");
+		return CPTRA_SUCCESS;
+	}
+#endif
 
 	ret = cptra_read_abb_soc_manifest(&cptra_ctx);
 	LOG_INF("Read soc man... %s (0x%x)", ret ? "fail" : "ok", ret);

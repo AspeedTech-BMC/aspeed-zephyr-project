@@ -273,7 +273,7 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 
 #ifndef CONFIG_CPTRA_2X_LAYOUT
 	if (!cptra_rt_ready()) {
-		LOG_ERR("Caliptra is unavailable");
+		LOG_ERR("Cptra not ready");
 		return CPTRA_ERR_IMAGE_VFY_CPTRA_RT_NOT_READY;
 	}
 #endif
