@@ -39,10 +39,11 @@ bool is_ast2700_a2(void)
 
 uint32_t cptra_manifest_start_offset(void)
 {
-	if (is_ast2700_a1())
-		return 0x00100000;
-
+#ifdef CONFIG_FORCE_ABB_OFFSET
 	return 0x0;
+#else
+	return is_ast2700_a1() ? 0x00100000 : 0x0;
+#endif
 }
 
 #ifdef CONFIG_CPTRA_2X_LAYOUT
