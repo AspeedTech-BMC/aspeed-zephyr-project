@@ -33,6 +33,8 @@ LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 	 (CHECK_EXIST(node, ehci)       << 2) | \
 	 (CHECK_EXIST(node, xhci)       << 3))
 
+#define PCIE_ALT_NODE(node) DT_PROP(node, alt_pcie_node)
+
 #define CHECK_INTx(node, prop) \
 	(strcmp(DT_PROP_OR(node, prop, "INTx"), "MSI") ? 0 : 1)
 
@@ -49,7 +51,8 @@ int pci_init(struct ast_chip *chip)
 	uint8_t pcie1_en = PCIE_CONF(DT_PATH(soc0, pcie1));
 	uint8_t pcie0_intx = PCIE_INTx(DT_PATH(soc0, pcie0));
 	uint8_t pcie1_intx = PCIE_INTx(DT_PATH(soc0, pcie1));
-    uint32_t reg;
+	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_PATH(soc0, pcie1));
+	uint32_t reg;
 
 	if ((scu->modrst2_ctrl & (SCU0_RST2_E2M1 | SCU0_RST2_E2M0)) == 0) {
 		LOG_DBG("%s: PCIE already initialized\n", __func__);
@@ -58,6 +61,11 @@ int pci_init(struct ast_chip *chip)
 
 	scu->pci0_misc[28] = pcie0_en * 0x010101 | (pcie0_intx << 24);
 	scu->pci1_misc[28] = pcie1_en * 0x010101 | (pcie1_intx << 24);
+	if (pcie1_alt) {
+		// disable vga & bmc-dev if alt_pcie_node is set
+		clrbits_le32(&scu->pci1_misc[28], 0x03030303);
+		clrbits_le32(&scu->pci1_misc[30], BIT(31));
+	}
 	LOG_DBG("%s: PCIE0 en=0x%02x int=0x%02x, PCIE1 en=0x%02x int=0x%02x\n", __func__, pcie0_en, pcie0_intx, pcie1_en, pcie1_intx);
 
 	// leave works to u-boot
