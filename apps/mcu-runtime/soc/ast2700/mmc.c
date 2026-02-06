@@ -37,22 +37,13 @@ static int mmc_init(struct device *dev)
 {
 	int ret = 0;
 
-	if (is_ast2700_a1()) {
-		/* set clk/cmd driving */
-		sys_write32(2, MMC_CLK_DRIVING_REG);
-		sys_write32(1, MMC_CMD_DRIVING_REG);
-		sys_write32(1, MMC_DAT0_DRIVING_REG);
-		sys_write32(1, MMC_DAT1_DRIVING_REG);
-		sys_write32(1, MMC_DAT2_DRIVING_REG);
-		sys_write32(1, MMC_DAT3_DRIVING_REG);
-	} else if (is_ast2700_a2()) {
-		sys_write32(3, MMC_CLK_DRIVING_REG);
-		sys_write32(1, MMC_CMD_DRIVING_REG);
-		sys_write32(1, MMC_DAT0_DRIVING_REG);
-		sys_write32(1, MMC_DAT1_DRIVING_REG);
-		sys_write32(1, MMC_DAT2_DRIVING_REG);
-		sys_write32(1, MMC_DAT3_DRIVING_REG);
-	}
+	/* set clk/cmd driving */
+	sys_write32(2, MMC_CLK_DRIVING_REG);
+	sys_write32(1, MMC_CMD_DRIVING_REG);
+	sys_write32(1, MMC_DAT0_DRIVING_REG);
+	sys_write32(1, MMC_DAT1_DRIVING_REG);
+	sys_write32(1, MMC_DAT2_DRIVING_REG);
+	sys_write32(1, MMC_DAT3_DRIVING_REG);
 
 	/* release emmc pin from emmc boot */
 	sys_write32(0, 0x12c0b00c);
