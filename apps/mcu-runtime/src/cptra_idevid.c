@@ -136,16 +136,17 @@ end:
 
 int cptra_populate_idevid(void)
 {
-#if defined(CONFIG_CPTRA_DICE)
+
 	const struct device *dev = device_get_binding(CPTRA_DICE_DRV_NAME);
-#else
-	return -ENODEV;
-#endif
 	struct cptra_get_idev_cert_ia input;
 	struct cptra_get_idev_cert_oa output;
 	struct cptra_populate_idev_cert_ia in_buff;
 	struct cptra_populate_idev_cert_oa out_buff;
 	int ret;
+
+#if !defined(CONFIG_CPTRA_DICE)
+	return -ENODEV;
+#endif
 
 	if (!dev) {
 		LOG_ERR("Device %s not found", CPTRA_DICE_DRV_NAME);
