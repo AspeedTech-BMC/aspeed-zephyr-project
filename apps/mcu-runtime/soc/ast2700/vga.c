@@ -94,7 +94,7 @@ static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, b
 	uint32_t val, addr, vram_size;
 	uint8_t vram_size_cfg;
 	const uint32_t offsets[2] = { E2M0_VGA_RAM, E2M1_VGA_RAM };
-	const uint32_t misc[2] = { scu->pci0_misc[3], scu->pci1_misc[3] };
+	const uint32_t misc[2] = { (uintptr_t)&scu->pci0_misc[3], (uintptr_t)&scu->pci1_misc[3] };
 	int node;
 
 	vram_size_cfg = is_64vram ? 0xf : 0xe;
