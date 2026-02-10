@@ -1,0 +1,340 @@
+#include "ast1060_prot_gpio_common.dts"
+#include "ast1060_prot_gpio_bhs.dts"
+#define AFM_VERSION 4
+
+&i2cfilter {
+	status = "okay";
+};
+
+&mbxctrl {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+
+	swmbx0: swmbx0@38 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x38>;
+		size = <256>;
+		port = <0>;
+		status = "okay";
+	};
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+
+	swmbx1: swmbx1@70 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x70>;
+		size = <256>;
+		port = <1>;
+		status = "okay";
+	};
+};
+
+&i2c4 {
+	status = "okay";
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+};
+
+// For mctp over i3c
+// BMC i3c-5 -> AST1060 i3c-2
+&i3c2 {
+	status = "okay";
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&wdt1 {
+	status = "okay";
+};
+
+&wdt2 {
+	status = "okay";
+};
+
+&wdt3 {
+	status = "okay";
+};
+
+&wdt4 {
+	status = "okay";
+};
+
+&fmc {
+	status = "okay";
+};
+
+/* Using partition layout from ast1060_dcscm_dice for MCUboot support */
+&fmc_cs0 {
+	/delete-property/ broken-sfdp;
+	/delete-property/ write-block-size;
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		mcuboot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x0 0x1c000>;
+		};
+
+		certificate_partition: partition@1c000 {
+			label = "certificate";
+			reg = <0x1c000 0x4000>;
+		};
+
+
+		active_partition: partition@20000 {
+			label = "active";
+			reg = <0x20000 0x60000>;
+		};
+
+		recovery_partition: partition@80000 {
+			label = "recovery";
+			reg = <0x80000 0x60000>;
+		};
+
+		afm_act_1_partition: partition@e0000 {
+			label = "afm_act_1";
+			reg = <0xe0000 0x6000>;
+		};
+
+		state_partition: partition@e6000 {
+			label = "state";
+			reg = <0xe6000 0x2000>;
+		};
+
+		key_partition: partition@e8000 {
+			label = "key";
+			reg = <0xe8000 0x8000>;
+		};
+
+		intel_state_partition: partition@f0000 {
+			label = "intel_state";
+			reg = <0xf0000 0x10000>;
+		};
+	};
+};
+
+&fmc_cs1 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+#if (AFM_VERSION == 4)
+		/* Reserved for Intel-PFR 4.0 */
+		afm_act1_partition: partition@0 {
+			label = "afm_active_1";
+			reg = <0x0 0x20000>;
+		};
+
+		afm_act2_partition: partition@20000 {
+			label = "afm_active_2";
+			reg = <0x20000 0x20000>;
+		};
+
+		afm_rcv1_partition: partition@40000 {
+			label = "afm_recovery_1";
+			reg = <0x40000 0x20000>;
+		};
+
+		afm_rcv2_partition: partition@60000 {
+			label = "afm_recovery_2";
+			reg = <0x60000 0x20000>;
+		};
+
+		intel_cpld_act_partition: partition@80000 {
+			label = "intel_cpld_act";
+			reg = <0x80000 0x1C0000>;
+		};
+		intel_cpld_rc_partition: partition@240000 {
+			label = "intel_cpld_rc";
+			reg = <0x240000 0x1C0000>;
+		};
+#elif (AFM_VERSION == 3)
+		intel_cpld_act_partition: partition@0 {
+			label = "intel_cpld_act";
+			reg = <0x000000 0x200000>;
+		};
+		intel_cpld_rc_partition: partition@200000 {
+			label = "intel_cpld_rc";
+			reg = <0x200000 0x200000>;
+		};
+#endif
+	};
+};
+
+&spi1 {
+	num-cs = <2>;
+	status = "okay";
+};
+
+/* "SPI1_CS0" is used to access flash connected to SPI_Monitor_1,
+ * "SPI1_CS1" is used to access flash connected to SPI_Monitor_2,
+ * "SPI2_CS0" is used to access flash connected to SPI_Monitor_3,
+ * "SPI2_CS1" is used to access flash connected to SPI_Monitor_4,
+ */
+
+&spi1_cs0 {
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	spi-monitor-ctrl = <&spim1>;
+	status = "okay";
+};
+
+&spi1_cs1 {
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	spi-monitor-ctrl = <&spim2>;
+	status = "okay";
+};
+
+&spi2_cs0 {
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	spi-monitor-ctrl = <&spim3>;
+	status = "okay";
+};
+
+&spi2_cs1 {
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+	spi-monitor-ctrl = <&spim4>;
+	status = "okay";
+};
+
+&spi2 {
+	internal-mux-master = <2>;
+	spi-monitor-output-base = <3>;
+	spi-monitor-common-ctrl = <&spim0>;
+	pinctrl-0 = <>;
+
+	num-cs = <2>;
+	status = "okay";
+
+	spim-proprietary-config-enable;
+};
+
+&spim0 {
+	status = "okay";
+};
+
+&spim1 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pin_spim1csin &pin_spim1clkin &pin_spim1mosiin &pin_spim1misoin
+		&pin_spim1csout &pin_spim1io2in &pin_spim1io3in>;
+
+	pinctrl-names = "default";
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_a_d 12 0>, <&sgpiom_a_d 0 0>; /* SGPIO OUT #1 */
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+&spim2 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pin_spim2csin &pin_spim2clkin &pin_spim2mosiin &pin_spim2misoin
+		&pin_spim2csout &pin_spim2io2in &pin_spim2io3in>;
+
+	pinctrl-names = "default";
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_a_d 12 0>, <&sgpiom_a_d 0 0>; /* SGPIO OUT #1 */
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+
+&spim3 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pin_spim3csin &pin_spim3clkin &pin_spim3mosiin &pin_spim3misoin
+		&pin_spim3csout &pin_spim3io2in &pin_spim3io3in &pin_spim3clkout
+		&pin_spim3misoout &pin_spim3mosiout &pin_spim3io2out &pin_spim3io3out>;
+
+	pinctrl-names = "default";
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_e_h 8 0>, <&sgpiom_a_d 2 0>; /* SGPIO OUT #3 */
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+&spim4 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	log-ram-size = <0x200>;
+	pinctrl-0 = <&pin_spim4csin &pin_spim4clkin &pin_spim4mosiin &pin_spim4misoin
+		&pin_spim4csout &pin_spim4io2in &pin_spim4io3in &pin_spim4clkout
+		&pin_spim4misoout &pin_spim4mosiout &pin_spim4io2out &pin_spim4io3out>;
+
+	pinctrl-names = "default";
+	ext-mux-sel = <1>;
+	ext-mux-sel-gpios = <&gpio0_e_h 8 0>, <&sgpiom_a_d 2 0>; /* SGPIO OUT #3 */
+	ext-mux-sel-delay-us = <1000>;
+	status = "okay";
+
+	write-forbidden-regions = <
+		0x00000000 0x08000000
+	>;
+};
+
+&sgpiom {
+	status = "okay";
+	sgpiom_a_d {
+		status = "okay";
+	};
+	sgpiom_e_h {
+		status = "okay";
+	};
+	sgpiom_i_l {
+		status = "okay";
+	};
+	sgpiom_m_p {
+		status = "okay";
+	};
+};
+
+&hace {
+	status = "okay";
+};
+
+&rsa {
+	status = "okay";
+};
+
+&ecdsa {
+	status = "okay";
+};

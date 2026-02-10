@@ -1,0 +1,59 @@
+/*
+ * Copyright (c) 2026 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <aspeed/ast10x0.dtsi>
+
+#define BOOT_FROM_UART 0
+
+/ {
+	model = "Aspeed AST1060 PROT Evaluation board with DICE support";
+	compatible = "aspeed,bic-ast1030", "aspeed,ast1030";
+
+	chosen {
+		zephyr,console = &uart5;
+		zephyr,shell-uart = &uart5;
+		zephyr,sram = &sram0;
+		zephyr,entropy = &rng;
+		zephyr,flash = &fmc_cs0;
+	};
+
+#if (BOOT_FROM_UART == 1)
+        /* For boot from uart, enable below setting and remove CONFIG_BOOTLOADER_MCUBOOT=y */
+	sram1: memory@a0000 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		device_type = "memory";
+		reg = <0xa0000 DT_SIZE_K(128)>;
+		zephyr,memory-region = "RAM_NC";
+		zephyr,memory-region-mpu = "RAM";
+	};
+#else
+	sram1: memory@400 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		device_type = "memory";
+		reg = <0x400 DT_SIZE_K(191)>;
+		zephyr,memory-region = "RAM_NC";
+	};
+#endif
+};
+
+#if (BOOT_FROM_UART == 1)
+/* For boot from uart, enable below setting and remove CONFIG_BOOTLOADER_MCUBOOT=y */
+&sram0 {
+	reg = <0 DT_SIZE_K(640)>;
+};
+#else
+&sram0 {
+	/* MCUboot reserves 192KB, so started from 0x30000 */
+	reg = <0x30000 DT_SIZE_K(575)>;
+};
+#endif
+
+&uart5 {
+	clock-frequency = <1846153>;
+	current-speed = <115200>;
+	status = "okay";
+};

@@ -38,7 +38,7 @@ int get_measurement_by_index(uint8_t measurement_index, uint8_t *measurement,
 
 	LOG_INF("MEASURE Index[%d]", measurement_index);
 	switch (measurement_index) {
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 	case 1:
 		ret = flash_area_open(FIXED_PARTITION_ID(mcuboot_partition), &area_measured);
 		area_size = FIXED_PARTITION_SIZE(mcuboot_partition);
@@ -219,7 +219,7 @@ int get_measurement(void *context,
 	size_t offset = 0, remain_size = *measurement_size;
 	uint8_t i, total_block_count;
 
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 	// for mcuboot, active, recovery
 	total_block_count = 3;
 #else

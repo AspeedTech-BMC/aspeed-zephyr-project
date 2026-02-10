@@ -1,0 +1,142 @@
+/*
+ * Copyright (c) 2026 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include <zephyr/init.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/sys_io.h>
+#if !defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_MP_ENABLED)
+#include "gpio/gpio_aspeed.h"
+#endif
+
+#define LOG_MODULE_NAME board
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
+// SPI2 Timing Compensation
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(spi2), okay)
+#define DEV_SPI_2
+#define SPI94_CE0_TIMING_CTRL (0x0094)
+#define SPI98_CE1_TIMING_CTRL (0x0098)
+// HCLK/4(50MHz)
+#define SPI2_50MHZ_HCYCLE 3
+#define SPI2_50MHZ_DELAY_NS 7
+// HCLK/5(40MHz)
+#define SPI2_40MHZ_HCYCLE 2
+#define SPI2_40MHZ_DELAY_NS 7
+#endif
+
+/*
+ * If the data distribution is too monotonous(ex: flash data all 0xff),
+ * the calibration operation cannot be executed.
+ * To support qspi 50MHz or 40MHz for spi2,
+ * adds fixed calibration value if spi drivers do auto-calibration failed.
+ * The calibration value is provided by spi drivers,
+ * please see aspeed_spi_timing_calibration function for detail to get the hcycle and delay_ns.
+ * The calibration value may be difference in the different board.
+ * So, strongly suggests users to update hcycle and delay_ns at the development stage
+ * for users PROT module.
+ */
+static int ast1060_prot_dice_post_init(const struct device *arg)
+{
+#ifdef DEV_SPI_2
+	mm_reg_t spi2_ctrl_base = DT_REG_ADDR_BY_NAME(DT_NODELABEL(spi2), ctrl_reg);
+	uint32_t final_delay = 0;
+	uint32_t calib_val = 0;
+	uint32_t delay_ns = 0;
+	uint32_t hcycle = 0;
+	uint32_t reg_addr;
+	uint32_t reg_val;
+
+	// 50MHZ
+	hcycle = SPI2_50MHZ_HCYCLE;
+	delay_ns = SPI2_50MHZ_DELAY_NS;
+	final_delay = (BIT(3) | hcycle | (delay_ns << 4));
+	reg_addr = spi2_ctrl_base + SPI94_CE0_TIMING_CTRL;
+	reg_val = sys_read32(reg_addr);
+	calib_val = sys_read32(reg_addr) & 0x00ff0000;
+	if (!calib_val) {
+		LOG_INF("set fixed calibration value(%x) for spi2_cs0 50MHz", final_delay);
+		sys_write32((reg_val | (final_delay << 16)), reg_addr);
+	}
+
+	reg_addr = spi2_ctrl_base + SPI98_CE1_TIMING_CTRL;
+	reg_val = sys_read32(reg_addr);
+	calib_val = sys_read32(reg_addr) & 0x00ff0000;
+	if (!calib_val) {
+		LOG_INF("set fixed calibration value(%x) for spi2_cs1 50MHz", final_delay);
+		sys_write32((reg_val | (final_delay << 16)), reg_addr);
+	}
+
+	// 40MHZ
+	final_delay = 0;
+	hcycle = SPI2_40MHZ_HCYCLE;
+	delay_ns = SPI2_40MHZ_DELAY_NS;
+	final_delay = (BIT(3) | hcycle | (delay_ns << 4));
+	reg_addr = spi2_ctrl_base + SPI94_CE0_TIMING_CTRL;
+	reg_val = sys_read32(reg_addr);
+	calib_val = sys_read32(reg_addr) & 0xff000000;
+	if (!calib_val) {
+		LOG_INF("set fixed calibration value(%x) for spi2_cs0 40MHz", final_delay);
+		sys_write32((reg_val | (final_delay << 24)), reg_addr);
+	}
+
+	reg_addr = spi2_ctrl_base + SPI98_CE1_TIMING_CTRL;
+	reg_val = sys_read32(reg_addr);
+	calib_val = sys_read32(reg_addr) & 0xff000000;
+	if (!calib_val) {
+		LOG_INF("set fixed calibration value(%x) for spi2_cs1 40MHz", final_delay);
+		sys_write32((reg_val | (final_delay << 24)), reg_addr);
+	}
+#endif
+
+	return 0;
+}
+
+static int ast1060_prot_dice_gpio_post_init(void)
+{
+	/* Initial setup for SGPIO */
+	const struct device *dev = device_get_binding("sgpiom_a_d");
+	if (dev) {
+		/* RST_SPI_PFR_CPU0_RESET_N */
+		gpio_pin_set_raw(dev, 6, 1);
+		/* RST_PFR_BMC_SPI_RESET_N */
+		gpio_pin_set_raw(dev, 7, 1);
+#if !defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_MP_ENABLED)
+		RTCRSTControl(false);
+#endif
+	} else {
+		LOG_ERR("Unabled to find sgpiom_a_d device");
+	}
+
+	return 0;
+}
+
+static int ast1060_prot_dice_init(const struct device *arg)
+{
+	return 0;
+}
+
+/*
+ * Priority of ast1060_prot_dice_gpio_post_init should be later than
+ * CONFIG_GPIO_ASPEED_INIT_PRIORITY (default: 60)
+ */
+#define APP_GPIO_INIT_PRIORITY 65
+BUILD_ASSERT(APP_GPIO_INIT_PRIORITY > CONFIG_GPIO_ASPEED_INIT_PRIORITY,
+	"APP GPIO Init Priority should be bigger than the driver GPIO Init Priority");
+
+SYS_INIT(ast1060_prot_dice_gpio_post_init, POST_KERNEL, APP_GPIO_INIT_PRIORITY);
+
+/*
+ * Priority of ast1060_prot_dice_post_init should be earlier than
+ * CONFIG_SPI_NOR_INIT_PRIORITY (default: 80)
+ */
+#define APP_PROT_POST_INIT_PRIORITY 75
+BUILD_ASSERT(APP_PROT_POST_INIT_PRIORITY < CONFIG_SPI_NOR_INIT_PRIORITY,
+	"Post INIT Init Priority should be less than the SPI Init Priority");
+
+SYS_INIT(ast1060_prot_dice_post_init, POST_KERNEL, APP_PROT_POST_INIT_PRIORITY);
+SYS_INIT(ast1060_prot_dice_init, APPLICATION, 0);

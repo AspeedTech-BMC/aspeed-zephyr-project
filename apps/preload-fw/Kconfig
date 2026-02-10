@@ -66,4 +66,11 @@ config MP_OTP_IMAGE_SIZE
 	default 0x10000
 	hex "OTP image size"
 
+config ASPEED_DICE
+	default n
+	bool "Aspeed DICE implementation"
+	help
+	  Enable DICE (Device Identifier Composition Engine) feature for
+	  hardware root of trust and attestation support.
+
 source "Kconfig.zephyr"

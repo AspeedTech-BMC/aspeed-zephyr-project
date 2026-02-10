@@ -135,7 +135,7 @@ struct spdm_req_fifo_data {
 void *spdm_context_create(void);
 void spdm_context_release(void *ctx);
 int spdm_load_certificate(void *ctx, bool remote, uint8_t slot_id, void *cert_data, uint16_t cert_len);
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 int spdm_append_certificate_chain(void *ctx, bool remote, uint8_t slot_id, void *cert_data, uint16_t cert_len);
 #endif
 int spdm_load_root_certificate(void *cert_data, uint16_t cert_len);

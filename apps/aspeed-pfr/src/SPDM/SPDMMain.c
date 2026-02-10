@@ -39,7 +39,7 @@
 
 LOG_MODULE_REGISTER(spdm, CONFIG_LOG_DEFAULT_LEVEL);
 
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 int load_responder_cert(struct spdm_context *context, cert_info *info, uint32_t cert_offset, uint8_t slot_num);
 int load_responder_key(struct spdm_context *context, cert_info *info);
 #endif
@@ -57,7 +57,7 @@ bool init_requester_context(struct spdm_context *context, SPDM_MEDIUM medium,
 
 	if (load_key) {
 #if defined(CONFIG_SECURE_CONNECTION_REQUESTER)
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 		static cert_info info NON_CACHED_BSS_ALIGN16;
 
 		ret = load_responder_cert(context, &info, DEVID_CERT_OFFSET, 0);
@@ -72,15 +72,7 @@ bool init_requester_context(struct spdm_context *context, SPDM_MEDIUM medium,
 				bundle_requester_certchain_der_len);
 		spdm_load_certificate(context, false, 1, bundle_requester_certchain1_der,
 				bundle_requester_certchain1_der_len);
-#endif
-#endif
-	}
 
-	context->release_connection_data = spdm_mctp_release_req;
-
-#if defined(CONFIG_SECURE_CONNECTION_REQUESTER)
-#if !defined(CONFIG_BOARD_AST1060_DCSCM_DICE) && !defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
-	if (load_key) {
 		/* Set private/public key pair for signing */
 		ret = mbedtls_ecp_group_load(&context->key_pair.MBEDTLS_PRIVATE(grp),
 				MBEDTLS_ECP_DP_SECP384R1);
@@ -99,14 +91,16 @@ bool init_requester_context(struct spdm_context *context, SPDM_MEDIUM medium,
 				context->random_callback,
 				context);
 		LOG_DBG("mbedtls_ecp_check_pub_priv ret=%x", -ret);
+#endif
+#endif
 	}
-#endif
-#endif
+
+	context->release_connection_data = spdm_mctp_release_req;
 
 	return true;
 }
 
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 int load_responder_cert(struct spdm_context *context, cert_info *info, uint32_t cert_offset, uint8_t slot_num)
 {
 	const struct flash_area *area_measured = NULL;
@@ -193,7 +187,7 @@ void init_responder_context(struct spdm_context *context)
 
 	register_get_measurement(context);
 
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 	static cert_info info NON_CACHED_BSS_ALIGN16;
 
 	ret = load_responder_cert(context, &info, DEVID_CERT_OFFSET, 0);
