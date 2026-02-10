@@ -44,6 +44,13 @@ config ASPEED_STATE_MACHINE_SHELL
 	help
 	  Enable if user need debug shell to interact with state machine
 
+config ASPEED_DICE
+	default n
+	bool "Aspeed DICE implementation"
+	help
+	  Enable DICE (Device Identifier Composition Engine) feature for
+	  hardware root of trust and attestation support.
+
 config ASPEED_DICE_SHELL
 	default n
 	bool "Aspeed DICE Shell"
@@ -180,9 +187,9 @@ config PIT_PROTECTION
 
 config PFR_SW_MAILBOX
 	default n
-        bool "SW mailbox solution"
-        help
-          Enable SW mailbox support.
+	bool "SW mailbox solution"
+	help
+	  Enable SW mailbox support.
 
 config KEY_MANIFEST_MAX_COUNT
 	depends on CERBERUS_PFR
@@ -243,11 +250,11 @@ config PFR_DEBUG_SHELL
 	select ASPEED_STATE_MACHINE_SHELL
 
 config PROVISION_SHELL
-        depends on PFR_DEBUG_SHELL
-        bool "Enable provision debug shell for development"
-        default n
-        help
-          provision debug shell command
+	depends on PFR_DEBUG_SHELL
+	bool "Enable provision debug shell for development"
+	default n
+	help
+	  provision debug shell command
 
 config ASPEED_STATE_MACHINE_EVENT_STEPPING
 	depends on ASPEED_STATE_MACHINE_SHELL

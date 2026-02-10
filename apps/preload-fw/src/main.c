@@ -42,7 +42,7 @@ void main(void)
 		LOG_ERR("Failed to update OTP and firmware image");
 	}
 #else
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 	PROV_STATUS ret;
 	BMCBootHold();
 	PCHBootHold();

@@ -8,4 +8,4 @@ add_subdirectory(otp)
 
 add_subdirectory_ifdef(CONFIG_AST10X0_PROGRAMMER_MP mp)
 
-add_subdirectory_ifdef(CONFIG_BOARD_AST1060_DCSCM_DICE certificate)
+add_subdirectory_ifdef(CONFIG_ASPEED_DICE certificate)

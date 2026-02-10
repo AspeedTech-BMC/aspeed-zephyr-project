@@ -248,7 +248,7 @@ int spdm_load_certificate(void *ctx, bool remote, uint8_t slot_id, void *cert_da
 	return 0;
 }
 
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 int spdm_append_certificate_chain(void *ctx, bool remote, uint8_t slot_id, void *cert_data, uint16_t cert_len)
 {
 	struct spdm_context *context = (struct spdm_context *)ctx;

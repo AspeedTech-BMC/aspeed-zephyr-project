@@ -1209,7 +1209,7 @@ void EnableSpdmAttestation(bool enable)
 			(uint8_t *)&cpld_status, sizeof(CPLD_STATUS));
 }
 
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 void ReadDeviceIdPublicKey(void)
 {
 	uint32_t pub_key_addr = 0;
@@ -1385,7 +1385,7 @@ void process_provision_command(void)
 		LOG_INF("Enable SPDM Attestation");
 		EnableSpdmAttestation(true);
 		break;
-#if defined(CONFIG_BOARD_AST1060_DCSCM_DICE) || defined(CONFIG_BOARD_AST1060_DUAL_FLASH_DICE)
+#if defined(CONFIG_ASPEED_DICE)
 	case READ_DEVICE_ID_PUBLIC_KEY:
 		ReadDeviceIdPublicKey();
 		break;
