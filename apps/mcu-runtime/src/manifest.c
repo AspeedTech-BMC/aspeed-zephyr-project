@@ -39,7 +39,7 @@ bool is_ast2700_a2(void)
 
 uint32_t cptra_manifest_start_offset(void)
 {
-#ifdef CONFIG_FORCE_ABB_OFFSET
+#ifdef CONFIG_FORCE_MANIFEST_BUNDLE_OFFSET
 	return 0x0;
 #else
 	return is_ast2700_a1() ? 0x00100000 : 0x0;
