@@ -1,6 +1,5 @@
 # Copyright (c) 2026 ASPEED Technology Inc.
 # SPDX-License-Identifier: MIT
 
-
-
+rsource "Kconfig.spdm"
 source "Kconfig.zephyr"

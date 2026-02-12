@@ -10,5 +10,22 @@ if DMTF_LIBSPDM
 config DMTF_LIBSPDM_CONFIG_FILE
 	string "Project based config file to replace spdm_lib_config.h"
 
+config DMTF_LIBSPDM_OS_STUB_CRYPTLIB_MBEDTLS
+	bool "Use mbedTLS in OS stub for LIBSPDM"
+	default n
+
+config DMTF_LIBSPDM_OS_STUB_CRYPTLIB_NULL
+	bool "Use NULL CryptLib in OS stub for LIBSPDM"
+	default n
+
+config DMTF_LIBSPDM_REQUESTOR
+	bool "Enable LIBSPDM Requestor"
+	default n
+
+config DMTF_LIBSPDM_RESPONDER
+	bool "Enable LIBSPDM Responder"
+	default n
+
+
 endif # DMTF_LIBSPDM
 

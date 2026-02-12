@@ -1,0 +1,10 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config SPDM_RESPONDER
+	bool "SPDM Responder"
+	select DMTF_LIBSPDM
+	select DMTF_LIBSPDM_RESPONDER
+	default n
+	help
+	  Enable SPDM Responder support.
