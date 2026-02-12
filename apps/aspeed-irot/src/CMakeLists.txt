@@ -24,3 +24,13 @@ target_sources(app
 	mctp/mctp_ipc.c
 	mctp/hal_ipm.c
 )
+
+if (CONFIG_SPDM_RESPONDER)
+	zephyr_link_libraries(dmtf_libspdm)
+	target_sources(app
+		PRIVATE
+		spdm/spdm_rsp.c
+		spdm/lib_caliptra.c
+		spdm/watchdog.c
+	)
+endif()

@@ -1291,6 +1291,13 @@ static void cptra_test_quote_pcrs(void)
 
 	LOG_DBG("output: chksum=0x%x, fips_status=0x%x",
 		output.chksum, output.fips_status);
+	LOG_HEXDUMP_DBG(output.PCRs[0], sizeof(output.PCRs[0]), "PCRs[0]:"); k_msleep(100);
+	LOG_HEXDUMP_DBG(output.PCRs[1], sizeof(output.PCRs[1]), "PCRs[1]:"); k_msleep(100);
+	LOG_HEXDUMP_DBG(output.PCRs[2], sizeof(output.PCRs[2]), "PCRs[2]:"); k_msleep(100);
+	LOG_HEXDUMP_DBG(output.PCRs[3], sizeof(output.PCRs[3]), "PCRs[3]:"); k_msleep(100);
+	LOG_HEXDUMP_DBG(output.PCRs[4], sizeof(output.PCRs[4]), "PCRs[4]:"); k_msleep(100);
+	LOG_HEXDUMP_DBG(output.PCRs[5], sizeof(output.PCRs[5]), "PCRs[5]:"); k_msleep(100);
+	LOG_HEXDUMP_DBG(output.PCRs[6], sizeof(output.PCRs[6]), "PCRs[6]:"); k_msleep(100);
 	LOG_HEXDUMP_DBG(output.PCRs[31], sizeof(output.PCRs[31]), "PCRs[31]:");
 	LOG_HEXDUMP_DBG(output.nonce, sizeof(output.nonce), "nonce:");
 	LOG_HEXDUMP_DBG(output.digest, sizeof(output.digest), "digest:");
