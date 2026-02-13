@@ -83,10 +83,6 @@ int pci_init(struct ast_chip *chip)
 	clrbits_le32((void *)ASPEED_PLDA2_MSI_CAP, BIT(3));
 	// Set Bridge2 INTA
 	clrsetbits_le32((void *)ASPEED_PLDA2_MSI_CAP, GENMASK(2, 0), 0x1);
-	if (chip->rev_id >= 2) {
-		// Enable bridge aliasing for pcie1
-		setbits_le32(&scu->pci1_misc[30], BIT(29));
-	}
 
 	// clk/reset for e2m
 	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M1);
@@ -102,10 +98,6 @@ int pci_init(struct ast_chip *chip)
 	clrbits_le32((void *)ASPEED_PLDA1_MSI_CAP, BIT(3));
 	// Set Bridge1 INTA
 	clrsetbits_le32((void *)ASPEED_PLDA1_MSI_CAP, GENMASK(2, 0), 0x1);
-	if (chip->rev_id >= 2) {
-		// Enable bridge aliasing for pcie0
-		setbits_le32(&scu->pci0_misc[30], BIT(29));
-	}
 
 	// clk/reset for e2m
 	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M0);
