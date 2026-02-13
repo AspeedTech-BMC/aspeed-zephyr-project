@@ -25,5 +25,5 @@ manifest:
       path: middlewares/cerberus
     - name: mcuboot
       remote: github
-      revision: 8c357d98f42d977cdd6fa9b4160c1f31ffd185d7
+      revision: 5bb9418452187b51b8f7d96c5df9c265f7aae9eb
       path: bootloader/mcuboot
