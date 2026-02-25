@@ -118,7 +118,7 @@ static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 	const struct device *dev = device_get_binding(CPTRA_HASH_DRV_NAME);
 
 	if (pad_len) {
-		LOG_WRN("cptra image size is not 4 byte aligned (%d, %d)", size, pad_len);
+		LOG_WRN("cptra img size is not 4byte aligned (%d, %d)", size, pad_len);
 		memset(img + size, 0x0, pad_len);
 	}
 
@@ -129,7 +129,7 @@ static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 
 	if (hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA384) || hash_update(&ini, &pkt) ||
 	    hash_compute(&ini, &pkt) || hash_free_session(dev, &ini)) {
-		LOG_ERR("cptra sha384 calculate fail.");
+		LOG_ERR("cptra sha384 calcu fail.");
 		return CPTRA_ERR_SHA384_CAL;
 	}
 
@@ -225,8 +225,8 @@ int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest)
 #define CPTRA_SOC_MANIFEST_VER (0)
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 {
-	static uint32_t ecc_pubk_x[12] = {0};
-	static uint32_t ecc_pubk_y[12] = {0};
+	uint32_t ecc_pubk_x[12] = {0};
+	uint32_t ecc_pubk_y[12] = {0};
 	struct lms_pub_key lms_pubk = {0};
 	struct cptra_manifest_aspeed_svn data = {0};
 	struct cptra_manifest_aspeed_preamble *preamble = &(manifest->preamble);
@@ -271,9 +271,16 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 	if (!cptra_manifest_sec_en())
 		return CPTRA_SUCCESS;
 
+#ifndef CONFIG_CPTRA_2X_LAYOUT
+	if (!cptra_rt_ready()) {
+		LOG_ERR("Cptra not ready");
+		return CPTRA_ERR_IMAGE_VFY_CPTRA_RT_NOT_READY;
+	}
+#endif
+
 	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
 	if (ret) {
-		LOG_ERR("Caliptra sha384 calculate fail.");
+		LOG_ERR("Cptra sha384 calcu fail.");
 		return ret;
 	}
 
@@ -290,7 +297,7 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 
 	ret = caliptra_authorize_and_stash(dev, &input, &output);
 	if (ret) {
-		LOG_ERR("Caliptra image authorize and stash fail.");
+		LOG_ERR("Cptra img auth&stash fail.");
 		return CPTRA_ERR_IMAGE_VFY_MBOX_ERROR;
 	}
 
@@ -310,7 +317,7 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 		break;
 	}
 
-	LOG_INF("Verify %s image... %s (0x%x)", cptra_ime_get_image_name(fw_id),
-		ret ? "fail" : "pass", ret);
+	LOG_INF("Verify %s image.. %s (0x%x)", cptra_ime_get_image_name(fw_id),
+		ret ? "fail" : "ok", ret);
 	return ret;
 }

@@ -159,7 +159,8 @@ struct ast_board *ast_create_board(struct ast_chip *chip)
 
 	board->load_image = board_load_image;
 	board->boot = board_prepare_for_boot;
-	board->populate = cptra_populate_idevid;
+	// board->populate = cptra_populate_idevid;
+	board->populate = NULL; /* IDEVID Certificate is not ready yet in ast1040 */
 	board->runtime_loop = (IS_ENABLED(CONFIG_CPTRA_IPC) ? cptra_ipc_enable : NULL);
 
 	chip->board = board;

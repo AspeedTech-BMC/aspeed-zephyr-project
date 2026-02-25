@@ -28,10 +28,10 @@ static int cptra_get_idevid_cert(struct cptra_get_idev_cert_ia *input,
 #else
 	const struct device *dev = NULL;
 #endif
-	uint16_t *p16 = (uint16_t *)input->tbs;
-	uint32_t tbs_offset = OTPCAL_IDEVID_TBS_OFFSET;
 	uint32_t cert_offset = OTPCAL_IDEVID_SIGN_OFFSET;
-	int size; /* word */
+	uint32_t tbs_offset = OTPCAL_IDEVID_TBS_OFFSET;
+	uint16_t *p16 = (uint16_t *)input->tbs;
+	uint16_t data;
 	int tbs_size = 0;
 	int ret;
 
@@ -40,36 +40,59 @@ static int cptra_get_idevid_cert(struct cptra_get_idev_cert_ia *input,
 		return -ENODEV;
 	}
 
+	LOG_INF("Get IDEVID Certificate");
 	memset(input, 0, sizeof(struct cptra_get_idev_cert_ia));
 	memset(output, 0, sizeof(struct cptra_get_idev_cert_oa));
 
-	for (int i = 0; i < sizeof(input->tbs) / 2; i++) {
-		ret = otp_read_cptra(tbs_offset + i, p16);
+	LOG_INF("Get tbs from OTP");
+
+	/* Check TBS tag */
+	ret = otp_read_cptra(tbs_offset, &data);
+	if (ret) {
+		LOG_ERR("otp_read_cptra failed, ret:0x%x", ret);
+		goto end;
+	}
+
+	if (data == 0x0) {
+		LOG_WRN("tbs is empty");
+		ret = -EIO;
+		goto end;
+
+	} else if (data != 0x8230) {
+		LOG_ERR("Invalid tbs tag, expected 0x8230, got 0x%x", data);
+		ret = -EIO;
+		goto end;
+	}
+
+	/* Check TBS length */
+	ret = otp_read_cptra(tbs_offset + 1, &data);
+	if (ret) {
+		LOG_ERR("otp_read_cptra failed, ret:0x%x", ret);
+		goto end;
+	}
+
+	tbs_size = sys_cpu_to_be16(data);
+	LOG_INF("tbs size: 0x%x", tbs_size);
+	if (tbs_size >= sizeof(input->tbs)) {
+		LOG_ERR("Invalid tbs length, expected less than 0x%x, got 0x%x",
+			sizeof(input->tbs), data);
+		ret = -EIO;
+		goto end;
+	}
+
+	// TBS includes ASN.1 tag
+	for (int i = 0; i < ((tbs_size + 1) / 2) + 2; i++) {
+		ret = otp_read_cptra(tbs_offset + i, p16++);
 		if (ret) {
 			LOG_ERR("otp_read_cptra failed, ret:0x%x", ret);
 			goto end;
-		}
-
-		if (i == 1) {
-			tbs_size = sys_cpu_to_be16(*p16);
-		}
-
-		if (*p16++ == 0x0) {
-			if (i == 0) {
-				LOG_WRN("tbs is empty");
-				ret = -EIO;
-				goto end;
-			}
-
-			/* Read tbs until end mark 0x0 */
-			size = i + 1;
-			break;
 		}
 	}
 
 	input->tbs_size = tbs_size + 0x4; /* 4 bytes for DER TAG & LENGTH */
 	/* LOG_HEXDUMP_INF(input->tbs, input->tbs_size, "tbs"); */
 
+	LOG_INF("Get signature_r from OTP");
 	p16 = (uint16_t *)input->signature_r;
 	for (int i = 0; i < sizeof(input->signature_r) / 2; i++) {
 		ret = otp_read_cptra(cert_offset + i, p16++);
@@ -80,6 +103,7 @@ static int cptra_get_idevid_cert(struct cptra_get_idev_cert_ia *input,
 	}
 
 	cert_offset += 0x18; /* 48 bytes for r */
+	LOG_INF("Get signature_s from OTP");
 	p16 = (uint16_t *)input->signature_s;
 	for (int i = 0; i < sizeof(input->signature_s) / 2; i++) {
 		ret = otp_read_cptra(cert_offset + i, p16++);
@@ -92,6 +116,7 @@ static int cptra_get_idevid_cert(struct cptra_get_idev_cert_ia *input,
 	/* LOG_HEXDUMP_INF(input->signature_r, sizeof(input->signature_r), "r:"); */
 	/* LOG_HEXDUMP_INF(input->signature_s, sizeof(input->signature_s), "s:"); */
 
+	LOG_INF("Get IDEVID Certificate from Cptra");
 	ret = caliptra_get_idev_cert(dev, input, output);
 	if (ret) {
 		LOG_ERR("caliptra_get_idev_cert is failure, ret:0x%x", ret);
@@ -111,16 +136,17 @@ end:
 
 int cptra_populate_idevid(void)
 {
-#if defined(CONFIG_CPTRA_DICE)
+
 	const struct device *dev = device_get_binding(CPTRA_DICE_DRV_NAME);
-#else
-	const struct device *dev = NULL;
-#endif
 	struct cptra_get_idev_cert_ia input;
 	struct cptra_get_idev_cert_oa output;
 	struct cptra_populate_idev_cert_ia in_buff;
 	struct cptra_populate_idev_cert_oa out_buff;
 	int ret;
+
+#if !defined(CONFIG_CPTRA_DICE)
+	return -ENODEV;
+#endif
 
 	if (!dev) {
 		LOG_ERR("Device %s not found", CPTRA_DICE_DRV_NAME);

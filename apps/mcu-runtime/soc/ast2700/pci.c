@@ -22,7 +22,6 @@
 #define DISCPUE2M1RAW  BIT(13)
 #define DISIOE2MRAW  BIT(6)
 
-
 LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 
 #define CHECK_EXIST(node, prop) \
@@ -33,6 +32,8 @@ LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 	 (CHECK_EXIST(node, bmc_device) << 1) | \
 	 (CHECK_EXIST(node, ehci)       << 2) | \
 	 (CHECK_EXIST(node, xhci)       << 3))
+
+#define PCIE_ALT_NODE(node) DT_PROP(node, alt_pcie_node)
 
 #define CHECK_INTx(node, prop) \
 	(strcmp(DT_PROP_OR(node, prop, "INTx"), "MSI") ? 0 : 1)
@@ -50,14 +51,21 @@ int pci_init(struct ast_chip *chip)
 	uint8_t pcie1_en = PCIE_CONF(DT_PATH(soc0, pcie1));
 	uint8_t pcie0_intx = PCIE_INTx(DT_PATH(soc0, pcie0));
 	uint8_t pcie1_intx = PCIE_INTx(DT_PATH(soc0, pcie1));
+	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_PATH(soc0, pcie1));
+	uint32_t reg;
 
 	if ((scu->modrst2_ctrl & (SCU0_RST2_E2M1 | SCU0_RST2_E2M0)) == 0) {
 		LOG_DBG("%s: PCIE already initialized\n", __func__);
 		return 0;
 	}
 
-	sys_write32(pcie0_en * 0x010101 | (pcie0_intx << 24), &scu->pci0_misc[28]);
-	sys_write32(pcie1_en * 0x010101 | (pcie1_intx << 24), &scu->pci1_misc[28]);
+	scu->pci0_misc[28] = pcie0_en * 0x010101 | (pcie0_intx << 24);
+	scu->pci1_misc[28] = pcie1_en * 0x010101 | (pcie1_intx << 24);
+	if (pcie1_alt) {
+		// disable vga & bmc-dev if alt_pcie_node is set
+		clrbits_le32(&scu->pci1_misc[28], 0x03030303);
+		clrbits_le32(&scu->pci1_misc[30], BIT(31));
+	}
 	LOG_DBG("%s: PCIE0 en=0x%02x int=0x%02x, PCIE1 en=0x%02x int=0x%02x\n", __func__, pcie0_en, pcie0_intx, pcie1_en, pcie1_intx);
 
 	// leave works to u-boot
@@ -75,10 +83,6 @@ int pci_init(struct ast_chip *chip)
 	clrbits_le32((void *)ASPEED_PLDA2_MSI_CAP, BIT(3));
 	// Set Bridge2 INTA
 	clrsetbits_le32((void *)ASPEED_PLDA2_MSI_CAP, GENMASK(2, 0), 0x1);
-	if (chip->rev_id >= 2) {
-		// Enable bridge aliasing for pcie1
-		setbits_le32(&scu->pci1_misc[30], BIT(29));
-	}
 
 	// clk/reset for e2m
 	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M1);
@@ -94,10 +98,6 @@ int pci_init(struct ast_chip *chip)
 	clrbits_le32((void *)ASPEED_PLDA1_MSI_CAP, BIT(3));
 	// Set Bridge1 INTA
 	clrsetbits_le32((void *)ASPEED_PLDA1_MSI_CAP, GENMASK(2, 0), 0x1);
-	if (chip->rev_id >= 2) {
-		// Enable bridge aliasing for pcie0
-		setbits_le32(&scu->pci0_misc[30], BIT(29));
-	}
 
 	// clk/reset for e2m
 	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M0);
@@ -115,6 +115,16 @@ int pci_init(struct ast_chip *chip)
 	if (FIELD_GET(SCU0_REVISION_ID_HW, scu->chip_id1) == AST2700A2) {
 		setbits_le32(&scu->raw_config, DISCPUE2M0RAW|DISCPUE2M1RAW);
 		setbits_le32(SCU1_RAW_CONFIG, DISIOE2MRAW);
+
+		/* only init i2c during power on reset */
+		reg = sys_read32(SCU0_RESET_LOG1);
+		if (reg & BIT(0)) {
+			/* clk/reset for i2c */
+			setbits_le32(SCU1_RSTCTL2, SCU1_RSTCTL2_I2C);
+			k_usleep(10);
+			setbits_le32(SCU1_RSTCTL2_CLR, SCU1_RSTCTL2_I2C);
+		}
+
 		vga_init(chip, true);
 	} else {
 		vga_init(chip, false);

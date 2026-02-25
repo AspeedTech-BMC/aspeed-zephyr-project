@@ -81,32 +81,35 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	return 0;
 }
 
-static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, bool is_64vram,
-			    bool is_pcie0_enable, bool is_pcie1_enable)
+static uint32_t ast_vga_get_gfm_ctrl(uint8_t node)
 {
-	uint32_t val, vram_size;
+	if (node == 1)
+		return (BIT(19) | BIT(28));
+	return (BIT(10) | BIT(27));
+}
+
+static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, bool is_64vram,
+			    const uint8_t nodes[2])
+{
+	uint32_t val, addr, vram_size;
 	uint8_t vram_size_cfg;
+	const uint32_t offsets[2] = { E2M0_VGA_RAM, E2M1_VGA_RAM };
+	const uint32_t misc[2] = { (uintptr_t)&scu->pci0_misc[3], (uintptr_t)&scu->pci1_misc[3] };
+	int node;
 
 	vram_size_cfg = is_64vram ? 0xf : 0xe;
 	vram_size = 2 << (vram_size_cfg + 10);
 	LOG_DBG("%s: VRAM size(%x) cfg(%x)\n", __func__, vram_size, vram_size_cfg);
 
-	if (is_pcie0_enable) {
-		LOG_DBG("pcie0 e2m addr(%x)", _ast_get_e2m_addr(ram, 0));
-		val = _ast_get_e2m_addr(ram, 0)
-		    | FIELD_PREP(SCU0_PCI_MISC0C_FB_SIZE, vram_size_cfg);
-		LOG_DBG("pcie0 debug reg(%x)", val);
-		sys_write32(val, E2M0_VGA_RAM);
-		sys_write32(val, (uintptr_t)&scu->pci0_misc[3]);
-	}
+	for (node = 0; node < 2; node++) {
+		if (!nodes[node])
+			continue;
 
-	if (is_pcie1_enable) {
-		LOG_DBG("pcie1 e2m addr(%x)", _ast_get_e2m_addr(ram, 1));
-		val = _ast_get_e2m_addr(ram, 1)
-		    | FIELD_PREP(SCU0_PCI_MISC0C_FB_SIZE, vram_size_cfg);
-		LOG_DBG("pcie1 debug reg(%x)", val);
-		sys_write32(val, E2M1_VGA_RAM);
-		sys_write32(val, (uintptr_t)&scu->pci1_misc[3]);
+		addr = _ast_get_e2m_addr(ram, node);
+		val = addr | FIELD_PREP(SCU0_PCI_MISC0C_FB_SIZE, vram_size_cfg);
+		LOG_DBG("pcie%d e2m addr(%x) val(%x)", node, addr, val);
+		sys_write32(val, offsets[node]);
+		sys_write32(val, misc[node]);
 	}
 }
 
@@ -117,9 +120,20 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 	struct ast2700_scu0 *scu = chip->scu0;
 	bool is_pcie0_enable = chip->pcie0_enable;
 	bool is_pcie1_enable = chip->pcie1_enable;
+	uint8_t nodes[2];
 	bool is_64vram = ram->gfmcfg & BIT(0);
 	uint8_t dac_src = scu->hwstrap1 & BIT(28);
 	uint8_t dp_src = scu->hwstrap1 & BIT(29);
+	int node;
+	volatile uint32_t *const scratch_regs[2] = {
+		&scu->vga0_scratch1[0],
+		&scu->vga1_scratch1[0],
+	};
+	volatile uint32_t *const gfm_regs[2] = {
+		&ram->gfm0ctl,
+		&ram->gfm1ctl,
+	};
+	const uint32_t clk_gates[2] = { SCU0_CLKGATE1_VGA0, SCU0_CLKGATE1_VGA1 };
 
 	/* Decide feature by efuse
 	 *  0: 2750 has full function
@@ -135,6 +149,9 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 		return 0;
 	}
 
+	nodes[0] = is_pcie0_enable;
+	nodes[1] = is_pcie1_enable;
+
 	LOG_DBG("%s: ENABLE 0(%d) 1(%d)", __func__, is_pcie0_enable, is_pcie1_enable);
 
 	if (scu->hwstrap1 & BIT(11)) {
@@ -142,7 +159,7 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 		return 0;
 	}
 
-	_ast_update_e2m(scu, ram, is_64vram, is_pcie0_enable, is_pcie1_enable);
+	_ast_update_e2m(scu, ram, is_64vram, nodes);
 
 	/* scratch for VGA CRAA[1:0] : 10b: 32Mbytes, 11b: 64Mbytes */
 	setbits_le32(&scu->hwstrap1, BIT(11));
@@ -151,37 +168,24 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 	else
 		setbits_le32(&scu->hwstrap1_clr, BIT(10));
 
-	if (is_pcie0_enable) {
-		// enable clk
-		setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_VGA0);
+	for (node = 0; node < 2; node++) {
+		if (!nodes[node])
+			continue;
 
-		/* load node0 vbios */
-		vbios_init(scu, 0);
+		// enable clk
+		setbits_le32(&scu->clkgate_clr, clk_gates[node]);
+
+		/* load node vbios */
+		vbios_init(scu, node);
 
 		// scratch for VGA CRD0[12]: Disable P2A
-		setbits_le32(&scu->vga0_scratch1[0], BIT(7));
-		setbits_le32(&scu->vga0_scratch1[0], BIT(12));
+		setbits_le32(scratch_regs[node], BIT(7) | BIT(12));
 
 		// Enable VRAM address offset: cursor, 2d
-		sys_write32(BIT(10) | BIT(27), (uintptr_t)&ram->gfm0ctl);
+		sys_write32(ast_vga_get_gfm_ctrl(node), (uintptr_t)gfm_regs[node]);
 	}
 
-	if (is_pcie1_enable) {
-		// enable clk
-		setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_VGA1);
-
-		/* load node1 vbios */
-		vbios_init(scu, 1);
-
-		// scratch for VGA CRD0[12]: Disable P2A
-		setbits_le32(&scu->vga1_scratch1[0], BIT(7));
-		setbits_le32(&scu->vga1_scratch1[0], BIT(12));
-
-		// Enable VRAM address offset: cursor, 2d
-		sys_write32(BIT(19) | BIT(28), (uintptr_t)&ram->gfm1ctl);
-	}
-
-	if (is_pcie0_enable || is_pcie1_enable) {
+	if (nodes[0] || nodes[1]) {
 		struct ast2700_vga_link *packer_cpu, *retimer_cpu, *packer_io,
 					*retimer_io;
 

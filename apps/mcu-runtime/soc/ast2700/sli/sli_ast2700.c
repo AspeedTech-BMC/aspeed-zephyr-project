@@ -159,18 +159,6 @@ struct sli_data {
 #define SCU0_SCRATCH31_SLI1_READY	BIT(0)
 #define AHBC_MAX_TIMEOUT		0x1ff
 
-static void trigger_reset(void)
-{
-	// Add SLI + DRAM reset
-	setbits_le32((void *)0x14c3701c, BIT(2) | BIT(1));
-	setbits_le32((void *)0x14c37028, BIT(3));
-
-	// trigger reset
-	sys_write32(0x200, (void *)0x14c37004);
-	sys_write32(0x4755, (void *)0x14c37008);
-	sys_write32(0x13, (void *)0x14c3700c);
-}
-
 static bool is_sli_calibrated(struct sli_data *data)
 {
 	uint32_t reg_val;
@@ -541,11 +529,6 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 		LOG_DBG("%s SLIM %s win: {%d, %d} retry %d\n", die_name, dir, d_first_pass, d_last_pass, count);
 	}
 
-	if (count == SLIM_RETRY_COUNT) {
-		LOG_WRN("%s SLIM %s calibration failed, {%d, %d}\n", die_name, dir, d_first_pass, d_last_pass);
-		trigger_reset();
-	}
-
 	dc = (d_first_pass + d_last_pass) >> 1;
 	if (dc == 0)
 		dc = SLIM_DEFAULT_DELAY;
@@ -850,12 +833,12 @@ int sli_init_f(struct ast_chip *chip)
 
 static void _mac_hotfix(struct sli_data *data)
 {
-	uint32_t val = readl((void *)data->die1.slim + 0xb8) & 0xe00;
+	uint32_t val = readl((uintptr_t)data->die1.slim + 0xb8) & 0xe00;
 
 	if (!val)
 		return;
 
-	writel(val, (void *)data->die1.slim + 0x68);
+	writel(val, (uintptr_t)data->die1.slim + 0x68);
 	setbits_le32(data->die1.slim + 0x60, BIT(5));
 }
 
