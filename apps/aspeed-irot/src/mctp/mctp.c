@@ -182,7 +182,7 @@ static uint8_t mctp_pkt_assembling(mctp *mctp_inst, uint8_t *buf, uint16_t len)
 
 	mctp_hdr *hdr = (mctp_hdr *)buf;
 	uint8_t **buf_p = &mctp_inst->temp_msg_buf[hdr->msg_tag][hdr->to].buf;
-	uint16_t *offset_p = &mctp_inst->temp_msg_buf[hdr->msg_tag][hdr->to].offset;
+	uint32_t *offset_p = &mctp_inst->temp_msg_buf[hdr->msg_tag][hdr->to].offset;
 
 	/* one packet message, do nothing */
 	if (hdr->som && hdr->eom)
@@ -195,12 +195,12 @@ static uint8_t mctp_pkt_assembling(mctp *mctp_inst, uint8_t *buf, uint16_t len)
 		}
 		*offset_p = 0;
 
-		*buf_p = (uint8_t *)malloc(MSG_ASSEMBLY_BUF_SIZE);
+		*buf_p = (uint8_t *)malloc((mctp_inst->max_msg_size) * 4 );
 		if (!*buf_p) {
-			LOG_WRN("cannot create memory...");
+			LOG_WRN("cannot create memory... mctp_inst=%p size=%d", mctp_inst, mctp_inst->max_msg_size);
 			return MCTP_ERROR;
 		}
-		memset(*buf_p, 0, MSG_ASSEMBLY_BUF_SIZE);
+		memset(*buf_p, 0, mctp_inst->max_msg_size);
 	}
 
 	if (!(*buf_p)) {
@@ -209,6 +209,13 @@ static uint8_t mctp_pkt_assembling(mctp *mctp_inst, uint8_t *buf, uint16_t len)
 	}
 
 	/* Appending other packet after the first packet */
+	if (!hdr->eom && (*offset_p + len - sizeof(hdr) > mctp_inst->max_msg_size)) {
+		LOG_WRN("Buffer overflow");
+		free(*buf_p);
+		*buf_p = NULL;
+		*offset_p = 0;
+		return MCTP_ERROR;
+	}
 	memcpy(*buf_p + *offset_p, buf + sizeof(hdr), len - sizeof(hdr));
 	*offset_p += len - sizeof(hdr);
 
@@ -230,7 +237,7 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 
 	LOG_INF("mctp_rx_task start %p", mctp_inst);
 
-	uint8_t *read_buf = malloc(MSG_ASSEMBLY_BUF_SIZE);
+	uint8_t *read_buf = malloc(mctp_inst->max_msg_size);
 	if (!read_buf) {
 		LOG_ERR("mctp_rx_task malloc read_buf failed");
 		return;
@@ -240,14 +247,14 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 #if 0
 		uint8_t read_buf[2048] = { 0 };
 #else
-		memset(read_buf, 0, MSG_ASSEMBLY_BUF_SIZE);
+		memset(read_buf, 0, mctp_inst->max_msg_size);
 #endif
 		mctp_ext_params ext_params;
 		uint8_t ret = MCTP_ERROR;
 		memset(&ext_params, 0, sizeof(ext_params));
 
-		uint16_t read_len =
-			mctp_inst->read_data(mctp_inst, read_buf, MSG_ASSEMBLY_BUF_SIZE, &ext_params);
+		uint32_t read_len =
+			mctp_inst->read_data(mctp_inst, read_buf, mctp_inst->max_msg_size, &ext_params);
 
 		if (!read_len)
 			continue;
@@ -278,8 +285,10 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 		/* handle this packet by self */
 
 		/* assembling the mctp message */
-		if (mctp_pkt_assembling(mctp_inst, read_buf, read_len) == MCTP_ERROR)
-			LOG_WRN("Packet assemble failed ");
+		if (mctp_pkt_assembling(mctp_inst, read_buf, read_len) == MCTP_ERROR) {
+			LOG_ERR("Packet assemble failed ");
+			continue;
+		}
 
 		/* if it is not last packet, waiting for the remain data */
 		if (!hdr->eom)
@@ -373,18 +382,29 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 
 		/* Setup MCTP header and send to destination endpoint */
 		uint8_t msg_tag = mctp_inst->msg_tag;
-		uint16_t max_msg_size = mctp_inst->max_msg_size;
+		uint32_t max_msg_size = mctp_inst->max_msg_size;
 		uint8_t i;
 		uint8_t split_pkt_num =
 			(mctp_msg.len / max_msg_size) + ((mctp_msg.len % max_msg_size) ? 1 : 0);
 		LOG_DBG("mctp_msg.len = %d", mctp_msg.len);
 		LOG_DBG("split_pkt_num = %d", split_pkt_num);
 		for (i = 0; i < split_pkt_num; i++) {
-			uint8_t buf[max_msg_size + MCTP_TRANSPORT_HEADER_SIZE];
+#if 0
+			// uint8_t buf[max_msg_size + MCTP_TRANSPORT_HEADER_SIZE];
+			memset(buf, 0, sizeof(buf));
+#else
+			size_t buf_size = max_msg_size + MCTP_TRANSPORT_HEADER_SIZE;
+			uint8_t *buf = malloc(buf_size);
+			if (buf == NULL) {
+				LOG_ERR("mctp tx task malloc buf failed");
+				ret = MCTP_ERROR;
+				break;
+			}
+			memset(buf, 0, buf_size);
+#endif
 			mctp_hdr *hdr = (mctp_hdr *)buf;
 			uint16_t cp_msg_size = max_msg_size;
 
-			memset(buf, 0, sizeof(buf));
 
 			/* The first packet should set SOM */
 			if (!i)
@@ -422,8 +442,18 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 
 			if (ret != MCTP_SUCCESS) {
 				LOG_WRN("mctp write data failed");
+#if 0
+#else
+				if (buf)
+					free(buf);
+#endif
 				break;
 			}
+#if 0
+#else
+			if (buf)
+				free(buf);
+#endif
 		}
 
 		free(mctp_msg.buf);

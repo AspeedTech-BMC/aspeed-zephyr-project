@@ -34,3 +34,29 @@ if (CONFIG_SPDM_RESPONDER)
 		spdm/watchdog.c
 	)
 endif()
+
+if (CONFIG_PLDM)
+	target_sources(app
+		PRIVATE
+		pldm/pldm.c
+	)
+	if (CONFIG_PLDM_BASE)
+		target_sources(app
+			PRIVATE
+			pldm/pldm_base.c
+		)
+	endif()
+	if (CONFIG_PLDM_FW_UPDATE)
+		target_sources(app
+			PRIVATE
+			pldm/pldm_firmware_update.c
+			pldm/pldm_firmware_update_platform.c
+		)
+	endif()
+	if (CONFIG_PLDM_OEM)
+		target_sources(app
+			PRIVATE
+			pldm/pldm_oem.c
+		)
+	endif()
+endif()

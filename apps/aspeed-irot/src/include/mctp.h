@@ -35,10 +35,8 @@ extern "C" {
 
 #define MCTP_TX_QUEUE_SIZE 16
 
-#define MSG_ASSEMBLY_BUF_SIZE (8192)
-
-#define MCTP_RX_TASK_STACK_SIZE 8192*3
-#define MCTP_TX_TASK_STACK_SIZE 8192*3
+#define MCTP_RX_TASK_STACK_SIZE 16384
+#define MCTP_TX_TASK_STACK_SIZE 16384
 #define MCTP_TASK_NAME_LEN 32
 
 #define MCTP_DEFAULT_ENDPOINT 0x0A
@@ -132,8 +130,8 @@ typedef struct _mctp_ext_params {
 typedef uint8_t (*mctp_fn_cb)(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
 
 /* medium write/read function prototype */
-typedef uint16_t (*medium_tx)(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
-typedef uint16_t (*medium_rx)(void *mctp_p, uint8_t *buf, uint32_t len,
+typedef uint32_t (*medium_tx)(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
+typedef uint32_t (*medium_rx)(void *mctp_p, uint8_t *buf, uint32_t len,
 			      mctp_ext_params *ext_params);
 
 /* prototype for destitation endpoint resloved */
@@ -181,7 +179,7 @@ typedef struct _mctp {
 	uint8_t is_servcie_start;
 	MCTP_MEDIUM_TYPE medium_type;
 	uint8_t endpoint;
-	uint16_t max_msg_size;
+	uint32_t max_msg_size;
 
 	/* medium related */
 	mctp_medium_conf medium_conf;
@@ -207,7 +205,7 @@ typedef struct _mctp {
 	/* point to the rx message buffer that is assembling request/response */
 	struct {
 		uint8_t *buf;
-		uint16_t offset;
+		uint32_t offset;
 	} temp_msg_buf[MCTP_MAX_MSG_TAG_NUM][2];
 
 	/* the callback when recevie mctp data */
@@ -217,12 +215,14 @@ typedef struct _mctp {
 	uint8_t pldm_inst_id;
 	uint32_t pldm_inst_table; // 32 bits field for instance id
 
+#if 0
 	/* for cci_msg_tag */
 	uint8_t cci_msg_tag;
 
 	/* for ncsi instance id */
 	uint8_t ncsi_inst_id;
 	uint32_t ncsi_inst_table[8]; // 256 bits field for instance id
+#endif
 
 	/* for MCTP msg tag */
 	uint8_t msg_tag;

@@ -11,6 +11,9 @@
 #if defined(CONFIG_SPDM_RESPONDER)
 #include <spdm_rsp.h>
 #endif
+#if defined(CONFIG_PLDM)
+#include <pldm.h>
+#endif
 
 LOG_MODULE_REGISTER(mctp_init);
 
@@ -45,6 +48,11 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 	case MCTP_MSG_TYPE_CTRL:
 		mctp_ctrl_cmd_handler(mctp_p, buf, len, ext_params);
 		break;
+#if defined(CONFIG_PLDM)
+	case MCTP_MSG_TYPE_PLDM:
+		mctp_pldm_cmd_handler(mctp_p, buf, len, ext_params);
+		break;
+#endif
 #if defined(CONFIG_SPDM_RESPONDER)
 	case MCTP_MSG_TYPE_SPDM:
 		mctp_spdm_cmd_handler(mctp_p, buf, len, ext_params);
@@ -63,10 +71,15 @@ int load_mctp_support_types(uint8_t *type_len, uint8_t *types)
 	*type_len = 0;
 	types[*type_len] = MCTP_MSG_TYPE_CTRL;
 	(*type_len)++;
+#if defined(CONFIG_PLDM)
+	types[*type_len] = MCTP_MSG_TYPE_PLDM;
+	(*type_len)++;
+#endif
 #if defined(CONFIG_SPDM_RESPONDER)
 	types[*type_len] = MCTP_MSG_TYPE_SPDM;
 	(*type_len)++;
 #endif
+
 	return 0;
 }
 
