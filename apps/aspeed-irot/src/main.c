@@ -12,7 +12,7 @@
 LOG_MODULE_REGISTER(aspeed_irot);
 
 int main() {
-	LOG_INF("Aspeed IROT module initialized.");
+	LOG_INF("Aspeed IROT FW Started");
 
 	irot_send_event(START_STATE_MACHINE, NULL);
 

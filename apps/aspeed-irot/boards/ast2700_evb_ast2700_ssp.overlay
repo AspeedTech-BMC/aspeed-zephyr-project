@@ -1,37 +1,5 @@
 #include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
 #include <zephyr/dt-bindings/memory-attr/memory-attr.h>
-#if 0
-/ {
-	chosen {
-		// zephyr,ipc = &ipc_legacy;
-		zephyr,ipc_shm_rx = &sram_ipc0_rx;
-		zephyr,ipc_shm_tx = &sram_ipc0_tx;
-	};
-
-	reserved-memory {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-		/* SRAM allocated to shared memory */
-		sram_ipc0_rx: memory@ff000 {
-			compatible = "zephyr,memory-region", "mmio-dram";
-			reg = <0xff000 DT_SIZE_K(2)>;
-			zephyr,memory-region = "RAM_NC_SHM_RX";
-			zephyr,memory-attr = <DT_MEM_ARM(ATTR_MPU_RAM_NOCACHE)>;
-		};
-
-		/* SRAM allocated to shared memory */
-		sram_ipc0_tx: memory@ff800 {
-			compatible = "zephyr,memory-region", "mmio-dram";
-			device_type = "memory";
-			reg = <0xff800 DT_SIZE_K(2)>;
-			zephyr,memory-region = "RAM_NC_SHM_TX";
-			zephyr,memory-attr = <DT_MEM_ARM(ATTR_MPU_RAM_NOCACHE)>;
-		};
-	};
-
-};
-#endif
 
 / {
 	bmc_pfm {
@@ -50,24 +18,14 @@
 	reg = <0x0 DT_SIZE_K(512)>;
 };
 
-#if 1
 &dram_rw_region {
-	reg = <DT_SIZE_K(512) DT_SIZE_K(512)>;
+	reg = <DT_SIZE_K(512) DT_SIZE_K(1536)>;
 };
 
 &dram_nc_region {
+	reg = <DT_SIZE_K(2048) DT_SIZE_K(30720 + 32768)>;
 	zephyr,memory-attr = <(DT_MEM_DMA)>;
 };
-
-#if 0
-&ipc_legacy {
-	tx-region = <&sram_ipc0_tx>;
-	rx-region = <&sram_ipc0_rx>;
-	mbox-names = "rx", "tx";
-	status = "okay";
-};
-#endif
-#endif
 
 &fmc {
 	status = "okay";

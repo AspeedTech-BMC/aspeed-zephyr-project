@@ -1,0 +1,29 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config PLDM
+	bool "PLDM"
+	default n
+	help
+	  Platform Level Data Model (PLDM) is a standard for managing and monitoring platform components. It provides a common interface for communication between management controllers and platform components, enabling efficient and standardized management of hardware resources. Enabling PLDM support allows the system to utilize PLDM features for improved hardware management and monitoring capabilities.
+
+if PLDM
+
+config PLDM_BASE
+	bool "PLDM Base"
+	default n
+	help
+	  The PLDM Base component provides the core functionality for the Platform Level Data Model (PLDM). It includes the essential features and interfaces required for PLDM communication and management. Enabling PLDM Base allows the system to utilize the fundamental capabilities of PLDM for efficient hardware management and monitoring.
+
+config PLDM_FW_UPDATE
+	bool "PLDM Firmware Update"
+	default n
+	help
+	  The PLDM Firmware Update component enables support for firmware updates using the Platform Level Data Model (PLDM). It allows the system to perform firmware updates on platform components through PLDM communication, providing a standardized and efficient method for managing firmware across various hardware resources.
+
+config PLDM_OEM
+	bool "PLDM OEM"
+	default n
+	help
+	  The PLDM OEM component provides support for OEM-specific extensions to the Platform Level Data Model (PLDM). It allows manufacturers to implement custom features and functionalities that are not covered by the standard PLDM specification, enabling enhanced management and monitoring capabilities tailored to specific hardware platforms.
+endif

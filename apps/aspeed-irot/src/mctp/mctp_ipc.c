@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(mctp_ipc, LOG_LEVEL_INF);
 K_MSGQ_DEFINE(mctp_ipc_msgq_rx, sizeof(mctp_ipc_packet), 1, 4);
 K_MSGQ_DEFINE(mctp_ipc_msgq_tx, sizeof(mctp_ipc_packet), 1, 4);
 
-static uint16_t mctp_ipc_read(void *mctp_p, uint8_t *buf, uint32_t len,
+static uint32_t mctp_ipc_read(void *mctp_p, uint8_t *buf, uint32_t len,
 				mctp_ext_params *extra_data)
 {
 	mctp_ipc_packet pkt;
@@ -33,7 +33,7 @@ static uint16_t mctp_ipc_read(void *mctp_p, uint8_t *buf, uint32_t len,
 }
 
 
-static uint16_t mctp_ipc_write(void *mctp_p, uint8_t *buf, uint32_t len,
+static uint32_t mctp_ipc_write(void *mctp_p, uint8_t *buf, uint32_t len,
 				 mctp_ext_params extra_data)
 {
 	mctp_ipc_packet pkt;
@@ -57,7 +57,7 @@ uint8_t mctp_ipc_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
 
-	mctp_inst->max_msg_size = 4096;
+	mctp_inst->max_msg_size = 32768;
 	mctp_inst->medium_conf = medium_conf;
 	mctp_inst->read_data = mctp_ipc_read;
 	mctp_inst->write_data = mctp_ipc_write;
