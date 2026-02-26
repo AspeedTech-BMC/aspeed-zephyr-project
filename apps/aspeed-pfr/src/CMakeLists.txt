@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 # Generate aspeed-zephyr-project version header
-if (PFR_PROJECT_VERSION_MAJOR)
+if (DEFINED PFR_PROJECT_VERSION_MAJOR)
 set(ASPEED_ZEPHYR_PROJECT_TAG ${PFR_PROJECT_VERSION_MAJOR}.${PFR_PROJECT_VERSION_MINOR})
 else()
 execute_process(
