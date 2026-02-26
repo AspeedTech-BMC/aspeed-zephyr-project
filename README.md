@@ -17,12 +17,6 @@ west update
 west build -b ast2700_dcscm -p auto aspeed-zephyr-project/apps/aspeed-pfr
 ```
 
-## AST2700 DCSCM A0 board
-
-```
-west build -b ast2700a0_dcscm -p auto aspeed-zephyr-project/apps/aspeed-pfr
-```
-
 ## AST2600 DCSCM board
 
 ```
