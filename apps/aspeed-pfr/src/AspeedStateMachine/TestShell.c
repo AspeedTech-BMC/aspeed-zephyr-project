@@ -182,15 +182,39 @@ static int cmd_asm_flash_copy(const struct shell *shell, size_t argc,
 	return 0;
 }
 
+struct dev_map {
+	const char *name;
+	const struct device *dev;
+};
+
+static const struct dev_map dev_table[] = {
+	{"spi1@0", DEVICE_DT_GET(DT_NODELABEL(spi1_cs0))},
+#if defined(CONFIG_BMC_DUAL_FLASH)
+	{"spi1@1", DEVICE_DT_GET(DT_NODELABEL(spi1_cs1))},
+#endif
+	{"spi2@0", DEVICE_DT_GET(DT_NODELABEL(spi2_cs0))},
+#if defined(CONFIG_CPU_DUAL_FLASH)
+	{"spi2@1", DEVICE_DT_GET(DT_NODELABEL(spi2_cs1))},
+#endif
+};
+
 static int cmd_asm_flash_rebind(const struct shell *shell, size_t argc,
 			char **argv)
 {
+	int i;
+	const struct device *dev = NULL;
+
 	if (argc != 2) {
-		shell_print(shell, "asm flash_rebind spiN_csX");
+		shell_print(shell, "asm flash_rebind spiN@X");
 		return 0;
 	}
 
-	const struct device *dev = device_get_binding(argv[1]);
+	for (i = 0; i < ARRAY_SIZE(dev_table); i++) {
+		if (strcmp(argv[1], dev_table[i].name) == 0) {
+			dev = dev_table[i].dev;
+		}
+	}
+
 	if (dev == NULL) {
 		shell_print(shell, "Device %s not found", argv[1]);
 		return 0;
