@@ -847,7 +847,7 @@ int sli_init_r(struct ast_chip *chip)
 	struct sli_data ast2700_sli_data[1];
 	struct sli_data *data = ast2700_sli_data;
 	uint32_t reg_val;
-	int retry = 10;
+	int retry = 100;
 	bool sli0_ready = false;
 
 	if (IS_ENABLED(CONFIG_SLI_TARGET_PHYCLK_25MHZ) ||
