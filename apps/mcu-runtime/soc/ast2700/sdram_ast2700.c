@@ -991,8 +991,16 @@ static int sdramc_init_mpu(struct sdramc *sdramc)
                                 }
                                 break;
                         case NS_READONLY:
+                                if (id == MPU_ID_CA35) {
+                                        sys_write32(0x10, (uint32_t)&regs->region[i].ctrl);
+                                        break;
+                                }
                                 break;
                         case NS_WRITEONLY:
+                                if (id == MPU_ID_CA35) {
+                                        sys_write32(0x20, (uint32_t)&regs->region[i].ctrl);
+                                        break;
+                                }
                                 break;
                         default:
                                 break;
