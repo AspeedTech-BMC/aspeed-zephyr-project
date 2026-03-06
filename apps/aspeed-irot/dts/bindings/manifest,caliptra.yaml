@@ -1,0 +1,18 @@
+
+
+description: Caliptra SoC Manifest
+
+compatible: "manifest,caliptra"
+
+include: [base.yaml]
+
+properties:
+  firmware-device:
+    type: phandle
+    required: true
+  manifest-device:
+    type: phandle
+    required: true
+  manifest-offset:
+    type: int
+    required: true

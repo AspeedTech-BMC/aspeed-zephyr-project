@@ -1,0 +1,1 @@
+// #define MBEDTLS_ECDSA_VERIFY_ALT
