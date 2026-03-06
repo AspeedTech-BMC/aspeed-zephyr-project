@@ -17,4 +17,10 @@ target_sources(app
 
 	cptra/cptra_mbedtls.c
 	cptra/cptra_api.c
+
+	mctp/mctp.c
+	mctp/mctp_init.c
+	mctp/mctp_ctrl.c
+	mctp/mctp_ipc.c
+	mctp/hal_ipm.c
 )

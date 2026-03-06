@@ -14,6 +14,7 @@
 #include <state_machine/irot_fsm.h>
 #include <psp/loader.h>
 #include <image/caliptra_soc_manifest.h>
+#include <mctp_init.h>
 
 LOG_MODULE_REGISTER(irot_fsm, LOG_LEVEL_DBG);
 
@@ -89,6 +90,8 @@ static void do_init_entry(void *state)
 	reg_val = sys_read32(0x72c00714);
 	reg_val &= ~(BIT(13) | BIT(14)); // Clear bits 13 and 14 to enable memory region
 	sys_write32(reg_val, 0x72c00714);
+
+	mctp_init_app();
 
 	irot_send_event(INIT_DONE, NULL);
 }
