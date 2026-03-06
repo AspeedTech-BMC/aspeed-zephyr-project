@@ -1,0 +1,41 @@
+/ {
+	share_4: share-4 {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = < 0x0 >;
+		protect-name = "share-4";
+		protect-start = < 0x31580000 >;
+		protect-end = < 0x31880000 >;
+		allow = <MPU_ID_SSP_DATA S_READWRITE>, <MPU_ID_CA35 NS_READONLY>;
+		status = "okay";
+	};
+};
+
+&ca35_s {
+	allow = <MPU_ID_CA35 S_READWRITE>, < MPU_ID_SLIM S_READWRITE>, <MPU_ID_SSP_DATA S_READWRITE>;
+};
+
+// TODO: Sepreate SSP priovate memory and DMA buffer for protection.
+&ssp {
+	protect-start = <0x2c000000>;
+	protect-end = <0x30000000>;
+	allow = <MPU_ID_SSP_INST S_READONLY>,
+		<MPU_ID_SSP_DATA S_READWRITE>,
+		<MPU_ID_SLIM S_READWRITE>,
+		<MPU_ID_HMAC S_READWRITE>;
+	
+};
+
+&tsp {
+	status = "disabled";
+};
+
+&share_2 {
+	protect-start = <0x31480000>;
+	protect-end = <0x31580000>;
+	allow = <MPU_ID_SSP_DATA S_READONLY>, <MPU_ID_CA35 NS_READWRITE>;
+};
+
+&sdrammc {
+	mpus = < &ca35_s >, < &ssp >, < &share_1 >, < &share_2 >, < &share_3 >, < &vb >, <&share_4 >;
+};
+
