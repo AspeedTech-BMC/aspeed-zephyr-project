@@ -183,3 +183,15 @@ int ast_loader_init(struct ast_chip *chip)
 
 	return err;
 }
+
+int ast_loader_deinit(struct ast_chip *chip)
+{
+	struct ast_loader *loader = &g_loader;
+	struct ast_loader_ops *ops;
+
+	ops = ast_loader_get_ops(loader);
+	if (ops && ops->deinit)
+		return ops->deinit(loader->dev);
+
+	return 0;
+}

@@ -30,6 +30,7 @@ struct ast_loader_ops {
         int (*init)(struct device *dev);
         int (*copy)(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len);
         int (*load)(struct device *dev, uint32_t *dst, uint32_t *len);
+        int (*deinit)(struct device *dev);
 };
 
 struct ast_loader {
@@ -60,6 +61,7 @@ void *memcpy32(uint32_t *dst, uint32_t *src, uint32_t len);
 
 /* internal use */
 int ast_loader_init(struct ast_chip *chip);
+int ast_loader_deinit(struct ast_chip *chip);
 int stor_init(struct ast_loader *loader);
 int recovery_init(struct ast_loader *loader);
 
