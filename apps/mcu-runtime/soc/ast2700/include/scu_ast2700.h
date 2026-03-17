@@ -39,8 +39,14 @@
 #define SCU0_RST2_E2M1				BIT(11)
 #define SCU0_RST2_E2M0				BIT(10)
 #define SCU0_RST2_TSP				BIT(9)
-#define SCU0_RST2_USBB_VHUB			BIT(3)
-#define SCU0_RST2_USBA_VHUB			BIT(0)
+#define SCU0_RST2_USBB_EHCI_VHUB0		BIT(7)
+#define SCU0_RST2_USBA_EHCI_VHUB0		BIT(6)
+#define SCU0_RST2_USBB_XHCI			BIT(5)
+#define SCU0_RST2_USBB_PHY3			BIT(4)
+#define SCU0_RST2_USBB_VHUB1			BIT(3)
+#define SCU0_RST2_USBA_XHCI			BIT(2)
+#define SCU0_RST2_USBA_PHY3			BIT(1)
+#define SCU0_RST2_USBA_VHUB1			BIT(0)
 
 #define SCU0_VGA_FUNC_DAC_OUTPUT		GENMASK(11, 10)
 #define SCU0_VGA_FUNC_DP_OUTPUT			GENMASK(9, 8)
@@ -546,7 +552,7 @@ struct ast2700_scu0 {
 	uint32_t pinmux2;		/* 0x404 */
 	uint32_t pinmux3;		/* 0x408 */
 	uint32_t rsv_0x40c;		/* 0x40C */
-	uint32_t pinmux4;		/* 0x410 */
+	uint32_t usb_func_ctrl;		/* 0x410 */
 	uint32_t vga_func_ctrl;		/* 0x414 */
 	uint32_t rsv_0x418[2];	/* 0x418 */
 	uint32_t pinmux_lock0;	/* 0x420 */
