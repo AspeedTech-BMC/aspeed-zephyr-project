@@ -915,7 +915,7 @@ static int sdramc_init_mpu(struct sdramc *sdramc)
 		{MPU_ID_SSP_DATA, "ssp_d", 0x14, BIT(14)},
 		{MPU_ID_XDMA8,  "xdma8", 0x14, BIT(15)},
 		{MPU_ID_XDMA,   "xdma", 0x14, BIT(16)},
-		{MPU_ID_SDIO,   "sdio", 0x14, BIT(17)},
+		{MPU_ID_EMMC,   "emmc", 0x14, BIT(17)},
 		{MPU_ID_SLIM,   "slim", 0x14, BIT(19)},
 		{MPU_ID_USBH_A, "usbh_a", 0x14, BIT(24)},
 		{MPU_ID_USBH_B, "usbh_b", 0x14, BIT(25)},
