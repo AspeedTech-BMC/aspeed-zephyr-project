@@ -1237,16 +1237,16 @@ static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
 	hci->usb_fsm_state = IDLE;
 	hci->dfu_data.state = dfuIDLE;
 	hci->dfu_data.status = statusOK;
-	
+
 	/* Read usb_vhub_port again. */
 	reg = sys_read32(SCU1_HWSTRAP1);
 	hci->usb_vhub_port = FIELD_GET(SCU1_HWSTRAP1_RECOVERY_USB_PORT, reg);
 
 	/* Save this time DFU destination and max. length */
 	hci->dfu_dst_addr = dst;
-	
+
 	LOG_DBG("USB Recovery waiting for download on port %d\n", hci->usb_vhub_port);
-	
+
 	while (!hci->is_dnload_done) {
 		ret = usb_poll(hci);
 		if (ret) {
@@ -1259,9 +1259,36 @@ static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
 	return ret;
 }
 
+static int usb_deinit(struct device *dev)
+{
+	struct bootusb_priv *hci = dev->data;
+	struct usb_vhub_config *usb;
+
+	/* Select the usb configuration */
+	usb = &usb_cfg[hci->usb_vhub_port];
+
+	/* Revert SRAM access control to DRAM access control */
+	if (hci->usb_vhub_port == PORT_A || hci->usb_vhub_port == PORT_B)
+		clrbits_le32(usb->base + 0x800, BIT(4));
+	else if (hci->usb_vhub_port == PORT_C || hci->usb_vhub_port == PORT_D)
+		clrbits_le32(usb->base + 0x800, BIT(10) | BIT(5));
+
+	if (hci->usb_vhub_port == PORT_C && hci->usb_uart_enabled == true) {
+		/* If usb2uart enabled (Mode-0), just clock reset the vhub */
+		usb_clk_enable_reset(hci->usb_vhub_port);
+	} else {
+		/* Assert reset */
+		sys_write32(usb->reset_bits, usb->scu_reset);
+		/* Stop (gated) clock */
+		sys_write32(usb->clock_bits, usb->scu_clock_stop);
+	}
+	return 0;
+}
+
 static struct ast_loader_ops bootusb_ops = {
 	.init = usb_init,
 	.load = usb_load,
+	.deinit = usb_deinit,
 };
 
 int usb_register(struct ast_loader *loader)
