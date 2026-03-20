@@ -5,6 +5,7 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/drivers/flash.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/smf.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
@@ -14,6 +15,7 @@
 #include <state_machine/irot_fsm.h>
 #include <psp/loader.h>
 #include <image/caliptra_soc_manifest.h>
+#include <image/caliptra_soc_manifest_v1.h>
 #include <mctp_init.h>
 
 LOG_MODULE_REGISTER(irot_fsm, LOG_LEVEL_DBG);
@@ -106,12 +108,21 @@ static void do_verify_run(void *state)
 	LOG_DBG("iRoT FSM running VERIFY state");
 
 	// Get from bmc_pfm node in dts
-	const struct device *man_dev = device_get_binding("fmc@1");
-	const struct device *fmc_dev = device_get_binding("fmc@0");
-	size_t offset = 0;
+	const struct device *man_dev = NULL, *fmc_dev = NULL;
+	uint32_t offset = 0;
+	struct cptra_flash_header_v1 v1_header = { 0 };
 	int ret;
+	man_dev = device_get_binding("fmc@0");
+	if (man_dev != NULL && flash_read(man_dev, 0, &v1_header, sizeof(v1_header)) == 0 &&
+	    v1_header.magic == CPTRA_FLASH_HEADER_MAGIC) {
+		fmc_dev = man_dev;
+		ret = cptra_soc_manifest_v1_handler.verify_manifest(man_dev, fmc_dev, offset);
+	} else {
+		man_dev = device_get_binding("fmc@1");
+		fmc_dev = device_get_binding("fmc@0");
+		ret = cptra_soc_manifest_handler.verify_manifest(man_dev, fmc_dev, offset);
+	}
 	
-	ret = cptra_soc_manifest_handler.verify_manifest(man_dev, fmc_dev, offset);
 	if (ret == 0) {
 		LOG_INF("Manifest verification successful");
 		irot_send_event(VERIFY_DONE, NULL);
@@ -326,4 +337,3 @@ K_THREAD_DEFINE(irot_fsm_tid,
 		NULL, NULL, NULL,
 		5,
 		0, 0);
-

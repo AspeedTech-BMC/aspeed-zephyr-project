@@ -7,11 +7,10 @@
 #pragma once
 
 #include <stdint.h>
-#include <image/firmware_manifest.h>
+#include <image/caliptra_soc_manifest_common.h>
 
 /* Caliptra SOC Manifest Version 2 */
 #define CPTRA_MANIFEST_MARKER 0x324D5441 /* "2MTA" */
-#define AUTH_MANIFEST_IMAGE_METADATA_MAX_COUNT 127
 
 struct cptra_image_metadata_entry {
 	uint32_t image_identifier;
@@ -35,40 +34,6 @@ struct cptra_image_metadata_entry {
 struct cptra_image_metadata_collection {
 	uint32_t count;
 	struct cptra_image_metadata_entry entries[];
-} __attribute__((packed));
-
-struct cptra_ecc_pub_key {
-	uint8_t x[48];
-	uint8_t y[48];
-} __attribute__((packed));
-
-struct cptra_ecc_signature {
-	uint8_t r[48];
-	uint8_t s[48];
-} __attribute__((packed));
-
-struct cptra_pqc_pub_key {
-	union {
-		uint8_t data[2592];
-		struct {
-			uint32_t tree_type;
-			uint32_t ots_type;
-			uint8_t id[16];
-			uint8_t digest[24];
-		} lms;
-	}
-} __attribute__((packed));
-
-struct cptra_pqc_signature {
-	union{
-		uint8_t data[4628];
-		struct {
-			uint32_t q;
-			uint8_t ots[1252];
-			uint32_t tree_type;
-			uint8_t tree_path[360];
-		} lms_sig;
-	}
 } __attribute__((packed));
 
 struct cptra_soc_manifest_preamble_v2 {

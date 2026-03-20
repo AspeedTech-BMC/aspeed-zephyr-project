@@ -1702,16 +1702,16 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 	input.preamble.manifest_flags = 0;
 	input.metadata_entry_entry_count = 1;
 
-	LOG_DBG("manifest_size:0x%x", input.manifest_size);
-	LOG_DBG("manifest_marker:0x%x", input.preamble.manifest_marker);
-	LOG_DBG("preamble_size:0x%x", input.preamble.preamble_size);
-	LOG_DBG("metadata_entry_entry_count:0x%x", input.metadata_entry_entry_count);
+	LOG_INF("manifest_size:0x%x", input.manifest_size);
+	LOG_INF("manifest_marker:0x%x", input.preamble.manifest_marker);
+	LOG_INF("preamble_size:0x%x", input.preamble.preamble_size);
+	LOG_INF("metadata_entry_entry_count:0x%x", input.metadata_entry_entry_count);
 
 	memcpy(input.preamble.manifest_owner_ecc384_key, own_manifest_tv[0].raw, 48);
 	memcpy(input.preamble.manifest_owner_ecc384_key + 12, own_manifest_tv[0].raw + 48, 48);
 
 	/* Hash the manifest_version and manifest_flags */
-	LOG_DBG("Hashing manifest_version and manifest_flags");
+	LOG_INF("Hashing manifest_version and manifest_flags");
 	memset(hash, 0, sizeof(hash));
 	range = sizeof(input.preamble.manifest_version) + sizeof(input.preamble.manifest_flags) +
 		sizeof(input.preamble.manifest_vendor_ecc384_key) +
@@ -1723,13 +1723,13 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		goto end;
 	}
 #endif
-	LOG_HEXDUMP_DBG(hash, sizeof(hash), "Hash:");
+	LOG_HEXDUMP_INF(hash, sizeof(hash), "Hash:");
 	ret = memcmp(hash, vnd_manifest_tv[0].m, 48);
 	if (ret) {
 		LOG_ERR("Hash compare - FAIL");
 		goto end;
 	} else
-		LOG_DBG("Hash compare - PASS");
+		LOG_INF("Hash compare - PASS");
 
 	ret = memcmp(&input.preamble.manifest_version, vnd_manifest_tv[0].raw,
 		     range);
@@ -1737,9 +1737,9 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		LOG_ERR("Raw compare - FAIL");
 		goto end;
 	} else
-		LOG_DBG("Raw compare - PASS");
+		LOG_INF("Raw compare - PASS");
 
-	LOG_DBG("Populate manifest_vendor_ecc384_sig");
+	LOG_INF("Populate manifest_vendor_ecc384_sig");
 	/* Copy r and s into manifest_vendor_ecc384_sig */
 	memcpy(input.preamble.manifest_vendor_ecc384_sig, vnd_manifest_tv[0].r, 48);
 	memcpy(input.preamble.manifest_vendor_ecc384_sig + 12, vnd_manifest_tv[0].s, 48);
@@ -1757,15 +1757,15 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		*data = __builtin_bswap32(*data);
 	}
 
-	LOG_DBG("manifest_vendor_ecc384_sig addr: 0x%x 0x%x",
+	LOG_INF("manifest_vendor_ecc384_sig addr: 0x%x 0x%x",
 		(uint32_t)input.preamble.manifest_vendor_ecc384_sig,
 		(uint32_t)(input.preamble.manifest_vendor_ecc384_sig + 12));
-	LOG_HEXDUMP_DBG(input.preamble.manifest_vendor_ecc384_sig, 48, "r:");
-	LOG_HEXDUMP_DBG(input.preamble.manifest_vendor_ecc384_sig + 12, 48, "s:");
+	LOG_HEXDUMP_INF(input.preamble.manifest_vendor_ecc384_sig, 48, "r:");
+	LOG_HEXDUMP_INF(input.preamble.manifest_vendor_ecc384_sig + 12, 48, "s:");
 
-	LOG_DBG("Verify & Populate vendor signature successfully");
+	LOG_INF("Verify & Populate vendor signature successfully");
 
-	LOG_DBG("Hashing owner pub keys");
+	LOG_INF("Hashing owner pub keys");
 	memset(hash, 0, sizeof(hash));
 	range = sizeof(input.preamble.manifest_owner_ecc384_key) +
 		sizeof(input.preamble.manifest_owner_lms_key);
@@ -1777,13 +1777,13 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		goto end;
 	}
 #endif
-	LOG_HEXDUMP_DBG(hash, sizeof(hash), "Hash:");
+	LOG_HEXDUMP_INF(hash, sizeof(hash), "Hash:");
 	ret = memcmp(hash, own_manifest_tv[0].m, 48);
 	if (ret) {
 		LOG_ERR("Hash compare - FAIL");
 		goto end;
 	} else
-		LOG_DBG("Hash compare - PASS");
+		LOG_INF("Hash compare - PASS");
 
 	ret = memcmp(&input.preamble.manifest_owner_ecc384_key, own_manifest_tv[0].raw,
 		     range);
@@ -1791,9 +1791,9 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		LOG_ERR("Raw compare - FAIL");
 		goto end;
 	} else
-		LOG_DBG("Raw compare - PASS");
+		LOG_INF("Raw compare - PASS");
 
-	LOG_DBG("Populate manifest_owner_ecc384_sig");
+	LOG_INF("Populate manifest_owner_ecc384_sig");
 	/* Copy r and s into manifest_owner_ecc384_sig */
 	memcpy(input.preamble.manifest_owner_ecc384_sig, own_manifest_tv[0].r, 48);
 	memcpy(input.preamble.manifest_owner_ecc384_sig + 12, own_manifest_tv[0].s, 48);
@@ -1811,15 +1811,15 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		*data = __builtin_bswap32(*data);
 	}
 
-	LOG_DBG("manifest_owner_ecc384_sig addr: 0x%x 0x%x",
+	LOG_INF("manifest_owner_ecc384_sig addr: 0x%x 0x%x",
 		(uint32_t)input.preamble.manifest_owner_ecc384_sig,
 		(uint32_t)(input.preamble.manifest_owner_ecc384_sig + 12));
-	LOG_HEXDUMP_DBG(input.preamble.manifest_owner_ecc384_sig, 48, "r:");
-	LOG_HEXDUMP_DBG(input.preamble.manifest_owner_ecc384_sig + 12, 48, "s:");
+	LOG_HEXDUMP_INF(input.preamble.manifest_owner_ecc384_sig, 48, "r:");
+	LOG_HEXDUMP_INF(input.preamble.manifest_owner_ecc384_sig + 12, 48, "s:");
 
-	LOG_DBG("Verify & Populate owner signature successfully");
+	LOG_INF("Verify & Populate owner signature successfully");
 
-	LOG_DBG("Hashing metadata entries");
+	LOG_INF("Hashing metadata entries");
 	memset(hash, 0, sizeof(hash));
 	range = sizeof(input.metadata_entry_entry_count) +
 		sizeof(input.metadata_entries[0]);
@@ -1831,13 +1831,13 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		goto end;
 	}
 #endif
-	LOG_HEXDUMP_DBG(hash, sizeof(hash), "Hash:");
+	LOG_HEXDUMP_INF(hash, sizeof(hash), "Hash:");
 	ret = memcmp(hash, metadata_manifest_tv[0].m, 48);
 	if (ret) {
 		LOG_ERR("Hash compare - FAIL");
 		goto end;
 	} else
-		LOG_DBG("Hash compare - PASS");
+		LOG_INF("Hash compare - PASS");
 
 	ret = memcmp(&input.metadata_entry_entry_count, metadata_manifest_tv[0].raw,
 		     range);
@@ -1845,9 +1845,9 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		LOG_ERR("Raw compare - FAIL");
 		goto end;
 	} else
-		LOG_DBG("Raw compare - PASS");
+		LOG_INF("Raw compare - PASS");
 
-	LOG_DBG("Populate metadata_owner_ecc384_sig");
+	LOG_INF("Populate metadata_owner_ecc384_sig");
 	/* Copy r and s into metadata_owner_ecc384_sig */
 	memcpy(input.preamble.metadata_owner_ecc384_sig,
 	       metadata_manifest_tv[0].r, 48);
@@ -1867,12 +1867,12 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		*data = __builtin_bswap32(*data);
 	}
 
-	LOG_DBG("metadata_owner_ecc384_sig addr: 0x%x 0x%x",
+	LOG_INF("metadata_owner_ecc384_sig addr: 0x%x 0x%x",
 		(uint32_t)input.preamble.metadata_owner_ecc384_sig,
 		(uint32_t)(input.preamble.metadata_owner_ecc384_sig + 12));
-	LOG_HEXDUMP_DBG(input.preamble.metadata_owner_ecc384_sig, 48, "r:");
-	LOG_HEXDUMP_DBG(input.preamble.metadata_owner_ecc384_sig + 12, 48, "s:");
-	LOG_DBG("Verify & Populate metadata signature successfully");
+	LOG_HEXDUMP_INF(input.preamble.metadata_owner_ecc384_sig, 48, "r:");
+	LOG_HEXDUMP_INF(input.preamble.metadata_owner_ecc384_sig + 12, 48, "s:");
+	LOG_INF("Verify & Populate metadata signature successfully");
 
 #if CONFIG_CPTRA_SAMPLE_BOOTMCU
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
@@ -1889,9 +1889,9 @@ __attribute__((unused)) static void cptra_test_set_auth_manifest(void)
 		LOG_ERR("caliptra_set_auth_manifest is failure, ret:0x%x", ret);
 		goto end;
 	} else
-		LOG_DBG("caliptra_set_auth_manifest is successful");
+		LOG_INF("caliptra_set_auth_manifest is successful");
 
-	LOG_DBG("output: chksum:0x%x, fips_status:0x%x",
+	LOG_INF("output: chksum:0x%x, fips_status:0x%x",
 		output.chksum, output.fips_status);
 
 	LOG_INF("%s: Pass", __func__);
