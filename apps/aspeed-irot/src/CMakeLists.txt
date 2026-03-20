@@ -11,6 +11,7 @@ target_sources(app
 	state_machine/irot_fsm.c
 	state_machine/irot_shell.c
 	image/caliptra_soc_manifest.c
+	image/caliptra_soc_manifest_v1.c
 
 	cptra/cptra_sample.c
 	cptra/cptra_idevid.c

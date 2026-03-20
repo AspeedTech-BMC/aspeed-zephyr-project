@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include <cptra/cptra_api.h>
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/drivers/ipm.h>
@@ -343,4 +344,102 @@ int cptra_verify_lms(
 int cptra_get_cert_chain(void **cert_chain, size_t *cert_chain_size)
 {
 	return 0;
+}
+
+int cptra_set_auth_manifest(const struct cptra_set_auth_manifest_ia *input)
+{
+	struct cptra_set_auth_manifest_ia *input_buf;
+	struct cptra_set_auth_manifest_oa *output_buf;
+	int ret;
+
+	if (input == NULL) {
+		return -EINVAL;
+	}
+
+	input_buf = malloc(sizeof(*input_buf));
+	output_buf = malloc(sizeof(*output_buf));
+	if (input_buf == NULL || output_buf == NULL) {
+		free(input_buf);
+		free(output_buf);
+		return -ENOMEM;
+	}
+
+	memcpy(input_buf, input, sizeof(*input_buf));
+	memset(output_buf, 0, sizeof(*output_buf));
+
+	ret = cptra_ipc_transfer(CPTRA_IPCCMD_SET_AUTH_MANIFEST,
+				 input_buf, sizeof(*input_buf),
+				 CPTRA_IPC_RX_TYPE_EXTERNAL,
+				 output_buf, sizeof(*output_buf));
+	free(input_buf);
+	free(output_buf);
+	if (ret) {
+		LOG_ERR("set_auth_manifest failed, ret:0x%x", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+int cptra_authorize_and_stash(uint32_t fw_id, uint8_t digest[48], bool skip_stash)
+{
+	struct cptra_authorize_and_stash_ia *input;
+	struct cptra_authorize_and_stash_oa *output;
+	int ret;
+
+	LOG_INF("Caliptra IPC authorize_and_stash...");
+
+	input = malloc(sizeof(*input));
+	output = malloc(sizeof(*output));
+	if (input == NULL || output == NULL) {
+		free(input);
+		free(output);
+		return -ENOMEM;
+	}
+
+	memset(input, 0, sizeof(*input));
+	memset(output, 0, sizeof(*output));
+
+	memcpy(input->fw_id, &fw_id, sizeof(fw_id));
+	memcpy(input->measurement, digest, sizeof(input->measurement));
+	input->svn = 3;
+	input->flags = 0;
+	input->source = 0;
+
+	/* Set input data */
+	input->source = InRequest;
+	if (skip_stash) {
+		input->flags |= BIT(0); // SKIP_STASH
+	}
+
+	ret = cptra_ipc_transfer(CPTRA_IPCCMD_AUTHORIZE_AND_STASH,
+				 input, sizeof(*input),
+				 CPTRA_IPC_RX_TYPE_EXTERNAL,
+				 output, sizeof(*output));
+
+	if (ret) {
+		LOG_ERR("  Send IPC Caliptra authorize_and_stash is failure, ret:0x%x", ret);
+		goto out;
+	} else
+		LOG_DBG("  Send IPC Caliptra authorize_and_stash is successful");
+
+	LOG_DBG("  output: chksum=0x%x, fips_status=0x%x", output->chksum, output->fips_status);
+	LOG_DBG("  auth_req_result: 0x%x", output->auth_req_result);
+
+	if (output->auth_req_result != AUTHORIZE_IMAGE) {
+		LOG_ERR("  authorize image failed");
+		LOG_HEXDUMP_ERR(digest, sizeof(digest), "  Image digest");
+		ret = output->auth_req_result;
+		goto out;
+	}
+
+	LOG_INF("%s: Pass", __func__);
+	ret = 0;
+out:
+	free(input);
+	free(output);
+	if (ret) {
+		LOG_INF("%s: Failed", __func__);
+	}
+	return ret;
 }
