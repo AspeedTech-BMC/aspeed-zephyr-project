@@ -1,0 +1,180 @@
+&fmc {
+	status = "okay";
+};
+
+&fmc_cs0 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		slot0_partition: partition@0 {
+			label = "image-0";
+			reg = <0x0 0x100000>;
+		};
+		slot1_partition: partition@1 {
+		       label = "image-1";
+		       reg = <0x0 0x100000>;
+	       };
+	};
+};
+
+&i2c0 {
+	status = "okay";
+	label = "I2C_0";
+	clock-frequency = <1000000>;
+};
+
+&i2c1 {
+	status = "okay";
+	label = "I2C_1";
+};
+
+&i2c2 {
+	status = "okay";
+	label = "I2C_2";
+};
+
+&i2c3 {
+	status = "okay";
+	label = "I2C_3";
+};
+
+&i2c4 {
+	status = "okay";
+	label = "I2C_4";
+};
+
+&i2c5 {
+	status = "okay";
+	label = "I2C_5";
+};
+
+&i2c6 {
+	status = "okay";
+	label = "I2C_6";
+};
+
+&i2c7 {
+	status = "okay";
+	label = "I2C_7";
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&wdt1 {
+	status = "okay";
+};
+
+&wdt2 {
+	status = "okay";
+};
+
+&wdt3 {
+	status = "okay";
+};
+
+&wdt4 {
+	status = "okay";
+};
+
+/*
+ * i3c0-to-i3c1 Loopback:
+ * i3c0 plays the role as the bus controller
+ * i3c1 plays the rols as the target device
+ *
+ * In I3C shell command, the following devices will be found:
+ * i3c@7e7a2000 -> i3c0 controller
+ * i3cdev@7ec80011000 -> the i3c device attached to i3c0 controller
+ *
+ * i3c@7e7a2000 -> i3c1 controller
+ * i3c-tmq@7ec80011000 -> i3c target mqueue device
+ */
+// &i3c0 {
+// 	status = "okay";
+// 	label = "I3C_0";
+// 	sda-tx-hold-ns = <20>;
+// 	i3c-pp-scl-hi-period-ns = <250>;
+// 	i3c-pp-scl-lo-period-ns = <250>;
+//
+// 	assigned-address = <0x30>;
+//
+// 	i3cdev@7ec80011000 {
+// 		compatible = "i3c-dummy-device";
+// 		reg = <0x0 0x7ec 0x80011000>;
+// 		status = "okay";
+// 	};
+// };
+
+// &i3c1 {
+// 	secondary;
+// 	dcr = <0xcc>;
+// 	status = "okay";
+// 	label = "I3C_1";
+//
+// 	assigned-address = <0x31>;
+//
+// 	i3c-tmq@7ec80011000 {
+// 		compatible = "i3c-target-mqueue";
+// 		reg = <0x0 0x7ec 0x80011000>;
+// 		msg-size = <128>;
+// 		num-of-msgs = <4>;
+// 		mandatory-data-byte = <0xbf>;
+// 		status = "okay";
+// 	};
+// };
+
+&sgpiom {
+	status = "okay";
+	aspeed,bus-freq = <1000>;
+
+	sgpiom_a_d {
+		status = "okay";
+	};
+	sgpiom_e_h {
+		status = "okay";
+	};
+	sgpiom_i_l {
+		status = "okay";
+	};
+	sgpiom_m_p {
+		status = "okay";
+	};
+};
+
+&spi1 {
+	status = "okay";
+};
+
+&spi1_cs0 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+};
+
+&spi1_cs1 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+};
+
+&spi2 {
+	status = "okay";
+};
+
+&spi2_cs0 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+};
+
+&spi2_cs1 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+};
