@@ -68,7 +68,7 @@ static void lstp_usb_bulk_out(uint8_t ep, enum usb_dc_ep_cb_status_code ep_statu
 	usb_ep_read_wait(ep, usb_dev_data.rx_buf, sizeof(usb_dev_data.rx_buf), &bytes_read);
 	usb_ep_read_continue(ep);
 
-	LOG_HEXDUMP_DBG(usb_dev_data.rx_buf, bytes_read, "USB RX Packets");
+	LOG_HEXDUMP_DBG(usb_dev_data.rx_buf, (bytes_read > 64 ? 64 : bytes_read), "USB RX Packets");
 
 	if (bytes_read > 0) {
 		/* Route directly to LSTP core */
@@ -170,7 +170,7 @@ int lstp_usb_send(const uint8_t *data, size_t len)
 	uint32_t bytes_written;
 	int ret;
 
-	LOG_HEXDUMP_DBG(data, len, "USB TX Packets");
+	LOG_HEXDUMP_DBG(data, (len > 64 ? 64 : len), "USB TX Packets");
 
 	ret = usb_write(LSTP_IN_EP_ADDR, data, len, &bytes_written);
 	if (ret < 0) {

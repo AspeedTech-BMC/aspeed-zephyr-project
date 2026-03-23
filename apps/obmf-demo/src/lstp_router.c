@@ -14,7 +14,7 @@
 #include "lstp_usb.h"
 #include "lstp_task.h"
 
-LOG_MODULE_REGISTER(lstp_router, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(lstp_router, LOG_LEVEL_ERR);
 
 struct lstp_channel_state {
 	bool enabled;

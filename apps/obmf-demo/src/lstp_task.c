@@ -15,7 +15,7 @@
 #include "lstp_i2c.h"
 #include "lstp_spi.h"
 
-LOG_MODULE_REGISTER(lstp_task, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(lstp_task, LOG_LEVEL_ERR);
 
 #define LSTP_MSG_QUEUE_SIZE     4
 #define LSTP_IRQ_QUEUE_SIZE     8
@@ -47,7 +47,7 @@ static uint8_t _irq_states[LSTP_GPIO_NUM]; /* lstp_gpio_irq_config_t values */
  * ----------------------------------------------------------------------- */
 static void lstp_task_thread_main(void *, void *, void *);
 
-K_THREAD_DEFINE(lstp_task_id, 2048,
+K_THREAD_DEFINE(lstp_task_id, 8192,
 		lstp_task_thread_main, NULL, NULL, NULL,
 		K_PRIO_COOP(5), 0, 0);
 
@@ -407,18 +407,21 @@ static void lstp_task_thread_main(void *p1, void *p2, void *p3)
 				struct lstp_hdr *resp_hdr = (struct lstp_hdr *)resp_buf;
 				uint8_t *resp_payload = resp_buf + sizeof(struct lstp_hdr);
 				size_t resp_payload_len = 0;
+				bool send_response = true;
 
 				lstp_status_t status = lstp_spi_receive(
 					hdr->channel_id, hdr,
 					payload, payload_len,
-					resp_payload, &resp_payload_len);
+					resp_payload, &resp_payload_len,
+					&send_response);
+				if (send_response) {
+					resp_hdr->channel_id      = hdr->channel_id;
+					resp_hdr->cmd_status_code = (uint8_t)status | LSTP_RESPONSE_BIT;
+					resp_hdr->len_lsb = resp_payload_len & LSB_MASK;
+					resp_hdr->len_msb = (resp_payload_len >> BYTE1_SHIFT) & LSB_MASK;
 
-				resp_hdr->channel_id      = hdr->channel_id;
-				resp_hdr->cmd_status_code = (uint8_t)status | LSTP_RESPONSE_BIT;
-				resp_hdr->len_lsb = resp_payload_len & LSB_MASK;
-				resp_hdr->len_msb = (resp_payload_len >> BYTE1_SHIFT) & LSB_MASK;
-
-				resp_len = sizeof(struct lstp_hdr) + resp_payload_len;
+					resp_len = sizeof(struct lstp_hdr) + resp_payload_len;
+				}
 			} else if (hdr->channel_id == 2 /* I2C Channel */) {
 				/*
 				 * I2C transfers must run in thread context (blocking).

@@ -8,6 +8,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/usb/usb_device.h>
 #include "lstp_router.h"
+#include "lstp_spi.h"
 #include "lstp_task.h"
 #include "lstp_usb.h"
 
@@ -23,8 +24,13 @@ int main(void)
 	/* Initialize the background hardware task */
 	lstp_task_init();
 
+	int ret = lstp_spi_init();
+	if (ret != 0) {
+		LOG_ERR("Failed to initialize SPI SFDP cache: %d", ret);
+	}
+
 	/* Initialize the USB Subsystem for LSTP */
-	int ret = lstp_usb_init();
+	ret = lstp_usb_init();
 	if (ret != 0) {
 		LOG_ERR("Failed to initialize USB subsystem: %d", ret);
 		return ret;
