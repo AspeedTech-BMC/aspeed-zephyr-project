@@ -5219,7 +5219,9 @@ dwc_ddrphy_apb_wr(0xd0000, 0x0); // DWC_DDRPHYA_APBONLY0_MicroContMuxSel
 //  _read_1d_message_block_outputs_
 //}
 //This can be accomplished by issuing APB read commands to the DMEM addresses.
-dwc_ddrphy_phyinit_userCustom_H_readMsgBlock(0);
+err = dwc_ddrphy_phyinit_userCustom_H_readMsgBlock(0);
+if (err)
+	return err;
 
 //[dwc_ddrphy_phyinit_userCustom_H_readMsgBlock] End of dwc_ddrphy_phyinit_userCustom_H_readMsgBlock()
 //// 3.	Isolate the APB access from the internal CSRs by setting the MicroContMuxSel CSR to 1.

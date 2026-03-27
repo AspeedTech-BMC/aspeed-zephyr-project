@@ -481,7 +481,7 @@ struct train_bin {
 };
 
 void fpga_phy_init(struct sdramc *sdramc);
-void dwc_phy_init(struct sdramc *sdramc);
+int dwc_phy_init(struct sdramc *sdramc);
 bool is_ddr4(void);
 //void sdramc_mpu_enable(struct udevice *dev);
 int dram_init(struct ast_chip *chip);

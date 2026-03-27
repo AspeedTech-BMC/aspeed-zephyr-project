@@ -90,13 +90,9 @@ int dwc_ddrphy_phyinit_userCustom_H_readMsgBlock(int train2D)
 			LOG_DBG("%s: Training Failure index (0x%x)\n", __func__, message);
 		else
 			LOG_DBG("%s: DDR5 1D/2D Training Passed\n", __func__);
-
-		/* 3. Read ResultAddrOffset */
-		message = dwc_readMsgBlock(DWC_PHY_DDR5_MB_RESULT_ADR);
-		LOG_DBG("%s: Result Address Offset (0x%x)\n", __func__, message);
 	}
 
-	return 0;
+	return message;
 }
 
 void dwc_ddrphy_phyinit_userCustom_A_bringupPower(void)
@@ -258,8 +254,10 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 	return ret;
 }
 
-void dwc_phy_init(struct sdramc *sdramc)
+int dwc_phy_init(struct sdramc *sdramc)
 {
+	uint32_t err = -1;
+
 	// enable ddrphy free-run clock
 	sys_write32(SCU0_DDR_PHY_CLOCK, SCU0_CLOCK_STOP_CLR_REG);
 
@@ -270,4 +268,6 @@ void dwc_phy_init(struct sdramc *sdramc)
 		LOG_DBG("%s: Starting ddr5 training\n", __func__);
 		#include "dwc_ddrphy_phyinit_ddr5-3200-nodimm-train2D.c"
 	}
+
+	return err;
 }

@@ -368,13 +368,17 @@ static int sdramc_init(struct sdramc *sdramc, struct sdramc_ac_timing **ac)
 	return 0;
 }
 
-static void sdramc_phy_init(struct sdramc *sdramc, struct sdramc_ac_timing *ac)
+static int sdramc_phy_init(struct sdramc *sdramc, struct sdramc_ac_timing *ac)
 {
+	int err = -1;
+
 	/* initialize phy */
 	if (sdramc->fpga)
 		fpga_phy_init(sdramc);
 	else
-		dwc_phy_init(sdramc);
+		err = dwc_phy_init(sdramc);
+
+	return err;
 }
 
 static int sdramc_exit_self_refresh(struct sdramc *sdramc)
@@ -662,8 +666,14 @@ static int sdramc_bist(struct sdramc *sdramc, uint32_t addr, uint32_t size, uint
 	sys_write32(0x89abcdef, (uint32_t)&regs->bist_patt);
 	sys_write32(cfg | DRAMC_BISTCFG_START, (uint32_t)&regs->bistcfg);
 
-	while (!(sys_read32((uint32_t)&regs->intr_status) & DRAMC_IRQSTA_BIST_DONE))
+	while (!(sys_read32((uint32_t)&regs->intr_status) & DRAMC_IRQSTA_BIST_DONE) &&
+		timeout--)
 		;
+
+	if (timeout == 0) {
+		printf("bist timeout\n");
+		return 1;
+	}
 
 	sys_write32(DRAMC_IRQSTA_BIST_DONE, (uint32_t)&regs->intr_clear);
 
@@ -762,7 +772,7 @@ static int sdramc_ecc_enable(struct sdramc *sdramc)
 
 	/* Clean up all the dram for ECC redundant */
 	bistcfg = 0x82;
-	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 0x200000);
+	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 0x2000000);
 	if (err) {
 		printf("ecc bist failed\n");
 		return err;
@@ -1100,7 +1110,10 @@ int dram_init(struct ast_chip *chip)
 {
 	struct sdramc_ac_timing *ac;
 	uint32_t bistcfg;
-	int err = 0;
+	int err = -1;
+	int retry = 3;
+	uint32_t pll_para;
+	uint32_t wdt_swrst[5] = {0};
 
 	sdramc->chip = chip;
 	sdramc->regs = (struct sdramc_regs *)DRAMC_BASE;
@@ -1109,33 +1122,65 @@ int dram_init(struct ast_chip *chip)
 	if (is_ddr_initialized(sdramc))
 		goto out;
 
-	sdramc_unlock(sdramc);
+	while (err && retry--) {
+		sdramc_unlock(sdramc);
 
-	err = sdramc_init(sdramc, &ac);
-	if (err)
+		err = sdramc_init(sdramc, &ac);
+		if (err)
+			return err;
+
+		err = sdramc_phy_init(sdramc, ac);
+		if (err) {
+			pll_para = sys_read32(0x12c02310);
+			sys_write32(pll_para | BIT(24) | BIT(25), 0x12c02310);
+			sys_write32(pll_para | BIT(24), 0x12c02310);
+			sys_write32(pll_para, 0x12c02310);
+
+			while (!(sys_read32(0x12c02314) & BIT(31)))
+				;
+
+			for (int i = 0; i < 5; i++)
+				wdt_swrst[i] = sys_read32(0x14c37034 + i * 4);
+
+			sys_write32(0x2, 0x14c37034);
+			sys_write32(0x0, 0x14c37038);
+			sys_write32(0x0, 0x14c3703c);
+			sys_write32(0x0, 0x14c37040);
+			sys_write32(0x0, 0x14c37044);
+
+			sys_write32(0xaeedf123, 0x14c37030);
+			k_busy_wait(1000);
+
+			continue;
+		}
+
+		sdramc_exit_self_refresh(sdramc);
+
+		sdramc_configure_mrs(sdramc, ac);
+
+		sdramc_enable_refresh(sdramc);
+
+		sdramc_get_property(sdramc);
+
+		if (IS_ENABLED(CONFIG_ASPEED_DRAM_AES))
+			sdramc_aes_enable(sdramc, 0, 0x30000000);
+
+		bistcfg = FIELD_PREP(DRAMC_BISTCFG_PMODE, BIST_PMODE_CRC)
+			| FIELD_PREP(DRAMC_BISTCFG_BMODE, BIST_BMODE_RW_SWITCH)
+			| DRAMC_BISTCFG_ENABLE;
+
+		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
+		if (err)
+			printf("dram bist failed\n");
+
+	};
+
+	if (err && retry == 0) {
+		printf("%s init is failed\n", ac->desc);
 		return err;
-
-	sdramc_phy_init(sdramc, ac);
-
-	sdramc_exit_self_refresh(sdramc);
-
-	sdramc_configure_mrs(sdramc, ac);
-
-	sdramc_enable_refresh(sdramc);
-
-	sdramc_get_property(sdramc);
-
-	if (IS_ENABLED(CONFIG_ASPEED_DRAM_AES))
-		sdramc_aes_enable(sdramc, 0, 0x30000000);
-
-	bistcfg = FIELD_PREP(DRAMC_BISTCFG_PMODE, BIST_PMODE_CRC)
-		| FIELD_PREP(DRAMC_BISTCFG_BMODE, BIST_BMODE_RW_SWITCH)
-		| DRAMC_BISTCFG_ENABLE;
-
-	err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
-	if (err) {
-		printf("%s bist is failed\n", ac->desc);
-		return err;
+	} else if (retry < 2) {
+		for (int i = 0; i < 5; i++)
+			sys_write32(wdt_swrst[i], 0x14c37034 + i * 4);
 	}
 
 	sdramc_size_detect(sdramc);
