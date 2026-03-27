@@ -28,5 +28,8 @@ int extrst_mask_init(struct ast_chip *chip)
 		sys_write32(reg, (SCU1_REG + 0x2F4));
 	}
 
+	/* assert i2c scu reset */
+	sys_write32(BIT(15), (SCU1_REG + 0x220));
+
         return 0;
 }
