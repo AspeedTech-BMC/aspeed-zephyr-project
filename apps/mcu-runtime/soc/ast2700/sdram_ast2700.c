@@ -1106,21 +1106,53 @@ static void sdramc_qos_init(struct sdramc *sdramc)
                (uint32_t)&sdramc->regs->port[1].cfg);
 }
 
+void sdramc_pll_reset(struct sdramc *sdramc)
+{
+	uint32_t pll_para;
+
+	// mpll reset sequence
+	pll_para = sys_read32(0x12c02310);
+	sys_write32(pll_para | BIT(24) | BIT(25), 0x12c02310);
+	sys_write32(pll_para | BIT(24), 0x12c02310);
+	sys_write32(pll_para, 0x12c02310);
+
+	// wait for mpll lock
+	while (!(sys_read32(0x12c02314) & BIT(31)))
+		;
+
+	// wdt sw reset for dramc only
+	sys_write32(0x2, 0x14c37034);
+	sys_write32(0x0, 0x14c37038);
+	sys_write32(0x0, 0x14c3703c);
+	sys_write32(0x0, 0x14c37040);
+	sys_write32(0x0, 0x14c37044);
+
+	// kick wdt sw reset
+	sys_write32(0xaeedf123, 0x14c37030);
+	k_busy_wait(100000);
+}
+
 int dram_init(struct ast_chip *chip)
 {
 	struct sdramc_ac_timing *ac;
 	uint32_t bistcfg;
 	int err = -1;
 	int retry = 3;
-	uint32_t pll_para;
-	uint32_t wdt_swrst[5] = {0};
 
 	sdramc->chip = chip;
 	sdramc->regs = (struct sdramc_regs *)DRAMC_BASE;
 	sdramc->phy_regs = (uint32_t *)DRAMC_PHY_BASE;
 
+	// wait for mpll lock
+	while (!(sys_read32(0x12c02314) & BIT(31)))
+		;
+
 	if (is_ddr_initialized(sdramc))
 		goto out;
+
+	// save wdt reset mask
+	for (int i = 0; i < 5; i++)
+		sdramc->wdt_swrst[i] = sys_read32(0x14c37034 + i * 4);
 
 	while (err && retry--) {
 		sdramc_unlock(sdramc);
@@ -1131,26 +1163,7 @@ int dram_init(struct ast_chip *chip)
 
 		err = sdramc_phy_init(sdramc, ac);
 		if (err) {
-			pll_para = sys_read32(0x12c02310);
-			sys_write32(pll_para | BIT(24) | BIT(25), 0x12c02310);
-			sys_write32(pll_para | BIT(24), 0x12c02310);
-			sys_write32(pll_para, 0x12c02310);
-
-			while (!(sys_read32(0x12c02314) & BIT(31)))
-				;
-
-			for (int i = 0; i < 5; i++)
-				wdt_swrst[i] = sys_read32(0x14c37034 + i * 4);
-
-			sys_write32(0x2, 0x14c37034);
-			sys_write32(0x0, 0x14c37038);
-			sys_write32(0x0, 0x14c3703c);
-			sys_write32(0x0, 0x14c37040);
-			sys_write32(0x0, 0x14c37044);
-
-			sys_write32(0xaeedf123, 0x14c37030);
-			k_busy_wait(1000);
-
+			sdramc_pll_reset(sdramc);
 			continue;
 		}
 
@@ -1170,17 +1183,18 @@ int dram_init(struct ast_chip *chip)
 			| DRAMC_BISTCFG_ENABLE;
 
 		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
-		if (err)
-			printf("dram bist failed\n");
-
+		if (err) {
+			sdramc_pll_reset(sdramc);
+		}
 	};
 
 	if (err && retry == 0) {
 		printf("%s init is failed\n", ac->desc);
 		return err;
 	} else if (retry < 2) {
+		// restore wdt reset mask
 		for (int i = 0; i < 5; i++)
-			sys_write32(wdt_swrst[i], 0x14c37034 + i * 4);
+			sys_write32(sdramc->wdt_swrst[i], 0x14c37034 + i * 4);
 	}
 
 	sdramc_size_detect(sdramc);
