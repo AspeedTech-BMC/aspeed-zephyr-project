@@ -313,6 +313,7 @@ struct sdramc {
 
 	struct mpu_info mpu[MAX_MPU_COUNT];
 	int mpu_cnt;
+	uint32_t wdt_swrst[5];
 };
 
 struct sdramc_port {
