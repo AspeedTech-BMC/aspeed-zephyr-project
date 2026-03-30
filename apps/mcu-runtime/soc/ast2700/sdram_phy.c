@@ -172,9 +172,10 @@ void dwc_decode_streaming_message(void)
 #define DWC_PHY_MB_START_STREAM_MSG	0x8
 #define DWC_PHY_MB_TRAIN_SUCCESS	0x7
 #define DWC_PHY_MB_TRAIN_FAIL		0xff
-void dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
+int dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
 {
-	uint32_t message = 0, mail;
+	uint32_t message = 0, mail, timeout = 0x2000000;
+	int err = 0;
 
 	while (message != DWC_PHY_MB_TRAIN_SUCCESS && message != DWC_PHY_MB_TRAIN_FAIL) {
 		dwc_get_mailbox(0, &mail);
@@ -183,8 +184,18 @@ void dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
 		if (IS_ENABLED(CONFIG_ASPEED_PHY_TRAINING_MESSAGE)) {
 			if (message == DWC_PHY_MB_START_STREAM_MSG)
 				dwc_decode_streaming_message();
+
+			continue;
+		}
+
+		if (timeout-- == 0) {
+			printf("Cooooooooool phy wait fw done timeout\n");
+			err = -1;
+			break;
 		}
 	}
+
+	return err;
 }
 
 void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
@@ -257,9 +268,6 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 int dwc_phy_init(struct sdramc *sdramc)
 {
 	uint32_t err = -1;
-
-	// enable ddrphy free-run clock
-	sys_write32(SCU0_DDR_PHY_CLOCK, SCU0_CLOCK_STOP_CLR_REG);
 
 	if (is_ddr4()) {
 		LOG_DBG("%s: Starting ddr4 training\n", __func__);
