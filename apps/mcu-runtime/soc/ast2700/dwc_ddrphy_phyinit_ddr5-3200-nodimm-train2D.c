@@ -5185,7 +5185,10 @@ dwc_ddrphy_apb_wr(0xd0099, 0x0); // DWC_DDRPHYA_APBONLY0_MicroReset
 //
 //// 3.   Wait for the training firmware to complete by following the procedure in "uCtrl Initialization and Mailbox Messaging"
 //// 4.3.7  3.   Wait for the training firmware to complete.  Implement timeout function or follow the procedure in "3.4 Running the firmware" of the Training Firmware Application Note to poll the Mailbox message.
-dwc_ddrphy_phyinit_userCustom_G_waitFwDone();
+err = dwc_ddrphy_phyinit_userCustom_G_waitFwDone();
+if (err)
+	return err;
+
 
 //// [dwc_ddrphy_phyinit_userCustom_G_waitFwDone] End of dwc_ddrphy_phyinit_userCustom_G_waitFwDone()
 //// 4.   Halt the microcontroller."
