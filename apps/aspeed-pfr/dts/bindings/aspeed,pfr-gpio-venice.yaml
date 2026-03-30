@@ -1,7 +1,7 @@
 # Copyright (c) 2026 ASPEED Technology Inc.
 # SPDX-License-Identifier: MIT
 
-description:|
+description: |
     This binding provides gpio required to support amd venice platform.
 
 compatible: "aspeed,pfr-gpio-venice"
