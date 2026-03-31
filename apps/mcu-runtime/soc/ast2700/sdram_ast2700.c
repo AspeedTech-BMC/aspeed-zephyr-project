@@ -672,7 +672,7 @@ static int sdramc_bist(struct sdramc *sdramc, uint32_t addr, uint32_t size, uint
 
 	if (timeout == 0) {
 		printf("bist timeout\n");
-		return 1;
+		return 0xff;
 	}
 
 	sys_write32(DRAMC_IRQSTA_BIST_DONE, (uint32_t)&regs->intr_clear);
@@ -1180,10 +1180,8 @@ int dram_init(struct ast_chip *chip)
 			return err;
 
 		err = sdramc_phy_init(sdramc, ac);
-		if (err) {
-			printf("%s phy init failed, retrying...%d\n", ac->desc, 3 - retry);
+		if (err)
 			continue;
-		}
 
 		sdramc_exit_self_refresh(sdramc);
 
@@ -1201,13 +1199,10 @@ int dram_init(struct ast_chip *chip)
 			| DRAMC_BISTCFG_ENABLE;
 
 		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
-		if (err) {
-			printf("%s bist failed, retrying...%d\n", ac->desc, 3 - retry);
-		}
 	};
 
 	if (err && retry == 0) {
-		printf("%s init is failed\n", ac->desc);
+		printf("%s init is failed(%d)\n", ac->desc, err);
 		return err;
 	}
 
