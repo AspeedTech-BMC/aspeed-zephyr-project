@@ -1181,7 +1181,7 @@ int dram_init(struct ast_chip *chip)
 
 		err = sdramc_phy_init(sdramc, ac);
 		if (err) {
-			printf("Cooooooooooooool phy init failed, retrying...%d\n", 3 - retry);
+			printf("%s phy init failed, retrying...%d\n", ac->desc, 3 - retry);
 			continue;
 		}
 
@@ -1202,7 +1202,7 @@ int dram_init(struct ast_chip *chip)
 
 		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
 		if (err) {
-			printf("Cooooooooooooooool bist failed, retrying...%d\n", 3 - retry);
+			printf("%s bist failed, retrying...%d\n", ac->desc, 3 - retry);
 		}
 	};
 
