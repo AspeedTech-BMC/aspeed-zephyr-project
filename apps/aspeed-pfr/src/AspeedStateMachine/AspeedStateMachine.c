@@ -871,7 +871,7 @@ void handle_recovery(void *o)
 	int ret;
 	EVENT_CONTEXT evt_wrap;
 	CPLD_STATUS cpld_update_status, cached_status;
-	uint8_t region_index = INVALID_REGION_INDEX;
+	uint8_t region_index_map = 0;
 
 	initializeEngines();
 	initializeManifestProcessor();
@@ -886,10 +886,10 @@ void handle_recovery(void *o)
 	case ATTESTATION_FAILED:
 		if (evt_ctx->data.bit8[0] == 0 || evt_ctx->data.bit8[0] == 1) {
 			state->pch_active_object.ActiveImageStatus = Failure;
-			region_index = PCH_REGION;
+			region_index_map |= BIT(PCH_REGION);
 		} else if (evt_ctx->data.bit8[0] == 2) {
 			state->bmc_active_object.ActiveImageStatus = Failure;
-			region_index = BMC_REGION;
+			region_index_map |= BIT(BMC_REGION);
 		}
 		__attribute__((fallthrough));
 #endif
@@ -901,13 +901,13 @@ void handle_recovery(void *o)
 #if defined(CONFIG_BMC_CHECKPOINT_RECOVERY)
 			if (evt_ctx->data.bit8[0] == BMC_EVENT) {
 				state->bmc_active_object.ActiveImageStatus = Failure;
-				region_index = BMC_REGION;
+				region_index_map |= BIT(BMC_REGION);
 			}
 #endif
 #if defined(CONFIG_PCH_CHECKPOINT_RECOVERY)
 			if (evt_ctx->data.bit8[0] == PCH_EVENT) {
 				state->pch_active_object.ActiveImageStatus = Failure;
-				region_index = PCH_REGION;
+				region_index_map |= BIT(PCH_REGION);
 			}
 #endif
 		}
@@ -947,7 +947,7 @@ void handle_recovery(void *o)
 			if (evt_ctx->event == WDT_TIMEOUT)
 				inc_recovery_level(BMC_SPI);
 #endif
-			region_index = BMC_REGION;
+			region_index_map |= BIT(BMC_REGION);
 		}
 
 		if (state->pch_active_object.RecoveryImageStatus == Failure) {
@@ -969,7 +969,7 @@ void handle_recovery(void *o)
 			if (evt_ctx->event == WDT_TIMEOUT)
 				inc_recovery_level(PCH_SPI);
 #endif
-			region_index = PCH_REGION;
+			region_index_map |= BIT(PCH_REGION);
 		}
 
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
@@ -988,7 +988,7 @@ void handle_recovery(void *o)
 			/* Even if AFM recovery failed, the BMC/PCH are still allow to boot,
 			 * but the attestation service will be disabled. */
 			recovery_done = 1;
-			region_index  = AFM_REGION;
+			region_index_map |= BIT(AFM_REGION);
 		}
 #endif
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
@@ -1008,7 +1008,13 @@ void handle_recovery(void *o)
 		break;
 	}
 
-	clear_pending_recovery_update(&cpld_update_status, region_index);
+	LOG_INF("region_index_map = %x", region_index_map);
+	if (region_index_map) {
+		for (int i = 0; i < ARRAY_SIZE(cpld_update_status.Region); i++) {
+			if (BIT(i) & region_index_map)
+				clear_pending_recovery_update(&cpld_update_status, i);
+		}
+	}
 	if (memcmp(&cached_status, &cpld_update_status, sizeof(CPLD_STATUS))) {
 		ufm_write(UPDATE_STATUS_UFM, UPDATE_STATUS_ADDRESS, (uint8_t *)&cpld_update_status, sizeof(CPLD_STATUS));
 	}
