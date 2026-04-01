@@ -1157,7 +1157,7 @@ void sdramc_postset(struct sdramc *sdramc)
 
 int dram_init(struct ast_chip *chip)
 {
-	struct sdramc_ac_timing *ac;
+	struct sdramc_ac_timing *ac = NULL;
 	uint32_t bistcfg;
 	int err = -1;
 	int retry = 3;
@@ -1167,12 +1167,11 @@ int dram_init(struct ast_chip *chip)
 	sdramc->phy_regs = (uint32_t *)DRAMC_PHY_BASE;
 
 	if (is_ddr_initialized(sdramc))
-		goto out;
+		return 0;
 
-	while (err && retry--) {
+	while (retry--) {
 
 		sdramc_preset(sdramc);
-
 		sdramc_unlock(sdramc);
 
 		err = sdramc_init(sdramc, &ac);
@@ -1184,11 +1183,8 @@ int dram_init(struct ast_chip *chip)
 			continue;
 
 		sdramc_exit_self_refresh(sdramc);
-
 		sdramc_configure_mrs(sdramc, ac);
-
 		sdramc_enable_refresh(sdramc);
-
 		sdramc_get_property(sdramc);
 
 		if (IS_ENABLED(CONFIG_ASPEED_DRAM_AES))
@@ -1199,17 +1195,18 @@ int dram_init(struct ast_chip *chip)
 			| DRAMC_BISTCFG_ENABLE;
 
 		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
+		if (!err)
+			break;
 	};
 
-	if (err && retry == 0) {
-		printf("%s init is failed(%d)\n", ac->desc, err);
+	if (err) {
+		printf("%s init is failed, err=%d\n",
+			ac ? ac->desc : "unknow", err);
 		return err;
 	}
 
 	sdramc_postset(sdramc);
-
 	sdramc_size_detect(sdramc);
-
 	sdramc_ecc_enable(sdramc);
 
 	sdramc_init_mpu(sdramc);
@@ -1219,8 +1216,6 @@ int dram_init(struct ast_chip *chip)
 
 	LOG_DBG("%s is successfully initialized\n", ac->desc);
 	sdramc_set_flag(DRAMC_INIT_DONE);
-
-out:
 
 	return 0;
 }
