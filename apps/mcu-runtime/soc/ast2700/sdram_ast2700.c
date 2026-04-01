@@ -657,38 +657,36 @@ static int sdramc_bist(struct sdramc *sdramc, uint32_t addr, uint32_t size, uint
 {
 	struct sdramc_regs *regs = sdramc->regs;
 	uint32_t val;
-	uint32_t err = 0;
 
 	sys_write32(0, (uint32_t)&regs->bistcfg);
 	sys_write32(cfg, (uint32_t)&regs->bistcfg);
 	sys_write32(addr >> 4, (uint32_t)&regs->bist_addr);
 	sys_write32(size, (uint32_t)&regs->bist_size);
 	sys_write32(0x89abcdef, (uint32_t)&regs->bist_patt);
+
+	/* Start BIST */
 	sys_write32(cfg | DRAMC_BISTCFG_START, (uint32_t)&regs->bistcfg);
 
-	while (!(sys_read32((uint32_t)&regs->intr_status) & DRAMC_IRQSTA_BIST_DONE) &&
-		timeout--)
-		;
-
-	if (timeout == 0) {
-		printf("bist timeout\n");
-		return 0xff;
+	/* Wait for BIST done or timeout */
+	while (!(sys_read32((uint32_t)&regs->intr_status) &
+		 DRAMC_IRQSTA_BIST_DONE)) {
+		if (!timeout--)
+			return -ETIMEDOUT;
 	}
 
+	/* Clear BIST done interrupt */
 	sys_write32(DRAMC_IRQSTA_BIST_DONE, (uint32_t)&regs->intr_clear);
 
 	val = sys_read32((uint32_t)&regs->bist_res);
 
-	/* bist done */
-	if (val & DRAMC_BISTRES_DONE) {
-		/* bist pass [9]=0 */
-		if (val & DRAMC_BISTRES_FAIL)
-			err++;
-	} else {
-		err++;
-	}
+	/* Check BIST result */
+	if (!(val & DRAMC_BISTRES_DONE))
+		return -EIO;
 
-	return err;
+	if (val & DRAMC_BISTRES_FAIL)
+		return -EIO;
+
+	return 0;
 }
 
 static void sdramc_aes_enable(struct sdramc *sdramc, uint32_t addr_min, uint32_t addr_max)
