@@ -174,28 +174,30 @@ void dwc_decode_streaming_message(void)
 #define DWC_PHY_MB_TRAIN_FAIL		0xff
 int dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
 {
-	uint32_t message = 0, mail, timeout = 0x2000000;
-	int err = 0;
+	uint32_t mail;
+	uint32_t message = 0;
+	uint32_t timeout_ms = 6000;
 
-	while (message != DWC_PHY_MB_TRAIN_SUCCESS && message != DWC_PHY_MB_TRAIN_FAIL) {
+	while (timeout_ms--) {
+
 		dwc_get_mailbox(0, &mail);
-		message = mail & 0xffff;
+		message = mail & 0xFFFF;
 
-		if (IS_ENABLED(CONFIG_ASPEED_PHY_TRAINING_MESSAGE)) {
-			if (message == DWC_PHY_MB_START_STREAM_MSG)
-				dwc_decode_streaming_message();
+		/* Training completed */
+		if (message == DWC_PHY_MB_TRAIN_SUCCESS)
+			return 0;
 
-			continue;
-		}
+		if (message == DWC_PHY_MB_TRAIN_FAIL)
+			return -EIO;
 
-		if (timeout-- == 0) {
-			printf("Cooooooooool phy wait fw done timeout\n");
-			err = -1;
-			break;
-		}
+		if (IS_ENABLED(CONFIG_ASPEED_PHY_TRAINING_MESSAGE) && message == DWC_PHY_MB_START_STREAM_MSG)
+			dwc_decode_streaming_message();
+
+		/* wait 1 ms */
+		k_busy_wait(1000);
 	}
 
-	return err;
+	return -ETIMEDOUT;
 }
 
 void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
