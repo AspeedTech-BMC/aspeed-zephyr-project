@@ -1723,6 +1723,15 @@ void handle_update_requested(void *o)
 		if (ret != Success) {
 			clear_pending_recovery_update(&cpld_update_status, region_index);
 			GenerateStateMachineEvent(UPDATE_FAILED, evt_ctx->data.ptr);
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+#if defined (CONFIG_INTEL_PFR)
+			/* If AFM update fails, clear AFM pending status to
+			 * stop immediate chained retries
+			 */
+			if (image_type == AFM_TYPE)
+				AfmStatus = 0;
+#endif
+#endif
 		}
 	}
 
