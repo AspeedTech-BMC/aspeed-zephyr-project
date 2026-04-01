@@ -672,6 +672,8 @@ static int sdramc_bist(struct sdramc *sdramc, uint32_t addr, uint32_t size, uint
 		 DRAMC_IRQSTA_BIST_DONE)) {
 		if (!timeout--)
 			return -ETIMEDOUT;
+
+		k_busy_wait(1000); /* wait 1ms */
 	}
 
 	/* Clear BIST done interrupt */
@@ -770,9 +772,9 @@ static int sdramc_ecc_enable(struct sdramc *sdramc)
 
 	/* Clean up all the dram for ECC redundant */
 	bistcfg = 0x82;
-	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 0x2000000);
+	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 5000);
 	if (err) {
-		printf("ecc bist failed\n");
+		printf("ecc bist failed, err=%d\n", err);
 		return err;
 	}
 
@@ -1192,7 +1194,7 @@ int dram_init(struct ast_chip *chip)
 			| FIELD_PREP(DRAMC_BISTCFG_BMODE, BIST_BMODE_RW_SWITCH)
 			| DRAMC_BISTCFG_ENABLE;
 
-		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 0x200000);
+		err = sdramc_bist(sdramc, 0, 0x10000, bistcfg, 1000);
 		if (!err)
 			break;
 	};
