@@ -246,7 +246,7 @@ static void pldm_status_reset()
 
 static void exit_update_mode()
 {
-	printk("PLDM update mode timeout, exiting update mode...\n");
+	LOG_ERR("PLDM update mode timeout, exiting update mode...");
 	pldm_status_reset();
 }
 
@@ -416,6 +416,7 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 
 	uint32_t last_offset = 0xFFFFFFFF;
 	uint8_t retry_count = 0;
+	uint32_t previous_remaining_mb = UINT32_MAX;
 
 	// uint8_t *resp_buf = (uint8_t *)malloc(4096);
 	resp_buf = (uint8_t *)malloc(MAX_FWUPDATE_RSP_BUF_SIZE + 24);
@@ -505,13 +506,16 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 		update_param.data_len = expect_len;
 		update_param.data_ofs = req.offset;
 
-		uint8_t percent = ((update_param.data_ofs + update_param.data_len) * 100) /
-				  update_param.fw_update_cfg.image_size;
+		uint32_t loaded_size = update_param.data_ofs + update_param.data_len;
+		uint32_t remaining_size = update_param.fw_update_cfg.image_size - loaded_size;
+		uint32_t remaining_mb = (remaining_size + (1024 * 1024) - 1) / (1024 * 1024);
+		uint32_t total_mb =
+			(update_param.fw_update_cfg.image_size + (1024 * 1024) - 1) /
+			(1024 * 1024);
 
-		static uint8_t previous_percent = 0;
-		if (previous_percent + 9 < percent) {
-			LOG_INF("package loaded: %d%%", percent);
-			previous_percent = percent;
+		if (previous_remaining_mb != remaining_mb) {
+			LOG_INF("package remaining: %u/%u MB", remaining_mb, total_mb);
+			previous_remaining_mb = remaining_mb;
 		}
 
 		if (fw_info->update_func(&update_param)) {
@@ -550,19 +554,19 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 	}
 
 	LOG_INF("Verify complete %d", verify_result);
-	if (report_tranfer(mctp_p, ext_params, PLDM_FW_UPDATE_VERIFY_SUCCESS)) {
+	if (report_tranfer(mctp_p, ext_params, verify_result) && verify_result != PLDM_FW_UPDATE_VERIFY_SUCCESS) {
 		report_tranfer(mctp_p, ext_params, PLDM_FW_UPDATE_GENERIC_ERROR);
 		cur_aux_state = STATE_AUX_FAILED;
 		goto exit;
 	}
 	state_update(STATE_APPLY);
 
-	LOG_INF("Apply complete");
-
 	uint8_t apply_result = PLDM_FW_UPDATE_APPLY_SUCCESS;
 	if (fw_info->self_apply_work_func != NULL) {
 		apply_result = fw_info->self_apply_work_func(fw_info->self_apply_work_arg);
 	}
+
+	LOG_INF("Apply complete %d", apply_result);
 
 	if (report_tranfer(mctp_p, ext_params, apply_result)) {
 		report_tranfer(mctp_p, ext_params, PLDM_FW_UPDATE_GENERIC_ERROR);
@@ -1390,4 +1394,3 @@ uint8_t fill_descriptor_into_buf(struct pldm_descriptor_string *descriptor, uint
 	*fill_length = descriptor_count;
 	return PLDM_SUCCESS;
 }
-

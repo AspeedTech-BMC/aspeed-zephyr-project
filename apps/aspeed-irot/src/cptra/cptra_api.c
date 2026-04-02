@@ -427,8 +427,8 @@ int cptra_authorize_and_stash(uint32_t fw_id, uint8_t digest[48], bool skip_stas
 	LOG_DBG("  auth_req_result: 0x%x", output->auth_req_result);
 
 	if (output->auth_req_result != AUTHORIZE_IMAGE) {
-		LOG_ERR("  authorize image failed");
-		LOG_HEXDUMP_ERR(digest, sizeof(digest), "  Image digest");
+		LOG_ERR("  authorize image failed, auth_req_result: 0x%x", output->auth_req_result);
+		LOG_HEXDUMP_ERR(digest, 48, "  Image digest");
 		ret = output->auth_req_result;
 		goto out;
 	}
@@ -443,3 +443,4 @@ out:
 	}
 	return ret;
 }
+

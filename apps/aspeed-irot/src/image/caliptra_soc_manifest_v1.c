@@ -129,7 +129,8 @@ static int cptra_fill_set_auth_manifest_input_v1(
 	       sizeof(input->preamble.metadata_owner_ecc384_sig));
 	memcpy(input->preamble.metadata_owner_LMS_sig, &temp_preamble->owner_imc_lms_signature,
 	       sizeof(input->preamble.metadata_owner_LMS_sig));
-	memcpy(input->metadata_entries, imc->entries, imc->count * sizeof(struct cptra_manifest_ime));
+	memcpy(input->metadata_entries, imc->entries,
+	       AUTH_MANIFEST_IMAGE_METADATA_MAX_COUNT * sizeof(struct cptra_manifest_ime));
 
 	free(temp_preamble);
 
@@ -149,6 +150,7 @@ static int cptra_set_auth_manifest_v1(const struct cptra_soc_manifest_preamble_v
 
 	ret = cptra_fill_set_auth_manifest_input_v1(input, manifest_preamble, imc);
 	if (ret) {
+		LOG_ERR("Failed to fill set_auth_manifest input structure");
 		free(input);
 		return ret;
 	}
@@ -284,8 +286,7 @@ static int cptra_check_bundle_image_integrity_v1(const uint8_t *bundle, size_t b
 		LOG_ERR("Image digest mismatch for fw_id=0x%08X", entry->firmware_id);
 		LOG_HEXDUMP_ERR(digest, 48, "Digested:");
 		LOG_HEXDUMP_ERR(entry->digest, 48, "Expected:");
-		LOG_WRN("Continuing with authorization even though integrity check failed");
-		// return -EACCES;
+		return -EACCES;
 	}
 
 	return 0;
@@ -305,7 +306,7 @@ static int cptra_authorize_bundle_image_v1(const uint8_t *bundle, size_t bundle_
 
 	ret = cptra_authorize_and_stash(entry->firmware_id, digest, true);
 	if (ret) {
-		LOG_ERR("Caliptra authorization failed for fw_id=0x%08X ret=%d",
+		LOG_ERR("Caliptra authorization failed for fw_id=0x%08X ret=%08X",
 			entry->firmware_id, ret);
 		return -EACCES;
 	}
@@ -363,16 +364,8 @@ int cptra_validate_bundle_v1(const uint8_t *bundle, size_t bundle_size)
 	ret = cptra_set_auth_manifest_v1(manifest_preamble, imc);
 	if (ret) {
 		LOG_ERR("set_auth_manifest failed");
-		ret = 0;
-		// return ret;
+		return ret;
 	}
-
-//	ret = cptra_verify_manifest_imc_signature_v1(manifest_preamble, imc);
-//	if (ret) {
-//		LOG_ERR("Manifest IMC signature verification failed");
-//		ret = 0; /* Continue to check individual image integrity even if signature verification fails */
-//		// return ret;
-//	}
 
 	for (uint32_t i = 0; i < imc->count; i++) {
 		const struct cptra_image_metadata_entry_v1 *entry = &imc->entries[i];
@@ -471,15 +464,15 @@ static int load_image(const struct device *firmware_device,
 		LOG_ERR("Digest mismatch for fw_id=0x%08X", firmware_id);
 		LOG_HEXDUMP_ERR(calculated_digest, 48, "Calculated:");
 		LOG_HEXDUMP_ERR(expect_digest, 48, "Expected:");
-		// ret = -EACCES;
-		// goto err;
+		ret = -EACCES;
+		goto err;
 	}
 
 	ret = cptra_authorize_and_stash(firmware_id, calculated_digest, false);
 	if (ret) {
 		LOG_ERR("Image authorization failed, ret: %d", ret);
-		// ret = -EACCES;
-		// goto err;
+		ret = -EACCES;
+		goto err;
 	}
 
 	ret = 0;
@@ -503,8 +496,7 @@ int cptra_verify_manifest_v1(
 	ret = cptra_verify_manifest_imc_signature_v1(manifest_preamble, imc);
 	if (ret) {
 		LOG_ERR("Manifest IMC signature verification failed");
-		ret = 0;
-		// return ret;
+		return ret;
 	}
 
 	for (uint32_t i = 0; i < imc->count; i++) {
