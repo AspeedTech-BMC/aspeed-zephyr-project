@@ -246,8 +246,7 @@ static uint8_t pldm_msg_timeout_check(sys_slist_t *list, struct k_mutex *mutex)
 		wait_msg *p = (wait_msg *)node;
 
 		if ((p->exp_to_ms <= cur_uptime)) {
-			printk("pldm msg timeout!!\n");
-			printk("cmd %x, inst_id %x\n", p->msg.hdr.cmd, p->msg.hdr.inst_id);
+			LOG_ERR("PLDM msg timeout! cmd %x inst_id %x uptime %lld, exp_to_ms %lld", p->msg.hdr.cmd, p->msg.hdr.inst_id, cur_uptime, p->exp_to_ms);
 			sys_slist_remove(list, pre_node, node);
 
 			if (unregister_instid(p->mctp_inst, p->msg.hdr.inst_id) == false) {
