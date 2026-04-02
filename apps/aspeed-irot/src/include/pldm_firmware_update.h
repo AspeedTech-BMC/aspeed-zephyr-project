@@ -216,6 +216,10 @@ enum pldm_firmware_update_transfer_result_values {
  */
 enum pldm_firmware_update_verify_result_values {
 	PLDM_FW_UPDATE_VERIFY_SUCCESS = 0x00,
+	PLDM_FW_UPDATE_VERIFY_COMPLETE_WITH_VERIFICATION_FAILURE = 0x01,
+	PLDM_FW_UPDATE_VERIFY_COMPLETE_WITH_ERROR_AS_VERSIION_MISMATCH = 0x02,
+	PLDM_FW_UPDATE_VERIFY_COMPLETE_WITH_ERROR_FD_SECURITY_VIOLATION = 0x03,
+	PLDM_FW_UPDATE_VERIFY_COMPLETE_WITH_TRANSFERRED_DATA_CORRUPTED = 0x04,
 	/* Other values that are not currently used, and will be defined if they are
   used in the future. */
 };
@@ -357,6 +361,7 @@ typedef struct pldm_fw_update_info {
 	pldm_fwupdate_func pre_update_func;
 	pldm_fwupdate_func update_func;
 	pldm_fwupdate_func pos_update_func;
+	pldm_fwupdate_func verify_func;
 	fd_update_interface_t inf;
 	uint16_t activate_method;
 	pldm_apply_work self_apply_work_func;
@@ -702,6 +707,7 @@ struct downstream_device_parameter_table {
 	} __attribute__((packed));
 } __attribute__((packed));
 
+void state_update(uint8_t state);
 uint8_t pldm_fw_update_handler_query(uint8_t code, void **ret_fn);
 uint16_t pldm_fw_update_read(void *mctp_p, enum pldm_firmware_update_commands cmd, uint8_t *req,
 			     uint16_t req_len, uint8_t *rbuf, uint16_t rbuf_len, void *ext_params);

@@ -218,7 +218,7 @@ static uint8_t do_self_activate(uint16_t comp_id)
 	return 0;
 }
 
-static void state_update(uint8_t state)
+void state_update(uint8_t state)
 {
 	if (state == 0xff)
 		return;
@@ -544,7 +544,12 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 	}
 	state_update(STATE_VERIFY);
 
-	LOG_INF("Verify complete");
+	uint8_t verify_result = PLDM_FW_UPDATE_VERIFY_SUCCESS;
+	if (fw_info->verify_func != NULL) {
+		verify_result = fw_info->verify_func(&update_param);
+	}
+
+	LOG_INF("Verify complete %d", verify_result);
 	if (report_tranfer(mctp_p, ext_params, PLDM_FW_UPDATE_VERIFY_SUCCESS)) {
 		report_tranfer(mctp_p, ext_params, PLDM_FW_UPDATE_GENERIC_ERROR);
 		cur_aux_state = STATE_AUX_FAILED;
@@ -848,7 +853,7 @@ static uint8_t update_component(void *mctp_inst, uint8_t *buf, uint16_t len, uin
 	fw_update_tid =
 		k_thread_create(&pldm_fw_update_thread, pldm_fw_update_stack,
 				K_THREAD_STACK_SIZEOF(pldm_fw_update_stack), req_fw_update_handler,
-				(void *)mctp_inst, extra_data, NULL, CONFIG_MAIN_THREAD_PRIORITY, 0,
+				(void *)mctp_inst, extra_data, NULL, 3, 0,
 				K_MSEC(UPDATE_THREAD_DELAY_SECOND));
 	k_thread_name_set(&pldm_fw_update_thread, "pldm_fw_update_thread");
 
