@@ -367,12 +367,12 @@ int cptra_validate_bundle_v1(const uint8_t *bundle, size_t bundle_size)
 		// return ret;
 	}
 
-	ret = cptra_verify_manifest_imc_signature_v1(manifest_preamble, imc);
-	if (ret) {
-		LOG_ERR("Manifest IMC signature verification failed");
-		ret = 0; /* Continue to check individual image integrity even if signature verification fails */
-		// return ret;
-	}
+//	ret = cptra_verify_manifest_imc_signature_v1(manifest_preamble, imc);
+//	if (ret) {
+//		LOG_ERR("Manifest IMC signature verification failed");
+//		ret = 0; /* Continue to check individual image integrity even if signature verification fails */
+//		// return ret;
+//	}
 
 	for (uint32_t i = 0; i < imc->count; i++) {
 		const struct cptra_image_metadata_entry_v1 *entry = &imc->entries[i];

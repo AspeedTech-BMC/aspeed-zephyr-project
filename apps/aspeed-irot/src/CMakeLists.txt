@@ -52,6 +52,8 @@ if (CONFIG_PLDM)
 			PRIVATE
 			pldm/pldm_firmware_update.c
 			pldm/pldm_firmware_update_platform.c
+			pldm/pldm_fw_update_mbedtls_sha384.c
+			pldm/pldm_fw_update_sd_ast2700_image.c
 		)
 	endif()
 	if (CONFIG_PLDM_OEM)
