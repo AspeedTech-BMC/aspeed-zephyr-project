@@ -324,7 +324,7 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 	}
 
 	dc = (d_first_pass + d_last_pass) >> 1;
-	LOG_DBG("IOD SLIH DS coarse win: {%d, %d} -> select %d", d_first_pass, d_last_pass, dc);
+	LOG_DBG("IOD SLIH DS coarse win: {%d, %d} -> select %d\n", d_first_pass, d_last_pass, dc);
 
 	sli_set_ahb_rx_delay(data->die1.slih, dc, dc);
 
@@ -889,8 +889,11 @@ int sli_init_r(struct ast_chip *chip)
 	}
 
 	if (sli0_ready) {
-		sli_clear(SLI1_REG + SLIH_REG_OFFSET,
+		sli_clear(data->die1.slih,
 			  SLI_CLEAR_RX | SLI_CLEAR_BUS);
+		sli_wait_suspend(data->die1.slih);
+		k_busy_wait(CAL_DELAY_US);
+
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x034);
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x074);
 		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0b4);
