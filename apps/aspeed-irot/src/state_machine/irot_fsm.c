@@ -76,22 +76,6 @@ static void do_init_entry(void *state)
 	
 	/* Add user defined init code here */
 	cptra_ipc_enable();
-	// ca35_ns_ipc_enable();
-
-	LOG_INF("SETUP MEMORY PROTECTION FOR SSP TO CA35S");
-	/* enable atf/optee memory region */
-	uint32_t reg_val = 0;
-	reg_val = sys_read32(0x72c00614);
-	reg_val &= ~(BIT(13) | BIT(14)); // Clear bits 13 and 14 to enable memory region
-	sys_write32(reg_val, 0x72c00614);
-
-	reg_val = sys_read32(0x72c0061c);
-	reg_val &= ~(BIT(13) | BIT(14)); // Clear bits 13 and 14 to enable memory region
-	sys_write32(reg_val, 0x72c0061c);
-
-	reg_val = sys_read32(0x72c00714);
-	reg_val &= ~(BIT(13) | BIT(14)); // Clear bits 13 and 14 to enable memory region
-	sys_write32(reg_val, 0x72c00714);
 
 	mctp_init_app();
 
