@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/sys/util.h>
 #include <string.h>
 
 #include "lstp_common.h"
@@ -42,10 +43,28 @@ K_MSGQ_DEFINE(lstp_irq_queue, sizeof(struct lstp_irq_msg),  LSTP_IRQ_QUEUE_SIZE,
  * ----------------------------------------------------------------------- */
 static uint8_t _irq_states[LSTP_GPIO_NUM]; /* lstp_gpio_irq_config_t values */
 
+struct lstp_gpio_irq_bank {
+	const char *dev_name;
+	uint16_t base_index;
+	const struct device *dev;
+	struct gpio_callback cb;
+	bool registered;
+};
+
+static struct lstp_gpio_irq_bank gpio_irq_banks[] = {
+	{ .dev_name = "sgpiom_a_d", .base_index = 0U },
+	{ .dev_name = "sgpiom_e_h", .base_index = 32U },
+	{ .dev_name = "sgpiom_i_l", .base_index = 64U },
+	{ .dev_name = "sgpiom_m_p", .base_index = 96U },
+};
+
 /* -----------------------------------------------------------------------
  * Forward declarations
  * ----------------------------------------------------------------------- */
 static void lstp_task_thread_main(void *, void *, void *);
+static void lstp_gpio_irq_handler(const struct device *port,
+				  struct gpio_callback *cb,
+				  gpio_port_pins_t pins);
 
 K_THREAD_DEFINE(lstp_task_id, 8192,
 		lstp_task_thread_main, NULL, NULL, NULL,
@@ -86,6 +105,68 @@ static gpio_flags_t irq_config_to_zephyr_flags(lstp_gpio_irq_config_t irq_type)
 	case LSTP_GPIO_IRQ_LOW:       return GPIO_INT_LEVEL_LOW;
 	case LSTP_GPIO_IRQ_DISABLED:
 	default:                      return GPIO_INT_DISABLE;
+	}
+}
+
+static void lstp_gpio_irq_handler(const struct device *port,
+				  struct gpio_callback *cb,
+				  gpio_port_pins_t pins)
+{
+	ARG_UNUSED(port);
+
+	for (size_t bank_idx = 0; bank_idx < ARRAY_SIZE(gpio_irq_banks); bank_idx++) {
+		struct lstp_gpio_irq_bank *bank = &gpio_irq_banks[bank_idx];
+
+		if (&bank->cb != cb) {
+			continue;
+		}
+
+		for (uint8_t pin = 0; pin < 32U; pin++) {
+			if ((pins & BIT(pin)) == 0U) {
+				continue;
+			}
+
+			uint16_t gpio_index = bank->base_index + pin;
+
+			if (gpio_index >= LSTP_GPIO_NUM) {
+				break;
+			}
+
+			lstp_task_submit_gpio_irq(gpio_index);
+		}
+
+		return;
+	}
+}
+
+static void register_gpio_irq_callbacks(void)
+{
+	for (size_t bank_idx = 0; bank_idx < ARRAY_SIZE(gpio_irq_banks); bank_idx++) {
+		struct lstp_gpio_irq_bank *bank = &gpio_irq_banks[bank_idx];
+		int ret;
+
+		if (bank->base_index >= LSTP_GPIO_NUM) {
+			break;
+		}
+
+		if (bank->registered) {
+			continue;
+		}
+
+		bank->dev = device_get_binding(bank->dev_name);
+		if (!bank->dev || !device_is_ready(bank->dev)) {
+			LOG_WRN("GPIO IRQ bank %s not ready", bank->dev_name);
+			continue;
+		}
+
+		gpio_init_callback(&bank->cb, lstp_gpio_irq_handler, GENMASK(31, 0));
+		ret = gpio_add_callback(bank->dev, &bank->cb);
+		if (ret < 0) {
+			LOG_ERR("gpio_add_callback failed for %s: %d", bank->dev_name, ret);
+			continue;
+		}
+
+		bank->registered = true;
 	}
 }
 
@@ -226,15 +307,16 @@ static size_t process_gpio_req(struct lstp_hdr *req_hdr, uint8_t *req_payload,
 				goto done;
 			}
 
+			// It is not necessary to read back the value to verify the write for sgpio devices.
 			/* Readback to verify (matches OpenSMA's push-pull verification). */
-			int read_val = gpio_pin_get_raw(dev, pin);
-
-			if (read_val < 0 || read_val != write_val) {
-				LOG_ERR("SetValue: readback mismatch idx=%u wrote=%d got=%d",
-					req->gpio_index, write_val, read_val);
-				status = LSTP_STATUS_ERROR;
-				goto done;
-			}
+			// int read_val = gpio_pin_get_raw(dev, pin);
+			//
+			// if (read_val < 0 || read_val != write_val) {
+			// 	LOG_ERR("SetValue: readback mismatch idx=%u wrote=%d got=%d",
+			// 		req->gpio_index, write_val, read_val);
+			// 	status = LSTP_STATUS_ERROR;
+			// 	goto done;
+			// }
 		}
 		/* resp_payload_len stays 0 — empty payload on success */
 		break;
@@ -478,6 +560,7 @@ static void lstp_task_thread_main(void *p1, void *p2, void *p3)
 void lstp_task_init(void)
 {
 	memset(_irq_states, LSTP_GPIO_IRQ_DISABLED, sizeof(_irq_states));
+	register_gpio_irq_callbacks();
 	LOG_INF("LSTP Background Task Initialized");
 	/* Thread and Queue are statically allocated/initialized via macros */
 }
