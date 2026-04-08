@@ -102,7 +102,7 @@ struct lstp_management_config {
  * Number of logical GPIO indices exposed over LSTP.
  * Currently maps to one SGPIO block (sgpiom_a_d, pins 0-31).
  */
-#define LSTP_GPIO_NUM 32
+#define LSTP_GPIO_NUM 128
 
 /**
  * Mask to strip the response/request bit (bit 7) from cmd_status_code
