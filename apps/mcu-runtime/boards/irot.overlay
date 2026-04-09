@@ -8,6 +8,18 @@
 		allow = <MPU_ID_SSP_DATA S_READWRITE>, <MPU_ID_CA35 NS_READONLY>;
 		status = "okay";
 	};
+
+	prictrl_bootmcu: prictrl-bootmcu {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <IO_S_FMC RW_PROT>, <IO_S_FMC_REG RW_PROT>;
+		status = "okay";
+	};
+
+	prictrl_ssp: prictrl-ssp {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <IO_S_FMC RW_PROT>, <IO_S_FMC_REG RW_PROT>;
+		status = "okay";
+	};
 };
 
 &ca35_s {
