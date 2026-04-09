@@ -69,8 +69,8 @@ static struct peripheral peri_tbl[] = {
 	{"DP",		dp_init, NULL},
 	{"SLI0",	sli_init_r, NULL},
 	{"DRAM",	dram_init, NULL},
-	{"PCI",		pci_init, NULL},
 	{"USB",		usb_init, NULL},
+	{"PCI",		pci_init, NULL},
 };
 #endif
 
@@ -94,4 +94,13 @@ struct ast_chip *ast_create_chip(void)
 	chip->pcie1_enable = sys_read32(SCU0_REG + 0xa80) & BIT(0);
 
 	return chip;
+}
+
+int ast_destroy_chip(struct ast_chip *chip)
+{
+	int err;
+
+	err = ast_loader_deinit(chip);
+
+	return err;
 }

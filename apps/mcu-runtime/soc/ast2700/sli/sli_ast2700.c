@@ -445,6 +445,8 @@ static int sli_calibrate_mbus_pad_delay(struct sli_data *data, int index, int be
 		if ((d_last_pass - d_first_pass) >= 3)
 			break;
 		LOG_DBG("%s SLIM[%d] %s win: {%d, %d} retry %d\n", die_name, index, dir, d_first_pass, d_last_pass, count);
+		d_first_pass = -1;
+		d_last_pass = -1;
 	}
 
 	if (d_first_pass == -1)
@@ -527,6 +529,8 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 		if ((d_last_pass - d_first_pass) >= 3)
 			break;
 		LOG_DBG("%s SLIM %s win: {%d, %d} retry %d\n", die_name, dir, d_first_pass, d_last_pass, count);
+		d_first_pass = -1;
+		d_last_pass = -1;
 	}
 
 	dc = (d_first_pass + d_last_pass) >> 1;
@@ -847,7 +851,7 @@ int sli_init_r(struct ast_chip *chip)
 	struct sli_data ast2700_sli_data[1];
 	struct sli_data *data = ast2700_sli_data;
 	uint32_t reg_val;
-	int retry = 10;
+	int retry = 100;
 	bool sli0_ready = false;
 
 	if (IS_ENABLED(CONFIG_SLI_TARGET_PHYCLK_25MHZ) ||

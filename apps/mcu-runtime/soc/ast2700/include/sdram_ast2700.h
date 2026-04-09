@@ -313,6 +313,7 @@ struct sdramc {
 
 	struct mpu_info mpu[MAX_MPU_COUNT];
 	int mpu_cnt;
+	uint32_t wdt_swrst[5];
 };
 
 struct sdramc_port {
@@ -481,7 +482,7 @@ struct train_bin {
 };
 
 void fpga_phy_init(struct sdramc *sdramc);
-void dwc_phy_init(struct sdramc *sdramc);
+int dwc_phy_init(struct sdramc *sdramc);
 bool is_ddr4(void);
 //void sdramc_mpu_enable(struct udevice *dev);
 int dram_init(struct ast_chip *chip);

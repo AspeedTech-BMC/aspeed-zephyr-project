@@ -585,7 +585,7 @@ enum i3c_hdr_mode {
 
 #define MIPI_VENDOR_ASPEED 0x3f6
 /* Aspeed part id: G6 A1 */
-#define PART_ID_ASPEED 0x0601
+#define PART_ID_ASPEED 0x0602
 /* Extended Capability Header */
 #define CAP_HEADER_LENGTH GENMASK(23, 8)
 #define CAP_HEADER_ID GENMASK(7, 0)

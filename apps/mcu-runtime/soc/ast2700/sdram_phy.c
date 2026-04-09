@@ -90,13 +90,9 @@ int dwc_ddrphy_phyinit_userCustom_H_readMsgBlock(int train2D)
 			LOG_DBG("%s: Training Failure index (0x%x)\n", __func__, message);
 		else
 			LOG_DBG("%s: DDR5 1D/2D Training Passed\n", __func__);
-
-		/* 3. Read ResultAddrOffset */
-		message = dwc_readMsgBlock(DWC_PHY_DDR5_MB_RESULT_ADR);
-		LOG_DBG("%s: Result Address Offset (0x%x)\n", __func__, message);
 	}
 
-	return 0;
+	return message;
 }
 
 void dwc_ddrphy_phyinit_userCustom_A_bringupPower(void)
@@ -176,19 +172,32 @@ void dwc_decode_streaming_message(void)
 #define DWC_PHY_MB_START_STREAM_MSG	0x8
 #define DWC_PHY_MB_TRAIN_SUCCESS	0x7
 #define DWC_PHY_MB_TRAIN_FAIL		0xff
-void dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
+int dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
 {
-	uint32_t message = 0, mail;
+	uint32_t mail;
+	uint32_t message = 0;
+	uint32_t timeout_ms = 6000;
 
-	while (message != DWC_PHY_MB_TRAIN_SUCCESS && message != DWC_PHY_MB_TRAIN_FAIL) {
+	while (timeout_ms--) {
+
 		dwc_get_mailbox(0, &mail);
-		message = mail & 0xffff;
+		message = mail & 0xFFFF;
 
-		if (IS_ENABLED(CONFIG_ASPEED_PHY_TRAINING_MESSAGE)) {
-			if (message == DWC_PHY_MB_START_STREAM_MSG)
-				dwc_decode_streaming_message();
-		}
+		/* Training completed */
+		if (message == DWC_PHY_MB_TRAIN_SUCCESS)
+			return 0;
+
+		if (message == DWC_PHY_MB_TRAIN_FAIL)
+			return -EIO;
+
+		if (IS_ENABLED(CONFIG_ASPEED_PHY_TRAINING_MESSAGE) && message == DWC_PHY_MB_START_STREAM_MSG)
+			dwc_decode_streaming_message();
+
+		/* wait 1 ms */
+		k_busy_wait(1000);
 	}
+
+	return -ETIMEDOUT;
 }
 
 void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
@@ -258,10 +267,9 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 	return ret;
 }
 
-void dwc_phy_init(struct sdramc *sdramc)
+int dwc_phy_init(struct sdramc *sdramc)
 {
-	// enable ddrphy free-run clock
-	sys_write32(SCU0_DDR_PHY_CLOCK, SCU0_CLOCK_STOP_CLR_REG);
+	uint32_t err = -1;
 
 	if (is_ddr4()) {
 		LOG_DBG("%s: Starting ddr4 training\n", __func__);
@@ -270,4 +278,6 @@ void dwc_phy_init(struct sdramc *sdramc)
 		LOG_DBG("%s: Starting ddr5 training\n", __func__);
 		#include "dwc_ddrphy_phyinit_ddr5-3200-nodimm-train2D.c"
 	}
+
+	return err;
 }

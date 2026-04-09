@@ -63,5 +63,6 @@ struct ast_chip {
 };
 
 struct ast_chip *ast_create_chip(void);
+int ast_destroy_chip(struct ast_chip *chip);
 struct ast_board *ast_create_board(struct ast_chip *chip);
 #endif

@@ -52,7 +52,6 @@ int pci_init(struct ast_chip *chip)
 	uint8_t pcie0_intx = PCIE_INTx(DT_PATH(soc0, pcie0));
 	uint8_t pcie1_intx = PCIE_INTx(DT_PATH(soc0, pcie1));
 	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_PATH(soc0, pcie1));
-	uint32_t reg;
 
 	if ((scu->modrst2_ctrl & (SCU0_RST2_E2M1 | SCU0_RST2_E2M0)) == 0) {
 		LOG_DBG("%s: PCIE already initialized\n", __func__);
@@ -115,15 +114,6 @@ int pci_init(struct ast_chip *chip)
 	if (FIELD_GET(SCU0_REVISION_ID_HW, scu->chip_id1) == AST2700A2) {
 		setbits_le32(&scu->raw_config, DISCPUE2M0RAW|DISCPUE2M1RAW);
 		setbits_le32(SCU1_RAW_CONFIG, DISIOE2MRAW);
-
-		/* only init i2c during power on reset */
-		reg = sys_read32(SCU0_RESET_LOG1);
-		if (reg & BIT(0)) {
-			/* clk/reset for i2c */
-			setbits_le32(SCU1_RSTCTL2, SCU1_RSTCTL2_I2C);
-			k_usleep(10);
-			setbits_le32(SCU1_RSTCTL2_CLR, SCU1_RSTCTL2_I2C);
-		}
 
 		vga_init(chip, true);
 	} else {

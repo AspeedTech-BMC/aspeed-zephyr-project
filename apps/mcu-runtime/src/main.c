@@ -51,11 +51,13 @@ int main(void)
 			if (board->boot)
 				board->boot();
 
-			/* Runtime ipc loop */
-			if (board->runtime_loop)
-				board->runtime_loop();
+			ast_destroy_chip(chip);
 		}
 	}
+
+	/* Runtime ipc loop */
+	if (board && board->runtime_loop)
+		board->runtime_loop();
 
 	return 0;
 }
