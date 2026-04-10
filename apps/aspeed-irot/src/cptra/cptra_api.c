@@ -7,6 +7,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/crypto/hash.h>
 #include <image/caliptra_soc_manifest.h>
+#include <mbedtls/sha512.h>
 
 LOG_MODULE_REGISTER(cptra_api, LOG_LEVEL_DBG);
 
@@ -137,6 +138,12 @@ end:
 
 int cptra_sha384(const char *msg, int msg_size, uint8_t *output, int output_size)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	// using mbedtls sha384 implementation to replace cptra sha384 for testing purpose when fw verification is skipped.
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	mbedtls_sha512((const unsigned char *)msg, msg_size, output, 1);
+	return 0;
+#endif
 	int ret = cptra_sha384_init();
 	if (ret) {
 		LOG_ERR("cptra_sha384_init failed, ret:0x%x", ret);
@@ -164,6 +171,10 @@ int cptra_verify_ecdsa_hashed(
 		const uint8_t *msg, size_t msg_len,
 		const uint8_t *sig_r, const uint8_t *sig_s)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	return 0;
+#endif
 	int ipccmd = CPTRA_IPCCMD_ECDSA384_SIGNATURE_VERIFY;
 	uint8_t *p8_bmcu_in = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
 	struct cptra_ecdsa_ctx ctx;
@@ -226,6 +237,10 @@ int cptra_verify_ecdsa(
 		const uint8_t *msg, size_t msg_len,
 		const uint8_t *sig_r, const uint8_t *sig_s)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	return 0;
+#endif
 	uint8_t hash[48];
 	int ret;
 
@@ -251,6 +266,10 @@ int cptra_verify_lms_hashed(
 		const uint8_t *msg, size_t msg_len,
 		const uint8_t *signature)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	return 0;
+#endif
 	int ipccmd = CPTRA_IPCCMD_LMS_SIGNATURE_VERIFY;
 	uint8_t *p8_bmcu_in = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
 	struct cptra_lms_ctx ctx;
@@ -321,6 +340,10 @@ int cptra_verify_lms(
 		const uint8_t *msg, size_t msg_len,
 		const uint8_t *signature)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	return 0;
+#endif
 	uint8_t hash[48];
 	int ret;
 
@@ -348,6 +371,10 @@ int cptra_get_cert_chain(void **cert_chain, size_t *cert_chain_size)
 
 int cptra_set_auth_manifest(const struct cptra_set_auth_manifest_ia *input)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	return 0;
+#endif
 	struct cptra_set_auth_manifest_ia *input_buf;
 	struct cptra_set_auth_manifest_oa *output_buf;
 	int ret;
@@ -383,6 +410,10 @@ int cptra_set_auth_manifest(const struct cptra_set_auth_manifest_ia *input)
 
 int cptra_authorize_and_stash(uint32_t fw_id, uint8_t digest[48], bool skip_stash)
 {
+#if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
+	LOG_WRN("FW verification is skipped, bypassing %s", __func__);
+	return 0;
+#endif
 	struct cptra_authorize_and_stash_ia *input;
 	struct cptra_authorize_and_stash_oa *output;
 	int ret;

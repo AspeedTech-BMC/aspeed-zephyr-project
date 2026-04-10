@@ -28,3 +28,9 @@ config KERNEL_LOAD_ADDR
 	hex "Address in memory for Kernel firmware"
 	help
 	  Address in memory to use as the default safe load address for Kernel.
+
+config SKIP_CPTRA_FW_VERIFICATION
+	default n
+	bool "Skip firmware verification"
+	help
+	  If enabled, the firmware will be loaded without verification. This option is reserved for emulator environment.
