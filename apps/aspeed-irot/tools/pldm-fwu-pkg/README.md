@@ -48,8 +48,14 @@ The command line generate the package:
 ```
 
 ## PLDM Firmware Update Agent
-In our test environment, we cross compile [CodeConstruct/mctp-rs]() with aarch64 and copy pldm-fw into BMC.
+In our test environment, we cross compile [CodeConstruct/mctp-rs](https://github.com/CodeConstruct/mctp-rs) with aarch64 and copy pldm-fw into BMC.
 ```
+git clone https://github.com/CodeConstruct/mctp-rs
+cd mctp-rs
+mkdir .cargo
+echo "[target.aarch64-unknown-linux-musl]" >> .cargo/config.toml
+echo "linker = "aarch64-linux-musl-gcc" >> .cargo/config.toml
+rustup target add aarch64-unknown-linux-musl
 cargo build --release --target aarch64-unknown-linux-musl
 scp target/aarch64-unknown-linux-musl/release/pldm-fw root@${BMC_IP}:/tmp/pldm-fw
 ```
@@ -57,12 +63,17 @@ scp target/aarch64-unknown-linux-musl/release/pldm-fw root@${BMC_IP}:/tmp/pldm-f
 ## PLDM Firmware Update through ASPEED-iROT
 ### From BMC side:
 
-Setup MCTP Network
+Setup MCTP Network if the interface is not automatically initiated.
 ```bash
 mctp link set mctpmbox0 up
 mctp addr add 11 dev mctpmbox0
 mctp route add 10 via mctpmbox0
 ip link set dev mctpmbox0 mtu 32768
+```
+
+Disable pldmd service if running, due to there are some conflict with pldm-fw.
+```
+systemctl stop pldmd
 ```
 
 Check if ASPEED-iROT supports PLDM Firmware Update
