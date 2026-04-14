@@ -404,6 +404,11 @@ static int sdramc_exit_self_refresh(struct sdramc *sdramc)
 static void sdramc_enable_refresh(struct sdramc *sdramc)
 {
 	struct sdramc_regs *regs = sdramc->regs;
+	uint32_t tREFI;
+
+	/* update tREFI */
+	tREFI = (is_ddr4() ? 0xb4 : 0x5a);
+	sys_write32(sys_read32((uint32_t)&regs->refctl) & ~0xff0000 | (tREFI << 16), (uint32_t)&regs->refctl);
 
 	/* refresh update */
 	//clrbits(le32, (uint32_t)&regs->refctl, 0x8000);
