@@ -426,6 +426,15 @@ int usb_init(struct ast_chip *chip)
 		return 0;
 	}
 
+	if (chip->bootmode == BOOT_DEVICE_USB) {
+		int port = FIELD_GET(SCU1_HWSTRAP1_RECOVERY_USB_PORT, sys_read32(SCU1_HWSTRAP1));
+		LOG_INF("USB Recovery Mode: Port = %d", port);
+		if (port == 0)
+			porta_func = VHUB_PHY;
+		else if (port == 1)
+			portb_func = VHUB_PHY;
+	}
+
 	/* Switch PortA and PortB USB function */
 	usb_func_init(chip, PORT_A, porta_func);
 	usb_func_init(chip, PORT_B, portb_func);
