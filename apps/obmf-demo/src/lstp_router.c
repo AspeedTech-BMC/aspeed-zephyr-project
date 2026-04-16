@@ -11,6 +11,7 @@
 
 #include "lstp_common.h"
 #include "lstp_router.h"
+#include "lstp_uart.h"
 #include "lstp_usb.h"
 #include "lstp_task.h"
 
@@ -131,6 +132,7 @@ static lstp_status_t write_channel_config_helper(uint8_t channel_id,
 	case LSTP_CHANNEL_TYPE_SPI:
 	case LSTP_CHANNEL_TYPE_GPIO:
 	case LSTP_CHANNEL_TYPE_I2C:
+	case LSTP_CHANNEL_TYPE_UART:
 		if ((bool)cfg->channel_enabled != channels[channel_id].enabled) {
 			return LSTP_STATUS_NOT_SUPPORTED;
 		}
@@ -243,6 +245,18 @@ static lstp_status_t handle_read_config(struct lstp_hdr *req_hdr, uint8_t *paylo
 				return LSTP_STATUS_SUCCESS;
 			}
 
+		case 4: /* UART Channel */
+			resp_blob->channel_type = LSTP_CHANNEL_TYPE_UART;
+			resp_blob->channel_enabled = channels[4].enabled;
+			strncpy((char *)resp_blob->channel_name, "UART", sizeof(resp_blob->channel_name));
+			if (req->offset == 0U && req->length == 0U) {
+				lstp_uart_set_host_active(true);
+			}
+			if (offset + sizeof(struct lstp_uart_channel_config) <= LSTP_MAX_PAYLOAD_SIZE) {
+				offset += sizeof(struct lstp_uart_channel_config);
+			}
+			break;
+
 		default:
 			LOG_WRN("Unsupported channel configuration read: %d", req->channel_id);
 			return LSTP_STATUS_NOT_SUPPORTED;
@@ -254,6 +268,8 @@ static lstp_status_t handle_read_config(struct lstp_hdr *req_hdr, uint8_t *paylo
 
 static lstp_status_t handle_write_config(uint8_t *payload, size_t payload_len)
 {
+	lstp_status_t status;
+
 	if (payload_len < sizeof(struct lstp_channel_config_write_request)) {
 		return LSTP_STATUS_ERROR;
 	}
@@ -276,7 +292,12 @@ static lstp_status_t handle_write_config(uint8_t *payload, size_t payload_len)
 
 	struct lstp_channel_config_blob *cfg =
 		(struct lstp_channel_config_blob *)(payload + sizeof(*req));
-	return write_channel_config_helper(req->channel_id, cfg, cfg_size);
+	status = write_channel_config_helper(req->channel_id, cfg, cfg_size);
+	if (status == LSTP_STATUS_SUCCESS && req->channel_id == 4U) {
+		lstp_uart_set_host_active(true);
+	}
+
+	return status;
 }
 
 static lstp_status_t handle_channel_0(struct lstp_hdr *hdr, uint8_t *payload, size_t payload_len,
@@ -396,8 +417,33 @@ void lstp_router_receive(uint8_t *buffer, size_t len)
 			/* Do NOT send a synchronous response here, lstp_task handles it */
 			break;
 
+		case 4: /* UART Channel */
+			if (lstp_task_submit_req(buffer, len) < 0) {
+				LOG_ERR("Task queue full, dropping UART req");
+			}
+			break;
+
 		default:
 			LOG_WRN("Routing for channel %d not implemented", hdr->channel_id);
 			break;
 	}
+}
+
+int lstp_router_send_uart_data(const uint8_t *data, size_t len)
+{
+	uint8_t buf[LSTP_MSG_SIZE];
+	struct lstp_hdr *hdr = (struct lstp_hdr *)buf;
+
+	if (len > LSTP_MAX_PAYLOAD_SIZE) {
+		return -EINVAL;
+	}
+
+	hdr->channel_id = 4;
+	hdr->cmd_status_code = (uint8_t)LSTP_UART_CMD_WRITE;
+	hdr->len_lsb = len & LSB_MASK;
+	hdr->len_msb = (len >> BYTE1_SHIFT) & LSB_MASK;
+
+	memcpy(buf + sizeof(*hdr), data, len);
+
+	return lstp_usb_send(buf, sizeof(*hdr) + len);
 }

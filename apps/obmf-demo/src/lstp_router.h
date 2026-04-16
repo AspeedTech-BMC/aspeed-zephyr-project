@@ -38,4 +38,13 @@ void lstp_router_receive(uint8_t *buffer, size_t len);
  */
 void lstp_router_send_gpio_irq_event(uint16_t gpio_index, uint8_t value);
 
+/**
+ * @brief Send UART RX bytes to the host on the LSTP UART channel.
+ *
+ * @param data UART payload bytes
+ * @param len  Number of bytes in @p data
+ * @return 0 on success, negative errno-style value on transport failure
+ */
+int lstp_router_send_uart_data(const uint8_t *data, size_t len);
+
 #endif /* LSTP_ROUTER_H */

@@ -10,13 +10,17 @@
 #include <zephyr/usb/usb_ch9.h>
 #include <string.h>
 
+#include "lstp_common.h"
 #include "lstp_usb.h"
 #include "lstp_router.h"
 
-LOG_MODULE_REGISTER(lstp_usb, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(lstp_usb, LOG_LEVEL_ERR);
+
+#define LSTP_USB_TRACE 0
 
 #define LSTP_USB_CLASS_SUBCLASS 0x00
 #define LSTP_USB_CLASS_PROTOCOL 0x00
+#define LSTP_USB_TX_QUEUE_SIZE  8
 /* Base vendor specific class */
 #define LSTP_USB_BCC_VENDOR 0xFF
 
@@ -61,6 +65,60 @@ static struct {
 	size_t rx_len;
 } usb_dev_data;
 
+struct lstp_usb_tx_msg {
+	uint8_t buf[LSTP_MSG_SIZE];
+	size_t len;
+};
+
+static atomic_t lstp_usb_configured;
+static atomic_t lstp_usb_in_busy;
+static struct k_work lstp_usb_tx_work;
+static struct k_msgq lstp_usb_tx_queue;
+static struct lstp_usb_tx_msg lstp_usb_tx_queue_buffer[LSTP_USB_TX_QUEUE_SIZE];
+static struct lstp_usb_tx_msg lstp_usb_tx_current;
+static bool lstp_usb_tx_current_valid;
+
+static void lstp_usb_tx_kick(struct k_work *work)
+{
+	uint32_t bytes_written;
+	int ret;
+
+	ARG_UNUSED(work);
+
+	if (!atomic_get(&lstp_usb_configured) || atomic_get(&lstp_usb_in_busy)) {
+		return;
+	}
+
+	if (!lstp_usb_tx_current_valid) {
+		if (k_msgq_get(&lstp_usb_tx_queue, &lstp_usb_tx_current, K_NO_WAIT) != 0) {
+			return;
+		}
+		lstp_usb_tx_current_valid = true;
+	}
+
+	if (!atomic_cas(&lstp_usb_in_busy, 0, 1)) {
+		return;
+	}
+
+	ret = usb_write(LSTP_IN_EP_ADDR, lstp_usb_tx_current.buf, lstp_usb_tx_current.len,
+			&bytes_written);
+	if (ret < 0) {
+		atomic_clear(&lstp_usb_in_busy);
+		if (ret != -EAGAIN) {
+			LOG_ERR("USB write failed: %d", ret);
+			lstp_usb_tx_current_valid = false;
+		}
+		k_work_submit(&lstp_usb_tx_work);
+		return;
+	}
+
+	if (bytes_written != lstp_usb_tx_current.len) {
+		LOG_WRN("USB short write: %u of %zu", bytes_written, lstp_usb_tx_current.len);
+	}
+
+	lstp_usb_tx_current_valid = false;
+}
+
 static void lstp_usb_bulk_out(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 {
 	uint32_t bytes_read;
@@ -68,7 +126,9 @@ static void lstp_usb_bulk_out(uint8_t ep, enum usb_dc_ep_cb_status_code ep_statu
 	usb_ep_read_wait(ep, usb_dev_data.rx_buf, sizeof(usb_dev_data.rx_buf), &bytes_read);
 	usb_ep_read_continue(ep);
 
+#if LSTP_USB_TRACE
 	LOG_HEXDUMP_DBG(usb_dev_data.rx_buf, (bytes_read > 64 ? 64 : bytes_read), "USB RX Packets");
+#endif
 
 	if (bytes_read > 0) {
 		/* Route directly to LSTP core */
@@ -78,7 +138,11 @@ static void lstp_usb_bulk_out(uint8_t ep, enum usb_dc_ep_cb_status_code ep_statu
 
 static void lstp_usb_bulk_in(uint8_t ep, enum usb_dc_ep_cb_status_code ep_status)
 {
+	atomic_clear(&lstp_usb_in_busy);
+	k_work_submit(&lstp_usb_tx_work);
+#if LSTP_USB_TRACE
 	LOG_DBG("Bulk IN transaction complete on EP 0x%02x", ep);
+#endif
 }
 
 /* Endpoint configuration */
@@ -111,15 +175,21 @@ static void lstp_usb_status_cb(struct usb_cfg_data *cfg,
 			LOG_ERR("USB device error");
 			break;
 		case USB_DC_RESET:
+			atomic_clear(&lstp_usb_configured);
+			atomic_clear(&lstp_usb_in_busy);
 			LOG_INF("USB device reset");
 			break;
 		case USB_DC_CONNECTED:
 			LOG_INF("USB device connected");
 			break;
 		case USB_DC_CONFIGURED:
+			atomic_set(&lstp_usb_configured, 1);
+			k_work_submit(&lstp_usb_tx_work);
 			LOG_INF("USB device configured");
 			break;
 		case USB_DC_DISCONNECTED:
+			atomic_clear(&lstp_usb_configured);
+			atomic_clear(&lstp_usb_in_busy);
 			LOG_INF("USB device disconnected");
 			break;
 		default:
@@ -157,6 +227,9 @@ USBD_DEFINE_CFG_DATA(lstp_usb_config) = {
 int lstp_usb_init(void)
 {
 	LOG_INF("Initializing LSTP USB Transport");
+	k_msgq_init(&lstp_usb_tx_queue, (char *)lstp_usb_tx_queue_buffer,
+		    sizeof(struct lstp_usb_tx_msg), LSTP_USB_TX_QUEUE_SIZE);
+	k_work_init(&lstp_usb_tx_work, lstp_usb_tx_kick);
 	int ret = usb_enable(NULL);
 	if (ret < 0) {
 		LOG_ERR("Failed to enable USB: %d", ret);
@@ -167,20 +240,20 @@ int lstp_usb_init(void)
 
 int lstp_usb_send(const uint8_t *data, size_t len)
 {
-	uint32_t bytes_written;
-	int ret;
+	struct lstp_usb_tx_msg msg;
 
-	LOG_HEXDUMP_DBG(data, (len > 64 ? 64 : len), "USB TX Packets");
-
-	ret = usb_write(LSTP_IN_EP_ADDR, data, len, &bytes_written);
-	if (ret < 0) {
-		LOG_ERR("USB write failed: %d", ret);
-		return ret;
+	if (len > sizeof(msg.buf)) {
+		return -EMSGSIZE;
 	}
 
-	if (bytes_written != len) {
-		LOG_WRN("USB short write: %u of %zu", bytes_written, len);
+	msg.len = len;
+	memcpy(msg.buf, data, len);
+
+	if (k_msgq_put(&lstp_usb_tx_queue, &msg, K_NO_WAIT) != 0) {
+		return -ENOMEM;
 	}
+
+	k_work_submit(&lstp_usb_tx_work);
 
 	return 0;
 }

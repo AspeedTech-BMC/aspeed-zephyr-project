@@ -12,7 +12,7 @@
 #include "lstp_common.h"
 #include "lstp_i2c.h"
 
-LOG_MODULE_REGISTER(lstp_i2c, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(lstp_i2c, LOG_LEVEL_ERR);
 
 /* -----------------------------------------------------------------------
  * I2C channel → Zephyr device binding table

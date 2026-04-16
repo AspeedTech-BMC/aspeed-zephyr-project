@@ -178,3 +178,7 @@
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <50000000>;
 };
+
+&uart3 {
+	status = "okay";
+};

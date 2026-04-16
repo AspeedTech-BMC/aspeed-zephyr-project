@@ -15,6 +15,7 @@
 #include "lstp_usb.h"
 #include "lstp_i2c.h"
 #include "lstp_spi.h"
+#include "lstp_uart.h"
 
 LOG_MODULE_REGISTER(lstp_task, LOG_LEVEL_ERR);
 
@@ -529,6 +530,22 @@ static void lstp_task_thread_main(void *p1, void *p2, void *p3)
 				resp_len = process_gpio_req(
 					hdr, payload, payload_len,
 					resp_buf, sizeof(resp_buf));
+			} else if (hdr->channel_id == 4 /* UART Channel */) {
+				struct lstp_hdr *resp_hdr = (struct lstp_hdr *)resp_buf;
+				uint8_t *resp_payload = resp_buf + sizeof(struct lstp_hdr);
+				size_t resp_payload_len = 0;
+
+				lstp_status_t status = lstp_uart_receive(
+					hdr->channel_id, hdr,
+					payload, payload_len,
+					resp_payload, &resp_payload_len);
+
+				resp_hdr->channel_id      = hdr->channel_id;
+				resp_hdr->cmd_status_code = (uint8_t)status | LSTP_RESPONSE_BIT;
+				resp_hdr->len_lsb = resp_payload_len & LSB_MASK;
+				resp_hdr->len_msb = (resp_payload_len >> BYTE1_SHIFT) & LSB_MASK;
+
+				resp_len = sizeof(struct lstp_hdr) + resp_payload_len;
 			} else {
 				LOG_WRN("Unhandled channel in task: %d", hdr->channel_id);
 				struct lstp_hdr *resp_hdr = (struct lstp_hdr *)resp_buf;

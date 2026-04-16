@@ -28,7 +28,7 @@ extern "C" {
  *****************************************************/
 #define LSTP_VERSION      1
 #define LSTP_MAX_CHANNELS 255
-#define LSTP_NUM_CHANNELS 4
+#define LSTP_NUM_CHANNELS 5
 
 typedef enum {
 	LSTP_CHANNEL_TYPE_MANAGEMENT = 0,
@@ -348,6 +348,17 @@ struct lstp_i2c_write_read_request {
 	uint8_t  address;
 	uint16_t read_len;
 	/* Followed by M bytes of write data */
+} __attribute__((packed));
+
+/*****************************************************
+ * LSTP UART Channel
+ *****************************************************/
+
+typedef enum {
+	LSTP_UART_CMD_WRITE = 0x00,
+} lstp_uart_command_t;
+
+struct lstp_uart_channel_config {
 } __attribute__((packed));
 
 #ifdef __cplusplus

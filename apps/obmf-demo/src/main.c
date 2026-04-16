@@ -10,6 +10,7 @@
 #include "lstp_router.h"
 #include "lstp_spi.h"
 #include "lstp_task.h"
+#include "lstp_uart.h"
 #include "lstp_usb.h"
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
@@ -33,6 +34,12 @@ int main(void)
 	ret = lstp_usb_init();
 	if (ret != 0) {
 		LOG_ERR("Failed to initialize USB subsystem: %d", ret);
+		return ret;
+	}
+
+	ret = lstp_uart_init();
+	if (ret != 0) {
+		LOG_ERR("Failed to initialize LSTP UART console backend: %d", ret);
 		return ret;
 	}
 

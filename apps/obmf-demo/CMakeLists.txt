@@ -13,4 +13,5 @@ target_sources(app PRIVATE
     src/lstp_task.c
     src/lstp_i2c.c
     src/lstp_spi.c
+    src/lstp_uart.c
 )
