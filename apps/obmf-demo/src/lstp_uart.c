@@ -155,7 +155,6 @@ void shell_uart_mirror_tx_hook(const uint8_t *data, size_t len)
 static void lstp_uart3_irq_handler(const struct device *dev, void *user_data)
 {
 	uint8_t buf[64];
-	int recv_len;
 
 	ARG_UNUSED(user_data);
 
@@ -163,13 +162,9 @@ static void lstp_uart3_irq_handler(const struct device *dev, void *user_data)
 		return;
 	}
 
+	/* Drain RX FIFO to prevent buffer full, but don't send to host */
 	while (uart_irq_rx_ready(dev)) {
-		recv_len = uart_fifo_read(dev, buf, sizeof(buf));
-		if (recv_len > 0) {
-			if (lstp_uart_host_active) {
-				(void)lstp_router_send_uart_data(buf, (size_t)recv_len);
-			}
-		} else {
+		if (uart_fifo_read(dev, buf, sizeof(buf)) <= 0) {
 			break;
 		}
 	}
@@ -211,7 +206,7 @@ lstp_status_t lstp_uart_receive(uint8_t channel_id,
 	if (payload_len == 0U) {
 		lstp_uart_host_active = true;
 	}
-	/* Has payload = RX data from host, redirect to uart3 */
+	/* Has payload = RX data from host, send to uart3 */
 	else if (lstp_uart3_dev != NULL && payload != NULL) {
 		lstp_uart_host_active = true;
 		for (size_t i = 0; i < payload_len; i++) {
