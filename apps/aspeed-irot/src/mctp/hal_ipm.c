@@ -30,17 +30,9 @@ static void ipm_cb(const struct device *ipmdev, void *user_data,
 	LOG_DBG("IN dev %s msg id %x, msg hdr = %08x len = %d", ipmdev->name, id, *(uint32_t *)data, ipc_hdr->msg_len);
 
 	mctp_ipc_packet pkt;
-	switch(ipc_hdr->type) {
-	case MCTP_IPC_SHM_TYPE:
-		LOG_DBG("MCTP IPC SHM TYPE");
-		memcpy(&pkt.ipc_hdr, (void *)data, sizeof(pkt.ipc_hdr));
-		memcpy(&pkt.hdr, rx_mmio, 4);
-		pkt.buf = rx_mmio + 4;
-		break;
-	default:
-		LOG_ERR("Unknown MCTP IPC TYPE");
-		return;
-	}
+	memcpy(&pkt.ipc_hdr, (void *)data, sizeof(pkt.ipc_hdr));
+	memcpy(&pkt.hdr, rx_mmio, 4);
+	pkt.buf = rx_mmio + 4;
 
 
 	LOG_HEXDUMP_DBG(&pkt, 12, "IPC RECV");
@@ -69,7 +61,6 @@ void ipm_mctp_main(void *a, void *b, void *c)
 		if (ret == 0) {
 			
 			LOG_DBG("OUT dev %s msg len %x, msg data at %p", ipmdev->name, pkt->ipc_hdr.msg_len, (void *)pkt);
-			pkt->ipc_hdr.type = MCTP_IPC_SHM_TYPE;
 			memcpy((void *)tx_mmio, &pkt->hdr, 4);
 			memcpy((void *)(tx_mmio + 4), pkt->buf, pkt->ipc_hdr.msg_len - 4);
 			send_len = sizeof(pkt->ipc_hdr);
@@ -130,4 +121,3 @@ fail:
 }
 
 SYS_INIT(ipm_init, APPLICATION, 1);
-

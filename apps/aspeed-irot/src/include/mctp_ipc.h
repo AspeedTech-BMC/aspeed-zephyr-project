@@ -9,15 +9,8 @@
 #include <zephyr/kernel.h>
 #include <mctp.h>
 
-enum {
-	MCTP_IPC_PACKET_TYPE = 0x00,
-	MCTP_IPC_SHM_TYPE = 0x01,
-};
-
 struct mctp_ipc_hdr {
-        uint16_t msg_len;
-        uint8_t reserved;
-        uint8_t type;
+	uint32_t msg_len;
 };
 
 typedef struct _mctp_ipc_packet {
@@ -37,4 +30,3 @@ int mctp_ipc_send_raw(mctp_ipc_packet *pkt);
 int mctp_ipc_recv(mctp_ipc_packet *pkt);
 uint8_t mctp_ipc_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_ipc_deinit(mctp *mctp_inst);
-
