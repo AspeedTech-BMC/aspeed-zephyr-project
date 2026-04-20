@@ -131,7 +131,7 @@ enum usb_status_code {
 #define USB_DEVICE_VID				0x2245
 #define USB_DEVICE_DFU_PID			0x2700
 #define USB_DFU_DETACH_TIMEOUT			1000
-#define USB_DFU_MAX_XFER_SIZE			4096
+#define USB_DFU_MAX_XFER_SIZE			256
 #define USB_DFU_DEFAULT_POLLTIMEOUT		0
 
 #define USB_DEVICE_MANUFACTURER			"ASPEED"
@@ -139,10 +139,7 @@ enum usb_status_code {
 #define USB_DEVICE_SN				"8000000080000000"
 #define FIRMWARE_IMAGE_0_LABEL			"SPL DFU"
 
-#define CPU_SRAM_BASE				0x10000000
-#define CPU_SRAM_SIZE				0x20000
-#define USB_DMA_BUF_ADDR			CPU_SRAM_BASE
-#define USB_DMA_BUF_SIZE			CPU_SRAM_SIZE
+#define USB_DMA_BUF_SIZE			USB_DFU_MAX_XFER_SIZE
 #define DRAM_BLOCK_SIZE				USB_DFU_MAX_XFER_SIZE
 
 /*************************************************************************
@@ -529,7 +526,7 @@ struct bootusb_priv {
 	uint32_t *dfu_dst_addr;
 	uint32_t dfu_max_len;
 	uint32_t dfu_recv_len;
-	uint8_t *ep0_ctrl_buf;
+	uint8_t ep0_ctrl_buf[USB_DFU_MAX_XFER_SIZE];
 	enum usb_state usb_fsm_state;
 	struct request_ctx usb_req_ctx;
 	struct dfu_data_t dfu_data;
@@ -1177,8 +1174,6 @@ static int usb_init(struct device *dev)
 	struct bootusb_priv *hci = dev->data;
 	struct usb_vhub_config *usb;
 	uint32_t val, reg;
-
-	hci->ep0_ctrl_buf = (uint8_t *)USB_DMA_BUF_ADDR + CPU_SRAM_SIZE - USB_DFU_MAX_XFER_SIZE;
 	hci->usb_fsm_state = IDLE;
 	hci->dfu_max_len = UINT32_MAX;
 	hci->dfu_data.state = dfuIDLE;
