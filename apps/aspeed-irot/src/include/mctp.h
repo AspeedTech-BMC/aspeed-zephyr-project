@@ -202,6 +202,9 @@ typedef struct _mctp {
 	/* write queue */
 	struct k_msgq mctp_tx_queue;
 
+	/* tracks on-demand rx buffers so mctp_stop() can free any mid-flight on abort */
+	sys_slist_t rx_buf_list;
+
 	/* point to the rx message buffer that is assembling request/response */
 	struct {
 		uint8_t *buf;
