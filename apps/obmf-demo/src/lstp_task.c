@@ -464,7 +464,7 @@ static void lstp_task_thread_main(void *p1, void *p2, void *p3)
 	struct lstp_task_msg msg;
 	uint8_t resp_buf[LSTP_MSG_SIZE];
 
-	LOG_INF("LSTP Background Task Started");
+	LOG_INF("OBMF background task started");
 
 	while (1) {
 		if (k_msgq_get(&lstp_req_queue, &msg, K_FOREVER) == 0) {
@@ -578,7 +578,7 @@ void lstp_task_init(void)
 {
 	memset(_irq_states, LSTP_GPIO_IRQ_DISABLED, sizeof(_irq_states));
 	register_gpio_irq_callbacks();
-	LOG_INF("LSTP Background Task Initialized");
+	LOG_INF("OBMF background task initialized");
 	/* Thread and Queue are statically allocated/initialized via macros */
 }
 

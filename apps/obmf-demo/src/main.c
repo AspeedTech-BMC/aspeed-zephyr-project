@@ -19,7 +19,7 @@ int main(void)
 {
 	LOG_INF("Starting obmf-demo application");
 
-	/* Initialize the LSTP framework router */
+	/* Initialize the OBMF transport router */
 	lstp_router_init();
 
 	/* Initialize the background hardware task */
@@ -30,7 +30,7 @@ int main(void)
 		LOG_ERR("Failed to initialize SPI SFDP cache: %d", ret);
 	}
 
-	/* Initialize the USB Subsystem for LSTP */
+	/* Initialize the USB transport for OBMF */
 	ret = lstp_usb_init();
 	if (ret != 0) {
 		LOG_ERR("Failed to initialize USB subsystem: %d", ret);
@@ -39,7 +39,7 @@ int main(void)
 
 	ret = lstp_uart_init();
 	if (ret != 0) {
-		LOG_ERR("Failed to initialize LSTP UART console backend: %d", ret);
+		LOG_ERR("Failed to initialize OBMF UART backend: %d", ret);
 		return ret;
 	}
 

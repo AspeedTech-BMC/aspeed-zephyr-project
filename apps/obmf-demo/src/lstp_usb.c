@@ -226,7 +226,7 @@ USBD_DEFINE_CFG_DATA(lstp_usb_config) = {
 
 int lstp_usb_init(void)
 {
-	LOG_INF("Initializing LSTP USB Transport");
+	LOG_INF("Initializing OBMF USB transport");
 	k_msgq_init(&lstp_usb_tx_queue, (char *)lstp_usb_tx_queue_buffer,
 		    sizeof(struct lstp_usb_tx_msg), LSTP_USB_TX_QUEUE_SIZE);
 	k_work_init(&lstp_usb_tx_work, lstp_usb_tx_kick);

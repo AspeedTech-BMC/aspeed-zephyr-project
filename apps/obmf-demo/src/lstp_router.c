@@ -147,7 +147,7 @@ static lstp_status_t write_channel_config_helper(uint8_t channel_id,
 
 void lstp_router_init(void)
 {
-	LOG_INF("Initializing LSTP Router");
+	LOG_INF("Initializing OBMF Router");
 	for (int i = 0; i < LSTP_NUM_CHANNELS; i++) {
 		channels[i].enabled = true; // By default all supported channels enabled
 	}
@@ -384,7 +384,7 @@ void lstp_router_receive(uint8_t *buffer, size_t len)
 
 			int ret = lstp_usb_send(resp_buf, sizeof(struct lstp_hdr) + resp_payload_len);
 			if (ret < 0) {
-				LOG_ERR("Failed to send LSTP Mgmt response: %d", ret);
+				LOG_ERR("Failed to send OBMF management response: %d", ret);
 			}
 			break;
 
