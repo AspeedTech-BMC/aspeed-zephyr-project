@@ -75,3 +75,12 @@ struct ast_chip *ast_create_chip(void)
 
 	return chip;
 }
+
+int ast_destroy_chip(struct ast_chip *chip)
+{
+	int err;
+
+	err = ast_loader_deinit(chip);
+
+	return err;
+}
