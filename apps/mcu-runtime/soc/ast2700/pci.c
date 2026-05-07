@@ -44,6 +44,36 @@ LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 	 (CHECK_INTx(node, ehci)       << 2) | \
 	 (CHECK_INTx(node, xhci)       << 3))
 
+/**
+ * pcie_init_node - Initialize a single PCIe node (PLDA controller)
+ * @scu: pointer to SCU0 control register set
+ * @node_base: base address of the PLDA node
+ * @clk_gate_mask: clock gate enable mask for this node
+ * @rst_mask: reset release mask for this node
+ *
+ * Configures preset values, enables MSI, sets INTA routing, and manages clock/reset
+ * sequencing for a single PCIe PLDA node. This API consolidates duplicated node
+ * initialization logic for cpu-die (PLDA1/PLDA2) nodes.
+ */
+static void pcie_init_node(struct ast2700_scu0 *scu,
+			   uint32_t node_base,
+			   uint32_t clk_gate_mask,
+			   uint32_t rst_mask)
+{
+	/* setup preset for plda */
+	sys_write32(0x12600000, node_base + PLDA_PRESET0);
+	sys_write32(0x00012600, node_base + PLDA_PRESET1);
+
+	/* Enable bridge MSI and set INTA */
+	clrbits_le32((void *)(node_base + PLDA_MSI_CAP), BIT(3));
+	clrsetbits_le32((void *)(node_base + PLDA_MSI_CAP), GENMASK(2, 0), 0x1);
+
+	/* clk/reset for e2m */
+	setbits_le32(&scu->clkgate_clr, clk_gate_mask);
+	k_msleep(10);
+	setbits_le32(&scu->modrst2_clr, rst_mask);
+}
+
 int pci_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = chip->scu0;
@@ -74,40 +104,18 @@ int pci_init(struct ast_chip *chip)
 	}
 
 	/* cpu-die pcie node 1 */
-	// setup preset for plda2
-	sys_write32(0x12600000, ASPEED_PLDA2_PRESET0);
-	sys_write32(0x00012600, ASPEED_PLDA2_PRESET1);
-
-	// Enable Bridge2 MSI
-	clrbits_le32((void *)ASPEED_PLDA2_MSI_CAP, BIT(3));
-	// Set Bridge2 INTA
-	clrsetbits_le32((void *)ASPEED_PLDA2_MSI_CAP, GENMASK(2, 0), 0x1);
-
-	// clk/reset for e2m
-	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M1);
-	k_msleep(10);
-	setbits_le32(&scu->modrst2_clr, SCU0_RST2_E2M1);
+	pcie_init_node(scu, ASPEED_PLDA2_BASE,
+		       SCU0_CLKGATE1_E2M1, SCU0_RST2_E2M1);
 
 	/* cpu-die pcie node 0 */
-	// setup preset for plda1
-	sys_write32(0x12600000, ASPEED_PLDA1_PRESET0);
-	sys_write32(0x00012600, ASPEED_PLDA1_PRESET1);
-
-	// Enable Bridge1 MSI
-	clrbits_le32((void *)ASPEED_PLDA1_MSI_CAP, BIT(3));
-	// Set Bridge1 INTA
-	clrsetbits_le32((void *)ASPEED_PLDA1_MSI_CAP, GENMASK(2, 0), 0x1);
-
-	// clk/reset for e2m
-	setbits_le32(&scu->clkgate_clr, SCU0_CLKGATE1_E2M0);
-	k_msleep(10);
-	setbits_le32(&scu->modrst2_clr, SCU0_RST2_E2M0);
+	pcie_init_node(scu, ASPEED_PLDA1_BASE,
+		       SCU0_CLKGATE1_E2M0, SCU0_RST2_E2M0);
 
 	/* io-die pcie node */
 	// Enable Bridge3 MSI
-	clrbits_le32((void *)ASPEED_PLDA3_MSI_CAP, BIT(3));
+	clrbits_le32((void *)(ASPEED_PLDA3_BASE + PLDA_MSI_CAP), BIT(3));
 	// Set Bridge3 INTA
-	clrsetbits_le32((void *)ASPEED_PLDA3_MSI_CAP, GENMASK(2, 0), 0x1);
+	clrsetbits_le32((void *)(ASPEED_PLDA3_BASE + PLDA_MSI_CAP), GENMASK(2, 0), 0x1);
 
 	/* the raw of e2m need to disable under AST2700 A2 CPU / IO die */
 	/* turn on vlink codec under AST2700 A2 */
