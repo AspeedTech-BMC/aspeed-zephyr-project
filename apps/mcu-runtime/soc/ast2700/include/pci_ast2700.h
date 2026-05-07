@@ -11,8 +11,17 @@
 #define ASPEED_PLDA1_BASE		0x12c15000
 #define ASPEED_PLDA2_BASE		0x12c15800
 #define   PLDA_MSI_CAP			(0x10)
+#define   PLDA_MISC_48			(0x48)
+#define     ECRC_GEN_SUPPORT		BIT(2)
+#define     ECRC_CHK_SUPPORT		BIT(1)
 #define   PLDA_PRESET0			(0xb0)
 #define   PLDA_PRESET1			(0xb4)
+#define   PLDA_MISC_1FC			(0x1FC)
+// When set, strips ECRC from incoming TLP if downstream device lacks ECRC support
+#define     ECRC_DISCARD_IF_DS_UNSUPP	BIT(29)
+#define   PLDA_MISC_258			(0x258)
+// When set, PCIe core adds ECRC to outgoing Tx TLP header if TD = 1
+#define     ECRC_TX_INSERT_IF_TD	BIT(10)
 
 #define ASPEED_PLDA3_BASE		0x14c1c000
 #define ASPEED_PLDA3_MSI_CAP		(ASPEED_PLDA3_BASE + 0x10)

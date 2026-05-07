@@ -68,6 +68,14 @@ static void pcie_init_node(struct ast2700_scu0 *scu,
 	clrbits_le32((void *)(node_base + PLDA_MSI_CAP), BIT(3));
 	clrsetbits_le32((void *)(node_base + PLDA_MSI_CAP), GENMASK(2, 0), 0x1);
 
+#if !defined(CONFIG_PCIE_ECRC_DISABLE)
+	/* Enable ECRC */
+	setbits_le32(node_base + PLDA_MISC_48,
+		     ECRC_GEN_SUPPORT | ECRC_CHK_SUPPORT);
+	setbits_le32(node_base + PLDA_MISC_1FC, ECRC_DISCARD_IF_DS_UNSUPP);
+	setbits_le32(node_base + PLDA_MISC_258, ECRC_TX_INSERT_IF_TD);
+#endif
+
 	/* clk/reset for e2m */
 	setbits_le32(&scu->clkgate_clr, clk_gate_mask);
 	k_msleep(10);
