@@ -7,7 +7,7 @@
 
 #define SCU_CPU_PINMUX1                 (SCU0_REG + 0x400)
 
-void fpga_phy_init(struct sdramc *sdramc)
+int fpga_phy_init(struct sdramc *sdramc)
 {
 	struct sdramc_regs *regs = sdramc->regs;
 
@@ -48,6 +48,8 @@ void fpga_phy_init(struct sdramc *sdramc)
 		;
 
 	sys_write32(DRAMC_IRQSTA_PHY_INIT_DONE, (uint32_t)&regs->intr_clear);
+
+	return 0;
 }
 
 #if defined(ASPEED_FPGA_DDR_CALI)

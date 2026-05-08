@@ -374,7 +374,7 @@ static int sdramc_phy_init(struct sdramc *sdramc, struct sdramc_ac_timing *ac)
 
 	/* initialize phy */
 	if (sdramc->fpga)
-		fpga_phy_init(sdramc);
+		err = fpga_phy_init(sdramc);
 	else
 		err = dwc_phy_init(sdramc);
 
