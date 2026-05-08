@@ -17,6 +17,7 @@ target_sources(app PRIVATE
 	usb.c
 	mmc.c
 	stor_ast2700.c
+	mac.c
 )
 
 target_include_directories(app PRIVATE
