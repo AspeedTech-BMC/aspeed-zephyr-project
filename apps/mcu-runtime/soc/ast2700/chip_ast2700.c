@@ -15,6 +15,7 @@
 #include <sdram_ast2700.h>
 #include <dp_ast2700.h>
 #include <pci_ast2700.h>
+#include <mac_ast2700.h>
 #include <ast_loader.h>
 #include <wdt.h>
 #include <extrst.h>
@@ -71,6 +72,7 @@ static struct peripheral peri_tbl[] = {
 	{"DRAM",	dram_init, NULL},
 	{"USB",		usb_init, NULL},
 	{"PCI",		pci_init, NULL},
+	{"VGA",		mac_init, NULL},
 };
 #endif
 
