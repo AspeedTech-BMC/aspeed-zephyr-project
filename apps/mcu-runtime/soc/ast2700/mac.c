@@ -268,11 +268,29 @@ static void mac_init_tx_desc_only_desc0(void)
 	txdes->des0 |= MAC_TXDES0_TXDMA_OWN;
 }
 
-static void set_rgmii_delay(struct ast2700_scu1 *scu, uint32_t tx, uint32_t rx,
-			    uint32_t index, bool freq_set)
+static void set_rgmii_delay_1g(struct ast2700_scu1 *scu, uint32_t tx, uint32_t rx,
+			       uint32_t index, bool freq_set)
 {
 	uintptr_t target = freq_set ? (uintptr_t)&scu->mac_10m_delay :
 				     (uintptr_t)&scu->mac_delay;
+	uint32_t reg = sys_read32(target);
+
+	if (index) {
+		reg &= ~(TX_DELAY_2 | RX_DELAY_2);
+		reg |= FIELD_PREP(TX_DELAY_2, tx) | FIELD_PREP(RX_DELAY_2, rx);
+	} else {
+		reg &= ~(TX_DELAY_1 | RX_DELAY_1);
+		reg |= FIELD_PREP(TX_DELAY_1, tx) | FIELD_PREP(RX_DELAY_1, rx);
+	}
+
+	sys_write32(reg, target);
+}
+
+static void set_rgmii_delay_100m_10m(struct ast2700_scu1 *scu, uint32_t tx,
+				     uint32_t rx, uint32_t index, bool speed_100m)
+{
+	uintptr_t target = speed_100m ? (uintptr_t)&scu->mac_100m_delay :
+					(uintptr_t)&scu->mac_10m_delay;
 	uint32_t reg = sys_read32(target);
 
 	if (index) {
@@ -436,9 +454,9 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 
 		rgmii_chain = index ? SCU_DBGSEL_RING_SEL_RGMII1_TX :
 				      SCU_DBGSEL_RING_SEL_RGMII0_TX;
-		set_rgmii_delay(scu, 0, 0, index, true);
+		set_rgmii_delay_1g(scu, 0, 0, index, true);
 		tx_start = cal_delay32_ring(scu, revision, rgmii_chain);
-		set_rgmii_delay(scu, 31, 0, index, true);
+		set_rgmii_delay_1g(scu, 31, 0, index, true);
 		tx_end = cal_delay32_ring(scu, revision, rgmii_chain);
 
 		tx_average_delay = (tx_end - tx_start) / 31;
@@ -449,9 +467,9 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 #ifdef RX_DELAY_CHAIN
 		rgmii_chain = index ? SCU_DBGSEL_RING_SEL_RGMII1_RX :
 				      SCU_DBGSEL_RING_SEL_RGMII0_RX;
-		set_rgmii_delay(scu, 0, 0, index, true);
+		set_rgmii_delay_1g(scu, 0, 0, index, true);
 		rx_start = cal_delay32_ring(scu, revision, rgmii_chain);
-		set_rgmii_delay(scu, 0, 31, index, true);
+		set_rgmii_delay_1g(scu, 0, 31, index, true);
 		rx_end = cal_delay32_ring(scu, revision, rgmii_chain);
 		rx_average_delay = (rx_end - rx_start) / 31;
 		rx_average_delay /= 2;
@@ -476,7 +494,7 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 		tx_en = 2000 / tx_average_delay;
 
 	for (rx = 0; rx < 32; rx++) {
-		set_rgmii_delay(scu, tx_en, rx, index, false);
+		set_rgmii_delay_1g(scu, tx_en, rx, index, false);
 		result[rx] = packet_check(index);
 	}
 
@@ -494,6 +512,8 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 	mac_clk_disable(scu, index);
 	mac_reset_assert(scu, index);
 
+	set_rgmii_delay_100m_10m(scu, tx_en, rx_en, index, true);
+	set_rgmii_delay_100m_10m(scu, tx_en, rx_en, index, false);
 	record_rgmii_delay(scu, index, tx_dis, tx_en, rx_dis, rx_en,
 			   tx_average_delay, rx_average_delay);
 }
