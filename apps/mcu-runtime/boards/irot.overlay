@@ -34,7 +34,10 @@
 		<MPU_ID_SSP_DATA S_READWRITE>,
 		<MPU_ID_SLIM S_READWRITE>,
 		<MPU_ID_HMAC S_READWRITE>;
-	
+
+	sli_port {
+		allow = <MPU_ID_BOOTMCU S_READWRITE>, <MPU_ID_FMC S_READWRITE>;
+	};
 };
 
 &tsp {
