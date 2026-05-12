@@ -72,7 +72,7 @@ static struct peripheral peri_tbl[] = {
 	{"DRAM",	dram_init, NULL},
 	{"USB",		usb_init, NULL},
 	{"PCI",		pci_init, NULL},
-	{"VGA",		mac_init, NULL},
+	{"MAC",		mac_init, NULL},
 };
 #endif
 
