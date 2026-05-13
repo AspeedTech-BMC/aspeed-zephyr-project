@@ -95,12 +95,12 @@ int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 	return err;
 }
 
-static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, bool verify)
+static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, bool verify, uint32_t *img_read_size)
 {
 	struct ast_loader *loader = &g_loader;
 	uint32_t sz = 0;
 	int err = 0;
-	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, verify=%d\n",
+	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, verify=%d",
 		__func__, type, (uint32_t)dst, (uint32_t)buf, verify);
 
 	if (loader->load) {
@@ -111,22 +111,30 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 
 	if (verify) {
 		if (!loader->verify) {
-			LOG_ERR("Verifier does not be registered.\n");
+			LOG_ERR("Verifier does not be registered.");
 			return -1;
 		}
 
-		if (!buf || sz == 0) {
-			LOG_ERR("Hash buffer is NULL or size is zero.\n");
+		if (!buf) {
+			LOG_ERR("Hash buffer is NULL");
 			return -1;
+		}
+
+		if (sz == 0) {
+			LOG_WRN("Img size == 0");
+			if (img_read_size)
+				*img_read_size = 0;
+			return 0;
 		}
 
 		err = loader->verify(type, buf, sz);
 		if (err) {
-			printf("%s: type %d verify failed, err=%d\n", __func__, type, err);
+			LOG_ERR("%s: type %d verify failed, err=%d", __func__, type, err);
 			return err;
 		}
 	}
-
+	if (img_read_size)
+		*img_read_size = sz;
 	memcpy32(dst, buf, sz);
 
 	return err;
@@ -134,12 +142,12 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 
 int ast_loader_load_image(uint32_t type, uint32_t *dst, bool verify)
 {
-	return _ast_loader_load_image(type, dst, (uint32_t *)AST_HASH_BUFFER, 1);
+	return _ast_loader_load_image(type, dst, (uint32_t *)AST_HASH_BUFFER, 1, NULL);
 }
 
-int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify)
+int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify, uint32_t *img_read_size)
 {
-	return _ast_loader_load_image(type, dst, (uint32_t *)CONFIG_SYS_LOAD_ADDR, 1);
+	return _ast_loader_load_image(type, dst, (uint32_t *)CONFIG_SYS_LOAD_ADDR, 1, img_read_size);
 }
 
 static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)

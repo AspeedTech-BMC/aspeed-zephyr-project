@@ -270,6 +270,7 @@ int cptra_load_abb_image(void)
 	uint32_t image_count = 0;
 	uint32_t fw_id;
 	uint32_t identifier;
+	uint32_t img_read_size = 0;
 
 	struct cptra_image_info default_image_info[] = {
 		{CPTRA_ATF_HDR_ID, 0x0, 0x0},
@@ -308,8 +309,13 @@ int cptra_load_abb_image(void)
 		if (!load_addr)
 			continue;
 
-		ret = ast_loader_load_manifest_image(fw_id, load_addr, true);
-		LOG_INF("Load %s image... %s (0x%x)", cptra_ime_get_image_name(fw_id),
+		ret = ast_loader_load_manifest_image(fw_id, load_addr, true, &img_read_size);
+		if (ret == 0 && img_read_size == 0) {
+			LOG_WRN("%s image size is 0, skip loading\n", cptra_ime_get_image_name(fw_id));
+			continue;
+		}
+
+		LOG_INF("Load %s image... %s (0x%x)\n", cptra_ime_get_image_name(fw_id),
 			ret ? "fail" : "pass", ret);
 
 		if (!ret)
