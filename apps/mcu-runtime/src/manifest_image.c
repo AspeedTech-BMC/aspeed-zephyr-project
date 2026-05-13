@@ -35,21 +35,21 @@ struct cptra_load_image {
 };
 
 static struct cptra_load_image image_list[] = {
-	{ "manifest", CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID, CPTRA_FMC_LOAD_ADDR},
-	{ "ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "ddr4_dmem", CPTRA_DDR4_DMEM_HDR_ID, CPTRA_DDR4_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
+	{ "manifest",     CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID,     CPTRA_NO_LOAD_ADDR},
+	{ "mcu_fmc",      CPTRA_FMC_HDR_ID,          CPTRA_FMC_FW_ID,          CPTRA_FMC_LOAD_ADDR},
+	{ "ddr4_imem",    CPTRA_DDR4_IMEM_HDR_ID,    CPTRA_DDR4_IMEM_FW_ID,    CPTRA_NO_LOAD_ADDR},
+	{ "ddr4_dmem",    CPTRA_DDR4_DMEM_HDR_ID,    CPTRA_DDR4_DMEM_FW_ID,    CPTRA_NO_LOAD_ADDR},
 	{ "ddr4_2d_imem", CPTRA_DDR4_2D_IMEM_HDR_ID, CPTRA_DDR4_2D_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
 	{ "ddr4_2d_dmem", CPTRA_DDR4_2D_DMEM_HDR_ID, CPTRA_DDR4_2D_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "ddr5_imem", CPTRA_DDR5_IMEM_HDR_ID, CPTRA_DDR5_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "ddr5_dmem", CPTRA_DDR5_DMEM_HDR_ID, CPTRA_DDR5_DMEM_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "dp_fw", CPTRA_DP_FW_HDR_ID, CPTRA_DP_FW_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "uefi", CPTRA_UEFI_HDR_ID, CPTRA_UEFI_FW_ID, CPTRA_NO_LOAD_ADDR},
-	{ "atf", CPTRA_ATF_HDR_ID, CPTRA_ATF_FW_ID, CPTRA_ATF_LOAD_ADDR},
-	{ "optee", CPTRA_OPTEE_HDR_ID, CPTRA_OPTEE_FW_ID, CPTRA_OPTEE_LOAD_ADDR},
-	{ "uboot", CPTRA_UBOOT_HDR_ID, CPTRA_UBOOT_FW_ID, CPTRA_UBOOT_LOAD_ADDR},
-	{ "ssp", CPTRA_SSP_HDR_ID, CPTRA_SSP_FW_ID, CPTRA_SSP_LOAD_ADDR},
-	{ "tsp", CPTRA_TSP_HDR_ID, CPTRA_TSP_FW_ID, CPTRA_TSP_LOAD_ADDR},
+	{ "ddr5_imem",    CPTRA_DDR5_IMEM_HDR_ID,    CPTRA_DDR5_IMEM_FW_ID,    CPTRA_NO_LOAD_ADDR},
+	{ "ddr5_dmem",    CPTRA_DDR5_DMEM_HDR_ID,    CPTRA_DDR5_DMEM_FW_ID,    CPTRA_NO_LOAD_ADDR},
+	{ "dp_fw",        CPTRA_DP_FW_HDR_ID,        CPTRA_DP_FW_FW_ID,        CPTRA_NO_LOAD_ADDR},
+	{ "uefi",         CPTRA_UEFI_HDR_ID,         CPTRA_UEFI_FW_ID,         CPTRA_NO_LOAD_ADDR},
+	{ "atf",          CPTRA_ATF_HDR_ID,          CPTRA_ATF_FW_ID,          CPTRA_ATF_LOAD_ADDR},
+	{ "optee",        CPTRA_OPTEE_HDR_ID,        CPTRA_OPTEE_FW_ID,        CPTRA_OPTEE_LOAD_ADDR},
+	{ "uboot",        CPTRA_UBOOT_HDR_ID,        CPTRA_UBOOT_FW_ID,        CPTRA_UBOOT_LOAD_ADDR},
+	{ "ssp",          CPTRA_SSP_HDR_ID,          CPTRA_SSP_FW_ID,          CPTRA_SSP_LOAD_ADDR},
+	{ "tsp",          CPTRA_TSP_HDR_ID,          CPTRA_TSP_FW_ID,          CPTRA_TSP_LOAD_ADDR},
 };
 
 static struct cptra_image_info *cptra_find_image_info(struct cptra_image_context *ctx,
@@ -230,12 +230,16 @@ struct cptra_manifest_ime *cptra_get_ime_by_fw_id(struct cptra_soc_manifest *man
 	struct cptra_load_image *img = NULL;
 	uint32_t image_count = 0;
 	struct cptra_manifest_ime *imc_stored = cptra_get_imc_stored();
+	static uint32_t invalid_count = 0;
 
 	if (!is_ast2700_a2() && !man)
 		return NULL;
 
 	if (is_ast2700_a2() && !cptra_imc_stored_valid()) {
-		LOG_WRN("IMC stored invalid, skip ime lookup.");
+		invalid_count++;
+		if (invalid_count == 1) {
+			LOG_WRN("IMC stored invalid (SoC manifest may be invalid), skip ime lookup.");
+		}
 		return NULL;
 	}
 
