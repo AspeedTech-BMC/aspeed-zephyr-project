@@ -154,11 +154,6 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 
 	LOG_DBG("%s: ENABLE 0(%d) 1(%d)", __func__, is_pcie0_enable, is_pcie1_enable);
 
-	if (scu->hwstrap1 & BIT(11)) {
-		LOG_DBG("%s: Skip probe since it has been done.\n", __func__);
-		return 0;
-	}
-
 	_ast_update_e2m(scu, ram, is_64vram, nodes);
 
 	/* scratch for VGA CRAA[1:0] : 10b: 32Mbytes, 11b: 64Mbytes */
