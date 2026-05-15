@@ -88,6 +88,8 @@ static int stor_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, ui
 
 	*len = sz;
 
+	LOG_INF("%s: src=0x%x, size=0x%x", __func__, src, sz);
+
 	return err;
 }
 

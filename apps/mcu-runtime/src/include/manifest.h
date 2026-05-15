@@ -231,6 +231,7 @@ uint32_t cptra_manifest_start_offset(void);
 int cptra_verify_abb_loader(void);
 int cptra_load_abb_image(void);
 int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
+bool cptra_manifest_sec_en(void);
 int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest);
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
 int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id);
