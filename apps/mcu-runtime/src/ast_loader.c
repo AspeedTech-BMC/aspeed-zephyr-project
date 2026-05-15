@@ -100,8 +100,9 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 	struct ast_loader *loader = &g_loader;
 	uint32_t sz = 0;
 	int err = 0;
-	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, verify=%d",
-		__func__, type, (uint32_t)dst, (uint32_t)buf, verify);
+
+	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, sec boot verify=%d",
+			__func__, type, (uint32_t)dst, (uint32_t)buf, verify && cptra_manifest_sec_en());
 
 	if (loader->load) {
 		err = loader->load(loader, type, buf, &sz);
