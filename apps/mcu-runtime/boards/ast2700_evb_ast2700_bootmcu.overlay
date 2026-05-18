@@ -5,7 +5,7 @@
 	};
 
 	sram: memory@14b80000 {
-		reg = <0x14b80000 0x2f800>;
+		reg = <0x14b80000 0x2f400>;
 	};
 
 	reserved-memory {
