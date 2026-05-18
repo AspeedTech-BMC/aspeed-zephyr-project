@@ -7,6 +7,8 @@
 #ifndef CPTRA_IDEVID_H_
 #define CPTRA_IDEVID_H_
 
-int cptra_populate_idevid(void);
+struct ast_chip;
+
+int cptra_otp_init(struct ast_chip *chip);
 
 #endif

@@ -12,7 +12,6 @@
 #include <scu.h>
 #include <ssp_tsp.h>
 #include <manifest.h>
-#include <cptra_idevid.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
 #include <chip.h>
 
@@ -201,7 +200,6 @@ struct ast_board *ast_create_board(struct ast_chip *chip)
 	board->boot = board_prepare_for_boot;
 
 	if (!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA)) {
-		board->populate = cptra_populate_idevid;
 		if (IS_ENABLED(CONFIG_CPTRA_IPC))
 			board->runtime_loop = cptra_ipc_enable;
 	}
