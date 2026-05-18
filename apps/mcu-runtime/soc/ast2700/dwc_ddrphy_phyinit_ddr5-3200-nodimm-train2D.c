@@ -4228,10 +4228,10 @@ dwc_ddrphy_apb_wr(0x200fd, 0xf5); // DWC_DDRPHYA_MASTER0_base0_DqPreamblePattern
 dwc_ddrphy_apb_wr(0x2003a, 0x2); // DWC_DDRPHYA_MASTER0_base0_DbyteDllModeCntrl
 //// [phyinit_C_initPhyConfig] Pstate=0, Memclk=1600MHz, Programming TxOdtDrvStren::TxOdtStrenPu to 0x4
 //// [phyinit_C_initPhyConfig] Pstate=0, Memclk=1600MHz, Programming TxOdtDrvStren::TxOdtStrenPd to 0x0
-dwc_ddrphy_apb_wr(0x1004d, 0x82); // DWC_DDRPHYA_DBYTE0_base0_TxOdtDrvStren_b0_p0
-dwc_ddrphy_apb_wr(0x1014d, 0x82); // DWC_DDRPHYA_DBYTE0_base0_TxOdtDrvStren_b1_p0
-dwc_ddrphy_apb_wr(0x1104d, 0x82); // DWC_DDRPHYA_DBYTE1_base0_TxOdtDrvStren_b0_p0
-dwc_ddrphy_apb_wr(0x1114d, 0x82); // DWC_DDRPHYA_DBYTE1_base0_TxOdtDrvStren_b1_p0
+dwc_ddrphy_apb_wr(0x1004d, 0x9e); // DWC_DDRPHYA_DBYTE0_base0_TxOdtDrvStren_b0_p0
+dwc_ddrphy_apb_wr(0x1014d, 0x9e); // DWC_DDRPHYA_DBYTE0_base0_TxOdtDrvStren_b1_p0
+dwc_ddrphy_apb_wr(0x1104d, 0x9e); // DWC_DDRPHYA_DBYTE1_base0_TxOdtDrvStren_b0_p0
+dwc_ddrphy_apb_wr(0x1114d, 0x9e); // DWC_DDRPHYA_DBYTE1_base0_TxOdtDrvStren_b1_p0
 //// [phyinit_C_initPhyConfig] Pstate=0, Memclk=1600MHz, Programming ATxImpedance::ADrvStrenP to 0x3f
 //// [phyinit_C_initPhyConfig] Pstate=0, Memclk=1600MHz, Programming ATxImpedance::ADrvStrenN to 0x3f
 //// [phyinit_C_initPhyConfig] Pstate=0, Memclk=1600MHz, Programming ATxImpedance::ATxReserved13x12 to 0x0
