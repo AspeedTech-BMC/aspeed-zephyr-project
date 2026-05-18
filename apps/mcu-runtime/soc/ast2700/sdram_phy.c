@@ -271,6 +271,13 @@ int dwc_phy_init(struct sdramc *sdramc)
 {
 	uint32_t err = -1;
 
+	sys_write32(0xabcd2700, 0x13c00000);
+	while (sys_read32(0x13c00000) != 1);
+	sys_write32(0x16c, 0x13c00050);
+	sys_write32(0x16c, 0x13c00054);
+	sys_write32(0xaaa, 0x13c00000);
+	while (sys_read32(0x13c00000) != 0);
+
 	if (is_ddr4()) {
 		LOG_DBG("%s: Starting ddr4 training\n", __func__);
 		#include "dwc_ddrphy_phyinit_ddr4-3200-nodimm-train2D.c"
