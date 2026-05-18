@@ -8,6 +8,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/misc/aspeed/otp_ast27xx.h>
 #include <zephyr/sys/byteorder.h>
+#include <platform.h>
+#include <chip.h>
+#include <scu.h>
 
 LOG_MODULE_REGISTER(cptra_idevid, CONFIG_SOC_LOG_LEVEL);
 
@@ -134,7 +137,7 @@ end:
 	return ret;
 }
 
-int cptra_populate_idevid(void)
+static int cptra_populate_idevid(void)
 {
 
 	const struct device *dev = device_get_binding(CPTRA_DICE_DRV_NAME);
@@ -191,4 +194,43 @@ int cptra_populate_idevid(void)
 end:
 	LOG_ERR("%s: Failed", __func__);
 	return ret;
+}
+
+int cptra_otp_init(struct ast_chip *chip)
+{
+#if !defined(CONFIG_CPTRA_DICE)
+	return 0;
+#else
+	const struct device *dev = device_get_binding(CPTRA_DICE_DRV_NAME);
+	struct cptra_reallocate_dpe_context_limits_ia input;
+	struct cptra_reallocate_dpe_context_limits_oa output;
+	int ret;
+
+	if (sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA)
+		return 0;
+
+	ret = cptra_populate_idevid();
+	if (ret)
+		LOG_WRN("populate idevid skipped, ret:%d", ret);
+
+	if (!dev) {
+		LOG_ERR("Device %s not found", CPTRA_DICE_DRV_NAME);
+		return -ENODEV;
+	}
+
+	memset(&input, 0, sizeof(input));
+	memset(&output, 0, sizeof(output));
+	input.pl0_context_limit = 32;
+
+	ret = caliptra_reallocate_dpe_context_limits(dev, &input, &output);
+	if (ret) {
+		LOG_ERR("caliptra_reallocate_dpe_context_limits failed, ret:0x%x", ret);
+		return ret;
+	}
+
+	LOG_INF("DPE context limits reallocated: pl0=%u, pl1=%u",
+		output.new_pl0_context_limit, output.new_pl1_context_limit);
+
+	return 0;
+#endif
 }

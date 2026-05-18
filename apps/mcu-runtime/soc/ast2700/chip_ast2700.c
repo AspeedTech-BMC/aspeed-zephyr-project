@@ -20,6 +20,7 @@
 #include <wdt.h>
 #include <extrst.h>
 #include <usb.h>
+#include <cptra_idevid.h>
 
 LOG_MODULE_REGISTER(ast_chip, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -73,6 +74,7 @@ static struct peripheral peri_tbl[] = {
 	{"USB",		usb_init, NULL},
 	{"PCI",		pci_init, NULL},
 	{"MAC",		mac_init, NULL},
+	{"CPTRA",	cptra_otp_init, NULL},
 };
 #endif
 
