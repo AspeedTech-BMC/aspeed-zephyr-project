@@ -1,8 +1,18 @@
 # Copyright (c) 2022 ASPEED Technology Inc.
 # SPDX-License-Identifier: MIT
 
+config INTEL_PFR_CPLD_UPDATE_CAPABLE
+	bool
+	default y if BOARD_AST1060_DCSCM || BOARD_AST1060_DCSCM_DICE || \
+		BOARD_AST1060_PROT || BOARD_AST1060_PROT_DICE || \
+		BOARD_AST2700_DCSCM || BOARD_AST2700_DCSCM_BHS
+	help
+	  Internal capability selected by boards whose platform GPIO layout
+	  matches the Intel CPLD update implementation.
+
 config INTEL_PFR_CPLD_UPDATE
 	depends on INTEL_PFR
+	depends on INTEL_PFR_CPLD_UPDATE_CAPABLE
 	default n
 	bool "Intel PFR 4.0 CPLD update"
 	help

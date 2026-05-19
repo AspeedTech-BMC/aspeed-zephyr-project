@@ -11,7 +11,7 @@
 /* i2c dev bus */
 #define I2C_BUS_BMC 0x00
 
-#if defined(CONFIG_BOARD_AST2700_DCSCM)
+#if defined(CONFIG_BOARD_AST2700_DCSCM_FAMILY)
 #define I2C_BUS_PCH 0x05
 #else
 #define I2C_BUS_PCH 0x02

@@ -11,10 +11,16 @@ cd workspace
 west update
 ```
 
-## AST2700 DCSCM A1 board
+## AST2700 DCSCM board for Intel Birchstream
 
 ```
-west build -b ast2700_dcscm -p auto aspeed-zephyr-project/apps/aspeed-pfr
+west build -b ast2700_dcscm_bhs -p auto aspeed-zephyr-project/apps/aspeed-pfr
+```
+
+## AST2700 DCSCM board for Intel Oakstream
+
+```
+west build -b ast2700_dcscm_oks -p auto aspeed-zephyr-project/apps/aspeed-pfr
 ```
 
 ## AST2700 DCSCM board for AMD
