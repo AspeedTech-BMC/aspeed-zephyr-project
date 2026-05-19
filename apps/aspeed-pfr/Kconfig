@@ -7,6 +7,15 @@ config ASPEED_DC_SCM
 	help
 	  Enable ASPEED DC-SCM board basic settings.
 
+config BOARD_AST2700_DCSCM_FAMILY
+	bool
+	default y if BOARD_AST2700_DCSCM || BOARD_AST2700_DCSCM_BHS || BOARD_AST2700_DCSCM_OKS
+	help
+	  Selected by AST2700 DCSCM-family boards that share the same MCTP
+	  topology (BMC bridges CPU MCTP-over-I3C to PFR, PCH on I2C bus 5).
+	  New family members should be added to this symbol's default
+	  expression instead of editing source `#if` chains.
+
 config BMC_DUAL_FLASH
 	default n
 	bool "Enable BMC dual flash support"

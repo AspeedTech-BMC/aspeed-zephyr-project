@@ -21,7 +21,7 @@ extern const struct device dev_i3c_tmq[I3C_MAX_NUM];
 #define I3C_BUS_CPU          0x00
 #define I3C_BUS_BMC          0x02
 
-#if defined(CONFIG_BOARD_AST2700_DCSCM)
+#if defined(CONFIG_BOARD_AST2700_DCSCM_FAMILY)
 mctp_i3c_dev i3c_devs[] = {
 	{
 		// For BMC to send mctp msg to PFR

@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Aspeed AST1060 board configuration for AST2700 DCSCM OKS
+#
+# Copyright (c) 2026 ASPEED Technology Inc.
+
+config BOARD_AST2700_DCSCM_OKS
+	select SOC_AST1060
