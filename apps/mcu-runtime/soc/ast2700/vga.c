@@ -58,7 +58,7 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	/* If the memory region would not be loaded before */
 	if (*(uint16_t *)vbios_mem_base != BIOS_HEADER_TAG) {
 		memset((uint32_t *)vbios_base, 0x0, 0x10000);
-		ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0);
+		ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0, true);
 	}
 
 	/* Remove riscv Dram base */
