@@ -79,7 +79,7 @@ int dp_init(struct ast_chip *chip)
 		mcu_ctrl |= MCU_CTRL_AHBS_IMEM_EN;
 		sys_write32(mcu_ctrl, MCU_CTRL);
 
-		ast_loader_load_image(CPTRA_DP_FW_FW_ID, (uint32_t *)MCU_IMEM_BASE, 0);
+		ast_loader_load_image(CPTRA_DP_FW_FW_ID, (uint32_t *)MCU_IMEM_BASE, 0, true);
 
 		/* release DPMCU internal reset */
 		mcu_ctrl &= ~MCU_CTRL_AHBS_IMEM_EN;

@@ -19,7 +19,7 @@ LOG_MODULE_REGISTER(ast_loader, CONFIG_SOC_FMC_LOG_LEVEL);
 struct ast_loader g_loader;
 
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
-static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
+static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len, uint32_t buf_len)
 {
 	int err = 0;
 
@@ -29,7 +29,7 @@ static int ast_loader_verify(uint32_t type, uint32_t *message, uint32_t len)
 
 #ifndef CONFIG_CPTRA_2X_LAYOUT
 		err = cptra_verify_soc_manifest(
-			(struct cptra_soc_manifest *)message);
+			(struct cptra_soc_manifest_verify_buf *)message, buf_len);
 		if (err)
 			goto end;
 
@@ -95,19 +95,35 @@ int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 	return err;
 }
 
-static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, bool verify, uint32_t *img_read_size)
+static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t dst_check_max_len, uint32_t *buf, uint32_t buf_size,
+								  bool verify, uint32_t *img_read_size)
 {
 	struct ast_loader *loader = &g_loader;
 	uint32_t sz = 0;
-	int err = 0;
+	int err;
+
+	if (!dst || !buf || buf_size == 0 || !loader->load) {
+		LOG_ERR("%s: Invalid input params", __func__);
+		return -1;
+	}
 
 	LOG_INF("%s: type=%d, dst=0x%x, buf=0x%x, sec boot verify=%d",
-			__func__, type, (uint32_t)dst, (uint32_t)buf, verify && cptra_manifest_sec_en());
+		__func__, type, (uint32_t)dst, (uint32_t)buf, verify && cptra_manifest_sec_en());
 
-	if (loader->load) {
-		err = loader->load(loader, type, buf, &sz);
-		if (err)
-			return err;
+	err = loader->load(loader, type, buf, &sz);
+	if (err)
+		return err;
+
+	if (sz == 0) {
+		LOG_WRN("Img size == 0");
+		if (img_read_size)
+			*img_read_size = 0;
+		return 0;
+	}
+
+	if (sz > buf_size || (dst_check_max_len != 0 && sz > dst_check_max_len)) {
+		LOG_ERR("Img size (0x%x) exceeds tmp buf size (0x%x) or dst buf size (0x%x)", sz, buf_size, dst_check_max_len);
+		return -1;
 	}
 
 	if (verify) {
@@ -116,39 +132,33 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t *buf, b
 			return -1;
 		}
 
-		if (!buf) {
-			LOG_ERR("Hash buffer is NULL");
-			return -1;
-		}
-
-		if (sz == 0) {
-			LOG_WRN("Img size == 0");
-			if (img_read_size)
-				*img_read_size = 0;
-			return 0;
-		}
-
-		err = loader->verify(type, buf, sz);
+		err = loader->verify(type, buf, sz, buf_size);
 		if (err) {
 			LOG_ERR("%s: type %d verify failed, err=%d", __func__, type, err);
 			return err;
 		}
 	}
+
+	// make sure verify pass before copy to destination
 	if (img_read_size)
 		*img_read_size = sz;
 	memcpy32(dst, buf, sz);
 
-	return err;
+	return 0;
 }
 
-int ast_loader_load_image(uint32_t type, uint32_t *dst, bool verify)
+int ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t dst_check_max_len, bool verify)
 {
-	return _ast_loader_load_image(type, dst, (uint32_t *)AST_HASH_BUFFER, 1, NULL);
+	uint32_t *temp_buf = (uint32_t *)AST_HASH_BUFFER;
+	LOG_DBG("temp_buf start addr: 0x%08x end addr: 0x%08x",
+			(uint32_t)temp_buf, (uint32_t)((uint8_t *)temp_buf + CONFIG_AST_LOADER_TEMP_BUF_SIZE));
+	return _ast_loader_load_image(type, dst, dst_check_max_len, temp_buf, CONFIG_AST_LOADER_TEMP_BUF_SIZE, verify, NULL);
 }
 
 int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify, uint32_t *img_read_size)
 {
-	return _ast_loader_load_image(type, dst, (uint32_t *)CONFIG_SYS_LOAD_ADDR, 1, img_read_size);
+	return _ast_loader_load_image(type, dst, 0, (uint32_t *)CONFIG_SYS_LOAD_ADDR,
+								  CONFIG_AST_LOADER_DRAM_TEMP_BUF_MAX_SIZE, verify, img_read_size);
 }
 
 static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)

@@ -175,15 +175,14 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 {
 	int ret = 0;
 	static struct cptra_soc_manifest soc_manifest;
+	const uint32_t manifest_size = sizeof(struct cptra_soc_manifest);
 
+	LOG_DBG("size of soc manifest: %d", manifest_size);
+	// to avoid overwrite issue, to make sure size is correct
 	ret = ast_loader_load_image(CPTRA_MANIFEST_FW_ID,
-				    (uint32_t *)AST_HASH_BUFFER, true);
+				    (uint32_t *)&soc_manifest, manifest_size, true);
 	if (ret)
 		return CPTRA_ERR_SOC_MANIFEST_READ_ERROR;
-
-	// to avoid overwrite issue, to make sure size is correct
-	memcpy(&soc_manifest, (uint8_t *)AST_HASH_BUFFER,
-	       sizeof(struct cptra_soc_manifest));
 
 	if (soc_manifest.preamble.manifest_marker != CPTRA_AUTH_MANIFEST_MARKER) {
 		LOG_ERR("Soc manifest magic mismatch: 0x%x.",

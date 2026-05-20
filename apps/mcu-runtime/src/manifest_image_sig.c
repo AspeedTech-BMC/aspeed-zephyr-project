@@ -202,24 +202,38 @@ static int cptra_manifest_lms(uint8_t *data, uint32_t data_size, struct lms_pub_
 	return ret;
 }
 
-static struct cptra_set_auth_manifest_ia auth_input;
-int cptra_verify_soc_manifest(struct cptra_soc_manifest *manifest)
+int cptra_verify_soc_manifest(struct cptra_soc_manifest_verify_buf *verify_buf, uint32_t verify_buf_size)
 {
-	struct cptra_set_auth_manifest_oa output = {0};
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
-
+	struct cptra_set_auth_manifest_ia *auth_input = &(verify_buf->auth_input);
+	struct cptra_set_auth_manifest_oa *auth_output = &(verify_buf->output);
+	struct cptra_soc_manifest *manifest = &(verify_buf->manifest);
 	if (!cptra_manifest_sec_en())
 		return CPTRA_SUCCESS;
 
-	auth_input.manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
-			      sizeof(manifest->imc);
-	auth_input.metadata_entry_entry_count = manifest->ime_count;
+	if (!verify_buf) {
+		LOG_ERR("manifest verify buf is NULL");
+		return CPTRA_ERR_INVALID_PARAMETER;
+	}
+
+	if (sizeof(struct cptra_soc_manifest_verify_buf) > verify_buf_size) {
+		LOG_ERR("manifest verify buf size is too small, required: %d, provided: %d",
+				sizeof(struct cptra_soc_manifest_verify_buf), verify_buf_size);
+		return CPTRA_ERR_EXCEED_MEMORY_LIMIT;
+	}
+
+	memset(auth_input, 0x00, sizeof(struct cptra_set_auth_manifest_ia));
+	memset(auth_output, 0x00, sizeof(struct cptra_set_auth_manifest_oa));
+
+	auth_input->manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
+								sizeof(manifest->imc);
+	auth_input->metadata_entry_entry_count = manifest->ime_count;
 
 	/* Convert aspeed preamble format to caliptra preamble format*/
-	cptra_preamble_convert(&(auth_input.preamble), &(manifest->preamble));
-	memcpy(&(auth_input.metadata_entries), manifest->imc, sizeof(manifest->imc));
+	cptra_preamble_convert(&(auth_input->preamble), &(manifest->preamble));
+	memcpy(&(auth_input->metadata_entries), manifest->imc, sizeof(manifest->imc));
 
-	return caliptra_set_auth_manifest(dev, &auth_input, &output);
+	return caliptra_set_auth_manifest(dev, auth_input, auth_output);
 }
 
 #define CPTRA_SOC_MANIFEST_VER (0)

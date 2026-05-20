@@ -245,7 +245,7 @@ int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
 
 	fw = (type ? (train2D ? CPTRA_DDR4_2D_IMEM_FW_ID: CPTRA_DDR4_IMEM_FW_ID) : CPTRA_DDR5_IMEM_FW_ID);
 
-	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * imem_base), 0);
+	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * imem_base), 0, true);
 
 	return ret;
 }
@@ -263,7 +263,7 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 
 	fw = (type ? (train2D ? CPTRA_DDR4_2D_DMEM_FW_ID: CPTRA_DDR4_DMEM_FW_ID) : CPTRA_DDR5_DMEM_FW_ID);
 
-	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * dmem_base), 0);
+	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * dmem_base), 0, true);
 	return ret;
 }
 
