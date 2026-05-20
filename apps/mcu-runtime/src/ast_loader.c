@@ -149,10 +149,11 @@ static int _ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t dst_che
 
 int ast_loader_load_image(uint32_t type, uint32_t *dst, uint32_t dst_check_max_len, bool verify)
 {
-	uint32_t *temp_buf = (uint32_t *)AST_HASH_BUFFER;
-	LOG_DBG("temp_buf start addr: 0x%08x end addr: 0x%08x",
-			(uint32_t)temp_buf, (uint32_t)((uint8_t *)temp_buf + CONFIG_AST_LOADER_TEMP_BUF_SIZE));
-	return _ast_loader_load_image(type, dst, dst_check_max_len, temp_buf, CONFIG_AST_LOADER_TEMP_BUF_SIZE, verify, NULL);
+	uint8_t temp_buf[CONFIG_AST_LOADER_TEMP_BUF_SIZE];
+
+	return _ast_loader_load_image(type, dst, dst_check_max_len,
+				      (uint32_t *)temp_buf,
+				      CONFIG_AST_LOADER_TEMP_BUF_SIZE, verify, NULL);
 }
 
 int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify, uint32_t *img_read_size)
