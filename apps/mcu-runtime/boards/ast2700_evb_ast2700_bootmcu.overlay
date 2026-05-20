@@ -2,10 +2,17 @@
 	chosen {
 		zephyr,console = &uart12;
 		zephyr,shell-uart = &uart12;
+		zephyr,custom-stack = &loader_stack;
 	};
 
 	sram: memory@14b80000 {
-		reg = <0x14b80000 0x2f400>;
+		reg = <0x14b80000 0x2d400>;
+	};
+
+	loader_stack: stack@14bad400 {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bad400 0x12000>;
+		zephyr,memory-region = "CUSTOM_STACK";
 	};
 
 	reserved-memory {

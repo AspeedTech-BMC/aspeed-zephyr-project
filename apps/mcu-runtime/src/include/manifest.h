@@ -63,9 +63,7 @@
 #define CPTRA_SSP_HDR_ID          (0x100B)
 #define CPTRA_TSP_HDR_ID          (0x100C)
 
-/* 0x14bc0000(sram end) - 0x800 (2k csr) - 0x400 (1k imc for 2700 A2) -0x10000 (64k for Hash buffer)*/
-#define AST_HASH_BUFFER (0x14baf400)
-#define CONFIG_AST_LOADER_TEMP_BUF_SIZE          (0x10000)  // 64k temp buffer for image loading and verification in SRAM stask
+#define CONFIG_AST_LOADER_TEMP_BUF_SIZE          (0x10000)  // 64k image size limit for SRAM-destined loads
 #define CONFIG_AST_LOADER_DRAM_TEMP_BUF_MAX_SIZE (0x500000) // 5M temp buffer for image loading and verification in DRAM
 
 enum {
