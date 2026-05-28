@@ -5,10 +5,6 @@
 		zephyr,custom-stack = &loader_stack;
 	};
 
-	sram: memory@14b80a00 {
-		reg = <0x14b80a00 0x2ca00>;
-	};
-
 	loader_stack: stack@14bad400 {
 		compatible = "zephyr,memory-region";
 		reg = <0x14bad400 0x12000>;
