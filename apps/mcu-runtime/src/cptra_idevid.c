@@ -196,8 +196,30 @@ end:
 	return ret;
 }
 
+#define CPTRA_IFC_BASE			DT_REG_ADDR(DT_NODELABEL(cptra_ifc))
+
+
+static void cptra_check_error(void)
+{
+	uint32_t hw_fatal    = sys_read32(CPTRA_IFC_BASE + CPTRA_HW_ERROR_FATAL);
+	uint32_t hw_nonfatal = sys_read32(CPTRA_IFC_BASE + CPTRA_HW_ERROR_NONFATAL);
+	uint32_t fw_fatal    = sys_read32(CPTRA_IFC_BASE + CPTRA_FW_ERROR_FATAL);
+	uint32_t fw_nonfatal = sys_read32(CPTRA_IFC_BASE + CPTRA_FW_ERROR_NONFATAL);
+
+	if (hw_fatal || hw_nonfatal || fw_fatal || fw_nonfatal)
+		LOG_WRN("CPTRA errors: hw_fatal=0x%08x hw_nonfatal=0x%08x fw_fatal=0x%08x fw_nonfatal=0x%08x",
+			hw_fatal, hw_nonfatal, fw_fatal, fw_nonfatal);
+	else
+		LOG_INF("CPTRA: no errors detected");
+}
+
 int cptra_otp_init(struct ast_chip *chip)
 {
+	if (sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA)
+		return 0;
+
+	cptra_check_error();
+
 #if !defined(CONFIG_CPTRA_DICE)
 	return 0;
 #else
@@ -205,9 +227,6 @@ int cptra_otp_init(struct ast_chip *chip)
 	struct cptra_reallocate_dpe_context_limits_ia input;
 	struct cptra_reallocate_dpe_context_limits_oa output;
 	int ret;
-
-	if (sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA)
-		return 0;
 
 	ret = cptra_populate_idevid();
 	if (ret)
