@@ -22,7 +22,7 @@ int wdt_init(struct ast_chip *chip)
 
 	if (chip->rev_id) {
 		/* ast2700a1 */
-		for (idx = 0; idx < 8; idx++) {
+		for (idx = 0; idx < 9; idx++) {
 			wdt_base_addr = ASPEED_WDT_BASE + idx * 0x80;
 
 			/* SoC reset mask */
