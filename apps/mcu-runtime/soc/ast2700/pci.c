@@ -124,6 +124,12 @@ int pci_init(struct ast_chip *chip)
 	clrbits_le32((void *)(ASPEED_PLDA3_BASE + PLDA_MSI_CAP), BIT(3));
 	// Set Bridge3 INTA
 	clrsetbits_le32((void *)(ASPEED_PLDA3_BASE + PLDA_MSI_CAP), GENMASK(2, 0), 0x1);
+	// Assert E2M reset
+	setbits_le32(&scu->modrst2_ctrl, SCU1_RSTCTL2_E2M);
+	k_msleep(10);
+	// Deassert E2M reset
+	setbits_le32(&scu->modrst2_clr, SCU1_RSTCTL2_E2M);
+	k_msleep(10);
 
 	/* the raw of e2m need to disable under AST2700 A2 CPU / IO die */
 	/* turn on vlink codec under AST2700 A2 */
