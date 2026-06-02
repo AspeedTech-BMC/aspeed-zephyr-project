@@ -11,6 +11,7 @@
 #include <platform.h>
 #include <chip.h>
 #include <scu.h>
+#include <manifest.h>
 
 LOG_MODULE_REGISTER(cptra_idevid, CONFIG_SOC_LOG_LEVEL);
 
@@ -241,14 +242,16 @@ int cptra_otp_init(struct ast_chip *chip)
 	memset(&output, 0, sizeof(output));
 	input.pl0_context_limit = 32;
 
-	ret = caliptra_reallocate_dpe_context_limits(dev, &input, &output);
-	if (ret) {
-		LOG_ERR("caliptra_reallocate_dpe_context_limits failed, ret:0x%x", ret);
-		return ret;
-	}
+	if (!is_ast2700_a1()) {
+		ret = caliptra_reallocate_dpe_context_limits(dev, &input, &output);
+		if (ret) {
+			LOG_ERR("caliptra_reallocate_dpe_context_limits failed, ret:0x%x", ret);
+			return ret;
+		}
 
-	LOG_INF("DPE context limits reallocated: pl0=%u, pl1=%u",
-		output.new_pl0_context_limit, output.new_pl1_context_limit);
+		LOG_INF("DPE context limits reallocated: pl0=%u, pl1=%u",
+			output.new_pl0_context_limit, output.new_pl1_context_limit);
+	}
 
 	return 0;
 #endif
