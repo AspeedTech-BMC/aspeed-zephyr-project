@@ -159,6 +159,43 @@ struct sli_data {
 #define SCU0_SCRATCH31_SLI1_READY	BIT(0)
 #define AHBC_MAX_TIMEOUT		0x1ff
 
+static void ahbc_timeout_enable(struct sli_data *data, bool enable)
+{
+	if (data->flags & SLI_FLAG_AST2700A0)
+		return;
+
+	if (enable) {
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x034);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x074);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0b4);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0f4);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x134);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x174);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1b4);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1f4);
+		k_busy_wait(CAL_DELAY_US);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x034);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x074);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0b4);
+		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0f4);
+		k_msleep(10);
+		LOG_INF("SLI0 calibration completed");
+	} else {
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x034);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x074);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0b4);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0f4);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x134);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x174);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1b4);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1f4);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x034);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x074);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0b4);
+		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0f4);
+	}
+}
+
 static bool is_sli_calibrated(struct sli_data *data)
 {
 	uint32_t reg_val;
@@ -782,21 +819,8 @@ int sli_init_f(struct ast_chip *chip)
 		return 0;
 	}
 
-	if (!(data->flags & SLI_FLAG_AST2700A0)) {
-		/* Disable AHBC timeout before calibration */
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x034);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x074);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0b4);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0f4);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x134);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x174);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1b4);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1f4);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x034);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x074);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0b4);
-		sys_write32(0, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0f4);
-	}
+	/* Disable AHBC timeout before calibration */
+	ahbc_timeout_enable(data, false);
 
 	/* Speed up engine clock before adjusting PHY TX clock and delay */
 	reg_val = FIELD_PREP(SLI_CLK_SEL, data->die1.eng_clk_freq);
@@ -894,23 +918,9 @@ int sli_init_r(struct ast_chip *chip)
 		sli_wait_suspend(data->die1.slih);
 		k_busy_wait(CAL_DELAY_US);
 
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x034);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x074);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0b4);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x0f4);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x134);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x174);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1b4);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC1_BASE + 0x1f4);
-		k_busy_wait(CAL_DELAY_US);
+		ahbc_timeout_enable(data, true);
 		setbits_le32((mem_addr_t)&data->scu0->cpu_scratch[31],
 			     SCU0_SCRATCH31_SLI1_READY);
-		k_busy_wait(CAL_DELAY_US);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x034);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x074);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0b4);
-		sys_write32(AHBC_MAX_TIMEOUT, (mem_addr_t)ASPEED_AHBC0_BASE + 0x0f4);
-		LOG_INF("SLI0 calibration completed");
 
 		setbits_le32((mem_addr_t)&data->scu1->scratch[31],
 			     SCU1_SCRATCH31_SLI_SKIP_CALI);
