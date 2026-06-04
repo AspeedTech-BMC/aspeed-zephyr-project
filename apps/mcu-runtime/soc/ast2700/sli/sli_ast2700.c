@@ -96,6 +96,10 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_SOC_FMC_LOG_LEVEL);
 #define   SLIM_SLI_MARB_CLR		BIT(4)
 #define   SLIM_SLI_MARB_RR		BIT(0)
 
+#define INTC_PROT			0x00
+#define   INTC_ENABLE_CPUD_RESET_SRC	BIT(11)
+#define INTC_STATUS			0x14
+
 #if defined(CONFIG_SLI_TARGET_PHYCLK_1GHZ)
 #define SLI_TARGET_PHYCLK		SLI_PHYCLK_1G
 #elif defined(CONFIG_SLI_TARGET_PHYCLK_800MHZ)
@@ -141,6 +145,7 @@ struct sli_data {
 #define SLI_FLAG_RX_LAH_NEG_IO_SLIH	BIT(1)
 #define SLI_FLAG_RX_LAH_NEG_IO_SLIM	BIT(2)
 #define SLI_FLAG_RX_LAH_NEG_IO_SLIV	BIT(3)
+#define SLI_FLAG_AST2700A2		BIT(4)
 	uint32_t flags;
 };
 
@@ -158,6 +163,14 @@ struct sli_data {
 #define SCU1_SCRATCH31_SLI_SKIP_CALI	BIT(1)	/* skip calibration */
 #define SCU0_SCRATCH31_SLI1_READY	BIT(0)
 #define AHBC_MAX_TIMEOUT		0x1ff
+
+static void identify_chip_rev(struct sli_data *data)
+{
+	if (FIELD_GET(SCU0_REVISION_ID_HW, data->scu1->chip_id1) == 0)
+		data->flags |= SLI_FLAG_AST2700A0;
+	if (FIELD_GET(SCU0_REVISION_ID_HW, data->scu1->chip_id1) == 2)
+		data->flags |= SLI_FLAG_AST2700A2;
+}
 
 static void ahbc_timeout_enable(struct sli_data *data, bool enable)
 {
@@ -782,8 +795,7 @@ int sli_init_f(struct ast_chip *chip)
 	data->flags = 0;
 	data->scu1 = chip->scu1;
 
-	if (FIELD_GET(SCU0_REVISION_ID_HW, data->scu1->chip_id1) == 0)
-		data->flags |= SLI_FLAG_AST2700A0;
+	identify_chip_rev(data);
 
 	/* Return if SLI had been calibrated */
 	if (is_sli_calibrated(data)) {
@@ -898,6 +910,8 @@ int sli_init_r(struct ast_chip *chip)
 	data->scu0 = chip->scu0;
 	data->scu1 = chip->scu1;
 
+	identify_chip_rev(data);
+
 	if (data->scu1->scratch[31] & SCU1_SCRATCH31_SLI_SKIP_CALI) {
 		printf("SLI0 has been initialized\n");
 		_mac_hotfix(data);
@@ -929,8 +943,12 @@ int sli_init_r(struct ast_chip *chip)
 		setbits_le32(SLI1_REG + SLIM_REG_OFFSET + SLIM_MARB_FUNC_I, SLIM_SLI_MARB_CLR);
 
 		/* Clear the INTC reset interrupt status. */
-		reg_val = sys_read32((mem_addr_t)ASPEED_IO_INTC_BASE + 0x14);
-		sys_write32(reg_val, (mem_addr_t)ASPEED_IO_INTC_BASE + 0x14);
+		reg_val = sys_read32((mem_addr_t)ASPEED_IO_INTC_BASE + INTC_STATUS);
+		sys_write32(reg_val, (mem_addr_t)ASPEED_IO_INTC_BASE + INTC_STATUS);
+
+		if (data->flags & SLI_FLAG_AST2700A2)
+			setbits_le32(ASPEED_IO_INTC_BASE + INTC_PROT,
+				     INTC_ENABLE_CPUD_RESET_SRC);
 
 		sli_calibrate_video_delay(data, false, true);
 		if (IS_ENABLED(CONFIG_SLI_K_ON_CPU)) {
