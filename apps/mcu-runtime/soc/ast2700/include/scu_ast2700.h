@@ -6,6 +6,10 @@
 #ifndef _ASM_ARCH_SCU_AST2700_H
 #define _ASM_ARCH_SCU_AST2700_H
 
+#include <chip.h>
+
+int scu_init(struct ast_chip *chip);
+
 /* SCU0 Register */
 #define SCU0_REVISION_ID_HW			GENMASK(23, 16)
 #define SCU0_REVISION_ID_EFUSE			GENMASK(15, 8)
@@ -104,6 +108,10 @@
 #define SCU1_CHIP_REV_ID			SCU1_REG
 #define   CHIP_ID_MASK				GENMASK(17, 16)
 #define SCU1_HWSTRAP1				(SCU1_REG + 0x010)
+#define SCU1_HWSTRAP1_WPROT			(SCU1_REG + 0x020)
+#define SCU1_HWSTRAP1_SEC1			(SCU1_REG + 0x024)
+#define SCU1_HWSTRAP1_SEC2			(SCU1_REG + 0x028)
+#define SCU1_HWSTRAP1_SEC3			(SCU1_REG + 0x02c)
 #define   SCU1_HWSTRAP1_DIS_CPTRA		BIT(30)
 #define   SCU1_HWSTRAP1_RECOVERY_USB_PORT	GENMASK(29, 28)
 #define   SCU1_HWSTRAP1_RECOVERY_INTERFACE	GENMASK(27, 26)
@@ -413,6 +421,7 @@ struct aspeed_clks {
 };
 
 #ifndef __ASSEMBLY__
+
 struct ast2700_scu0 {
 	uint32_t chip_id1;		/* 0x000 */
 	uint32_t rsv_0x04[3];		/* 0x004 ~ 0x00C */
