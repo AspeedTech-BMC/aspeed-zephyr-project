@@ -64,6 +64,7 @@ static struct peripheral peri_tbl[] = {
 #else
 static struct peripheral peri_tbl[] = {
 	{"POLICY",	NULL, NULL},//sys_policy_init},
+	{"SCU",		scu_init, NULL},
 	{"WDT",		wdt_init, NULL},
 	{"EXTRST",	extrst_mask_init, NULL},
 	{"LOADER",	ast_loader_init, NULL},
