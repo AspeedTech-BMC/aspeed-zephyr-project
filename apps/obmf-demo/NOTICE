@@ -1,0 +1,21 @@
+obmf-demo NOTICE
+
+This Zephyr RTOS application contains code derived from NVIDIA OpenSMA
+(https://github.com/NVIDIA/OpenSMA), licensed under the Apache License,
+Version 2.0.
+
+The original LSTP implementation (C++) from OpenSMA was ported to C and
+adapted for Zephyr RTOS, then modified by ASPEED Technology Inc.
+
+Portions Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Portions Copyright (c) 2026 ASPEED Technology Inc.
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file for details.
+
+--------------------------------------------------------------------------------
+Attribution notice from the upstream OpenSMA NOTICE file:
+
+  OpenSMA NOTICE
+  Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES
+  Licensed under the Apache License, Version 2.0.
+--------------------------------------------------------------------------------

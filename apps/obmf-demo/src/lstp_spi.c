@@ -1,7 +1,11 @@
 /*
- * Copyright (c) 2026 ASPEED Technology Inc.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+ * SPDX-FileCopyrightText: Copyright (c) 2026 ASPEED Technology Inc.
  *
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Portions derived from NVIDIA OpenSMA (https://github.com/NVIDIA/OpenSMA),
+ * licensed under Apache-2.0. Ported and modified by ASPEED.
  */
 
 #include <zephyr/kernel.h>
