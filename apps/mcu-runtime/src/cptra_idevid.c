@@ -216,8 +216,15 @@ static void cptra_check_error(void)
 
 int cptra_otp_init(struct ast_chip *chip)
 {
-	if (sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA)
+	if (sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA) {
+		LOG_WRN("Caliptra is disabled");
 		return 0;
+	}
+
+	if (!(sys_read32(SCU1_CPTRA_CTRL) & SCU1_CPTRA_RDY_FOR_RT)) {
+		LOG_WRN("Caliptra is unavailable");
+		return 0;
+	}
 
 	cptra_check_error();
 
