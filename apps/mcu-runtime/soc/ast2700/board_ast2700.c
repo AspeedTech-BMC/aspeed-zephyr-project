@@ -5,6 +5,7 @@
  */
 #include <platform.h>
 #include <stdio.h>
+#include <zephyr/kernel.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -18,6 +19,11 @@
 LOG_MODULE_REGISTER(ast_board, CONFIG_SOC_FMC_LOG_LEVEL);
 
 #define ASPEED_UFS_PATH_AXI	(0x12c080e4)
+
+#define INTC_STATUS		0x14
+#define   INTC_STATUS_PSP	BIT(0)
+#define   INTC_STATUS_SSP	BIT(1)
+#define   INTC_STATUS_TSP	BIT(2)
 
 static bool has_pspfw;
 static bool has_sspfw;
@@ -66,6 +72,8 @@ static int board_load_image(void)
 
 static void board_prepare_for_boot(void)
 {
+	uint32_t intc_status = 0;
+
 	/* for v7 FPGA only to switch to uart12. */
 	if (IS_ENABLED(CONFIG_ASPEED_FPGA)) {
 		sys_write32(SCU0_HWSTRAP_DIS_CPU, SCU0_HW_STRAP1_CLR);
@@ -81,16 +89,43 @@ static void board_prepare_for_boot(void)
 
 		/* release CA35 reset */
 		sys_write32(0x1, SCU0_CA35_REL);
+
+		intc_status |= INTC_STATUS_PSP;
 	}
 
 	/* release SSP reset */
 	if (has_sspfw) {
 		ssp_enable();
+
+		intc_status |= INTC_STATUS_SSP;
 	}
 
 	/* release TSP reset */
 	if (has_tspfw) {
 		tsp_enable();
+
+		intc_status |= INTC_STATUS_TSP;
+	}
+
+	if (intc_status) {
+		/*
+		 * Dummy read from the CPU-die SCU so the CPU release writes
+		 * above are flushed to the CPU die before the wait starts.
+		 */
+		(void)sys_read32(SCU0_CA35_REL);
+
+		/*
+		 * The INTC reset interrupt status in the IO die is synced from
+		 * the CPU die by hardware every 1ms. Wait one sync period after
+		 * the reset release so the last sync carrying the stale status
+		 * has landed; otherwise an in-flight sync could re-assert the
+		 * bit right after the write-1-clear below.
+		 */
+		k_busy_wait(1000);
+
+		/* clear the INTC reset interrupt status of released CPUs */
+		sys_write32(intc_status,
+			    (mem_addr_t)ASPEED_IO_INTC_BASE + INTC_STATUS);
 	}
 }
 
