@@ -201,6 +201,7 @@ int scu_init(struct ast_chip *chip);
 #define   SCU1_CLKGATE2_LTPI0_TX		BIT(9)
 #define SCU1_CLKGATE2_CLR			(SCU1_REG + 0x264)
 #define SCU1_CPTRA_CTRL				(SCU1_REG + 0x130)
+#define   SCU1_CPTRA_RDY_FOR_RT			BIT(18)
 #define   SCU1_CPTRA_CTRL_SEC_STAT		GENMASK(10, 8)
 #define   SCU1_CPTRA_CTRL_PWRGOOD		BIT(0)
 #define SCU1_CPTRA_OBF_KEY(n)			(SCU1_REG + 0x140 + ((n) << 2))
