@@ -27,6 +27,14 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_SOC_FMC_LOG_LEVEL);
 #define SCU_MCU0_MAP1_MASK		GENMASK(22, 16)
 #define SCU_MCU0_MAP1_SHIFT		(16)
 
+#define WDT_BASE			0x14c37000
+#define WDTn_BASE(idx)			(WDT_BASE + (idx) * 0x80)
+#define WDT_FOR_DRAM_SW_RESET_BASE	(WDTn_BASE(7))
+#define WDT_SW_RESET_CTRL_REG		(WDT_FOR_DRAM_SW_RESET_BASE + 0x30)
+#define WDT_SW_RESET_MASK_REG		(WDT_FOR_DRAM_SW_RESET_BASE + 0x34)
+#define WDT_SW_RESET_DRAM_MASK		0x2
+#define WDT_SW_RESET_KICK		0xaeedf123
+
 /*
  * Given a maximum RFC value for biggest capacity,
  * it will be updated after dram size is determined later
@@ -1118,17 +1126,17 @@ void sdramc_reset(struct sdramc *sdramc)
 
 	// save wdt sw reset mask
 	for (int i = 0; i < 5; i++)
-		sdramc->wdt_swrst[i] = sys_read32(0x14c37034 + i * 4);
+		sdramc->wdt_swrst[i] = sys_read32(WDT_SW_RESET_MASK_REG + i * 4);
 
 	// wdt sw reset for dramc only
-	sys_write32(0x2, 0x14c37034);
-	sys_write32(0x0, 0x14c37038);
-	sys_write32(0x0, 0x14c3703c);
-	sys_write32(0x0, 0x14c37040);
-	sys_write32(0x0, 0x14c37044);
+	sys_write32(WDT_SW_RESET_DRAM_MASK, WDT_SW_RESET_MASK_REG);
+	sys_write32(0x0, WDT_SW_RESET_MASK_REG + 4);
+	sys_write32(0x0, WDT_SW_RESET_MASK_REG + 8);
+	sys_write32(0x0, WDT_SW_RESET_MASK_REG + 12);
+	sys_write32(0x0, WDT_SW_RESET_MASK_REG + 16);
 
 	// kick wdt sw reset
-	sys_write32(0xaeedf123, 0x14c37030);
+	sys_write32(WDT_SW_RESET_KICK, WDT_SW_RESET_CTRL_REG);
 	k_busy_wait(1000);
 }
 
@@ -1157,7 +1165,7 @@ void sdramc_postset(struct sdramc *sdramc)
 {
 	// restore wdt reset mask
 	for (int i = 0; i < 5; i++)
-		sys_write32(sdramc->wdt_swrst[i], 0x14c37034 + i * 4);
+		sys_write32(sdramc->wdt_swrst[i], WDT_SW_RESET_MASK_REG + i * 4);
 }
 
 int dram_init(struct ast_chip *chip)
