@@ -23,7 +23,8 @@ int extrst_mask_init(struct ast_chip *chip)
 	sys_write32(SCU1_EXTRST_MASK_2_VAL, (SCU1_REG + 0x2F4));
 	sys_write32(SCU1_EXTRST_MASK_3_VAL, (SCU1_REG + 0x2F8));
 
-	if (sys_read32(SCU1_HW_STRAP1) & BIT(3)) {
+	if (!!(sys_read32(SCU1_HW_STRAP1) & BIT(3)) ||
+	    (sys_read32(SCU1_REVISION_ID) & GENMASK(23, 16)) >> 16 >= 2) {
 		reg = sys_read32((SCU1_REG + 0x2F4)) | BIT(1);
 		sys_write32(reg, (SCU1_REG + 0x2F4));
 	}
