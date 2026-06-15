@@ -1124,10 +1124,6 @@ void sdramc_reset(struct sdramc *sdramc)
 	// enable phy clock.
 	sys_write32(BIT(11), 0x12c02244);
 
-	// save wdt sw reset mask
-	for (int i = 0; i < 5; i++)
-		sdramc->wdt_swrst[i] = sys_read32(WDT_SW_RESET_MASK_REG + i * 4);
-
 	// wdt sw reset for dramc only
 	sys_write32(WDT_SW_RESET_DRAM_MASK, WDT_SW_RESET_MASK_REG);
 	sys_write32(0x0, WDT_SW_RESET_MASK_REG + 4);
@@ -1157,6 +1153,15 @@ void sdramc_pll_reset(struct sdramc *sdramc)
 
 void sdramc_preset(struct sdramc *sdramc)
 {
+	// save wdt sw reset mask
+	for (int i = 0; i < 5; i++)
+		sdramc->wdt_swrst[i] = sys_read32(WDT_SW_RESET_MASK_REG + i * 4);
+	// save gfm cfg
+	sdramc->gfmcfg_bak = sdramc->regs->gfmcfg;
+}
+
+void sdramc_full_reset(struct sdramc *sdramc)
+{
 	sdramc_pll_reset(sdramc);
 	sdramc_reset(sdramc);
 }
@@ -1166,6 +1171,8 @@ void sdramc_postset(struct sdramc *sdramc)
 	// restore wdt reset mask
 	for (int i = 0; i < 5; i++)
 		sys_write32(sdramc->wdt_swrst[i], WDT_SW_RESET_MASK_REG + i * 4);
+	// restore gfm cfg
+	sdramc->regs->gfmcfg = sdramc->gfmcfg_bak;
 }
 
 int dram_init(struct ast_chip *chip)
@@ -1182,9 +1189,10 @@ int dram_init(struct ast_chip *chip)
 	if (is_ddr_initialized(sdramc))
 		return 0;
 
+	sdramc_preset(sdramc);
 	while (retry--) {
 
-		sdramc_preset(sdramc);
+		sdramc_full_reset(sdramc);
 		sdramc_unlock(sdramc);
 
 		err = sdramc_init(sdramc, &ac);
