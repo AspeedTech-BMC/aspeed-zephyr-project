@@ -276,6 +276,7 @@ void mctp_i3c_target_intf_init(void)
 
 		mctp_start(mctp_instance);
 		if (mctp_i3c_instance->state == MCTP_I3C_TARGET_INITIALIZED_DETACHED) {
+			mctp_i3c_instance->state = MCTP_I3C_TARGET_ATTACHED;
 			if (mctp_i3c_instance->i3c_state_sem.count <= 0)
 				k_sem_give(&mctp_i3c_instance->i3c_state_sem);
 		} else {
@@ -284,10 +285,10 @@ void mctp_i3c_target_intf_init(void)
 					NULL);
 			k_timer_user_data_set(&mctp_i3c_instance->i3c_state_timer,
 					&mctp_i3c_instance->i3c_state_sem);
+			mctp_i3c_instance->state = MCTP_I3C_TARGET_ATTACHED;
 			mctp_i3c_eid_assignment_thread_create(&i3c_dev_p->mctp_i3c_inst);
 		}
 
-		mctp_i3c_instance->state = MCTP_I3C_TARGET_ATTACHED;
 		LOG_INF("MCTP over I3C for bus %02x start", i3c_dev_p->i3c_conf.bus);
 	}
 
