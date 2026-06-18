@@ -1119,6 +1119,18 @@ static void sdramc_qos_init(struct sdramc *sdramc)
                (uint32_t)&sdramc->regs->port[1].cfg);
 }
 
+/*
+ * Disable the DARB master request recovery for the given masters on the
+ * DARB instance at @darb_base. Setting a master's bit to 1 disables its
+ * reset recovery request, which avoids the master being unable to access
+ * DRAM after a reset (e.g. the SSP/TSP data masters after an SSP/TSP reset).
+ * @master_mask is an OR of DARB_RECOVERY_* bits.
+ */
+static void sdramc_darb_recovery_disable(uint32_t darb_base, uint32_t master_mask)
+{
+	sys_set_bits(darb_base + DARB_REQ_RECOVERY_CTRL, master_mask);
+}
+
 void sdramc_reset(struct sdramc *sdramc)
 {
 	// enable phy clock.
@@ -1234,6 +1246,10 @@ int dram_init(struct ast_chip *chip)
 	sdramc_mpu_enable(sdramc);
 
 	sdramc_qos_init(sdramc);
+
+	/* SSP/TSP data masters are routed to DRAMC port served by DARB2 */
+	sdramc_darb_recovery_disable(DARB2_BASE,
+				     DARB2_RECOVERY_TSP_DATA | DARB2_RECOVERY_SSP_DATA);
 
 	LOG_DBG("%s is successfully initialized\n", ac->desc);
 	sdramc_set_flag(DRAMC_INIT_DONE);
