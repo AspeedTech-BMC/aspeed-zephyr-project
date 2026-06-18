@@ -25,6 +25,27 @@
 
 #define DRAMC_BASE			(0x12c00000)
 #define DRAMC_PHY_BASE			(0x13000000)
+
+/*
+ * DRAM Memory Bus Arbiter (DARB). One DARB per DRAMC port; each block is
+ * 0x100 apart. Masters are routed to a DRAMC port via its DARB instance.
+ */
+#define DARB_BASE			(0x12c01000)
+#define DARBn_BASE(n)			(DARB_BASE + (n) * 0x100)
+#define DARB0_BASE			DARBn_BASE(0)
+#define DARB1_BASE			DARBn_BASE(1)
+#define DARB2_BASE			DARBn_BASE(2)
+#define DARB3_BASE			DARBn_BASE(3)
+
+/*
+ * DARB Master Request Recovery Control Register (offset 0x88). Each bit
+ * disables the reset recovery request for one master, but the master-to-bit
+ * mapping differs per DARB instance, so these bit defines are DARB-specific.
+ */
+#define DARB_REQ_RECOVERY_CTRL		(0x88)
+/* DARB2 master indices */
+#define DARB2_RECOVERY_TSP_DATA		BIT(5)
+#define DARB2_RECOVERY_SSP_DATA		BIT(14)
 #define dwc_ddrphy_apb_wr(addr, value)		(*(volatile unsigned short *)(DRAMC_PHY_BASE + 2 * (addr)) = (unsigned short)value)
 #define dwc_ddrphy_apb_rd(addr)			(*(volatile unsigned short *)(DRAMC_PHY_BASE + 2 * (addr)))
 
