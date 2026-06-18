@@ -554,8 +554,12 @@ void req_fw_update_handler(void *mctp_p, void *ext_params, void *arg)
 	}
 
 	LOG_INF("Verify complete %d", verify_result);
-	if (report_tranfer(mctp_p, ext_params, verify_result) && verify_result != PLDM_FW_UPDATE_VERIFY_SUCCESS) {
+	if (report_tranfer(mctp_p, ext_params, verify_result)) {
 		report_tranfer(mctp_p, ext_params, PLDM_FW_UPDATE_GENERIC_ERROR);
+		cur_aux_state = STATE_AUX_FAILED;
+		goto exit;
+	}
+	if (verify_result != PLDM_FW_UPDATE_VERIFY_SUCCESS) {
 		cur_aux_state = STATE_AUX_FAILED;
 		goto exit;
 	}
