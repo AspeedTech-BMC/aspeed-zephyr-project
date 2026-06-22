@@ -68,8 +68,8 @@ static void do_init_entry(void *state)
 	// Init shared multi heap for non-cacheable memory allocation
 	shared_multi_heap_pool_init();
 	struct shared_multi_heap_region region = {
-		.addr = NONCACHE_ADDR,
-		.size = NONCACHE_SIZE,
+		.addr = NONCACHE_ADDR + 1024 * 1024,
+		.size = NONCACHE_SIZE - 1024 * 1024,
 		.attr = SMH_REG_ATTR_NON_CACHEABLE,
 	};
 	shared_multi_heap_add(&region, NULL);

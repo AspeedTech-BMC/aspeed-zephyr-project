@@ -13,6 +13,9 @@
 #include <image/caliptra_soc_manifest_v1.h>
 #include <image/firmware_manifest.h>
 #include <mbedtls/sha512.h>
+#include <zephyr/device.h>
+#include <zephyr/crypto/crypto.h>
+#include <zephyr/crypto/hash.h>
 
 LOG_MODULE_REGISTER(cptra_soc_manifest_v1, LOG_LEVEL_DBG);
 
@@ -401,15 +404,22 @@ int cptra_validate_bundle_v1(const uint8_t *bundle, size_t bundle_size)
 	return 0;
 }
 
+#define HACE_SHA_ENGINE
+#ifdef CONFIG_CRYPTO_ASPEED
+#define HASH_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_hace))
+#endif
+
 static int load_image(const struct device *firmware_device,
 		      uint32_t image_offset, uint32_t image_size,
 		      uint32_t firmware_id, const uint8_t *expect_digest, void *load_address)
 {
 	int ret;
 	void *noncache_ddr;
-	mbedtls_sha512_context sha_ctx;
 	uint8_t calculated_digest[48];
 	uint32_t remaining_size;
+#if defined(HACE_SHA_ENGINE)
+	int hash_session_started = 0;
+#endif
 
 	LOG_INF("Loading image fw_id=0x%08X, offset=0x%08X, size=0x%08X to address 0x%p",
 		firmware_id, image_offset, image_size, load_address);
@@ -425,12 +435,32 @@ static int load_image(const struct device *firmware_device,
 		return -ENOMEM;
 	}
 
+#if defined(HACE_SHA_ENGINE)
+	const struct device *hace_dev = device_get_binding(HASH_DRV_NAME);
+	struct hash_ctx ini;
+	struct hash_pkt pkt;
+	enum hash_algo algo;
+
+	algo = CRYPTO_HASH_ALGO_SHA384;
+
+	ini.flags = crypto_query_hwcaps(hace_dev);
+	pkt.out_buf = calculated_digest;
+
+	ret = hash_begin_session(hace_dev, &ini, algo);
+	if (ret) {
+		LOG_ERR("HACE Failed to hash_begin_session ret=%d", ret);
+		shared_multi_heap_free(noncache_ddr);
+		return ret;
+	}
+	hash_session_started = 1;
+#else
 	mbedtls_sha512_init(&sha_ctx);
 	ret = mbedtls_sha512_starts(&sha_ctx, 1);
 	if (ret) {
 		shared_multi_heap_free(noncache_ddr);
 		return ret;
 	}
+#endif
 
 	remaining_size = image_size;
 	while (remaining_size > 0) {
@@ -446,15 +476,50 @@ static int load_image(const struct device *firmware_device,
 
 		k_msleep(10);
 
+#if defined(HACE_SHA_ENGINE)
+		pkt.in_buf = noncache_ddr;
+		pkt.in_len = chunk_size;
+
+		ret = hash_update(&ini, &pkt);
+		if (ret) {
+			LOG_ERR("HACE hash_update error in_buf = %08x in_len = %d", pkt.in_buf, pkt.in_len);
+			goto err;
+		}
+#else
 		ret = mbedtls_sha512_update(&sha_ctx, noncache_ddr, chunk_size);
 		if (ret) {
 			goto err;
 		}
 
+#endif
+
 		memcpy((uint8_t *)load_address + (image_size - remaining_size), noncache_ddr, chunk_size);
 		remaining_size -= chunk_size;
 	}
 
+#if defined(HACE_SHA_ENGINE)
+	ret = hash_compute(&ini, &pkt);
+	if (ret) {
+		LOG_ERR("HACE Fail hash_compute ret %d", ret);
+		ret = -EACCES;
+		goto err;
+	}
+
+	hash_free_session(hace_dev, &ini);
+	hash_session_started = 0;
+
+	if (memcmp(pkt.out_buf, expect_digest, 48) != 0) {
+		LOG_ERR("HACE Digest mismatch for fw_id=0x%08X", firmware_id);
+		LOG_HEXDUMP_ERR(calculated_digest, 48, "HACE Calculated:");
+		LOG_HEXDUMP_ERR(expect_digest, 48, "Expected:");
+		ret = -EACCES;
+		goto err;
+	} else {
+		LOG_HEXDUMP_INF(calculated_digest, 48, "HACE Calculated:");
+		LOG_HEXDUMP_INF(expect_digest, 48, "Expected:");
+	}
+
+#else
 	ret = mbedtls_sha512_finish(&sha_ctx, calculated_digest);
 	if (ret) {
 		goto err;
@@ -467,6 +532,7 @@ static int load_image(const struct device *firmware_device,
 		ret = -EACCES;
 		goto err;
 	}
+#endif
 
 	ret = cptra_authorize_and_stash(firmware_id, calculated_digest, false);
 	if (ret) {
@@ -478,7 +544,13 @@ static int load_image(const struct device *firmware_device,
 	ret = 0;
 
 err:
+#if defined(HACE_SHA_ENGINE)
+	if (hash_session_started) {
+		hash_free_session(hace_dev, &ini);
+	}
+#else
 	mbedtls_sha512_free(&sha_ctx);
+#endif
 	shared_multi_heap_free(noncache_ddr);
 
 	return ret;
