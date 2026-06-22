@@ -8,6 +8,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/misc/aspeed/otp_ast27xx.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
 #include <platform.h>
 #include <chip.h>
 #include <scu.h>
@@ -20,6 +21,75 @@ LOG_MODULE_REGISTER(cptra_idevid, CONFIG_SOC_LOG_LEVEL);
 #else
 #define CPTRA_DICE_DRV_NAME			"aspeed_cptra_dice"
 #endif
+
+#define CPTRA_MISC_DRV_NAME			DEVICE_DT_NAME(DT_INST(0, aspeed_cptra_misc))
+
+/*
+ * FMC/RT release tag lookup table, keyed on runtime_sha384_digest[0..1]
+ * (first 8 bytes of the 48-byte RT firmware SHA384).
+ *
+ * To add a new entry: run cptra_dump_fw_info() on real hardware, copy the
+ * "RT sha384" hex dump first 8 bytes, and add a row here.
+ *
+ * Release list: https://github.com/chipsalliance/caliptra-sw#fmcruntime-fw-releases
+ */
+struct cptra_fw_tag_entry {
+	uint32_t rt_sha384[2]; /* runtime_sha384_digest[0..1], little-endian */
+	const char *tag;
+};
+
+static const struct cptra_fw_tag_entry cptra_fw_tag_table[] = {
+	/*
+	 * Keys: runtime_sha384_digest[0..1] as little-endian uint32.
+	 * Source: first 16 hex chars of runtime SHA384 per release at
+	 * https://github.com/chipsalliance/caliptra-sw#fmcruntime-fw-releases
+	 * Verify with "Caliptra RT  sha384:" hex dump logged at boot.
+	 */
+	{ .rt_sha384 = { 0x002809d7, 0x387f0bc6 }, .tag = "rt-1.2.0" }, /* d7092800c60b7f38 */
+	{ .rt_sha384 = { 0xb6838fd4, 0x328d3729 }, .tag = "rt-1.2.1" }, /* d48f83b629378d32 */
+	{ .rt_sha384 = { 0x09ce915a, 0x76c9e8d7 }, .tag = "rt-1.2.2" }, /* 5a91ce09d7e8c976 */
+	{ .rt_sha384 = { 0x89865e07, 0x491547ec }, .tag = "rt-1.2.3" }, /* 075e8689ec471549 */
+	{ .rt_sha384 = { 0x4aac73bf, 0xe46d0999 }, .tag = "rt-1.2.4" }, /* bf73ac4a99096de4 */
+	{ .rt_sha384 = { 0x67406db5, 0x1e0a2315 }, .tag = "rt-1.2.5" }, /* b56d406715230a1e */
+};
+
+static const char *cptra_lookup_fw_tag(const uint32_t *rt_sha384)
+{
+	for (int i = 0; i < ARRAY_SIZE(cptra_fw_tag_table); i++) {
+		if (cptra_fw_tag_table[i].rt_sha384[0] == rt_sha384[0] &&
+		    cptra_fw_tag_table[i].rt_sha384[1] == rt_sha384[1])
+			return cptra_fw_tag_table[i].tag;
+	}
+	return NULL;
+}
+
+static void cptra_dump_fw_info(void)
+{
+	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
+	struct cptra_fw_info_ia in = {};
+	struct cptra_fw_info_oa out = {};
+	char sha_str[41]; /* 20 bytes → 40 hex chars + NUL */
+	const char *tag;
+	int ret;
+
+	if (!dev) {
+		LOG_WRN("cptra fw_info: misc device not found");
+		return;
+	}
+
+	ret = caliptra_fw_info(dev, &in, &out);
+	if (ret) {
+		LOG_WRN("cptra fw_info: mailbox failed, ret:%d", ret);
+		return;
+	}
+
+	bin2hex(out.runtime_revision, sizeof(out.runtime_revision), sha_str, sizeof(sha_str));
+	tag = cptra_lookup_fw_tag(out.runtime_sha384_digest);
+	if (tag)
+		LOG_INF("Caliptra RT revision: %s (%s)", sha_str, tag);
+	else
+		LOG_INF("Caliptra RT revision: %s", sha_str);
+}
 
 #define OTPCAL_IDEVID_TBS_OFFSET		0x62
 #define OTPCAL_IDEVID_SIGN_OFFSET		0x262
@@ -221,12 +291,14 @@ int cptra_otp_init(struct ast_chip *chip)
 		return 0;
 	}
 
+	cptra_check_error();
+
 	if (!(sys_read32(SCU1_CPTRA_CTRL) & SCU1_CPTRA_RDY_FOR_RT)) {
 		LOG_WRN("Caliptra is unavailable");
 		return 0;
 	}
 
-	cptra_check_error();
+	cptra_dump_fw_info();
 
 #if !defined(CONFIG_CPTRA_DICE)
 	return 0;
@@ -253,7 +325,7 @@ int cptra_otp_init(struct ast_chip *chip)
 		ret = caliptra_reallocate_dpe_context_limits(dev, &input, &output);
 		if (ret) {
 			LOG_ERR("caliptra_reallocate_dpe_context_limits failed, ret:0x%x", ret);
-			return ret;
+			return 0;
 		}
 
 		LOG_INF("DPE context limits reallocated: pl0=%u, pl1=%u",
