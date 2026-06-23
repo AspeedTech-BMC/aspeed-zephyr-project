@@ -409,16 +409,162 @@ int cptra_validate_bundle_v1(const uint8_t *bundle, size_t bundle_size)
 #define HASH_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_hace))
 #endif
 
+/*
+ * Double-buffered image loader.
+ *
+ * A dedicated SPI-reader thread (producer) streams the image from flash in
+ * LOAD_CHUNK_SIZE pieces into one of LOAD_NUM_BUFFERS non-cacheable buffers,
+ * while the calling thread (consumer) feeds the previous chunk to the HACE
+ * engine and copies it to the load address. SPI DMA and the hash engine thus
+ * run concurrently.
+ *
+ * Note: real overlap depends on hash_update() yielding/blocking while the HACE
+ * engine runs so the reader gets CPU time. Both threads run at priority 5 with
+ * semaphore handoff (the normal Zephyr idiom); if the HACE driver busy-polls
+ * without yielding, the overlap benefit shrinks.
+ */
+#define LOAD_CHUNK_SIZE		(512 * 1024)
+#define LOAD_NUM_BUFFERS	2
+#define SPI_READER_STACK_SIZE	4096
+#define SPI_READER_PRIORITY	5
+
+/*
+ * Set to 1 to accumulate per-operation I/O timing (SPI DMA read, hash, memcpy,
+ * consumer stall) and log a per-image summary. Compiles out entirely when 0.
+ *
+ * Each window is measured with a 32-bit cycle delta (safe against a single
+ * counter wrap, since one chunk is far shorter than the wrap period) and
+ * accumulated into a 64-bit total that is converted to time only when reported.
+ */
+#define LOAD_IO_TIMING		1
+
+struct load_pipe {
+	const struct device *flash_dev;	/* flash device to read the image from */
+	uint32_t image_offset;		/* image start offset within the device */
+	uint32_t image_size;		/* total bytes to read for this job */
+	void *buf[LOAD_NUM_BUFFERS];	/* non-cacheable double buffers */
+	size_t len[LOAD_NUM_BUFFERS];	/* bytes valid in each buffer */
+	volatile int read_err;		/* flash_read failure from the reader */
+	volatile bool abort;		/* consumer asks the reader to stop early */
+#if LOAD_IO_TIMING
+	uint64_t read_cycles;		/* reader-owned: cycles spent in flash_read */
+	uint32_t read_chunks;		/* reader-owned: number of chunks read */
+#endif
+};
+
+static struct load_pipe g_load_pipe;
+static bool g_load_pipe_ready;
+
+/*
+ * Statically initialized so they are valid from boot: the SPI-reader thread
+ * starts at boot and blocks on job_start before load_pipe_init() runs, so these
+ * cannot be runtime-initialized without orphaning the queued reader.
+ */
+static K_SEM_DEFINE(load_buf_empty, 0, LOAD_NUM_BUFFERS);  /* buffers free for the reader */
+static K_SEM_DEFINE(load_buf_filled, 0, LOAD_NUM_BUFFERS); /* buffers ready for the consumer */
+static K_SEM_DEFINE(load_job_start, 0, 1);                 /* consumer kicks a new image read */
+static K_SEM_DEFINE(load_job_done, 0, 1);                  /* reader signals the read finished */
+
+static void spi_reader_thread_entry(void *p1, void *p2, void *p3)
+{
+	struct load_pipe *pipe = &g_load_pipe;
+
+	ARG_UNUSED(p1);
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
+
+	while (1) {
+		uint32_t remaining;
+		uint32_t n;
+
+		k_sem_take(&load_job_start, K_FOREVER);
+
+		remaining = pipe->image_size;
+		n = 0;
+		while (remaining > 0) {
+			size_t chunk_size = MIN(remaining, LOAD_CHUNK_SIZE);
+			unsigned int idx = n % LOAD_NUM_BUFFERS;
+			int ret;
+#if LOAD_IO_TIMING
+			uint32_t t0;
+#endif
+
+			k_sem_take(&load_buf_empty, K_FOREVER);
+			if (pipe->abort) {
+				break;
+			}
+
+#if LOAD_IO_TIMING
+			t0 = k_cycle_get_32();
+#endif
+			ret = flash_read(pipe->flash_dev,
+					 pipe->image_offset + (pipe->image_size - remaining),
+					 pipe->buf[idx], chunk_size);
+#if LOAD_IO_TIMING
+			pipe->read_cycles += k_cycle_get_32() - t0;
+			pipe->read_chunks++;
+#endif
+
+			pipe->len[idx] = chunk_size;
+			if (ret) {
+				LOG_ERR("Failed to read image chunk from flash");
+				pipe->read_err = ret;
+				k_sem_give(&load_buf_filled);
+				break;
+			}
+
+			k_sem_give(&load_buf_filled);
+			remaining -= chunk_size;
+			n++;
+		}
+
+		k_sem_give(&load_job_done);
+	}
+}
+
+K_THREAD_DEFINE(spi_reader_tid, SPI_READER_STACK_SIZE, spi_reader_thread_entry,
+		NULL, NULL, NULL, SPI_READER_PRIORITY, 0, 0);
+
+static int load_pipe_init(void)
+{
+	if (g_load_pipe_ready) {
+		return 0;
+	}
+
+	for (int i = 0; i < LOAD_NUM_BUFFERS; i++) {
+		g_load_pipe.buf[i] = shared_multi_heap_aligned_alloc(
+			SMH_REG_ATTR_NON_CACHEABLE, 16, LOAD_CHUNK_SIZE);
+		if (g_load_pipe.buf[i] == NULL) {
+			LOG_ERR("Failed to allocate non-cacheable load buffer %d", i);
+			for (int j = 0; j < i; j++) {
+				shared_multi_heap_free(g_load_pipe.buf[j]);
+				g_load_pipe.buf[j] = NULL;
+			}
+			return -ENOMEM;
+		}
+	}
+
+	g_load_pipe_ready = true;
+	return 0;
+}
+
 static int load_image(const struct device *firmware_device,
 		      uint32_t image_offset, uint32_t image_size,
 		      uint32_t firmware_id, const uint8_t *expect_digest, void *load_address)
 {
 	int ret;
-	void *noncache_ddr;
 	uint8_t calculated_digest[48];
 	uint32_t remaining_size;
+	uint32_t n;
 #if defined(HACE_SHA_ENGINE)
 	int hash_session_started = 0;
+#endif
+#if LOAD_IO_TIMING
+	uint64_t hash_cycles = 0;	/* time in hash_update + final compute */
+	uint64_t copy_cycles = 0;	/* time copying chunks to the load address */
+	uint64_t wait_cycles = 0;	/* consumer stalled waiting on the reader */
+	uint32_t t0;
+	uint32_t job_start_cyc = 0;
 #endif
 
 	LOG_INF("Loading image fw_id=0x%08X, offset=0x%08X, size=0x%08X to address 0x%p",
@@ -429,10 +575,10 @@ static int load_image(const struct device *firmware_device,
 		return -EINVAL;
 	}
 
-	noncache_ddr = shared_multi_heap_aligned_alloc(SMH_REG_ATTR_NON_CACHEABLE, 16, 1024 * 1024);
-	if (noncache_ddr == NULL) {
-		LOG_ERR("Failed to allocate non-cacheable DDR buffer");
-		return -ENOMEM;
+	ret = load_pipe_init();
+	if (ret) {
+		LOG_ERR("Failed to initialize image load buffers");
+		return ret;
 	}
 
 #if defined(HACE_SHA_ENGINE)
@@ -449,7 +595,6 @@ static int load_image(const struct device *firmware_device,
 	ret = hash_begin_session(hace_dev, &ini, algo);
 	if (ret) {
 		LOG_ERR("HACE Failed to hash_begin_session ret=%d", ret);
-		shared_multi_heap_free(noncache_ddr);
 		return ret;
 	}
 	hash_session_started = 1;
@@ -457,48 +602,122 @@ static int load_image(const struct device *firmware_device,
 	mbedtls_sha512_init(&sha_ctx);
 	ret = mbedtls_sha512_starts(&sha_ctx, 1);
 	if (ret) {
-		shared_multi_heap_free(noncache_ddr);
 		return ret;
 	}
 #endif
 
-	remaining_size = image_size;
-	while (remaining_size > 0) {
-		size_t chunk_size = MIN(remaining_size, 1024 * 1024);
+	/* Hand the image parameters to the SPI-reader thread and kick it off. */
+	g_load_pipe.flash_dev = firmware_device;
+	g_load_pipe.image_offset = image_offset;
+	g_load_pipe.image_size = image_size;
+	g_load_pipe.read_err = 0;
+	g_load_pipe.abort = false;
+#if LOAD_IO_TIMING
+	g_load_pipe.read_cycles = 0;
+	g_load_pipe.read_chunks = 0;
+#endif
+	k_sem_reset(&load_buf_empty);
+	k_sem_reset(&load_buf_filled);
+	for (int i = 0; i < LOAD_NUM_BUFFERS; i++) {
+		k_sem_give(&load_buf_empty);
+	}
+#if LOAD_IO_TIMING
+	job_start_cyc = k_cycle_get_32();
+#endif
+	k_sem_give(&load_job_start);
 
-		ret = flash_read(firmware_device, image_offset + (image_size - remaining_size),
-				 noncache_ddr, chunk_size);
-		if (ret) {
+	remaining_size = image_size;
+	n = 0;
+	ret = 0;
+	while (remaining_size > 0) {
+		unsigned int idx = n % LOAD_NUM_BUFFERS;
+		size_t chunk_size;
+
+		/* Wait for the reader to fill the next chunk. */
+#if LOAD_IO_TIMING
+		t0 = k_cycle_get_32();
+#endif
+		k_sem_take(&load_buf_filled, K_FOREVER);
+#if LOAD_IO_TIMING
+		wait_cycles += k_cycle_get_32() - t0;
+#endif
+
+		if (g_load_pipe.read_err) {
 			LOG_ERR("Failed to read image chunk from flash");
 			ret = -ENXIO;
-			goto err;
+			break;
 		}
 
-		k_msleep(10);
+		chunk_size = g_load_pipe.len[idx];
 
 #if defined(HACE_SHA_ENGINE)
-		pkt.in_buf = noncache_ddr;
+		pkt.in_buf = g_load_pipe.buf[idx];
 		pkt.in_len = chunk_size;
 
+#if LOAD_IO_TIMING
+		t0 = k_cycle_get_32();
+#endif
 		ret = hash_update(&ini, &pkt);
+#if LOAD_IO_TIMING
+		hash_cycles += k_cycle_get_32() - t0;
+#endif
 		if (ret) {
-			LOG_ERR("HACE hash_update error in_buf = %08x in_len = %d", pkt.in_buf, pkt.in_len);
-			goto err;
+			LOG_ERR("HACE hash_update error in_buf = %p in_len = %d", pkt.in_buf, pkt.in_len);
+			break;
 		}
 #else
-		ret = mbedtls_sha512_update(&sha_ctx, noncache_ddr, chunk_size);
+#if LOAD_IO_TIMING
+		t0 = k_cycle_get_32();
+#endif
+		ret = mbedtls_sha512_update(&sha_ctx, g_load_pipe.buf[idx], chunk_size);
+#if LOAD_IO_TIMING
+		hash_cycles += k_cycle_get_32() - t0;
+#endif
 		if (ret) {
-			goto err;
+			break;
 		}
 
 #endif
 
-		memcpy((uint8_t *)load_address + (image_size - remaining_size), noncache_ddr, chunk_size);
+#if LOAD_IO_TIMING
+		t0 = k_cycle_get_32();
+#endif
+		memcpy((uint8_t *)load_address + (image_size - remaining_size),
+		       g_load_pipe.buf[idx], chunk_size);
+#if LOAD_IO_TIMING
+		copy_cycles += k_cycle_get_32() - t0;
+#endif
+
+		/* Release the buffer back to the reader. */
+		k_sem_give(&load_buf_empty);
 		remaining_size -= chunk_size;
+		n++;
+	}
+
+	/*
+	 * On a consumer-side error, set abort before releasing the buffer so the
+	 * reader sees it the instant it wakes (no stale read, so a single give is
+	 * enough), then release the still-held buffer to unblock the reader.
+	 */
+	if (ret) {
+		g_load_pipe.abort = true;
+		k_sem_give(&load_buf_empty);
+	}
+	/* Wait for the reader to park before the buffers are reused. */
+	k_sem_take(&load_job_done, K_FOREVER);
+
+	if (ret) {
+		goto err;
 	}
 
 #if defined(HACE_SHA_ENGINE)
+#if LOAD_IO_TIMING
+	t0 = k_cycle_get_32();
+#endif
 	ret = hash_compute(&ini, &pkt);
+#if LOAD_IO_TIMING
+	hash_cycles += k_cycle_get_32() - t0;
+#endif
 	if (ret) {
 		LOG_ERR("HACE Fail hash_compute ret %d", ret);
 		ret = -EACCES;
@@ -520,7 +739,13 @@ static int load_image(const struct device *firmware_device,
 	}
 
 #else
+#if LOAD_IO_TIMING
+	t0 = k_cycle_get_32();
+#endif
 	ret = mbedtls_sha512_finish(&sha_ctx, calculated_digest);
+#if LOAD_IO_TIMING
+	hash_cycles += k_cycle_get_32() - t0;
+#endif
 	if (ret) {
 		goto err;
 	}
@@ -543,6 +768,27 @@ static int load_image(const struct device *firmware_device,
 
 	ret = 0;
 
+#if LOAD_IO_TIMING
+	{
+		uint64_t wall_ms = k_cyc_to_ms_floor64(k_cycle_get_32() - job_start_cyc);
+		uint64_t read_ms = k_cyc_to_ms_floor64(g_load_pipe.read_cycles);
+		uint64_t hash_ms = k_cyc_to_ms_floor64(hash_cycles);
+		uint64_t copy_ms = k_cyc_to_ms_floor64(copy_cycles);
+		uint64_t wait_ms = k_cyc_to_ms_floor64(wait_cycles);
+		/* MB/s = bytes * 1000 / (ms * 1024 * 1024); guard against 0 ms. */
+		uint32_t read_mbps = read_ms ?
+			(uint32_t)((uint64_t)image_size * 1000U / (read_ms * 1024U * 1024U)) : 0;
+		uint32_t hash_mbps = hash_ms ?
+			(uint32_t)((uint64_t)image_size * 1000U / (hash_ms * 1024U * 1024U)) : 0;
+
+		LOG_INF("LOAD fw_id=0x%08X size=%u KB: wall=%llu ms",
+			firmware_id, image_size / 1024U, wall_ms);
+		LOG_INF("spi_read=%llu ms (%u chunks, %u MB/s) | hash=%llu ms (%u MB/s) | memcpy=%llu ms | consumer_stall=%llu ms",
+			read_ms, g_load_pipe.read_chunks, read_mbps,
+			hash_ms, hash_mbps, copy_ms, wait_ms);
+	}
+#endif
+
 err:
 #if defined(HACE_SHA_ENGINE)
 	if (hash_session_started) {
@@ -551,7 +797,6 @@ err:
 #else
 	mbedtls_sha512_free(&sha_ctx);
 #endif
-	shared_multi_heap_free(noncache_ddr);
 
 	return ret;
 }
