@@ -19,6 +19,41 @@
 
 LOG_MODULE_REGISTER(cptra_soc_manifest_v1, LOG_LEVEL_DBG);
 
+#ifdef CONFIG_CRYPTO_ASPEED
+#define HACE_SHA_ENGINE
+#define HASH_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_hace))
+#endif
+
+/*
+ * Double-buffered image loader.
+ *
+ * A dedicated SPI-reader thread (producer) streams the image from flash in
+ * LOAD_CHUNK_SIZE pieces into one of LOAD_NUM_BUFFERS non-cacheable buffers,
+ * while the calling thread (consumer) feeds the previous chunk to the HACE
+ * engine and copies it to the load address. SPI DMA and the hash engine thus
+ * run concurrently.
+ *
+ * Note: real overlap depends on hash_update() yielding/blocking while the HACE
+ * engine runs so the reader gets CPU time. Both threads run at priority 5 with
+ * semaphore handoff (the normal Zephyr idiom); if the HACE driver busy-polls
+ * without yielding, the overlap benefit shrinks.
+ */
+#define LOAD_CHUNK_SIZE		(512 * 1024)
+#define LOAD_NUM_BUFFERS	2
+#define SPI_READER_STACK_SIZE	4096
+#define SPI_READER_PRIORITY	5
+
+/*
+ * Set to 1 to accumulate per-operation I/O timing (SPI DMA read, hash, memcpy,
+ * consumer stall) and log a per-image summary. Compiles out entirely when 0.
+ *
+ * Each window is measured with a 32-bit cycle delta (safe against a single
+ * counter wrap, since one chunk is far shorter than the wrap period) and
+ * accumulated into a 64-bit total that is converted to time only when reported.
+ */
+#define LOAD_IO_TIMING		1
+
+
 static void le_to_be32_words(uint8_t *data, size_t word_count)
 {
 	for (size_t i = 0; i < word_count; i++) {
@@ -404,40 +439,6 @@ int cptra_validate_bundle_v1(const uint8_t *bundle, size_t bundle_size)
 	return 0;
 }
 
-#define HACE_SHA_ENGINE
-#ifdef CONFIG_CRYPTO_ASPEED
-#define HASH_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_hace))
-#endif
-
-/*
- * Double-buffered image loader.
- *
- * A dedicated SPI-reader thread (producer) streams the image from flash in
- * LOAD_CHUNK_SIZE pieces into one of LOAD_NUM_BUFFERS non-cacheable buffers,
- * while the calling thread (consumer) feeds the previous chunk to the HACE
- * engine and copies it to the load address. SPI DMA and the hash engine thus
- * run concurrently.
- *
- * Note: real overlap depends on hash_update() yielding/blocking while the HACE
- * engine runs so the reader gets CPU time. Both threads run at priority 5 with
- * semaphore handoff (the normal Zephyr idiom); if the HACE driver busy-polls
- * without yielding, the overlap benefit shrinks.
- */
-#define LOAD_CHUNK_SIZE		(512 * 1024)
-#define LOAD_NUM_BUFFERS	2
-#define SPI_READER_STACK_SIZE	4096
-#define SPI_READER_PRIORITY	5
-
-/*
- * Set to 1 to accumulate per-operation I/O timing (SPI DMA read, hash, memcpy,
- * consumer stall) and log a per-image summary. Compiles out entirely when 0.
- *
- * Each window is measured with a 32-bit cycle delta (safe against a single
- * counter wrap, since one chunk is far shorter than the wrap period) and
- * accumulated into a 64-bit total that is converted to time only when reported.
- */
-#define LOAD_IO_TIMING		1
-
 struct load_pipe {
 	const struct device *flash_dev;	/* flash device to read the image from */
 	uint32_t image_offset;		/* image start offset within the device */
@@ -558,6 +559,8 @@ static int load_image(const struct device *firmware_device,
 	uint32_t n;
 #if defined(HACE_SHA_ENGINE)
 	int hash_session_started = 0;
+#else
+	mbedtls_sha512_context sha_ctx;
 #endif
 #if LOAD_IO_TIMING
 	uint64_t hash_cycles = 0;	/* time in hash_update + final compute */
