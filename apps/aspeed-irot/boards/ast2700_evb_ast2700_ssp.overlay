@@ -34,7 +34,7 @@
 
 &fmc_cs0 {
 	status = "okay";
-	spi-max-buswidth = < 0x1 >;
+	spi-max-buswidth = < 0x4 >;
 };
 
 &fmc_cs1 {
