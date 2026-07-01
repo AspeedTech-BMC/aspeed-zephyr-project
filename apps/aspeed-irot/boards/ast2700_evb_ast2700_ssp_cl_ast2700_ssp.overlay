@@ -1,0 +1,50 @@
+#include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
+#include <zephyr/dt-bindings/memory-attr/memory-attr.h>
+
+/ {
+	bmc_pfm {
+		compatible = "manifest,caliptra";
+		firmware-device = <&fmc_cs0>;
+		manifest-device = <&fmc_cs1>;
+		manifest-offset = <0x00000000>;
+	};
+
+	chosen {
+		zephyr,sram = &dram_rw_region;
+	};
+};
+
+/*
+ * mcuboot occupies 0x0 - 0x7FFFF (512KB).
+ * irot .text/.rodata is loaded here by mcuboot.
+ */
+&dram_ro_region {
+	reg = <0x80000 DT_SIZE_K(512)>;
+};
+
+&dram_rw_region {
+	reg = <DT_SIZE_K(512 + 512) DT_SIZE_K(1024)>;
+};
+
+&dram_nc_region {
+	reg = <DT_SIZE_K(2048) DT_SIZE_K(30720 + 32768)>;
+	zephyr,memory-attr = <(DT_MEM_DMA)>;
+};
+
+&fmc {
+	status = "okay";
+};
+
+&fmc_cs0 {
+	status = "okay";
+	spi-max-buswidth = < 0x4 >;
+};
+
+&fmc_cs1 {
+	status = "okay";
+	spi-max-buswidth = < 0x1 >;
+};
+
+&hace {
+	status = "okay";
+};
