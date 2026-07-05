@@ -41,6 +41,9 @@ int ssp_init(mem_addr_t load_addr)
 
 	reg_val = SCU0_SSP_TSP_NIDEN | SCU0_SSP_TSP_DBGEN |
 		  SCU0_SSP_TSP_DBG_ENABLE | SCU0_SSP_TSP_RESET;
+	/* Power up SRAM: clear sleep, deep sleep and shutdown modes */
+	reg_val &= ~(SCU0_SSP_TSP_SRAM_SLP | SCU0_SSP_TSP_SRAM_DSLP |
+		     SCU0_SSP_TSP_SRAM_SD);
 	sys_write32(reg_val, (mm_reg_t)&scu->ssp_ctrl_0);
 
 	/*
@@ -127,6 +130,9 @@ int tsp_init(mem_addr_t load_addr)
 
 	reg_val = SCU0_SSP_TSP_NIDEN | SCU0_SSP_TSP_DBGEN |
 		  SCU0_SSP_TSP_DBG_ENABLE | SCU0_SSP_TSP_RESET;
+	/* Power up SRAM: clear sleep, deep sleep and shutdown modes */
+	reg_val &= ~(SCU0_SSP_TSP_SRAM_SLP | SCU0_SSP_TSP_SRAM_DSLP |
+		     SCU0_SSP_TSP_SRAM_SD);
 	sys_write32(reg_val, (mm_reg_t)&scu->tsp_ctrl_0);
 
 	/* TSP 0x0000_0000 - 0x0200_0000 -> DRAM */
