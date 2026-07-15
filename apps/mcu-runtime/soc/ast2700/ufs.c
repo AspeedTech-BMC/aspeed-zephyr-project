@@ -22,8 +22,15 @@
 
 LOG_MODULE_REGISTER(aspeed_ufs, CONFIG_SOC_FMC_LOG_LEVEL);
 
-struct utp_transfer_cmd_desc ucd[1] __aligned(128);
-struct utp_transfer_req_desc utr[1] __aligned(1024);
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(peri_desc), okay)
+#define PERI_DESC_SECTION Z_GENERIC_SECTION(PERI_DESC)
+#else
+#define PERI_DESC_SECTION
+#endif
+
+/* Use dedicated descriptor memory when provided by the board. */
+struct utp_transfer_req_desc utr[1] __aligned(1024) PERI_DESC_SECTION;
+struct utp_transfer_cmd_desc ucd[1] __aligned(128) PERI_DESC_SECTION;
 
 #define TEST_TAG 0
 #define UFS_UIC_CMD_TIMEOUT 1000

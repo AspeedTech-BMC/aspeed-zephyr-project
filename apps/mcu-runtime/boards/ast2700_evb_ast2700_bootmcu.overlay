@@ -3,6 +3,7 @@
 		zephyr,console = &uart12;
 		zephyr,shell-uart = &uart12;
 		zephyr,custom-stack = &loader_stack;
+		aspeed,peri-desc = &peri_desc;
 	};
 
 	loader_stack: stack@14bab000 {
@@ -17,10 +18,10 @@
 		zephyr,memory-region = "DMA_POOL";
 	};
 
-	ufs_desc: memory@14bbe700 {
+	peri_desc: memory@14bbe700 {
 		compatible = "zephyr,memory-region";
 		reg = <0x14bbe700 0x520>;
-		zephyr,memory-region = "UFS_DESC";
+		zephyr,memory-region = "PERI_DESC";
 	};
 
 	reserved-memory {
