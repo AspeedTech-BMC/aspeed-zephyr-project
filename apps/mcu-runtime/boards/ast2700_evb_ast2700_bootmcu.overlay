@@ -5,10 +5,22 @@
 		zephyr,custom-stack = &loader_stack;
 	};
 
-	loader_stack: stack@14bad400 {
+	loader_stack: stack@14bab000 {
 		compatible = "zephyr,memory-region";
-		reg = <0x14bad400 0x12000>;
+		reg = <0x14bab000 0x12000>;
 		zephyr,memory-region = "CUSTOM_STACK";
+	};
+
+	dma_pool: memory@14bbd0e0 {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bbd0e0 0x1000>;
+		zephyr,memory-region = "DMA_POOL";
+	};
+
+	ufs_desc: memory@14bbe700 {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bbe700 0x520>;
+		zephyr,memory-region = "UFS_DESC";
 	};
 
 	reserved-memory {
