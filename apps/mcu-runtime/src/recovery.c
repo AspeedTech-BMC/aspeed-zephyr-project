@@ -47,7 +47,7 @@ static int recovery_load(struct ast_loader *loader, uint32_t type, uint32_t *dst
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->load)
-		err = ops->load(loader->dev, dst, &sz);
+		err = ops->load(loader, dst, &sz);
 
 	*len = sz;
 
@@ -82,7 +82,7 @@ int recovery_init(struct ast_loader *loader)
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->init)
-		err = ops->init(loader->dev);
+		err = ops->init(loader);
 
 	return err;
 }

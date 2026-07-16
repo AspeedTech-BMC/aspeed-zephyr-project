@@ -1248,13 +1248,13 @@ static int ufs_connection_test(int lun)
 	return ret;
 }
 
-static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len)
+static int ufs_read(struct ast_loader *loader, uint32_t *dst, uint32_t src, uint32_t len)
 {
 	uint32_t *base;
 	int ret;
 	uint32_t blks;
 	uint32_t offset, lba, trans, extra;
-	uint8_t blk_buf[UFS_SECTOR_LENGTH], *out = (uint8_t *)dst, *in = (uint8_t *)src;
+	uint8_t *blk_buf = loader->dma_pool, *out = (uint8_t *)dst, *in = (uint8_t *)src;
 
 	lba = (uint32_t)src / UFS_SECTOR_LENGTH;
 	offset = (uint32_t)src % UFS_SECTOR_LENGTH;
@@ -1322,7 +1322,7 @@ static int ufs_read(struct device *dev, uint32_t *dst, uint32_t src, uint32_t le
 	return 0;
 }
 
-static int ufs_init(struct device *dev)
+static int ufs_init(struct ast_loader *loader)
 {
 	int lun = (1 << abr_get_ind());
 	int err = 0;

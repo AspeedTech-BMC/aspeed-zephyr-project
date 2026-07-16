@@ -22,13 +22,14 @@ struct ymodem_port uport = {
 	.max_retries = 20,
 };
 
-static int uart_init(struct device *dev)
+static int uart_init(struct ast_loader *loader)
 {
 	return 0;
 }
 
-static int uart_load(struct device *dev, uint32_t *dst, uint32_t *len)
+static int uart_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 {
+	struct device *dev = loader->dev;
 	uint32_t out_sz = 0;
 	enum ymodem_status sts = YMODEM_OK;
 

@@ -526,7 +526,7 @@ struct bootusb_priv {
 	uint32_t *dfu_dst_addr;
 	uint32_t dfu_max_len;
 	uint32_t dfu_recv_len;
-	uint8_t ep0_ctrl_buf[USB_DFU_MAX_XFER_SIZE];
+	uint8_t *ep0_ctrl_buf;
 	enum usb_state usb_fsm_state;
 	struct request_ctx usb_req_ctx;
 	struct dfu_data_t dfu_data;
@@ -1169,8 +1169,9 @@ static void usb_clk_enable_reset(enum usb_port port)
 	sys_write32(usb->reset_bits, usb->scu_reset + 0x4);
 }
 
-static int usb_init(struct device *dev)
+static int usb_init(struct ast_loader *loader)
 {
+	struct device *dev = loader->dev;
 	struct bootusb_priv *hci = dev->data;
 	struct usb_vhub_config *usb;
 	uint32_t val, reg;
@@ -1181,6 +1182,7 @@ static int usb_init(struct device *dev)
 	hci->dfu_data.bwPollTimeout = USB_DFU_DEFAULT_POLLTIMEOUT;
 	hci->usb_uart_enabled = false;
 	hci->is_dnload_done = false;
+	hci->ep0_ctrl_buf = loader->dma_pool;
 
 	reg = sys_read32(SCU1_HWSTRAP1);
 	hci->usb_vhub_port = FIELD_GET(SCU1_HWSTRAP1_RECOVERY_USB_PORT, reg);
@@ -1221,8 +1223,9 @@ static int usb_init(struct device *dev)
 	return 0;
 }
 
-static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
+static int usb_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 {
+	struct device *dev = loader->dev;
 	struct bootusb_priv *hci = dev->data;
 	uint32_t reg;
 	int ret = 0;
@@ -1254,8 +1257,9 @@ static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
 	return ret;
 }
 
-static int usb_deinit(struct device *dev)
+static int usb_deinit(struct ast_loader *loader)
 {
+	struct device *dev = loader->dev;
 	struct bootusb_priv *hci = dev->data;
 	struct usb_vhub_config *usb;
 

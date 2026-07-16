@@ -4,6 +4,7 @@
 		zephyr,shell-uart = &uart12;
 		zephyr,custom-stack = &loader_stack;
 		aspeed,peri-desc = &peri_desc;
+		aspeed,dma-pool = &dma_pool;
 	};
 
 	loader_stack: stack@14bab000 {

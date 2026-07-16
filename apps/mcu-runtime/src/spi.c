@@ -100,8 +100,9 @@ static bool spi_single_flash_abr(void)
 	return !!(sys_read32(SCU1_REG + 0x030) & BIT(29));
 }
 
-static int spi_copy(struct device *dev, uint32_t *dest, uint32_t src, uint32_t len)
+static int spi_copy(struct ast_loader *loader, uint32_t *dest, uint32_t src, uint32_t len)
 {
+	struct device *dev = loader->dev;
 	int ret;
 
 	if (!dev)
@@ -139,7 +140,7 @@ static void hspi_init(void)
 	sys_write32(reg, ASPEED_SPI1_REG_BASE + MISC_CTRL_REG);
 }
 
-static int spi_init(struct device *dev)
+static int spi_init(struct ast_loader *loader)
 {
 	hspi_init();
 

@@ -140,7 +140,7 @@ enum ocp_recovery_command {
 
 #define DBG(...)
 
-uint8_t i2c_buff[I2C_BUFFER_SIZE];
+uint8_t *i2c_buff;
 
 #define field_prep(_mask, _val) (((_val) << (ffs(_mask) - 1)) & (_mask))
 
@@ -259,10 +259,13 @@ int i2c_poll_in_forever(struct i2c_hci *hci, uint32_t *size)
 	return 0;
 }
 
-static int i2c_init(struct device *dev)
+static int i2c_init(struct ast_loader *loader)
 {
+	struct device *dev = loader->dev;
 	struct i2c_hci *hci = DEV_DATA(dev);
 	uint32_t regval;
+
+	i2c_buff = loader->dma_pool;
 
 	/* get the otp setting for i2c recovery */
 	regval = sys_read32(SCU1_OTPCFG_15_14);
@@ -309,8 +312,9 @@ static int i2c_init(struct device *dev)
 	return 0;
 }
 
-static int i2c_load(struct device *dev, uint32_t *dst, uint32_t *len)
+static int i2c_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 {
+	struct device *dev = loader->dev;
 	struct i2c_hci *hci = DEV_DATA(dev);
 	uint32_t size, received_size = 0;
 	uint8_t *io_sram_ptr = NULL;
