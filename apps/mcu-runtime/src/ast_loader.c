@@ -87,7 +87,7 @@ int ast_loader_read(uint32_t *dst, uint32_t src, uint32_t len)
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->copy) {
-		err = ops->copy(loader->dev, dst, src, len);
+		err = ops->copy(loader, dst, src, len);
 		if (err)
 			return err;
 	}
@@ -162,11 +162,20 @@ int ast_loader_load_manifest_image(uint32_t type, uint32_t *dst, bool verify, ui
 								  CONFIG_AST_LOADER_DRAM_TEMP_BUF_MAX_SIZE, verify, img_read_size);
 }
 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(dma_pool), okay)
+#define DMA_POOL_SECTION Z_GENERIC_SECTION(DMA_POOL)
+#else
+#define DMA_POOL_SECTION
+#endif
+
+uint8_t ast_loader_dma_pool[0x1000] DMA_POOL_SECTION;
 static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 {
 	int err;
 
 	loader->bootmode = chip->bootmode;
+	loader->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
+	loader->dma_pool = ast_loader_dma_pool;
 
 	LOG_DBG("%s: bootmode=%d\n", __func__, loader->bootmode);
 
@@ -180,7 +189,6 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 		return err;
 	}
 
-	loader->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 #ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
 	LOG_INF("Registering manifest verifier...\n");
 	loader->verify = ast_loader_verify;
@@ -211,7 +219,7 @@ int ast_loader_deinit(struct ast_chip *chip)
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->deinit)
-		return ops->deinit(loader->dev);
+		return ops->deinit(loader);
 
 	return 0;
 }

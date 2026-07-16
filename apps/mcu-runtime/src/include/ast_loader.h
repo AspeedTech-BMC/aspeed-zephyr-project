@@ -27,10 +27,10 @@ struct ast_chip;
 struct ast_loader;
 
 struct ast_loader_ops {
-        int (*init)(struct device *dev);
-        int (*copy)(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len);
-        int (*load)(struct device *dev, uint32_t *dst, uint32_t *len);
-        int (*deinit)(struct device *dev);
+        int (*init)(struct ast_loader *loader);
+        int (*copy)(struct ast_loader *loader, uint32_t *dst, uint32_t src, uint32_t len);
+        int (*load)(struct ast_loader *loader, uint32_t *dst, uint32_t *len);
+        int (*deinit)(struct ast_loader *loader);
 };
 
 struct ast_loader {
@@ -46,6 +46,7 @@ struct ast_loader {
 
         int rev_id;
 
+	uint8_t *dma_pool;
 };
 
 struct stor_ops {

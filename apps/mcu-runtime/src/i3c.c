@@ -833,8 +833,9 @@ static void i3c_wait_address_assign(struct i3c_hci *hci)
 	    FIELD_GET(ASPEED_I3C_STS_SLV_DYNAMIC_ADDRESS, ast_inhouse_read(ASPEED_I3C_STS)));
 }
 
-static int i3c_init(struct device *dev)
+static int i3c_init(struct ast_loader *loader)
 {
+	struct device *dev = loader->dev;
 	struct i3c_hci *hci = DEV_DATA(dev);
 	uint32_t regval, offset;
 	int ret;
@@ -962,8 +963,9 @@ int i3c_poll_in_forever(struct i3c_hci *hci, uint8_t *data, uint32_t *size)
  * *dst: destination address to move to
  * len: required length, if not equal, return failre
  */
-static int i3c_recovery(struct device *dev, uint32_t *dst, uint32_t *len)
+static int i3c_recovery(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 {
+	struct device *dev = loader->dev;
 	struct i3c_hci *hci = DEV_DATA(dev);
 	uint32_t size, packet_size, received_size = 0;
 	uint8_t *io_sram_ptr;

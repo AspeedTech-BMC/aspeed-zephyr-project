@@ -84,7 +84,7 @@ static int stor_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, ui
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->copy)
-		err = ops->copy(loader->dev, dst, src, sz);
+		err = ops->copy(loader, dst, src, sz);
 
 	*len = sz;
 
@@ -109,7 +109,7 @@ int stor_init(struct ast_loader *loader)
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->init)
-			err = ops->init(loader->dev);
+		err = ops->init(loader);
 
 	stor_get_image_info(img_info);
 

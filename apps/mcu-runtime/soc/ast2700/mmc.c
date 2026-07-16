@@ -33,8 +33,9 @@ LOG_MODULE_REGISTER(ast_mmc, CONFIG_SDHC_LOG_LEVEL);
 
 static struct sd_card card;
 
-static int mmc_init(struct device *dev)
+static int mmc_init(struct ast_loader *loader)
 {
+	struct device *dev = loader->dev;
 	int ret = 0;
 
 	/* set clk/cmd driving */
@@ -66,13 +67,13 @@ static int mmc_init(struct device *dev)
 	return ret;
 }
 
-static int mmc_copy(struct device *dev, uint32_t *dst, uint32_t src, uint32_t len)
+static int mmc_copy(struct ast_loader *loader, uint32_t *dst, uint32_t src, uint32_t len)
 {
 	int ret;
 	uint32_t *base;
 	uint32_t blks;
 	uint32_t offset, lba, trans, extra;
-	uint8_t blk_buf[MMC_BLK_LEN], *out = (uint8_t *)dst, *in = (uint8_t *)src;
+	uint8_t *blk_buf = loader->dma_pool, *out = (uint8_t *)dst, *in = (uint8_t *)src;
 
 	lba = (uint32_t)src / MMC_BLK_LEN;
 	offset = (uint32_t)src % MMC_BLK_LEN;
