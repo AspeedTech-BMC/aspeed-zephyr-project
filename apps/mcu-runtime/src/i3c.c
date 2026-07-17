@@ -971,12 +971,21 @@ static int i3c_recovery(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 	uint8_t *io_sram_ptr;
 	struct i3c_recovey_packet const *hdr;
 	int resp_sts = 0;
+	unsigned int key;
 
 	io_sram_ptr = (uint8_t *)dst;
+	/*
+	 * The recovery data is drained by PIO polling. Any preemption from the
+	 * scheduler or timer interrupt while a response is pending can make the
+	 * transfer fail, so keep the whole polling loop in a critical section.
+	 */
+	key = irq_lock();
 	while (1) {
 		resp_sts = i3c_poll_in_forever(hci, hci->data, &size);
-		if (resp_sts)
+		if (resp_sts) {
+			irq_unlock(key);
 			return resp_sts;
+		}
 		hdr = (struct i3c_recovey_packet *)hci->data;
 		packet_size = (hdr->len_hi << 8) | hdr->len_lo;
 		DBG("command: 0x%x, length: %x, hw received size: %x\n", hdr->command, packet_size,
@@ -988,8 +997,10 @@ static int i3c_recovery(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 		 * With PEC, it should be minus an additional 1 byte.
 		 * With DDR mode, the packet size is even with PEC then need to minus padding data
 		 */
-		if (packet_size != size - 3 && packet_size != size - 4 && packet_size != size - 5)
+		if (packet_size != size - 3 && packet_size != size - 4 && packet_size != size - 5) {
+			irq_unlock(key);
 			return -EINVAL;
+		}
 		if (hdr->command == OCP_REC_CTRL) {
 			if (packet_size != OCP_REC_CTRL_BYTES)
 				continue;
@@ -1004,6 +1015,7 @@ static int i3c_recovery(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 			io_sram_ptr += packet_size;
 		}
 	}
+	irq_unlock(key);
 
 	DBG("received_size = %x\n", received_size);
 	*len = received_size;
