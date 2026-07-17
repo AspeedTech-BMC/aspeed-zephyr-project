@@ -1250,73 +1250,31 @@ static int ufs_connection_test(int lun)
 
 static int ufs_read(struct ast_loader *loader, uint32_t *dst, uint32_t src, uint32_t len)
 {
-	uint32_t *base;
 	int ret;
-	uint32_t blks;
-	uint32_t offset, lba, trans, extra;
-	uint8_t *blk_buf = loader->dma_pool, *out = (uint8_t *)dst, *in = (uint8_t *)src;
+	uint32_t offset, lba, trans;
+	uint8_t *blk_buf = loader->dma_pool, *out = (uint8_t *)dst;
 
-	lba = (uint32_t)src / UFS_SECTOR_LENGTH;
-	offset = (uint32_t)src % UFS_SECTOR_LENGTH;
+	/*
+	 * Always DMA one block into the dma_pool bounce buffer and copy
+	 * out from there: dst may live in memory the UFS DMA master has
+	 * no write permission to (GSRAM sprot only opens the pool).
+	 */
+	while (len) {
+		lba = src / UFS_SECTOR_LENGTH;
+		offset = src % UFS_SECTOR_LENGTH;
+		trans = MIN(len, UFS_SECTOR_LENGTH - offset);
 
-	/* Handle the case where the source address is not aligned to block size */
-	if (offset) {
-		if (len < (UFS_SECTOR_LENGTH - offset))
-			trans = len;
-		else
-			trans = UFS_SECTOR_LENGTH - offset;
-
-		/* Read the first block to get the offset */
 		ret = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)blk_buf, SYNC);
 		if (ret) {
 			LOG_ERR("blk read is incomplete!!!\n");
 			return -1;
 		}
 
-		base = (uint32_t *)(blk_buf + offset);
-		memcpy(dst, base, trans);
+		memcpy(out, blk_buf + offset, trans);
 
 		out += trans;
-		in  += trans;
+		src += trans;
 		len -= trans;
-	}
-
-	/* Read the rest of the blocks */
-	while (len)  {
-		blks = len / UFS_SECTOR_LENGTH;
-		extra = len % UFS_SECTOR_LENGTH;
-
-		lba = (uint32_t)in / UFS_SECTOR_LENGTH;
-		offset = (uint32_t)in % UFS_SECTOR_LENGTH;
-
-		if (len == extra) {
-			/* Read out the last block */
-			ret = ufs_scsi_read10(lba, UFS_SECTOR_LENGTH, (uintptr_t *)blk_buf, SYNC);
-			if (ret) {
-				LOG_ERR("blk read is incomplete!!!\n");
-				return -1;
-			}
-
-			memcpy(out, blk_buf + offset, extra);
-
-			out += extra;
-			in += extra;
-			len -= extra;
-		} else {
-			if (blks > 0x20)
-				blks = 0x20;
-
-			/* Read out the whole block */
-			ret = ufs_scsi_read10(lba, blks * UFS_SECTOR_LENGTH, (uintptr_t *)out, SYNC);
-			if (ret) {
-				LOG_ERR("blk read is incomplete!!!\n");
-				return -1;
-			}
-
-			out += (UFS_SECTOR_LENGTH * blks);
-			in += (UFS_SECTOR_LENGTH * blks);
-			len -= (UFS_SECTOR_LENGTH * blks);
-		}
 	}
 
 	return 0;
