@@ -5,6 +5,7 @@
 		zephyr,custom-stack = &loader_stack;
 		aspeed,peri-desc = &peri_desc;
 		aspeed,dma-pool = &dma_pool;
+		aspeed,usb-desc = &usb_desc;
 	};
 
 	loader_stack: stack@14bab000 {
@@ -23,6 +24,12 @@
 		compatible = "zephyr,memory-region";
 		reg = <0x14bbe700 0x520>;
 		zephyr,memory-region = "PERI_DESC";
+	};
+
+	usb_desc: memory@14bbed4c {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bbed4c 0x154>;
+		zephyr,memory-region = "USB_DESC";
 	};
 
 	reserved-memory {
