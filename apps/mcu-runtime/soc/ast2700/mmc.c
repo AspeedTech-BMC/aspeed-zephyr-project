@@ -28,6 +28,7 @@
 #define MMC_DAT7_DRIVING_REG	(SCU0_REG + 0x4ac)
 
 #define MMC_BLK_LEN	512
+#define MMC_DMA_POOL_LEN	0x1000
 
 LOG_MODULE_REGISTER(ast_mmc, CONFIG_SDHC_LOG_LEVEL);
 
@@ -70,73 +71,35 @@ static int mmc_init(struct ast_loader *loader)
 static int mmc_copy(struct ast_loader *loader, uint32_t *dst, uint32_t src, uint32_t len)
 {
 	int ret;
-	uint32_t *base;
 	uint32_t blks;
-	uint32_t offset, lba, trans, extra;
-	uint8_t *blk_buf = loader->dma_pool, *out = (uint8_t *)dst, *in = (uint8_t *)src;
+	uint32_t offset, lba, trans;
+	uint8_t *blk_buf = loader->dma_pool, *out = (uint8_t *)dst;
 
-	lba = (uint32_t)src / MMC_BLK_LEN;
-	offset = (uint32_t)src % MMC_BLK_LEN;
+	/*
+	 * Always DMA into the dma_pool bounce buffer and copy out from
+	 * there: dst may live in memory the MMC DMA master has no write
+	 * permission to (GSRAM sprot only opens the pool).
+	 */
+	while (len) {
+		lba = src / MMC_BLK_LEN;
+		offset = src % MMC_BLK_LEN;
+		trans = MIN(len, MMC_DMA_POOL_LEN - offset);
+		blks = DIV_ROUND_UP(offset + trans, MMC_BLK_LEN);
 
-	/* Handle the case where the source address is not aligned to block size */
-	if (offset) {
-		if (len < (MMC_BLK_LEN - offset))
-			trans = len;
-		else
-			trans = MMC_BLK_LEN - offset;
-
-		/* Read the first block to get the offset */
-		ret = mmc_read_blocks(&card, (void *)blk_buf, lba, 1);
-		if (ret) {// != 1) {
+		ret = mmc_read_blocks(&card, (void *)blk_buf, lba, blks);
+		if (ret) {
 			LOG_ERR("blk read is incomplete!!!\n");
 			return -1;
 		}
 
-		base = (uint32_t *)(blk_buf + offset);
-		memcpy(dst, base, trans);
+		memcpy(out, blk_buf + offset, trans);
 
 		out += trans;
-		in  += trans;
+		src += trans;
 		len -= trans;
 	}
 
-	/* Read the rest of the blocks */
-	while (len)  {
-		blks = len / MMC_BLK_LEN;
-		extra = len % MMC_BLK_LEN;
-
-		lba = (uint32_t)in / MMC_BLK_LEN;
-		offset = (uint32_t)in % MMC_BLK_LEN;
-
-		if (len == extra) {
-			/* Read out the last block */
-			ret = mmc_read_blocks(&card, (void *)blk_buf, lba, 1);
-			if (ret) {// != 1) {
-				LOG_ERR("blk read is incomplete!!!\n");
-				return -1;
-			}
-
-			memcpy(out, blk_buf + offset, extra);
-
-			out += extra;
-			in += extra;
-			len -= extra;
-		} else {
-			/* Read out the whole block */
-			ret = mmc_read_blocks(&card, (void *)out, lba, blks);
-			LOG_DBG("blk read cnt=%d\n", ret);
-			if (ret) {// != blks) {
-				LOG_ERR("blk read is incomplete!!!\n");
-				return -1;
-			}
-
-			out += (MMC_BLK_LEN * blks);
-			in += (MMC_BLK_LEN * blks);
-			len -= (MMC_BLK_LEN * blks);
-		}
-	}
-
-	return ret;
+	return 0;
 }
 
 static struct ast_loader_ops bootmmc_ops = {
