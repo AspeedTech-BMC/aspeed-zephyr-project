@@ -19,6 +19,14 @@ static struct bootusb_priv g_usb_hci;
 
 #define DBG(...)
 
+#if DT_NODE_HAS_STATUS(DT_NODELABEL(usb_desc), okay)
+#define USB_DESC_SECTION Z_GENERIC_SECTION(USB_DESC)
+#else
+#define USB_DESC_SECTION
+#endif
+
+/* Use dedicated descriptor memory when provided by the board. */
+
 /* USB VHUB register definitions */
 #define USB_VHUBA_REG             (0x12011000)
 #define USB_VHUBB_REG             (0x12021000)
@@ -255,63 +263,7 @@ struct dev_dfu_mode_descriptor {
 	} dfu_cfg;
 };
 
-static struct dev_dfu_mode_descriptor dfu_mode_desc = {
-	/* Device descriptor */
-	.device_desc = {
-		.bLength = sizeof(struct usb_device_descriptor),
-		.bDescriptorType = USB_DESC_DEVICE,
-		.bcdUSB = sys_cpu_to_le16(0x0200),
-		.bDeviceClass = 0,
-		.bDeviceSubClass = 0,
-		.bDeviceProtocol = 0,
-		.bMaxPacketSize0 = USB_MAX_CTRL_MPS,
-		.idVendor = sys_cpu_to_le16((uint16_t)USB_DEVICE_VID),
-		.idProduct = sys_cpu_to_le16((uint16_t)USB_DEVICE_DFU_PID),
-		.iManufacturer = 1,
-		.iProduct = 2,
-		.iSerialNumber = 3,
-		.bNumConfigurations = 1,
-	},
-	/* Configuration descriptor */
-	.cfg_desc = {
-		.bLength = sizeof(struct usb_cfg_descriptor),
-		.bDescriptorType = USB_DESC_CONFIGURATION,
-		.wTotalLength = sizeof(dfu_mode_desc.cfg_desc) +
-				sizeof(dfu_mode_desc.dfu_cfg),
-		.bNumInterfaces = 1,
-		.bConfigurationValue = 1,
-		.iConfiguration = 0,
-		.bmAttributes = USB_SCD_RESERVED |
-				USB_SCD_SELF_POWERED,
-		.bMaxPower = 0x32,
-	},
-	.dfu_cfg = {
-		/* Interface descriptor */
-		.if0 = {
-			.bLength = sizeof(struct usb_if_descriptor),
-			.bDescriptorType = USB_DESC_INTERFACE,
-			.bInterfaceNumber = 0,
-			.bAlternateSetting = 0,
-			.bNumEndpoints = 0,
-			.bInterfaceClass = USB_BCC_APPLICATION,
-			.bInterfaceSubClass = DFU_SUBCLASS,
-			.bInterfaceProtocol = DFU_MODE_PROTOCOL,
-			.iInterface = 4,
-		},
-		.dfu_run_desc = {
-			.bLength = sizeof(struct dfu_runtime_descriptor),
-			.bDescriptorType = DFU_FUNC_DESC,
-			.bmAttributes = DFU_ATTR_CAN_DNLOAD |
-					DFU_ATTR_MANIFESTATION_TOLERANT,
-			.wDetachTimeOut =
-				sys_cpu_to_le16(USB_DFU_DETACH_TIMEOUT),
-			.wTransferSize =
-				sys_cpu_to_le16(USB_DFU_MAX_XFER_SIZE),
-			.bcdDFUVersion =
-				sys_cpu_to_le16(DFU_VERSION),
-		},
-	},
-};
+static struct dev_dfu_mode_descriptor dfu_mode_desc USB_DESC_SECTION;
 
 #define VENDOR_REQ_MS_OS_DESC             0x12
 #define WINDEX_OS_FEATURE_EXT_COMPAT_ID   4
@@ -357,51 +309,11 @@ struct usb_os_ext_properties_desc {
 	uint8_t  bPropertyData[78];
 } __packed;
 
-struct usb_os_string const desc_string_ms_10 = {
-	.bLength = sizeof(struct usb_os_string),
-	.bDescriptorType = USB_DESC_STRING,
-	.qwSignature = {'M', 0, 'S', 0, 'F', 0, 'T', 0, '1', 0, '0', 0, '0', 0,},
-	.bMS_VendorCode = VENDOR_REQ_MS_OS_DESC,
-	.bPad = 0
-};
+struct usb_os_string desc_string_ms_10 USB_DESC_SECTION;
 
-struct usb_os_compat_id_desc const desc_compat_id_ms = {
-	// Header
-	.dwLength = sys_cpu_to_le32(sizeof(struct usb_os_compat_id_desc)),
-	.bcdVersion = sys_cpu_to_le16(0x0100),
-	.wIndex = sys_cpu_to_le16(0x0004), // The index for Extended compat ID descriptor
-	.bCount = 0x01,
-	.bReserved1 = {0},
-	// Function Section 1
-	.bFirstInterfaceNumber = 0x00, //ITF_NUM_DFU_RT
-	.bReserved2 = 1,
-	.bCompatibleID = "WINUSB",
-	.bSubCompatibleID = {0},
-	.bReserved3 = {0}
-};
+struct usb_os_compat_id_desc desc_compat_id_ms USB_DESC_SECTION;
 
-struct usb_os_ext_properties_desc const desc_ext_properties_ms = {
-	// Header
-	.dwLength = sys_cpu_to_le32(sizeof(struct usb_os_ext_properties_desc)),
-	.bcdVersion = sys_cpu_to_le16(0x0100),
-	.wIndex = sys_cpu_to_le16(0x0005), // The index for extended property OS descriptors.
-	.wCount = sys_cpu_to_le16(0x0001), // Only 1 Custom Property Section
-	// Custom Property Section 1
-	.dwSize = sys_cpu_to_le32(0x00000084),
-	.dwPropertyDataType = sys_cpu_to_le32(0x00000001), //Property Data Type: A NULL-terminated Unicode String (REG_SZ)
-	.wPropertyNameLength = sys_cpu_to_le16(0x0028),
-	.bPropertyName = {'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00,
-					'n', 0x00, 't', 0x00, 'e', 0x00, 'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00,
-					'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 0x00, 0x00},
-	.dwPropertyDataLength = sys_cpu_to_le32(0x0000004E),
-	// {AA536045-0A1E-4782-A559-2E1ACA555AAE}
-	.bPropertyData = {'{', 0x00, 'A', 0x00, 'A', 0x00, '5', 0x00, '3', 0x00, '6', 0x00, '0', 0x00,
-					'4', 0x00, '5', 0x00, '-', 0x00, '0', 0x00, 'A', 0x00, '1', 0x00, 'E', 0x00,
-					'-', 0x00, '4', 0x00, '7', 0x00, '8', 0x00, '2', 0x00, '-', 0x00, 'A', 0x00,
-					'5', 0x00, '5', 0x00, '9', 0x00, '-', 0x00, '2', 0x00, 'E', 0x00, '1', 0x00,
-					'A', 0x00, 'C', 0x00, 'A', 0x00, '5', 0x00, '5', 0x00, '5', 0x00, 'A', 0x00,
-					'A', 0x00, 'E', 0x00, '}', 0x00, 0x00, 0x00}
-};
+struct usb_os_ext_properties_desc desc_ext_properties_ms USB_DESC_SECTION;
 
 /*
  * The USB Unicode bString is encoded in UTF16LE, which means it takes up
@@ -454,33 +366,134 @@ struct usb_string_desription {
 	} utf16le_image0;
 };
 
-static struct usb_string_desription string_desc = {
-	.lang_desc = {
-		.bLength = sizeof(struct usb_string_descriptor),
+static struct usb_string_desription string_desc USB_DESC_SECTION;
+
+/* DT memory-region sections are NOLOAD, so descriptors are filled at runtime. */
+static void usb_desc_init(void)
+{
+	dfu_mode_desc = (struct dev_dfu_mode_descriptor) {
+		.device_desc = {
+			.bLength = sizeof(struct usb_device_descriptor),
+			.bDescriptorType = USB_DESC_DEVICE,
+			.bcdUSB = sys_cpu_to_le16(0x0200),
+			.bDeviceClass = 0,
+			.bDeviceSubClass = 0,
+			.bDeviceProtocol = 0,
+			.bMaxPacketSize0 = USB_MAX_CTRL_MPS,
+			.idVendor = sys_cpu_to_le16((uint16_t)USB_DEVICE_VID),
+			.idProduct = sys_cpu_to_le16((uint16_t)USB_DEVICE_DFU_PID),
+			.iManufacturer = 1,
+			.iProduct = 2,
+			.iSerialNumber = 3,
+			.bNumConfigurations = 1,
+		},
+		.cfg_desc = {
+			.bLength = sizeof(struct usb_cfg_descriptor),
+			.bDescriptorType = USB_DESC_CONFIGURATION,
+			.wTotalLength = sizeof(dfu_mode_desc.cfg_desc) +
+					sizeof(dfu_mode_desc.dfu_cfg),
+			.bNumInterfaces = 1,
+			.bConfigurationValue = 1,
+			.iConfiguration = 0,
+			.bmAttributes = USB_SCD_RESERVED |
+					USB_SCD_SELF_POWERED,
+			.bMaxPower = 0x32,
+		},
+		.dfu_cfg = {
+			.if0 = {
+				.bLength = sizeof(struct usb_if_descriptor),
+				.bDescriptorType = USB_DESC_INTERFACE,
+				.bInterfaceNumber = 0,
+				.bAlternateSetting = 0,
+				.bNumEndpoints = 0,
+				.bInterfaceClass = USB_BCC_APPLICATION,
+				.bInterfaceSubClass = DFU_SUBCLASS,
+				.bInterfaceProtocol = DFU_MODE_PROTOCOL,
+				.iInterface = 4,
+			},
+			.dfu_run_desc = {
+				.bLength = sizeof(struct dfu_runtime_descriptor),
+				.bDescriptorType = DFU_FUNC_DESC,
+				.bmAttributes = DFU_ATTR_CAN_DNLOAD |
+						DFU_ATTR_MANIFESTATION_TOLERANT,
+				.wDetachTimeOut =
+					sys_cpu_to_le16(USB_DFU_DETACH_TIMEOUT),
+				.wTransferSize =
+					sys_cpu_to_le16(USB_DFU_MAX_XFER_SIZE),
+				.bcdDFUVersion =
+					sys_cpu_to_le16(DFU_VERSION),
+			},
+		},
+	};
+
+	desc_string_ms_10 = (struct usb_os_string) {
+		.bLength = sizeof(struct usb_os_string),
 		.bDescriptorType = USB_DESC_STRING,
-		.bString = sys_cpu_to_le16(0x0409),
-	},
-	/* Manufacturer String Descriptor */
-	.utf16le_mfr = {
-		.bLength = USB_STRING_DESCRIPTOR_LENGTH(USB_DEVICE_MANUFACTURER),
-		.bDescriptorType = USB_DESC_STRING,
-	},
-	/* Product String Descriptor */
-	.utf16le_product = {
-		.bLength = USB_STRING_DESCRIPTOR_LENGTH(USB_DEVICE_PRODUCT),
-		.bDescriptorType = USB_DESC_STRING,
-	},
-	/* Serial Number String Descriptor */
-	.utf16le_sn = {
-		.bLength = USB_STRING_DESCRIPTOR_LENGTH(USB_DEVICE_SN),
-		.bDescriptorType = USB_DESC_STRING,
-	},
-	/* Image 0 String Descriptor */
-	.utf16le_image0 = {
-		.bLength = USB_STRING_DESCRIPTOR_LENGTH(FIRMWARE_IMAGE_0_LABEL),
-		.bDescriptorType = USB_DESC_STRING,
-	},
-};
+		.qwSignature = {'M', 0, 'S', 0, 'F', 0, 'T', 0, '1', 0, '0', 0, '0', 0,},
+		.bMS_VendorCode = VENDOR_REQ_MS_OS_DESC,
+		.bPad = 0
+	};
+
+	desc_compat_id_ms = (struct usb_os_compat_id_desc) {
+		.dwLength = sys_cpu_to_le32(sizeof(struct usb_os_compat_id_desc)),
+		.bcdVersion = sys_cpu_to_le16(0x0100),
+		.wIndex = sys_cpu_to_le16(0x0004),
+		.bCount = 0x01,
+		.bReserved1 = {0},
+		.bFirstInterfaceNumber = 0x00,
+		.bReserved2 = 1,
+		.bCompatibleID = "WINUSB",
+		.bSubCompatibleID = {0},
+		.bReserved3 = {0}
+	};
+
+	desc_ext_properties_ms = (struct usb_os_ext_properties_desc) {
+		.dwLength = sys_cpu_to_le32(sizeof(struct usb_os_ext_properties_desc)),
+		.bcdVersion = sys_cpu_to_le16(0x0100),
+		.wIndex = sys_cpu_to_le16(0x0005),
+		.wCount = sys_cpu_to_le16(0x0001),
+		.dwSize = sys_cpu_to_le32(0x00000084),
+		.dwPropertyDataType = sys_cpu_to_le32(0x00000001),
+		.wPropertyNameLength = sys_cpu_to_le16(0x0028),
+		.bPropertyName = {'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00,
+				  'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00,
+				  'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00,
+				  'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 0x00, 0x00},
+		.dwPropertyDataLength = sys_cpu_to_le32(0x0000004E),
+		.bPropertyData = {'{', 0x00, 'A', 0x00, 'A', 0x00, '5', 0x00, '3', 0x00,
+				  '6', 0x00, '0', 0x00, '4', 0x00, '5', 0x00, '-', 0x00,
+				  '0', 0x00, 'A', 0x00, '1', 0x00, 'E', 0x00, '-', 0x00,
+				  '4', 0x00, '7', 0x00, '8', 0x00, '2', 0x00, '-', 0x00,
+				  'A', 0x00, '5', 0x00, '5', 0x00, '9', 0x00, '-', 0x00,
+				  '2', 0x00, 'E', 0x00, '1', 0x00, 'A', 0x00, 'C', 0x00,
+				  'A', 0x00, '5', 0x00, '5', 0x00, '5', 0x00, 'A', 0x00,
+				  'A', 0x00, 'E', 0x00, '}', 0x00, 0x00, 0x00}
+	};
+
+	string_desc = (struct usb_string_desription) {
+		.lang_desc = {
+			.bLength = sizeof(struct usb_string_descriptor),
+			.bDescriptorType = USB_DESC_STRING,
+			.bString = sys_cpu_to_le16(0x0409),
+		},
+		.utf16le_mfr = {
+			.bLength = USB_STRING_DESCRIPTOR_LENGTH(USB_DEVICE_MANUFACTURER),
+			.bDescriptorType = USB_DESC_STRING,
+		},
+		.utf16le_product = {
+			.bLength = USB_STRING_DESCRIPTOR_LENGTH(USB_DEVICE_PRODUCT),
+			.bDescriptorType = USB_DESC_STRING,
+		},
+		.utf16le_sn = {
+			.bLength = USB_STRING_DESCRIPTOR_LENGTH(USB_DEVICE_SN),
+			.bDescriptorType = USB_DESC_STRING,
+		},
+		.utf16le_image0 = {
+			.bLength = USB_STRING_DESCRIPTOR_LENGTH(FIRMWARE_IMAGE_0_LABEL),
+			.bDescriptorType = USB_DESC_STRING,
+		},
+	};
+}
 
 /* Device data structure */
 struct dfu_data_t {
@@ -1175,6 +1188,9 @@ static int usb_init(struct ast_loader *loader)
 	struct bootusb_priv *hci = dev->data;
 	struct usb_vhub_config *usb;
 	uint32_t val, reg;
+
+	usb_desc_init();
+
 	hci->usb_fsm_state = IDLE;
 	hci->dfu_max_len = UINT32_MAX;
 	hci->dfu_data.state = dfuIDLE;
