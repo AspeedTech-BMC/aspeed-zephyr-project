@@ -81,13 +81,6 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	return 0;
 }
 
-static uint32_t ast_vga_get_gfm_ctrl(uint8_t node)
-{
-	if (node == 1)
-		return (BIT(19) | BIT(28));
-	return (BIT(10) | BIT(27));
-}
-
 static void _ast_update_e2m(struct ast2700_scu0 *scu, struct sdramc_regs *ram, bool is_64vram,
 			    const uint8_t nodes[2])
 {
@@ -128,10 +121,6 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 	volatile uint32_t *const scratch_regs[2] = {
 		&scu->vga0_scratch1[0],
 		&scu->vga1_scratch1[0],
-	};
-	volatile uint32_t *const gfm_regs[2] = {
-		&ram->gfm0ctl,
-		&ram->gfm1ctl,
 	};
 	const uint32_t clk_gates[2] = { SCU0_CLKGATE1_VGA0, SCU0_CLKGATE1_VGA1 };
 
@@ -175,9 +164,6 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 
 		// scratch for VGA CRD0[12]: Disable P2A
 		setbits_le32(scratch_regs[node], BIT(7) | BIT(12));
-
-		// Enable VRAM address offset: cursor, 2d
-		sys_write32(ast_vga_get_gfm_ctrl(node), (uintptr_t)gfm_regs[node]);
 	}
 
 	if (nodes[0] || nodes[1]) {

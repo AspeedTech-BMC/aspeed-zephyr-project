@@ -786,6 +786,22 @@ static void __unused sdramc_aes_lock(struct sdramc *sdramc)
 #endif
 }
 
+/* VRAM access for cursor & VGA */
+static uint32_t ast_vga_get_gfm_ctrl(uint8_t node)
+{
+	if (node == 1)
+		return (BIT(19) | BIT(28));
+	return (BIT(10) | BIT(27));
+}
+
+static void sdramc_setup_vga_access(struct sdramc *sdramc)
+{
+	struct sdramc_regs *regs = sdramc->regs;
+
+	regs->gfm0ctl = ast_vga_get_gfm_ctrl(0);
+	regs->gfm1ctl = ast_vga_get_gfm_ctrl(1);
+}
+
 static int sdramc_get_vga_mem_size(struct sdramc *sdramc)
 {
 	struct ast_chip *chip = sdramc->chip;
@@ -1405,6 +1421,7 @@ int dram_init(struct ast_chip *chip)
 	sdramc_mpu_enable(sdramc);
 
 	sdramc_qos_init(sdramc);
+	sdramc_setup_vga_access(sdramc);
 
 	/* SSP/TSP data masters are routed to DRAMC port served by DARB2 */
 	sdramc_darb_recovery_disable(DARB2_BASE,
