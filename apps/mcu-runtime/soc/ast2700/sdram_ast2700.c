@@ -1369,8 +1369,18 @@ int dram_init(struct ast_chip *chip)
 	sdramc->regs = (struct sdramc_regs *)DRAMC_BASE;
 	sdramc->phy_regs = (uint32_t *)DRAMC_PHY_BASE;
 
-	if (is_ddr_initialized(sdramc))
+	while (is_ddr_initialized(sdramc)) {
+		dwc_ddrphy_apb_wr(0xd0000, 0);
+
+		if (dwc_ddrphy_apb_rd(0x10056)) {
+			printf("DDR PHY is already initialized, but PHY RX FIFO is inconsistency. \n");
+			break;
+		} else {
+			dwc_ddrphy_apb_wr(0xd0000, 1);
+		}
+
 		return 0;
+	}
 
 	sdramc_preset(sdramc);
 	while (retry--) {
