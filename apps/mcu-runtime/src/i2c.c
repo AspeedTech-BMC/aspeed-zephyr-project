@@ -211,7 +211,7 @@ int i2c_device_init(struct i2c_hci *hci)
 	i2c_reg_write(I2CS_ISR, 0xFFFFFFFF);
 
 	/* set slave dma rx base */
-	i2c_reg_write(I2CS_RX_DMA, (uint32_t)(&i2c_buff));
+	i2c_reg_write(I2CS_RX_DMA, (uint32_t)(i2c_buff));
 	i2c_reg_write(I2CS_RX_DMA_H, 0x0);
 
 	/* set slave dma rx length */
