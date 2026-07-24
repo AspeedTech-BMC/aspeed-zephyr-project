@@ -1,0 +1,369 @@
+/*
+ * AST1080 DCSCM BHS board overlay for the aspeed-pfr application.
+ *
+ * AST1080 is an AST10x0-G2 (g7-generation) SoC. Only peripherals that are
+ * modelled in <arm/aspeed/ast1080.dtsi> / <aspeed/ast10x0-g2.dtsi> are
+ * enabled here.
+ */
+#include "ast1080_dcscm_gpio_common.dts"
+#include "ast1080_dcscm_gpio_bhs.dts"
+
+#define AFM_VERSION 4
+
+// &cptra_mci_mbox {
+// 	status = "okay";
+// };
+//
+// &cptra_mci_sha {
+// 	status = "okay";
+// };
+
+&i2cfilter {
+	status = "okay";
+};
+
+&mbxctrl {
+	status = "okay";
+};
+
+&spim0 {
+	status = "okay";
+};
+
+/* spim1 = spi0 CS0/CS1 (BMC), spim2 = spi0 CS2/CS3 (CPU1 PCH), spim3 = spi1
+ * CS0/CS1 (CPU0 PCH). CS0/CS1 and CS2/CS3 share spi0's pins via an analog
+ * mux (cs-group-analog-mux-enable below) - see commit 2fc2393be21.
+ */
+&spim1 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	status = "okay";
+};
+
+&spim2 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	status = "okay";
+};
+
+&spim3 {
+	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
+	status = "okay";
+};
+
+&spi0 {
+	status = "okay";
+	cs-group-analog-mux-enable;
+};
+
+&spi0_cs0 {
+	spi-monitor-ctrl = <&spim1>;
+	status = "okay";
+};
+
+&spi0_cs1 {
+	spi-monitor-ctrl = <&spim1>;
+	status = "okay";
+};
+
+&spi0_cs2 {
+	spi-monitor-ctrl = <&spim2>;
+	status = "okay";
+};
+
+&spi0_cs3 {
+	spi-monitor-ctrl = <&spim2>;
+	status = "okay";
+};
+
+&spi1 {
+	status = "okay";
+};
+
+&spi1_cs0 {
+	spi-monitor-ctrl = <&spim3>;
+	status = "okay";
+};
+
+&spi1_cs1 {
+	spi-monitor-ctrl = <&spim3>;
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+
+	swmbx0: swmbx0@38 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x38>;
+		size = <256>;
+		port = <0>;
+		status = "okay";
+	};
+};
+
+&i2c2 {
+	status = "okay";
+
+	swmbx1: swmbx1@70 {
+		compatible = "aspeed,swmbx-dev";
+		reg = <0x70>;
+		size = <256>;
+		port = <1>;
+		status = "okay";
+	};
+};
+
+&i2c4 {
+	status = "okay";
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+};
+
+// &i3c0 {
+// 	status = "okay";
+// 	sda-tx-hold-ns = <20>;
+// 	i3c-pp-scl-hi-period-ns = <380>;
+// 	i3c-pp-scl-lo-period-ns = <620>;
+// 	pinctrl-0 = <pinctrl_i3c0_default>;
+//
+// 	// i3chub
+// 	i3cdev@4cdffffffff {
+// 		compatible = "i3c-dummy-device";
+// 		reg = <0x0 0x4cd 0xffffffff>;
+// 		status = "okay";
+// 		zephyr,deferred-init;
+// 	};
+//
+// 	// cpu0
+// 	i3cdev@20a012900ef {
+// 		compatible = "i3c-dummy-device";
+// 		reg = <0x0 0x20a 0x012900ef>;
+// 		status = "okay";
+// 		zephyr,deferred-init;
+// 	};
+//
+// 	// cpu1
+// 	i3cdev@20a012910ef {
+// 		compatible = "i3c-dummy-device";
+// 		reg = <0x0 0x20a 0x012910ef>;
+// 		status = "okay";
+// 		zephyr,deferred-init;
+// 	};
+// };
+
+/* MCTP over I3C (AST2700 i3c-4 -> AST1080 i3c-3), same DC-SCM card / CPU
+ * platform PIDs as ast2700_dcscm_bhs - only the BMC SoC differs.
+ */
+&i3c3 {
+	status = "okay";
+	i3c-scl-hz = <12500000>;
+	// io-mode = "dma";
+
+	i3cdev@00000007ec06000000 {
+		compatible = "i3c-dummy-device";
+		reg = <0x0 0x7ec 0x06000000>;
+		status = "okay";
+		/*
+		 * The MIPI I3C HCI dummy-device driver enables IBI during
+		 * initialization. Defer that initialization until the application
+		 * has completed DAA; otherwise IBI setup has no dynamic address,
+		 * initialization fails, and Zephyr reports this device as DISABLED.
+		 */
+		zephyr,deferred-init;
+	};
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&wdt1 {
+	status = "okay";
+};
+
+&wdt2 {
+	status = "okay";
+};
+
+&wdt3 {
+	status = "okay";
+};
+
+&wdt4 {
+	status = "okay";
+};
+
+&fmc {
+	status = "okay";
+};
+
+&fmc_cs0 {
+	status = "okay";
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		active_partition: partition@0 {
+			label = "active";
+			reg = <0x0 0x3C0000>;
+			read-only;
+		};
+
+		state_partition: partition@3c0000 {
+			label = "state";
+			reg = <0x3C0000 0x10000>;
+		};
+
+		intel_state_partition: partition@3d0000 {
+			label = "intel_state";
+			reg = <0x3D0000 0x10000>;
+		};
+
+		key_partition: partition@3e0000 {
+			label = "key";
+			reg = <0x3E0000 0x10000>;
+		};
+
+		afm_act_1_partition: partition@3f0000 {
+			label = "afm_act_1";
+			reg = <0x3F0000 0x10000>;
+		};
+	};
+};
+
+&fmc_cs1 {
+	status = "okay";
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+#if (AFM_VERSION == 4)
+		/* Reserved for Intel-PFR 4.0 */
+		afm_act1_partition: partition@0 {
+			label = "afm_active_1";
+			reg = <0x0 0x20000>;
+		};
+
+		afm_act2_partition: partition@20000 {
+			label = "afm_active_2";
+			reg = <0x20000 0x20000>;
+		};
+
+		afm_rcv1_partition: partition@40000 {
+			label = "afm_recovery_1";
+			reg = <0x40000 0x20000>;
+		};
+
+		afm_rcv2_partition: partition@60000 {
+			label = "afm_recovery_2";
+			reg = <0x60000 0x20000>;
+		};
+
+		intel_cpld_act_partition: partition@80000 {
+			label = "intel_cpld_act";
+			reg = <0x80000 0x1C0000>;
+		};
+		intel_cpld_rc_partition: partition@240000 {
+			label = "intel_cpld_rc";
+			reg = <0x240000 0x1C0000>;
+		};
+#elif (AFM_VERSION == 3)
+		intel_cpld_act_partition: partition@0 {
+			label = "intel_cpld_act";
+			reg = <0x000000 0x200000>;
+		};
+		intel_cpld_rc_partition: partition@200000 {
+			label = "intel_cpld_rc";
+			reg = <0x200000 0x200000>;
+		};
+#endif
+	};
+};
+
+&sgpiom0 {
+	status = "okay";
+	ngpios = <72>;
+
+	sgpiom0_0_31 {
+		status = "okay";
+	};
+
+	sgpiom0_32_63 {
+		status = "okay";
+	};
+
+	sgpiom0_64_95 {
+		status = "okay";
+	};
+};
+
+/* sgpiom1 unused on this board; its child nodes already default to
+ * status "disabled" in ast10x0-g2.dtsi.
+ */
+&sgpiom1 {
+	status = "disabled";
+
+	sgpiom1_0_31 {
+		status = "disabled";
+	};
+
+	sgpiom1_32_63 {
+		status = "disabled";
+	};
+
+	sgpiom1_64_95 {
+		status = "disabled";
+	};
+
+	sgpiom1_96_127 {
+		status = "disabled";
+	};
+
+	sgpiom1_128_159 {
+		status = "disabled";
+	};
+
+	sgpiom1_160_191 {
+		status = "disabled";
+	};
+
+	sgpiom1_192_223 {
+		status = "disabled";
+	};
+
+	sgpiom1_224_255 {
+		status = "disabled";
+	};
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+/* Flash role aliases: resolved by lib/hrot_hal/flash/flash_aspeed.c
+ * to build the BMC_SPI/PCH_SPI device name at compile time.
+ */
+/ {
+	aliases {
+		bmc-spi0 = &spi0_cs0;
+		bmc-spi1 = &spi0_cs1;
+		pch-spi0 = &spi1_cs0;
+		pch-spi1 = &spi1_cs1;
+	};
+};

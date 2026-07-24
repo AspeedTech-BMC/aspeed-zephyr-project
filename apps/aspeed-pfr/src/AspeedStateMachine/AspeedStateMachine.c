@@ -1071,6 +1071,21 @@ void do_rot_recovery(void *o)
 	LOG_DBG("End");
 }
 
+static void bypass_spi_filter(const char *dev_name)
+{
+	if (device_get_binding(dev_name) == NULL)
+		return;
+
+#if !defined(CONFIG_SOC_AST1080_CM4)
+	Set_SPI_Filter_RW_Region(dev_name, SPI_FILTER_READ_PRIV,
+			SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+	Set_SPI_Filter_RW_Region(dev_name, SPI_FILTER_WRITE_PRIV,
+			SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
+#endif
+	SPI_Monitor_Enable(dev_name, false);
+	LOG_INF("Bypass %s", dev_name);
+}
+
 void enter_tzero(void *o)
 {
 	LOG_DBG("Start");
@@ -1123,41 +1138,10 @@ void enter_tzero(void *o)
 			LOG_ERR("Host firmware is invalid, host won't boot");
 	} else {
 		/* Unprovisioned - Releasing System Reset */
-		if (device_get_binding("spim@1") != NULL) {
-			Set_SPI_Filter_RW_Region("spim@1", SPI_FILTER_READ_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spim@1", SPI_FILTER_WRITE_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spim@1", false);
-			LOG_INF("Bypass %s", "spim@1");
-		}
-
-		if (device_get_binding("spim@2") != NULL) {
-			Set_SPI_Filter_RW_Region("spim@2", SPI_FILTER_READ_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spim@2", SPI_FILTER_WRITE_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spim@2", false);
-			LOG_INF("Bypass %s", "spim@2");
-		}
-
-		if (device_get_binding("spim@3") != NULL) {
-			Set_SPI_Filter_RW_Region("spim@3", SPI_FILTER_READ_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spim@3", SPI_FILTER_WRITE_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spim@3", false);
-			LOG_INF("Bypass %s", "spim@3");
-		}
-
-		if (device_get_binding("spim@4") != NULL) {
-			Set_SPI_Filter_RW_Region("spim@4", SPI_FILTER_READ_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			Set_SPI_Filter_RW_Region("spim@4", SPI_FILTER_WRITE_PRIV,
-					SPI_FILTER_PRIV_ENABLE, 0, 0x10000000);
-			SPI_Monitor_Enable("spim@4", false);
-			LOG_INF("Bypass %s", "spim@4");
-		}
+		bypass_spi_filter("spim@1");
+		bypass_spi_filter("spim@2");
+		bypass_spi_filter("spim@3");
+		bypass_spi_filter("spim@4");
 
 		/* Releasing I2C Filter */
 		const struct device *dev = NULL;

@@ -279,3 +279,15 @@
 &ecdsa {
 	status = "okay";
 };
+
+/* Flash role aliases: resolved by lib/hrot_hal/flash/flash_aspeed.c
+ * to build the BMC_SPI/PCH_SPI device name at compile time.
+ */
+/ {
+	aliases {
+		bmc-spi0 = &spi1_cs0;
+		bmc-spi1 = &spi1_cs1;
+		pch-spi0 = &spi2_cs0;
+		pch-spi1 = &spi2_cs1;
+	};
+};

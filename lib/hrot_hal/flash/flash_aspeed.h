@@ -27,28 +27,44 @@ enum {
 	SPI_APP_CMD_GET_FLASH_SIZE = 0x09,
 };
 
+/*
+ * device_id space is split into three contiguous bands. Band membership is
+ * tested elsewhere via relational comparison against the sentinels below
+ * (e.g. `device_id < ROT_BUS_DEVICE_COUNT`), so values within a band may be
+ * reordered freely, but a value must never be moved across a sentinel.
+ *
+ *  - [0, ROT_BUS_DEVICE_COUNT): raw SPI bus devices, indexed directly into
+ *    Flash_Devices_List[] in flash_aspeed.c. BMC_SPI_2/PCH_SPI_2 must stay
+ *    immediately after BMC_SPI/PCH_SPI (dual-flash overflow relies on
+ *    device_id + 1); see the BUILD_ASSERTs in flash_aspeed.c.
+ *  - [ROT_BUS_DEVICE_COUNT, ROT_EXT_REGION_BEGIN): internal flash_area
+ *    partitions, resolved by name via get_rot_region()'s switch.
+ *  - [ROT_EXT_REGION_BEGIN, ...): external device partitions, also
+ *    resolved by name via get_rot_region()'s switch.
+ */
 enum {
 	BMC_SPI = 0,
 	BMC_SPI_2,
 	PCH_SPI,
 	PCH_SPI_2,
-	ROT_INTERNAL_ACTIVE = 4,
+	ROT_BUS_DEVICE_COUNT,
+
+	ROT_INTERNAL_ACTIVE = ROT_BUS_DEVICE_COUNT,
 	ROT_INTERNAL_RECOVERY,
 	ROT_INTERNAL_STATE,
 	ROT_INTERNAL_INTEL_STATE,
 	ROT_INTERNAL_KEY,
 	ROT_INTERNAL_CERTIFICATE,
 	ROT_INTERNAL_AFM,
-	ROT_EXT_AFM_ACT_1,
+
+	ROT_EXT_REGION_BEGIN,
+	ROT_EXT_AFM_ACT_1 = ROT_EXT_REGION_BEGIN,
 	ROT_EXT_AFM_ACT_2,
 	ROT_EXT_AFM_RC_1,
 	ROT_EXT_AFM_RC_2,
 	ROT_EXT_CPLD_ACT,
 	ROT_EXT_CPLD_RC,
 };
-
-#define ROT_SPI     4
-#define ROT_EXT_SPI 5
 
 enum {
 	MIDLEY_FLASH_CMD_NOOP = 0x00,				/**< No-op */
@@ -332,6 +348,7 @@ int rot_flash_erase(uint8_t device_id, uint32_t address, uint32_t size, bool sec
 int bmc_pch_get_flash_size(uint8_t device_id);
 int rot_get_region_size(uint8_t device_id);
 int get_block_erase_size(uint8_t device_id);
+const char *get_flash_device_name(uint8_t device_id);
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED) || defined(CONFIG_SPI_WRITE_DMA_SUPPORT_ASPEED)
 void init_flash_rw_buf_mutex(void);
 #endif

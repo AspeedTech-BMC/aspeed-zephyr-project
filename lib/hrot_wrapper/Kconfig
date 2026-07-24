@@ -5,3 +5,46 @@ config HROT_WRAPPER
 	default n
 	bool "Hardware root of trust wrapper layer"
 
+choice HROT_HASH_BACKEND
+	depends on HROT_WRAPPER
+	prompt "HROT hash backend"
+	default HROT_HASH_BACKEND_ASPEED if CRYPTO_ASPEED
+	default HROT_HASH_BACKEND_CPTRA if CPTRA_MCI_SHA
+	default HROT_HASH_BACKEND_MBEDTLS if MBEDTLS
+	help
+	  Select the backend used by the HROT hash wrapper.
+
+config HROT_HASH_BACKEND_ASPEED
+	bool "ASPEED hardware hash"
+	depends on CRYPTO_ASPEED
+	help
+	  Use the ASPEED Zephyr crypto driver through the HROT HAL.
+
+config HROT_HASH_BACKEND_MBEDTLS
+	bool "mbedTLS software hash"
+	depends on MBEDTLS
+	select MBEDTLS_SHA256
+	select MBEDTLS_SHA384
+	help
+	  Use mbedTLS software SHA-256/SHA-384 through the HROT hash wrapper.
+
+config HROT_HASH_MBEDTLS_BYPASS
+	bool "mbedTLS backend: skip hashing, always report success"
+	depends on HROT_HASH_BACKEND_MBEDTLS
+	default n
+	help
+	  INSECURE - debug/bring-up only. Skips the actual mbedTLS SHA-256/
+	  SHA-384 computation and makes calculate_sha256/384, update, and
+	  finish return success immediately without touching the output
+	  buffer. Breaks all signature/hash verification that relies on this
+	  backend. Never enable in production builds.
+
+config HROT_HASH_BACKEND_CPTRA
+	bool "Caliptra-SS MCI mailbox hardware hash"
+	depends on CPTRA_MCI_SHA
+	help
+	  Use the Caliptra-SS MCI mailbox SHA engine (MC_SHA_INIT/UPDATE/FINAL)
+	  through the HROT hash wrapper. SHA-256 is not supported by this
+	  hardware; calculate_sha256/start_sha256 always fail.
+
+endchoice

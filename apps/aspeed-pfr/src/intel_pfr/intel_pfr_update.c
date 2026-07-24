@@ -974,7 +974,7 @@ int perform_seamless_update(uint32_t image_type, void *AoData, void *EventContex
 	uint32_t pc_type_status = 0;
 	CPLD_STATUS cpld_update_status;
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	const struct device *flash_dev = device_get_binding("spi1@0");
+	const struct device *flash_dev = device_get_binding(get_flash_device_name(BMC_SPI));
 	uint32_t flash_size = flash_get_flash_size(flash_dev);
 	uint32_t staging_start_addr;
 #endif

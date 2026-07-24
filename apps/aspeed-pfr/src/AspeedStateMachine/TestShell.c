@@ -41,6 +41,12 @@
 #include "mbedtls/base64.h"
 #include "mbedtls/asn1write.h"
 #endif
+#if defined(CONFIG_MBEDTLS)
+#include "mbedtls/sha256.h"
+#include "mbedtls/sha512.h"
+#include "mbedtls/ecdsa.h"
+#include "mbedtls/md.h"
+#endif
 #include <crypto/hash.h>
 #include <crypto/hash_aspeed.h>
 
@@ -76,13 +82,18 @@ static int cmd_asm_abr(const struct shell *shell, size_t argc,
 			char **argv)
 {
 	if (argc > 1 && !strncmp(argv[1], "enable", 6)) {
+#if defined(CONFIG_SOC_AST1080_CM4)
+		shell_error(shell, "AST1080 ABR control is not implemented");
+		return -ENOTSUP;
+#else
 		shell_print(shell, "Enable ABR FMCWDT2");
-#define ABR_CTRL_REG    0x7e620064
+#define ABR_CTRL_REG    (DT_REG_ADDR(DT_NODELABEL(fmc)) + 0x64)
 		uint32_t reg_val;
 
 		reg_val = sys_read32(ABR_CTRL_REG);
 		reg_val |= BIT(0);
 		sys_write32(reg_val, ABR_CTRL_REG);
+#endif
 	} else {
 		shell_print(shell, "Disable ABR FMCWDT2");
 		disable_abr_wdt();
@@ -187,14 +198,20 @@ struct dev_map {
 	const struct device *dev;
 };
 
+/*
+ * Use DEVICE_DT_GET_OR_NULL so platforms that do not model the monitored host
+ * SPI controllers (e.g. AST1080, whose spi1/spi2 register map is not yet in the
+ * devicetree) still build; the entry resolves to NULL and flash_rebind reports
+ * "Device not found" at runtime instead of failing to link.
+ */
 static const struct dev_map dev_table[] = {
-	{"spi1@0", DEVICE_DT_GET(DT_NODELABEL(spi1_cs0))},
+	{"spi1@0", DEVICE_DT_GET_OR_NULL(DT_NODELABEL(spi1_cs0))},
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	{"spi1@1", DEVICE_DT_GET(DT_NODELABEL(spi1_cs1))},
+	{"spi1@1", DEVICE_DT_GET_OR_NULL(DT_NODELABEL(spi1_cs1))},
 #endif
-	{"spi2@0", DEVICE_DT_GET(DT_NODELABEL(spi2_cs0))},
+	{"spi2@0", DEVICE_DT_GET_OR_NULL(DT_NODELABEL(spi2_cs0))},
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	{"spi2@1", DEVICE_DT_GET(DT_NODELABEL(spi2_cs1))},
+	{"spi2@1", DEVICE_DT_GET_OR_NULL(DT_NODELABEL(spi2_cs1))},
 #endif
 };
 
@@ -1148,6 +1165,427 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_asm,
 );
 
 SHELL_CMD_REGISTER(asm, &sub_asm, "Aspeed PFR State Machine Commands", NULL);
+
+// Accepts a trailing K/M suffix (e.g. "4M") on top of plain byte counts.
+// Shared by the mbedtls_perf / flash_perf commands below.
+static uint32_t perf_parse_size(const char *s)
+{
+	char *end;
+	uint32_t val = strtoul(s, &end, 0);
+
+	if (*end == 'k' || *end == 'K')
+		val *= 1024;
+	else if (*end == 'm' || *end == 'M')
+		val *= 1024 * 1024;
+
+	return val;
+}
+
+#if defined(CONFIG_MBEDTLS)
+// mbedtls software crypto performance test commands (hash/ecdsa), for ast1080 perf evaluation
+
+// Optional trailing "sram" arg on mbedtls_perf sha256/sha384: run the hash
+// over the fixed SRAM_BUF DT region instead of a heap allocation, to compare
+// crypto throughput out of tightly-coupled SRAM vs. DRAM. Only boards that
+// define a sram_buf DT node (e.g. ast1080_dcscm_*) can use it.
+static uint8_t *perf_get_buf(const struct shell *shell, uint32_t size, bool use_sram)
+{
+#if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
+	if (use_sram) {
+		if (size > DT_REG_SIZE(DT_NODELABEL(sram_buf))) {
+			shell_error(shell, "size exceeds SRAM_BUF (%u bytes)",
+					(uint32_t)DT_REG_SIZE(DT_NODELABEL(sram_buf)));
+			return NULL;
+		}
+		return (uint8_t *)DT_REG_ADDR(DT_NODELABEL(sram_buf));
+	}
+#else
+	if (use_sram) {
+		shell_error(shell, "SRAM_BUF not available on this board");
+		return NULL;
+	}
+#endif
+	return k_malloc(size);
+}
+
+static void perf_put_buf(uint8_t *buf, bool use_sram)
+{
+	if (!use_sram)
+		k_free(buf);
+}
+
+// Not a real RNG, only good enough to drive ECDSA keygen/sign for perf testing
+static int mbedtls_perf_rng(void *rng_ctx, unsigned char *out, size_t len)
+{
+	static uint32_t seed = 0x12345678;
+
+	ARG_UNUSED(rng_ctx);
+	for (size_t i = 0; i < len; i++) {
+		seed = seed * 1103515245 + 12345;
+		out[i] = (uint8_t)(seed >> 24);
+	}
+
+	return 0;
+}
+
+static int cmd_mbedtls_perf_sha256(const struct shell *shell, size_t argc, char **argv)
+{
+	uint32_t size, loop, i, time_start, time_end, elapsed;
+	uint8_t hash[32];
+	uint8_t *buf;
+	bool use_sram = false;
+
+	if (argc != 3 && argc != 4) {
+		shell_error(shell, "Usage: mbedtls_perf sha256 <size[K|M]> <loop> [sram]");
+		return -EINVAL;
+	}
+
+	if (argc == 4) {
+		if (strcmp(argv[3], "sram")) {
+			shell_error(shell, "Usage: mbedtls_perf sha256 <size[K|M]> <loop> [sram]");
+			return -EINVAL;
+		}
+		use_sram = true;
+	}
+
+	size = perf_parse_size(argv[1]);
+	loop = strtoul(argv[2], NULL, 0);
+	if (size == 0 || loop == 0) {
+		shell_error(shell, "Usage: mbedtls_perf sha256 <size[K|M]> <loop> [sram]");
+		return -EINVAL;
+	}
+
+	buf = perf_get_buf(shell, size, use_sram);
+	if (!buf)
+		return use_sram ? -EINVAL : -ENOMEM;
+
+	for (i = 0; i < size; i++)
+		buf[i] = (uint8_t)i;
+
+	time_start = k_uptime_get_32();
+	for (i = 0; i < loop; i++)
+		mbedtls_sha256(buf, size, hash, 0);
+	time_end = k_uptime_get_32();
+
+	perf_put_buf(buf, use_sram);
+
+	elapsed = time_end - time_start;
+	shell_print(shell, "SHA256: size=%u loop=%u elapsed=%u ms", size, loop, elapsed);
+	if (elapsed)
+		shell_print(shell, "throughput=%u KB/s",
+				(uint32_t)(((uint64_t)size * loop * 1000) / elapsed / 1024));
+
+	return 0;
+}
+
+static int cmd_mbedtls_perf_sha384(const struct shell *shell, size_t argc, char **argv)
+{
+	uint32_t size, loop, i, time_start, time_end, elapsed;
+	uint8_t hash[48];
+	uint8_t *buf;
+	bool use_sram = false;
+
+	if (argc != 3 && argc != 4) {
+		shell_error(shell, "Usage: mbedtls_perf sha384 <size[K|M]> <loop> [sram]");
+		return -EINVAL;
+	}
+
+	if (argc == 4) {
+		if (strcmp(argv[3], "sram")) {
+			shell_error(shell, "Usage: mbedtls_perf sha384 <size[K|M]> <loop> [sram]");
+			return -EINVAL;
+		}
+		use_sram = true;
+	}
+
+	size = perf_parse_size(argv[1]);
+	loop = strtoul(argv[2], NULL, 0);
+	if (size == 0 || loop == 0) {
+		shell_error(shell, "Usage: mbedtls_perf sha384 <size[K|M]> <loop> [sram]");
+		return -EINVAL;
+	}
+
+	buf = perf_get_buf(shell, size, use_sram);
+	if (!buf)
+		return use_sram ? -EINVAL : -ENOMEM;
+
+	for (i = 0; i < size; i++)
+		buf[i] = (uint8_t)i;
+
+	time_start = k_uptime_get_32();
+	for (i = 0; i < loop; i++)
+		mbedtls_sha512(buf, size, hash, 1);
+	time_end = k_uptime_get_32();
+
+	perf_put_buf(buf, use_sram);
+
+	elapsed = time_end - time_start;
+	shell_print(shell, "SHA384: size=%u loop=%u elapsed=%u ms", size, loop, elapsed);
+	if (elapsed)
+		shell_print(shell, "throughput=%u KB/s",
+				(uint32_t)(((uint64_t)size * loop * 1000) / elapsed / 1024));
+
+	return 0;
+}
+
+static int cmd_mbedtls_perf_ecdsa(const struct shell *shell, size_t argc, char **argv)
+{
+	mbedtls_ecdsa_context ctx;
+	mbedtls_ecp_group_id gid;
+	mbedtls_md_type_t md_alg;
+	uint8_t digest[48];
+	uint8_t sig[MBEDTLS_ECDSA_MAX_LEN];
+	size_t hlen, slen;
+	uint32_t loop, i, time_start, time_end;
+	int ret;
+
+	if (argc != 3) {
+		shell_error(shell, "Usage: mbedtls_perf ecdsa <p256|p384> <loop>");
+		return -EINVAL;
+	}
+
+	if (!strcmp(argv[1], "p256")) {
+		gid = MBEDTLS_ECP_DP_SECP256R1;
+		md_alg = MBEDTLS_MD_SHA256;
+		hlen = 32;
+	} else if (!strcmp(argv[1], "p384")) {
+		gid = MBEDTLS_ECP_DP_SECP384R1;
+		md_alg = MBEDTLS_MD_SHA384;
+		hlen = 48;
+	} else {
+		shell_error(shell, "Unsupported curve: %s (use p256 or p384)", argv[1]);
+		return -EINVAL;
+	}
+
+	loop = strtoul(argv[2], NULL, 0);
+	if (loop == 0) {
+		shell_error(shell, "loop must be > 0");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < hlen; i++)
+		digest[i] = (uint8_t)i;
+
+	mbedtls_ecdsa_init(&ctx);
+	ret = mbedtls_ecdsa_genkey(&ctx, gid, mbedtls_perf_rng, NULL);
+	if (ret) {
+		shell_error(shell, "genkey failed(%d)", ret);
+		mbedtls_ecdsa_free(&ctx);
+		return -EIO;
+	}
+
+	time_start = k_uptime_get_32();
+	for (i = 0; i < loop; i++) {
+		ret = mbedtls_ecdsa_write_signature(&ctx, md_alg, digest, hlen,
+				sig, sizeof(sig), &slen, mbedtls_perf_rng, NULL);
+		if (ret) {
+			shell_error(shell, "sign failed(%d)", ret);
+			mbedtls_ecdsa_free(&ctx);
+			return -EIO;
+		}
+	}
+	time_end = k_uptime_get_32();
+	shell_print(shell, "ECDSA-%s sign: loop=%u elapsed=%u ms", argv[1], loop, time_end - time_start);
+
+	time_start = k_uptime_get_32();
+	for (i = 0; i < loop; i++) {
+		ret = mbedtls_ecdsa_read_signature(&ctx, digest, hlen, sig, slen);
+		if (ret) {
+			shell_error(shell, "verify failed(%d)", ret);
+			mbedtls_ecdsa_free(&ctx);
+			return -EIO;
+		}
+	}
+	time_end = k_uptime_get_32();
+	shell_print(shell, "ECDSA-%s verify: loop=%u elapsed=%u ms", argv[1], loop, time_end - time_start);
+
+	mbedtls_ecdsa_free(&ctx);
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_mbedtls_perf,
+	SHELL_CMD(sha256, NULL, "SHA256 hash perf test\n\tsha256 <size[K|M]> <loop> [sram]", cmd_mbedtls_perf_sha256),
+	SHELL_CMD(sha384, NULL, "SHA384 hash perf test\n\tsha384 <size[K|M]> <loop> [sram]", cmd_mbedtls_perf_sha384),
+	SHELL_CMD(ecdsa, NULL, "ECDSA sign/verify perf test\n\tecdsa <p256|p384> <loop>", cmd_mbedtls_perf_ecdsa),
+	SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(mbedtls_perf, &sub_mbedtls_perf, "mbedtls performance test commands", NULL);
+
+// SPI flash read / read+hash performance test, to isolate whether a slow
+// firmware-verify hash is bottlenecked on flash I/O or on the SHA compute
+// itself. "read" times flash_read() alone; "hash" times flash_read() and
+// the SHA update separately over the same PAGE_SIZE chunking used by
+// hash_device_firmware() so the split reflects the real verify path.
+
+static int cmd_flash_perf_read(const struct shell *shell, size_t argc, char **argv)
+{
+	const struct device *dev;
+	off_t offset;
+	uint32_t size, loop, i, time_start, time_end, elapsed;
+	uint8_t *buf;
+	int ret;
+
+	if (argc != 5) {
+		shell_error(shell, "Usage: flash_perf read <dev> <offset> <size[K|M]> <loop>");
+		return -EINVAL;
+	}
+
+	dev = device_get_binding(argv[1]);
+	if (!dev) {
+		shell_error(shell, "Device %s not found", argv[1]);
+		return -ENODEV;
+	}
+
+	offset = (off_t)strtoul(argv[2], NULL, 0);
+	size = perf_parse_size(argv[3]);
+	loop = strtoul(argv[4], NULL, 0);
+	if (size == 0 || loop == 0) {
+		shell_error(shell, "Usage: flash_perf read <dev> <offset> <size[K|M]> <loop>");
+		return -EINVAL;
+	}
+
+	buf = k_malloc(size);
+	if (!buf) {
+		shell_error(shell, "Failed to allocate %u bytes", size);
+		return -ENOMEM;
+	}
+
+	time_start = k_uptime_get_32();
+	for (i = 0; i < loop; i++) {
+		ret = flash_read(dev, offset, buf, size);
+		if (ret) {
+			shell_error(shell, "flash_read failed(%d) at iteration %u", ret, i);
+			k_free(buf);
+			return ret;
+		}
+	}
+	time_end = k_uptime_get_32();
+
+	k_free(buf);
+
+	elapsed = time_end - time_start;
+	shell_print(shell, "flash read: dev=%s offset=0x%lx size=%u loop=%u elapsed=%u ms",
+			argv[1], (unsigned long)offset, size, loop, elapsed);
+	if (elapsed)
+		shell_print(shell, "throughput=%u KB/s",
+				(uint32_t)(((uint64_t)size * loop * 1000) / elapsed / 1024));
+
+	return 0;
+}
+
+static int cmd_flash_perf_hash(const struct shell *shell, size_t argc, char **argv)
+{
+	const struct device *dev;
+	off_t offset;
+	uint32_t size, remaining, chunk;
+	uint32_t read_ms = 0, hash_ms = 0, t0, t1;
+	uint8_t *buf;
+	uint8_t hash[64];
+	size_t hash_len;
+	bool is384;
+	mbedtls_sha256_context sha256_ctx;
+	mbedtls_sha512_context sha512_ctx;
+	int ret;
+
+	if (argc != 5) {
+		shell_error(shell, "Usage: flash_perf hash <dev> <offset> <size[K|M]> <sha256|sha384>");
+		return -EINVAL;
+	}
+
+	dev = device_get_binding(argv[1]);
+	if (!dev) {
+		shell_error(shell, "Device %s not found", argv[1]);
+		return -ENODEV;
+	}
+
+	offset = (off_t)strtoul(argv[2], NULL, 0);
+	size = perf_parse_size(argv[3]);
+	if (size == 0) {
+		shell_error(shell, "size must be > 0");
+		return -EINVAL;
+	}
+
+	if (!strcmp(argv[4], "sha256")) {
+		is384 = false;
+		hash_len = 32;
+		mbedtls_sha256_init(&sha256_ctx);
+		mbedtls_sha256_starts(&sha256_ctx, 0);
+	} else if (!strcmp(argv[4], "sha384")) {
+		is384 = true;
+		hash_len = 48;
+		mbedtls_sha512_init(&sha512_ctx);
+		mbedtls_sha512_starts(&sha512_ctx, 1);
+	} else {
+		shell_error(shell, "Unsupported algo: %s (use sha256 or sha384)", argv[4]);
+		return -EINVAL;
+	}
+
+	buf = k_malloc(PAGE_SIZE);
+	if (!buf) {
+		shell_error(shell, "Failed to allocate %u bytes", (uint32_t)PAGE_SIZE);
+		return -ENOMEM;
+	}
+
+	remaining = size;
+	while (remaining > 0) {
+		chunk = (remaining < PAGE_SIZE) ? remaining : PAGE_SIZE;
+
+		t0 = k_uptime_get_32();
+		ret = flash_read(dev, offset, buf, chunk);
+		t1 = k_uptime_get_32();
+		read_ms += (t1 - t0);
+		if (ret) {
+			shell_error(shell, "flash_read failed(%d) at offset 0x%lx", ret,
+					(unsigned long)offset);
+			k_free(buf);
+			return ret;
+		}
+
+		t0 = k_uptime_get_32();
+		if (is384)
+			mbedtls_sha512_update(&sha512_ctx, buf, chunk);
+		else
+			mbedtls_sha256_update(&sha256_ctx, buf, chunk);
+		t1 = k_uptime_get_32();
+		hash_ms += (t1 - t0);
+
+		offset += chunk;
+		remaining -= chunk;
+	}
+
+	k_free(buf);
+
+	if (is384)
+		mbedtls_sha512_finish(&sha512_ctx, hash);
+	else
+		mbedtls_sha256_finish(&sha256_ctx, hash);
+
+	shell_print(shell, "flash+hash: dev=%s offset=0x%lx size=%u algo=%s",
+			argv[1], (unsigned long)strtoul(argv[2], NULL, 0), size, argv[4]);
+	shell_print(shell, "flash_read: %u ms (%u KB/s)", read_ms,
+			read_ms ? (uint32_t)(((uint64_t)size * 1000) / read_ms / 1024) : 0);
+	shell_print(shell, "hash:       %u ms (%u KB/s)", hash_ms,
+			hash_ms ? (uint32_t)(((uint64_t)size * 1000) / hash_ms / 1024) : 0);
+	shell_print(shell, "total:      %u ms", read_ms + hash_ms);
+	shell_hexdump(shell, hash, hash_len);
+
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash_perf,
+	SHELL_CMD(read, NULL, "flash read perf test\n\tread <dev> <offset> <size[K|M]> <loop>",
+			cmd_flash_perf_read),
+	SHELL_CMD(hash, NULL,
+			"flash read+hash perf test, reports read/hash split\n"
+			"\thash <dev> <offset> <size[K|M]> <sha256|sha384>",
+			cmd_flash_perf_hash),
+	SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(flash_perf, &sub_flash_perf, "flash read / read+hash performance test", NULL);
+
+#endif // CONFIG_MBEDTLS
 
 #if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_OKS_ENABLED)
 #include <zephyr/drivers/gpio.h>

@@ -43,23 +43,31 @@ int get_measurement_by_index(uint8_t measurement_index, uint8_t *measurement,
 		ret = flash_area_open(FIXED_PARTITION_ID(mcuboot_partition), &area_measured);
 		area_size = FIXED_PARTITION_SIZE(mcuboot_partition);
 		break;
+#if FIXED_PARTITION_EXISTS(active_partition)
 	case 2:
 		ret = flash_area_open(FIXED_PARTITION_ID(active_partition), &area_measured);
 		area_size = FIXED_PARTITION_SIZE(active_partition);
 		break;
+#endif
+#if FIXED_PARTITION_EXISTS(recovery_partition)
 	case 3:
 		ret = flash_area_open(FIXED_PARTITION_ID(recovery_partition), &area_measured);
 		area_size = FIXED_PARTITION_SIZE(recovery_partition);
 		break;
+#endif
 #else
+#if FIXED_PARTITION_EXISTS(active_partition)
 	case 1:
 		ret = flash_area_open(FIXED_PARTITION_ID(active_partition), &area_measured);
 		area_size = FIXED_PARTITION_SIZE(active_partition);
 		break;
+#endif
+#if FIXED_PARTITION_EXISTS(recovery_partition)
 	case 2:
 		ret = flash_area_open(FIXED_PARTITION_ID(recovery_partition), &area_measured);
 		area_size = FIXED_PARTITION_SIZE(recovery_partition);
 		break;
+#endif
 #endif
 	default:
 		ret = -1;

@@ -1,0 +1,49 @@
+/*
+ * AST1080 DCSCM OKS PFR GPIO map.
+ *
+ * TODO (AST1080 HW bring-up): pin assignments are a straight bank-name
+ * translation of ast2700_dcscm_gpio_oks.dts (letter banks -> AST10x0-G2
+ * numeric banks: sgpiom_a_d -> sgpiom0_0_31, sgpiom_e_h -> sgpiom0_32_63,
+ * sgpiom_i_l -> sgpiom0_64_95, gpio0_m_p -> gpio0_96_127), same 1:1 mapping
+ * already used by ast1080_dcscm_gpio_common.dts / ast1080_dcscm_gpio_bhs.dts.
+ * hpm-stby-rdy-in-gpios is confirmed as GPI174 (gpio0_160_191, offset 14);
+ * the rest are NOT yet verified against the AST1080 DCSCM schematic.
+ */
+/ {
+	pfr_gpio_oks {
+		compatible = "aspeed,pfr-gpio-oks";
+		cpu0-aux-pwrgd-in-gpios = <&sgpiom0_32_63 1 0>;   /* SGPI33 */
+		cpu0-pltrst-sync-in-gpios = <&sgpiom0_32_63 2 0>; /* SGPI34 */
+		smbus0-rdy-in-gpios = <&sgpiom0_32_63 8 0>;       /* SGPI40 */
+		fp0-pwr-btn-in-gpios = <&sgpiom0_32_63 9 0>;      /* SGPI41 */
+		cpu1-aux-pwrgd-in-gpios = <&sgpiom0_32_63 17 0>;  /* SGPI49 */
+		cpu1-pltrst-sync-in-gpios = <&sgpiom0_32_63 18 0>; /* SGPI50 */
+		smbus1-rdy-in-gpios = <&sgpiom0_32_63 24 0>;      /* SGPI56 */
+		fp1-pwr-btn-in-gpios = <&sgpiom0_32_63 25 0>;     /* SGPI57 */
+		bmc-onctl-in-gpios = <&sgpiom0_64_95 4 0>;        /* SGPI68 */
+
+		// i3c-mng-mux-sel-out-gpios = <&gpio0_96_127 12 0>; /* GPIO_N4 */ TP229
+		scm-board-id0-in-gpios = <&sgpiom0_0_31 1 0>;     /* SGPI1 */
+		scm-rsu-hide-done-in-gpios = <&sgpiom0_32_63 10 0>; /* SGPI42 */
+
+		hpm-stby-rdy-in-gpios = <&gpio0_160_191 14 0>;    /* GPI174 */
+		hpm-stby-rst-out-gpios = <&gpio0_96_127 31 0>;    /* GPIO_127 */
+
+		bmc-pwr-btn-out-gpios = <&sgpiom0_0_31 9 0>;      /* SGPO9 */
+		rst-rtcrst-cpu0-out-gpios = <&sgpiom0_32_63 4 0>; /* SGPO36 */
+		pwrgd-cpu0-out-gpios = <&sgpiom0_32_63 5 0>;      /* SGPO37 */
+		pfr-btg-att-done-out-gpios = <&sgpiom0_32_63 6 0>; /* SGPO38 */
+		pfr-btg-att-fail-out-gpios = <&sgpiom0_32_63 7 0>; /* SGPO39 */
+		pfr-s0-att-done-out-gpios = <&sgpiom0_32_63 8 0>; /* SGPO40 */
+		pfr-s0-att-fail-out-gpios = <&sgpiom0_32_63 9 0>; /* SGPO41 */
+		pfr-s5-att-done-out-gpios = <&sgpiom0_32_63 10 0>; /* SGPO42 */
+		pfr-s5-att-fail-out-gpios = <&sgpiom0_32_63 11 0>; /* SGPO43 */
+		pwrgd-cpu1-out-gpios = <&sgpiom0_32_63 21 0>;     /* SGPO53 */
+		pfr-btg-att1-done-out-gpios = <&sgpiom0_32_63 22 0>; /* SGPO54 */
+		pfr-btg-att1-fail-out-gpios = <&sgpiom0_32_63 23 0>; /* SGPO55 */
+		pfr-s0-att1-done-out-gpios = <&sgpiom0_32_63 24 0>; /* SGPO56 */
+		pfr-s0-att1-fail-out-gpios = <&sgpiom0_32_63 25 0>; /* SGPO57 */
+		pfr-s5-att1-done-out-gpios = <&sgpiom0_32_63 26 0>; /* SGPO58 */
+		pfr-s5-att1-fail-out-gpios = <&sgpiom0_32_63 27 0>; /* SGPO59 */
+	};
+};

@@ -26,13 +26,14 @@
 #include <zephyr/drivers/i3c/ccc.h>
 #include "mctp.h"
 #include "mctp_i3c.h"
+#include "mctp_i3c_backend.h"
+#include "mctp_i3c_role.h"
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
 #include "SPDM/SPDMRequester.h"
 #include "i3c/i3c_util.h"
 
-#include "mctp/mctp_base_protocol.h"
 #include "cmd_channel_mctp.h"
 
 LOG_MODULE_REGISTER(mctp_i3c, LOG_LEVEL_INF);
@@ -42,14 +43,30 @@ LOG_MODULE_REGISTER(mctp_i3c, LOG_LEVEL_INF);
 #define I3C_2 DEVICE_DT_NAME(DT_NODELABEL(i3c2))
 #define I3C_3 DEVICE_DT_NAME(DT_NODELABEL(i3c3))
 
-#define MCTP_DOE_REGISTRATION_CMD           0x4
-
 static uint8_t i3c_data_in[256];
-static uint8_t mctp_msg_buf[MCTP_BASE_PROTOCOL_MAX_MESSAGE_LEN];
 mctp_i3c mctp_i3c_bmc_inst = {0};
 mctp_i3c mctp_i3c_cpu0_inst = {0};
 mctp_i3c mctp_i3c_cpu1_inst = {0};
 bool i3c_hub_configured = false;
+
+static int mctp_i3c_controller_resolve_dest_eid(mctp *mctp_instance,
+						 uint8_t *dest_eid)
+{
+	if (mctp_instance == mctp_i3c_bmc_inst.mctp_inst)
+		*dest_eid = MCTP_I3C_REGISTRATION_EID;
+	else if (mctp_instance == mctp_i3c_cpu0_inst.mctp_inst)
+		*dest_eid = MCTP_I3C_CPU0_EID;
+	else if (mctp_instance == mctp_i3c_cpu1_inst.mctp_inst)
+		*dest_eid = MCTP_I3C_CPU1_EID;
+	else
+		return -1;
+
+	return 0;
+}
+
+const struct mctp_i3c_role_ops mctp_i3c_role = {
+	.resolve_dest_eid = mctp_i3c_controller_resolve_dest_eid,
+};
 
 K_SEM_DEFINE(ibi_complete, 0, 1);
 K_SEM_DEFINE(cpu0_ibi_complete, 0, 1);
@@ -119,16 +136,6 @@ const struct device *get_mctp_i3c_dev(uint8_t bus_num)
 	return NULL;
 }
 
-void mctp_i3c_stop_discovery_notify(struct device_manager *mgr)
-{
-	int status;
-	status = device_manager_update_device_state(mgr,
-			DEVICE_MANAGER_SELF_DEVICE_NUM,
-			DEVICE_MANAGER_EID_ANNOUNCEMENT);
-	if (status != 0)
-		LOG_ERR("update self device state failed");
-}
-
 void mctp_i3c_pre_attestation(struct device_manager *mgr, int *duration)
 {
 	uint8_t provision_state = GetUfmStatusValue();
@@ -179,84 +186,6 @@ void mctp_i3c_attestation(struct device_manager *mgr, int *duration)
 				     DEVICE_MANAGER_RUNTIME);
 
 	}
-}
-
-int mctp_i3c_send_discovery_notify(mctp *mctp_instance, int *duration)
-{
-	struct mctp_interface_wrapper *mctp_wrapper = &mctp_instance->mctp_wrapper;
-	struct mctp_interface *mctp_interface = &mctp_wrapper->mctp_interface;
-	// { message_type, rq bit, command_code}
-	uint8_t req_buf[3] = {MCTP_BASE_PROTOCOL_MSG_TYPE_CONTROL_MSG, 0x81, 0x0d};
-
-	mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
-			mctp_instance->medium_conf.i3c_conf.addr, 0, req_buf, sizeof(req_buf),
-			mctp_msg_buf, sizeof(mctp_msg_buf), 1);
-
-	*duration = MCTP_I3C_MSG_RETRY_INTERVAL;
-
-	return 0;
-}
-
-int mctp_i3c_send_eid_announcement(mctp *mctp_instance, int *duration)
-{
-	int status = -1;
-	uint8_t dest_eid;
-
-	struct mctp_interface_wrapper *mctp_wrapper = &mctp_instance->mctp_wrapper;
-	struct mctp_interface *mctp_interface = &mctp_wrapper->mctp_interface;
-	struct device_manager *device_mgr = mctp_interface->device_manager;
-	int src_eid = device_manager_get_device_eid(device_mgr,
-				DEVICE_MANAGER_SELF_DEVICE_NUM);
-
-	if (ROT_IS_ERROR(src_eid)) {
-		LOG_ERR("Failed to get self EID");
-		return status;
-	}
-
-	uint8_t req_buf[21] = {MCTP_BASE_PROTOCOL_MSG_TYPE_VENDOR_DEF, 0x80, 0x86, 0x80, 0x0a, 0x00,
-		0x00, 0x00, 0x00, MCTP_DOE_REGISTRATION_CMD, 0x00, 0x00, 0x01, (uint8_t)src_eid, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-	if (mctp_instance == mctp_i3c_bmc_inst.mctp_inst) {
-		dest_eid = MCTP_I3C_REGISTRATION_EID;
-	} else if (mctp_instance == mctp_i3c_cpu0_inst.mctp_inst) {
-		dest_eid = MCTP_I3C_CPU0_EID;
-	} else if (mctp_instance == mctp_i3c_cpu1_inst.mctp_inst) {
-		dest_eid = MCTP_I3C_CPU1_EID;
-	} else {
-#if defined(CONFIG_PFR_MCTP_I3C_5_0)
-		uint8_t i, i3c_dev_counts;
-		bool found_mctp_inst = false;
-
-		i3c_dev_counts = mctp_i3c_target_get_dev_counts();
-
-		for (i = 0; i < i3c_dev_counts; i++) {
-			if (mctp_instance == mctp_i3c_target_get_mctp_inst(i)) {
-				dest_eid = mctp_instance->medium_conf.i3c_conf.dest_eid;
-				found_mctp_inst = true;
-				break;
-			}
-		}
-
-		if (!found_mctp_inst)
-			return status;
-#else
-		return status;
-#endif
-	}
-
-	status = mctp_interface_issue_request(mctp_interface, &mctp_instance->mctp_cmd_channel,
-			mctp_instance->medium_conf.i3c_conf.addr, dest_eid, req_buf,
-			sizeof(req_buf), mctp_msg_buf, sizeof(mctp_msg_buf), 12000);
-
-	if (status == 0) {
-		device_manager_update_device_state(device_mgr,
-				DEVICE_MANAGER_SELF_DEVICE_NUM,
-				DEVICE_MANAGER_PRE_ATTESTATION);
-	}
-
-	*duration = 2;
-
-	return status;
 }
 
 void mctp_i3c_state_handler(void *a, void *b, void *c)
@@ -321,10 +250,11 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 {
 	struct cmd_packet *packet = (struct cmd_packet *)msg_p;
 	mctp *mctp_inst = (mctp *)mctp_p;
-	struct i3c_msg xfer;
+	struct i3c_msg xfer = {0};
 	const struct device *dev;
 	struct i3c_driver_data* data;
 	struct i3c_device_desc* desc;
+	size_t rx_len;
 
 	LOG_DBG("mctp_inst=%p, msg_p=%p", mctp_inst, msg_p);
 	// read request from slave device.
@@ -354,20 +284,21 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 		return MCTP_ERROR;
 	}
 
-	LOG_DBG("xfer.len = %d", xfer.len);
-	LOG_HEXDUMP_DBG(xfer.buf, xfer.len, "i3c read : ");
+	rx_len = mctp_i3c_backend.received_len(&xfer);
+	LOG_DBG("i3c rx len = %zu", rx_len);
+	LOG_HEXDUMP_DBG(xfer.buf, rx_len, "i3c read : ");
 	packet->dest_addr = mctp_inst->medium_conf.i3c_conf.addr;
-	packet->pkt_size = xfer.len;
+	packet->pkt_size = rx_len;
 	packet->timeout_valid = 0;
 	packet->pkt_timeout = 0;
 	packet->state = CMD_VALID_PACKET;
 
-	if (xfer.len > CMD_MAX_PACKET_SIZE) {
+	if (rx_len > CMD_MAX_PACKET_SIZE) {
 		LOG_WRN("Buffer is smaller than received data");
-		xfer.len = CMD_MAX_PACKET_SIZE;
+		rx_len = CMD_MAX_PACKET_SIZE;
 	}
 
-	memcpy(packet->data, xfer.buf, xfer.len);
+	memcpy(packet->data, xfer.buf, rx_len);
 
 	return 0;
 }
@@ -473,12 +404,13 @@ error:
 
 int mctp_i3c_ibi_cb(struct i3c_device_desc *target, struct i3c_ibi_payload *payload)
 {
-        if (payload->payload_len) {
+	if (payload && payload->payload_len)
 		LOG_HEXDUMP_DBG(payload->payload, payload->payload_len, "IBI payload:");
-		mctp_i3c_sem_give(target);
-        }
 
-        return 0;
+	if (mctp_i3c_backend.ibi_is_data_ready(payload))
+		mctp_i3c_sem_give(target);
+
+	return 0;
 }
 
 uint8_t mctp_i3c_init(mctp *mctp_instance, mctp_medium_conf medium_conf)
@@ -516,13 +448,6 @@ uint8_t mctp_i3c_eid_assignment_thread_create(mctp_i3c *mctp_i3c_inst)
 	k_thread_name_set(mctp_i3c_inst->i3c_state_tid, mctp_i3c_inst->i3c_state_task_name);
 
 	return MCTP_SUCCESS;
-}
-
-void mctp_i3c_state_expiry_fn(struct k_timer *tmr)
-{
-	struct k_sem *state_sem;
-	state_sem = (struct k_sem *)k_timer_user_data_get(tmr);
-	k_sem_give(state_sem);
 }
 
 uint8_t mctp_i3c_deinit(mctp *mctp_instance)
@@ -588,15 +513,14 @@ int mctp_i3c_attach_target_dev(uint8_t bus, uint64_t pid)
 		goto error;
 	}
 
-	desc->ibi_cb = mctp_i3c_ibi_cb;
-	if (i3c_ibi_enable(desc)) {
-		LOG_ERR("Failed to enable ibi");
-		goto error;
-	}
-
 	mrl.len = 0x45;
 	mrl.ibi_len = 2;
-	i3c_ccc_do_setmrl(desc, &mrl);
+
+	rc = mctp_i3c_backend.configure_ibi(desc, mctp_i3c_ibi_cb, &mrl);
+	if (rc) {
+		LOG_ERR("Failed to configure IBI, ret = %d", rc);
+		goto error;
+	}
 	if (mctp_i3c_inst->state == MCTP_I3C_TARGET_ATTACHED) {
 		LOG_WRN("I3C device is attached");
 		return 0;
@@ -606,10 +530,15 @@ int mctp_i3c_attach_target_dev(uint8_t bus, uint64_t pid)
 	if (mctp_inst == NULL)
 		goto error;
 
-
-	mctp_set_medium_configure(mctp_inst, MCTP_MEDIUM_TYPE_I3C, mctp_inst->medium_conf);
 	mctp_inst->medium_conf.i3c_conf.bus = bus;
 	mctp_inst->medium_conf.i3c_conf.addr = desc->dynamic_addr;
+	rc = mctp_set_medium_configure(mctp_inst, MCTP_MEDIUM_TYPE_I3C,
+			mctp_inst->medium_conf);
+	if (rc != MCTP_SUCCESS) {
+		LOG_ERR("I3C medium initialization failed");
+		goto error;
+	}
+
 	mctp_channel_id = CMD_CHANNEL_I3C_BASE | mctp_inst->medium_conf.i3c_conf.bus;
 	rc = cmd_channel_mctp_init(&mctp_inst->mctp_cmd_channel,
 			mctp_channel_id);
@@ -689,7 +618,7 @@ void mctp_i3c_send_rstdaa(uint8_t bus)
 		SYS_SLIST_FOR_EACH_NODE(&data->attached_dev.devices.i3c, node) {
 			struct i3c_device_desc *desc =
 				CONTAINER_OF(node, struct i3c_device_desc, node);
-			desc->dynamic_addr = 0;
+			mctp_i3c_backend.reset_dynamic_addr(desc);
 			LOG_INF("Reset dynamic address for device %s", desc->dev->name);
                   }
           }
@@ -887,9 +816,6 @@ void mctp_i3c_configure_cpu_i3c_devs(void)
 {
 	if (!is_pltrst_sync())
 		return;
-#if defined(CONFIG_PFR_MCTP_I3C_5_0)
-	mctp_i3c_target_mctp_rerun_daa();
-#else
 	if (get_i3c_mng_owner() == I3C_MNG_OWNER_ROT) {
 		LOG_INF("Enable CPU i3c");
 		if (!i3c_hub_configured) {
@@ -920,5 +846,4 @@ void mctp_i3c_configure_cpu_i3c_devs(void)
 		// Therefore, simply release the CPU reset here.
 		RSTPlatformReset(false);
 	}
-#endif
 }

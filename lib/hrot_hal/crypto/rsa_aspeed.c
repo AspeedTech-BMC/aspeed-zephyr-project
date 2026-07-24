@@ -13,6 +13,13 @@ LOG_MODULE_REGISTER(rsa_middle_aspeed, CONFIG_LOG_DEFAULT_LEVEL);
 
 #ifdef CONFIG_RSA_ASPEED
 #define RSA_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_rsa))
+#else
+/*
+ * TODO(AST1080): AST1080 (G2) has no RSA engine; crypto is provided by the
+ * Caliptra subsystem, which is not yet wired into this HAL. Placeholder so the
+ * build links - device_get_binding() returns NULL and RSA is non-functional.
+ */
+#define RSA_DRV_NAME "RSA_NONE"
 #endif
 
 int decrypt_aspeed(const struct rsa_key *key, const uint8_t *encrypted, size_t in_length, uint8_t *decrypted, size_t out_length)

@@ -12,6 +12,13 @@ LOG_MODULE_REGISTER(ecdsa_middle_aspeed, CONFIG_LOG_DEFAULT_LEVEL);
 
 #ifdef CONFIG_ECDSA_ASPEED
 #define ECDSA_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_ecdsa))
+#else
+/*
+ * TODO(AST1080): AST1080 (G2) has no ECDSA engine; crypto is provided by the
+ * Caliptra subsystem, which is not yet wired into this HAL. Placeholder so the
+ * build links - device_get_binding() returns NULL and ECDSA is non-functional.
+ */
+#define ECDSA_DRV_NAME "ECDSA_NONE"
 #endif
 
 /**

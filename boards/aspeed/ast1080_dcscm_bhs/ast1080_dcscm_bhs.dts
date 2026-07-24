@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) 2026 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+#include <arm/aspeed/ast1080.dtsi>
+
+/ {
+	model = "Aspeed AST1080 DCSCM BHS Evaluation board";
+	compatible = "aspeed,ast1080-dcscm", "aspeed,ast1080";
+
+	chosen {
+		zephyr,console = &uart12;
+		zephyr,shell-uart = &uart12;
+		zephyr,flash = &dram_ro_region;
+		zephyr,sram = &dram_rw_region;
+	};
+
+	/*
+	 * Same 14 MiB DRAM/SRAM pool and layout order as
+	 * zephyr/boards/aspeed/ast1080_evb/ast1080_evb_cm4.dts, but the
+	 * dram_ro_region (code+rodata, XIP) is enlarged from 256K to 1M and
+	 * dram_rw_region shrunk to match: the PFR app (Cerberus + mbedTLS
+	 * software crypto backend) needs far more code space than the evb's
+	 * plain I/O peripheral demo.
+	 */
+	dram_rw_region: memory@100000 {
+		device_type = "memory";
+		reg = <0x100000 DT_SIZE_K(14336 - 1024 - 512)>;
+	};
+
+	sram1: memory@d80000 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		device_type = "memory";
+		reg = <0xd80000 DT_SIZE_K(512)>;
+		zephyr,memory-region = "RAM_NC";
+	};
+
+	sram_buf: memory@74b80000 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		device_type = "memory";
+		reg = <0x74b80000 DT_SIZE_K(512)>;
+		zephyr,memory-region = "SRAM_BUF";
+	};
+};
+
+&uart12 {
+	clock-frequency = <1846153>;
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&dram_ro_region {
+	reg = <0x0 DT_SIZE_M(1)>;
+};
+
+&nvic {
+	arm,num-irq-priority-bits = <3>;
+};

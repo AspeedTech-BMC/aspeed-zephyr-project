@@ -27,5 +27,9 @@ if (CONFIG_HROT_WRAPPER)
 		../hrot_hal
 	)
 
+	if (CONFIG_HROT_HASH_BACKEND_MBEDTLS)
+		zephyr_library_link_libraries(mbedTLS)
+	endif()
+
 	zephyr_library_link_libraries(hrot_wrapper)
 endif()
