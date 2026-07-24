@@ -22,11 +22,17 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, LOG_LEVEL_DBG);
 
+/*
+ * BMC_SPI/BMC_SPI_2/PCH_SPI/PCH_SPI_2 map to whichever physical SPI
+ * controller CS the board wires to that role, via the bmc-spi0/bmc-spi1/
+ * pch-spi0/pch-spi1 aliases each board overlay defines. fmc@0/fmc@1 use
+ * the same node names on every SOC, so no alias is needed for them.
+ */
 static char *Flash_Devices_List[6] = {
-	"spi1@0",
-	"spi1@1",
-	"spi2@0",
-	"spi2@1",
+	DT_NODE_FULL_NAME(DT_ALIAS(bmc_spi0)),	/* BMC_SPI */
+	DT_NODE_FULL_NAME(DT_ALIAS(bmc_spi1)),	/* BMC_SPI_2 */
+	DT_NODE_FULL_NAME(DT_ALIAS(pch_spi0)),	/* PCH_SPI */
+	DT_NODE_FULL_NAME(DT_ALIAS(pch_spi1)),	/* PCH_SPI_2 */
 	"fmc@0",
 	"fmc@1"
 };
@@ -168,9 +174,15 @@ int SPI_Command_Xfer(struct pspi_flash *flash, struct pflash_xfer *xfer)
 	return ret;
 }
 
+BUILD_ASSERT(BMC_SPI_2 == BMC_SPI + 1, "get_flash_dev dual-flash overflow relies on adjacency");
+BUILD_ASSERT(PCH_SPI_2 == PCH_SPI + 1, "get_flash_dev dual-flash overflow relies on adjacency");
+
 int get_flash_dev(uint8_t device_id, uint32_t *address, const struct device **dev)
 {
 	uint32_t flash_sz = 0;
+
+	if (device_id >= ARRAY_SIZE(Flash_Devices_List))
+		return -1;
 
 	*dev = device_get_binding(Flash_Devices_List[device_id]);
 	if (*dev == NULL)
@@ -204,12 +216,16 @@ int get_rot_region(uint8_t device_id, const struct flash_area **fa)
 	int ret = 0;
 
 	switch (device_id) {
+#if FIXED_PARTITION_EXISTS(active_partition)
 	case ROT_INTERNAL_ACTIVE:
 		ret = flash_area_open(FIXED_PARTITION_ID(active_partition), fa);
 		break;
+#endif
+#if FIXED_PARTITION_EXISTS(recovery_partition)
 	case ROT_INTERNAL_RECOVERY:
 		ret = flash_area_open(FIXED_PARTITION_ID(recovery_partition), fa);
 		break;
+#endif
 	case ROT_INTERNAL_STATE:
 		ret = flash_area_open(FIXED_PARTITION_ID(state_partition), fa);
 		break;
@@ -483,4 +499,12 @@ int get_block_erase_size(uint8_t device_id)
 	block_erase_sz = spi_nor_get_erase_sz(flash_device, MIDLEY_FLASH_CMD_BLOCK_ERASE);
 
 	return block_erase_sz;
+}
+
+const char *get_flash_device_name(uint8_t device_id)
+{
+	if (device_id >= ARRAY_SIZE(Flash_Devices_List))
+		return NULL;
+
+	return Flash_Devices_List[device_id];
 }

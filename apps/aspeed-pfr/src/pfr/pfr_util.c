@@ -124,7 +124,7 @@ uint32_t pfr_spi_get_device_size(uint8_t device_id)
 {
 	uint32_t size;
 
-	if (device_id < ROT_INTERNAL_ACTIVE) {
+	if (device_id < ROT_BUS_DEVICE_COUNT) {
 		size = bmc_pch_get_flash_size(device_id);
 	} else {
 		size = rot_get_region_size(device_id);
@@ -138,10 +138,10 @@ int pfr_spi_get_block_size(uint8_t device_id)
 	uint32_t block_size;
 	uint8_t flash_id;
 
-	if (device_id >= ROT_INTERNAL_ACTIVE && device_id < ROT_EXT_AFM_ACT_1)
-		flash_id = ROT_SPI;
-	else if (device_id >= ROT_EXT_AFM_ACT_1)
-		flash_id = ROT_EXT_SPI;
+	if (device_id >= ROT_BUS_DEVICE_COUNT && device_id < ROT_EXT_REGION_BEGIN)
+		flash_id = ROT_INTERNAL_ACTIVE;
+	else if (device_id >= ROT_EXT_REGION_BEGIN)
+		flash_id = ROT_INTERNAL_RECOVERY;
 	else
 		flash_id = device_id;
 
@@ -190,6 +190,10 @@ int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t
 	    (hash_length > SHA256_HASH_LENGTH && hash_length < SHA384_HASH_LENGTH)) {
 		return Failure;
 	}
+
+#if defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
+	return Success;
+#endif
 
 	return flash_hash_contents((struct flash *)pfr_manifest->flash,
 			pfr_manifest->pfr_hash->start_address,
@@ -255,6 +259,10 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 	ARG_UNUSED(signature);
 	ARG_UNUSED(sig_length);
 
+#if defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
+	return Success;
+#endif
+
 	if (length == SHA256_HASH_LENGTH) {
 		LOG_DBG("MBEDTLS ECDSA Start");
 		status = mbedtls_ecdsa_verify_middlelayer(manifest->verification->pubkey,
@@ -264,6 +272,15 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 							  manifest->verification->pubkey->signature_s);
 		LOG_DBG("MBEDTLS ECDSA End, status = %d", status);
 	} else if (length == SHA384_HASH_LENGTH) {
+#if defined(CONFIG_PFR_ECDSA_P384_BACKEND_MBEDTLS)
+		LOG_DBG("MBEDTLS ECDSA P-384 Start");
+		status = mbedtls_ecdsa_verify_middlelayer(manifest->verification->pubkey,
+							  digest,
+							  length,
+							  manifest->verification->pubkey->signature_r,
+							  manifest->verification->pubkey->signature_s);
+		LOG_DBG("MBEDTLS ECDSA P-384 End, status = %d", status);
+#elif defined(CONFIG_PFR_ECDSA_P384_BACKEND_ASPEED)
 		LOG_DBG("ASPEED ECDSA Start");
 		status = aspeed_ecdsa_verify_middlelayer(manifest->verification->pubkey->x,
 							 manifest->verification->pubkey->y,
@@ -272,6 +289,10 @@ int verify_signature(struct signature_verification *verification, const uint8_t 
 							 manifest->verification->pubkey->signature_r,
 							 manifest->verification->pubkey->signature_s);
 		LOG_DBG("ASPEED ECDSA End, status = %d", status);
+#else
+		LOG_ERR("No P-384 ECDSA backend selected");
+		status = Failure;
+#endif
 	} else
 		LOG_ERR("Unsupported digest length, %d", length);
 

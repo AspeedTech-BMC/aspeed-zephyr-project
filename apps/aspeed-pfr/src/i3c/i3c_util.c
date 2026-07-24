@@ -15,6 +15,20 @@
 
 LOG_MODULE_REGISTER(util_i3c);
 static const struct device *dev_i3c_tmq[I3C_MAX_NUM];
+static const struct device *const i3c_target_controllers[I3C_MAX_NUM] = {
+#ifdef DEV_I3C_TMQ_0
+	[0] = DEVICE_DT_GET(DT_BUS(DT_NODELABEL(i3c0_tmq))),
+#endif
+#ifdef DEV_I3C_TMQ_1
+	[1] = DEVICE_DT_GET(DT_BUS(DT_NODELABEL(i3c1_tmq))),
+#endif
+#ifdef DEV_I3C_TMQ_2
+	[2] = DEVICE_DT_GET(DT_BUS(DT_NODELABEL(i3c2_tmq))),
+#endif
+#ifdef DEV_I3C_TMQ_3
+	[3] = DEVICE_DT_GET(DT_BUS(DT_NODELABEL(i3c3_tmq))),
+#endif
+};
 K_SEM_DEFINE(pltrst_sem, 0, 1);
 
 struct k_thread cpu_i3c_setup_thread;
@@ -81,6 +95,9 @@ void util_init_I3C(void)
 int i3c_get_assigned_addr(uint8_t bus, uint8_t *address)
 {
 	const struct i3c_target_mqueue_data *tmq_data;
+
+	if (bus >= I3C_MAX_NUM || !address)
+		return -EINVAL;
 	if (!dev_i3c_tmq[bus])
 		return -ENODEV;
 
@@ -89,6 +106,47 @@ int i3c_get_assigned_addr(uint8_t bus, uint8_t *address)
 	*address = tmq_data->target_config.address;
 
 	return 0;
+}
+
+static const struct device *i3c_target_controller_get(uint8_t bus)
+{
+	if (bus >= ARRAY_SIZE(i3c_target_controllers))
+		return NULL;
+
+	return i3c_target_controllers[bus];
+}
+
+int i3c_target_wait_for_daa(uint8_t bus, uint8_t *address)
+{
+	const struct device *controller;
+	struct i3c_ibi hotjoin = {
+		.ibi_type = I3C_IBI_HOTJOIN,
+		.payload = NULL,
+		.payload_len = 0,
+	};
+	int ret;
+
+	ret = i3c_get_assigned_addr(bus, address);
+	if (ret || *address)
+		return ret;
+
+	controller = i3c_target_controller_get(bus);
+	if (!controller || !device_is_ready(controller))
+		return -ENODEV;
+
+	/* AST1080 target mode has no preset DA; ask the BMC controller for DAA. */
+	ret = i3c_ibi_raise(controller, &hotjoin);
+	if (ret && ret != -EALREADY)
+		return ret;
+
+	for (int retry = 0; retry < 100; retry++) {
+		ret = i3c_get_assigned_addr(bus, address);
+		if (ret || *address)
+			return ret;
+		k_msleep(10);
+	}
+
+	return -ETIMEDOUT;
 }
 
 int i3c_tmq_read(I3C_MSG *msg)
@@ -114,4 +172,3 @@ int i3c_tmq_write(I3C_MSG *msg)
 	ret = i3c_target_mqueue_write(dev_i3c_tmq[msg->bus], &msg->data[0], msg->tx_len);
 	return ret;
 }
-

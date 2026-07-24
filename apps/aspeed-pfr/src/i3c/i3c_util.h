@@ -35,6 +35,6 @@ typedef struct _I3C_MSG_ {
 
 void util_init_I3C(void);
 int i3c_get_assigned_addr(uint8_t bus, uint8_t *address);
+int i3c_target_wait_for_daa(uint8_t bus, uint8_t *address);
 int i3c_tmq_read(I3C_MSG *msg);
 int i3c_tmq_write(I3C_MSG *msg);
-

@@ -16,6 +16,12 @@ config BOARD_AST2700_DCSCM_FAMILY
 	  New family members should be added to this symbol's default
 	  expression instead of editing source `#if` chains.
 
+config SPI_NOR_INIT_PRIORITY
+	# AST1080 spi0/spi1 CS nodes depend on their spim monitor
+	# (spi-monitor-ctrl) via check_init_priorities.py; the aspeed spim
+	# driver's init priority (81) is above the default here (80).
+	default 90 if BOARD_AST1080_DCSCM_BHS || BOARD_AST1080_DCSCM_OKS
+
 config BMC_DUAL_FLASH
 	default n
 	bool "Enable BMC dual flash support"
@@ -40,6 +46,19 @@ config CERBERUS_PFR
 	bool "cerberus pfr solution"
 	help
 	  Cerberus PFR support
+
+config INTEL_PFR_UNSAFE_BYPASS
+	depends on INTEL_PFR
+	select HROT_HASH_MBEDTLS_BYPASS
+	default n
+	bool "INSECURE: skip Intel PFR signature/hash verification"
+	help
+	  INSECURE - debug/bring-up only. Skips the root-key hash, CSK/
+	  Block0 signature, and PC-hash checks in the Intel PFR active/
+	  recovery verification flow, so unsigned or corrupted images boot
+	  without authentication. Selects HROT_HASH_MBEDTLS_BYPASS too,
+	  since computing real hashes just to ignore the comparison is
+	  pointless. Never enable for production.
 
 config SPI_MUX_INVERSE
 	default n
@@ -213,6 +232,30 @@ config LMS_SIGN_SERIAL_OFFSET
 	help
 	  If there is no serial number, to set it to 0. Otherwise, to set it to 4.
 
+choice PFR_ECDSA_P384_BACKEND
+	depends on INTEL_PFR
+	prompt "PFR P-384 ECDSA backend"
+	default PFR_ECDSA_P384_BACKEND_ASPEED if ECDSA_ASPEED
+	default PFR_ECDSA_P384_BACKEND_MBEDTLS if MBEDTLS
+	help
+	  Select the backend used for Intel PFR P-384 ECDSA verification.
+	  P-256 verification uses the existing mbedTLS path.
+
+config PFR_ECDSA_P384_BACKEND_ASPEED
+	bool "ASPEED hardware ECDSA"
+	depends on ECDSA_ASPEED
+	help
+	  Use the ASPEED ECDSA hardware driver for P-384 signature verification.
+
+config PFR_ECDSA_P384_BACKEND_MBEDTLS
+	bool "mbedTLS software ECDSA"
+	depends on MBEDTLS && MBEDTLS_ECDSA_C && MBEDTLS_ECP_C
+	select MBEDTLS_ECP_DP_SECP384R1_ENABLED
+	help
+	  Use mbedTLS software ECDSA for P-384 signature verification.
+
+endchoice
+
 config OTP_SIM
 	depends on !OTP_ASPEED
 	default n
@@ -255,7 +298,9 @@ config PFR_DEBUG_SHELL
 	select FLASH_SHELL
 	select GPIO_SHELL
 	select HWINFO_SHELL
-	select SPI_MONITOR_SHELL_ASPEED
+	# Only pull in the SPI-monitor shell when the SPI-monitor driver is
+	# available.
+	select SPI_MONITOR_SHELL_ASPEED if SPI_MONITOR_ASPEED
 	select ASPEED_STATE_MACHINE_SHELL
 
 config PROVISION_SHELL

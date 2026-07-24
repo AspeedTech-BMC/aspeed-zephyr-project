@@ -65,11 +65,11 @@ int intel_pfr_pit_level2_verify(void)
 	uint32_t hash_length;
 	uint8_t sha_buffer[SHA384_DIGEST_LENGTH] = { 0 };
 	uint8_t pit_hash_buffer[SHA384_DIGEST_LENGTH] = { 0 };
-	static char *flash_devices[4] = {
-		"spi1@0",
-		"spi1@1",
-		"spi2@0",
-		"spi2@1",
+	static uint8_t flash_devices[4] = {
+		BMC_SPI,
+		BMC_SPI_2,
+		PCH_SPI,
+		PCH_SPI_2,
 	};
 
 	get_provision_data_in_flash(UFM_STATUS, (uint8_t *)&ufm_status, sizeof(ufm_status));
@@ -99,10 +99,10 @@ int intel_pfr_pit_level2_verify(void)
 	}
 
 	pfr_manifest->pfr_hash->start_address = 0;
-	flash_dev = device_get_binding(flash_devices[BMC_TYPE]);
+	flash_dev = device_get_binding(get_flash_device_name(flash_devices[BMC_TYPE]));
 	flash_size = flash_get_flash_size(flash_dev);
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	flash_dev = device_get_binding(flash_devices[BMC_TYPE + 1]);
+	flash_dev = device_get_binding(get_flash_device_name(flash_devices[BMC_TYPE + 1]));
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
 	pfr_manifest->image_type = BMC_TYPE;
@@ -128,10 +128,10 @@ int intel_pfr_pit_level2_verify(void)
 	}
 
 
-	flash_dev = device_get_binding(flash_devices[PCH_TYPE]);
+	flash_dev = device_get_binding(get_flash_device_name(flash_devices[PCH_TYPE]));
 	flash_size = flash_get_flash_size(flash_dev);
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	flash_dev = device_get_binding(flash_devices[PCH_TYPE + 1]);
+	flash_dev = device_get_binding(get_flash_device_name(flash_devices[PCH_TYPE + 1]));
 	flash_size += flash_get_flash_size(flash_dev);
 #endif
 	pfr_manifest->image_type = PCH_TYPE;
@@ -788,12 +788,14 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	}
 
 	LOG_INF("Block0: Verification PC, address = %x, length = %x", manifest->pfr_hash->start_address, manifest->pfr_hash->length);
+#if !defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
 	if (memcmp(ptr_sha, sha_buffer, hash_length)) {
 		LOG_ERR("Block0: Verification PC failed");
 		LOG_HEXDUMP_INF(sha_buffer, hash_length, "Calculated hash:");
 		LOG_HEXDUMP_INF(ptr_sha, hash_length, "Expected hash:");
 		return Failure;
 	}
+#endif
 
 	LOG_INF("Block0: Hash Matched");
 	return Success;

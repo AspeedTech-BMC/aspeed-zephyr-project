@@ -21,6 +21,20 @@
 
 #define SPIM_NUM  4
 
+/*
+ * AST1080's spim1/spim3 monitor a dual-flash pair's CS0+CS1 as one combined
+ * decode window, so an address past the first chip's size already lands on
+ * the second chip on the same device - no rebase, no device switch needed.
+ * Other SoCs give each chip its own zero-based device, so rebase the region
+ * and advance spi_id to reach it.
+ */
+#if defined(CONFIG_SOC_AST1080_CM4)
+#define DUAL_FLASH_TO_SECOND_CHIP(start, end, size, id)  ((id) = (id))
+#else
+#define DUAL_FLASH_TO_SECOND_CHIP(start, end, size, id) \
+	do { (start) -= (size); (end) -= (size); (id) += 1; } while (0)
+#endif
+
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 void apply_pfm_protection(int spi_device_id)
@@ -82,7 +96,19 @@ void apply_pfm_protection(int spi_device_id)
 	int pfm_record_length = (pfm_length[0] & 0xff) | (pfm_length[1] << 8 & 0xff00) | (pfm_length[2] << 16 & 0xff0000) | (pfm_length[3] << 24 & 0xff000000);
 
 	bool done = false;
-	// TODO: Clear all setting before apply new setting
+
+#if defined(CONFIG_SOC_AST1080_CM4)
+	/*
+	 * spim_addr_priv_remove_all() wipes the whole addr-priv table for a
+	 * device, so it must run once per device before this loop starts
+	 * applying the new region set - not per Set_SPI_Filter_Deny_Region()
+	 * call, or later regions in the same loop would erase earlier ones.
+	 * One spim device monitors both CS of a dual-flash pair (combined
+	 * decode window), so spi_id never switches devices on this SoC -
+	 * a single clear covers both chips.
+	 */
+	SPI_Filter_Remove_All(spim_devs[spi_id]);
+#endif
 
 	while (!done) {
 		/* Read PFM Record */
@@ -108,9 +134,9 @@ void apply_pfm_protection(int spi_device_id)
 			if (spi_device_id == BMC_SPI) {
 				flash_size = pfr_spi_get_device_size(spi_device_id);
 				if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
-					region_start_address -= flash_size;
-					region_end_address -= flash_size;
-					spi_id = spi_device_id + 1;
+					spi_id = spi_device_id;
+					DUAL_FLASH_TO_SECOND_CHIP(region_start_address,
+							region_end_address, flash_size, spi_id);
 				} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
 					LOG_ERR("ERROR: region start and end address should be in the same flash");
 					return;
@@ -124,9 +150,9 @@ void apply_pfm_protection(int spi_device_id)
 			if (spi_device_id == PCH_SPI) {
 				flash_size = pfr_spi_get_device_size(spi_device_id);
 				if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
-					region_start_address -= flash_size;
-					region_end_address -= flash_size;
-					spi_id = spi_device_id + 1;
+					spi_id = spi_device_id;
+					DUAL_FLASH_TO_SECOND_CHIP(region_start_address,
+							region_end_address, flash_size, spi_id);
 				} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
 					LOG_ERR("ERROR: region start and end address should be in the same flash");
 					return;
@@ -137,6 +163,16 @@ void apply_pfm_protection(int spi_device_id)
 #endif
 
 			region_length = region_end_address - region_start_address;
+#if defined(CONFIG_SOC_AST1080_CM4)
+			SPI_Monitor_Enable(spim_devs[spi_id], true);
+			Set_SPI_Filter_Deny_Region((char *)spim_devs[spi_id],
+					!(region_record[1] & 0x01), !(region_record[1] & 0x02),
+					region_start_address, region_length);
+			LOG_INF("SPI_ID[%d] read %s, write %s, 0x%08x to 0x%08x",
+				spi_id, (region_record[1] & 0x01) ? "enable" : "disable",
+				(region_record[1] & 0x02) ? "enable" : "disable",
+				region_start_address, region_end_address);
+#else
 			if (region_record[1] & 0x02) {
 				/* Write allowed region */
 				Set_SPI_Filter_RW_Region((char *)spim_devs[spi_id],
@@ -171,6 +207,7 @@ void apply_pfm_protection(int spi_device_id)
 				LOG_INF("SPI_ID[%d] read  disable 0x%08x to 0x%08x",
 					spi_id, region_start_address, region_end_address);
 			}
+#endif
 
 			/* Hash Algorhtm 2 bytes:
 			 * 0b00000001: SHA256 present
@@ -283,9 +320,9 @@ void apply_fvm_spi_protection(uint32_t fvm_addr, int offset)
 #if defined(CONFIG_CPU_DUAL_FLASH)
 			flash_size = pfr_spi_get_device_size(PCH_SPI);
 			if (region_start_address >= flash_size && (region_end_address - 1) >= flash_size) {
-				region_start_address -= flash_size;
-				region_end_address -= flash_size;
-				spi_id = 1;
+				spi_id = 0;
+				DUAL_FLASH_TO_SECOND_CHIP(region_start_address,
+						region_end_address, flash_size, spi_id);
 			} else if (region_start_address < flash_size && (region_end_address - 1) >= flash_size) {
 				LOG_ERR("ERROR: region start and end address should be in the same flash");
 				return;
@@ -293,6 +330,17 @@ void apply_fvm_spi_protection(uint32_t fvm_addr, int offset)
 				spi_id = 0;
 			}
 #endif
+#if defined(CONFIG_SOC_AST1080_CM4)
+			SPI_Monitor_Enable(pch_spim_devs[spi_id], true);
+			Set_SPI_Filter_Deny_Region(pch_spim_devs[spi_id],
+					!spi_def.ProtectLevelMask.ReadAllowed,
+					!spi_def.ProtectLevelMask.WriteAllowed,
+					region_start_address, region_length);
+			LOG_INF("SPI_ID[2] fvm read %s, write %s, 0x%08x to 0x%08x",
+				spi_def.ProtectLevelMask.ReadAllowed ? "enable" : "disable",
+				spi_def.ProtectLevelMask.WriteAllowed ? "enable" : "disable",
+				region_start_address, region_end_address);
+#else
 			if (spi_def.ProtectLevelMask.ReadAllowed) {
 				Set_SPI_Filter_RW_Region(pch_spim_devs[spi_id], SPI_FILTER_READ_PRIV,
 						SPI_FILTER_PRIV_ENABLE, region_start_address,
@@ -324,6 +372,7 @@ void apply_fvm_spi_protection(uint32_t fvm_addr, int offset)
 					region_start_address,
 					region_end_address);
 			}
+#endif
 
 			if (spi_def.HashAlgorithmInfo.SHA256HashPresent) {
 				fvm_body_offset += sizeof(PFM_SPI_DEFINITION) + SHA256_SIZE;

@@ -1,0 +1,63 @@
+#include <dt-bindings/gpio/gpio.h>
+
+/ {
+	pfr_gpio_common {
+		compatible = "aspeed,pfr-gpio-common";
+		// bmc-srst-ctrl-out-gpios = <&gpio0_96_127 5 0>; /* GPIO_M5 */
+		bmc-extrst-ctrl-out-gpios = <&gpio0_128_159 5 0>; /* GPIO133 */
+		bmc-rst-ind-in-gpios = <&gpio0_160_191 13 0>; /* GPIO173 */
+		// bmc-cpu1-mux-sel-out-gpios = <&gpio0_0_31 26 0>; /* GPIO_D2 */
+		// pch-rst-ctrl-out-gpios = <&gpio0_96_127 4 0>; /* GPIO_M4 */
+
+
+		/* NOTICE:
+		 * Normally, these two pin should be GPIO_ACTIVE_LOW, but currently this EVB
+		 * doesn't produce correct power sequence by itself.
+		 */
+		rst-srst-bmc-in-gpios = <&sgpiom0_32_63 0 GPIO_ACTIVE_HIGH>; /* SGPI32 */
+		rst-rsmrst-in-gpios = <&sgpiom0_32_63 1 GPIO_ACTIVE_HIGH>; /* SGPI33 */
+	};
+
+	aliases {
+		fp-input0 = &bmc_fp_green_led_in;
+		fp-input1 = &bmc_fp_amber_led_in;
+		fp-input2 = &bmc_fp_id_led_in;
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		bmc_fp_green_led_in: fp_green_led_in {
+			gpios = <&sgpiom0_64_95 1 0>; /* SGPI65 */
+			label = "BMC FP GREEN LED";
+		};
+
+		bmc_fp_amber_led_in: fp_amber_led_in {
+			gpios = <&sgpiom0_64_95 2 0>; /* SGPI66 */
+			label = "BMC FP AMBER LED";
+		};
+
+		bmc_fp_id_led_in: fp_id_led_in {
+			gpios = <&sgpiom0_64_95 0 0>; /* SGPI64 */
+			label = "BMC FP ID LED";
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		pfr_fp_green_led_out: green_led {
+			gpios = <&sgpiom0_32_63 2 0>; /* SGPO34 */
+			label = "PFR_FP_GREEN_LED";
+		};
+
+		pfr_fp_amber_led_out: amber_led {
+			gpios = <&sgpiom0_32_63 3 0>; /* SGPO35 */
+			label = "PFR_FP_AMBER_LED";
+		};
+
+		pfr_fp_id_led_out: id_led {
+			gpios = <&sgpiom0_32_63 1 0>; /* SGPO33 */
+			label = "PFR_FP_ID_LED";
+		};
+	};
+};

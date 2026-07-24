@@ -18,6 +18,10 @@
 #define MBEDTLS_GCM_C
 #define MBEDTLS_AES_C
 
+/* MBEDTLS_SHA512_SMALLER trades SHA-512 speed for code size. Disabled on
+ * AST1080 (CONFIG_SOC_AST1080_CM4); still enabled for all other boards. */
+#ifndef CONFIG_SOC_AST1080_CM4
 #define MBEDTLS_SHA512_SMALLER
+#endif
 //#define MBEDTLS_LMS_C
 //#define MBEDTLS_LMS_PRIVATE

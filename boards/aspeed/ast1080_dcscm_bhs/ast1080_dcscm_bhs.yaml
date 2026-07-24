@@ -1,0 +1,17 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+identifier: ast1080_dcscm_bhs
+name: AST1080-DCSCM-BHS
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+supported:
+  - i2c
+  - spi
+  - serial
+testing:
+  default: true
+ram: 12800
+flash: 1024
+vendor: aspeed

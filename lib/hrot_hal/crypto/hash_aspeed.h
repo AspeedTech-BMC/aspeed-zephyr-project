@@ -14,6 +14,15 @@
 #ifndef HASH_DRV_NAME
 #define HASH_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_hace))    // define hash driver for Aspeed
 #endif
+#else
+#ifndef HASH_DRV_NAME
+/*
+ * TODO(AST1080): AST1080 (G2) has no HACE engine; crypto is provided by the
+ * Caliptra subsystem, which is not yet wired into this HAL. Placeholder so the
+ * build links - device_get_binding() returns NULL and hashing is non-functional.
+ */
+#define HASH_DRV_NAME "HASH_NONE"
+#endif
 #endif
 
 /**

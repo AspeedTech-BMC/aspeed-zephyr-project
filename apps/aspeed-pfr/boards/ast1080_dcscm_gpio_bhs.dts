@@ -1,0 +1,21 @@
+/*
+ * AST1080 DCSCM Intel BHS PFR GPIO map.
+ */
+/ {
+	pfr_gpio_bhs {
+		compatible = "aspeed,pfr-gpio-bhs";
+		rst-pltrst-in-gpios = <&sgpiom0_32_63 2 0>; /* SGPI34 */
+		pwrgd-cpu0-out-gpios = <&sgpiom0_32_63 5 0>;      /* SGPO37 */
+		rst-rtcrst-cpu0-out-gpios = <&sgpiom0_32_63 4 0>; /* SGPO36 */
+		rst-pltrst-cpu0-out-gpios = <&sgpiom0_32_63 6 0>; /* SGPO38 */
+		rst-rtcrst-cpu1-out-gpios = <&sgpiom0_32_63 20 0>; /* SGPO52 */
+		pwrgd-cpu1-out-gpios = <&sgpiom0_32_63 21 0>;      /* SGPO53 */
+		rst-pltrst-cpu1-out-gpios = <&sgpiom0_32_63 22 0>; /* SGPO54 */
+		i3c-mng-mux-sel-out-gpios = <&gpio0_32_63 20 0>; /* GPIO52 */
+		scm-board-id0-in-gpios = <&sgpiom0_0_31 1 0>;
+		scm-rsu-hide-done-in-gpios = <&sgpiom0_32_63 10 0>; /* SGPI42 */
+		scm-rsu-hide-out-gpios = <&sgpiom0_0_31 16 0>; /* SGPO16*/
+		fp-pwr-btn-in-gpios = <&sgpiom0_32_63 9 0>; /* SGPI41 */
+		bmc-pwr-btn-out-gpios = <&sgpiom0_0_31 9 0>; /* SGPO9 */
+	};
+};

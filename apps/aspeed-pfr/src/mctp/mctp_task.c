@@ -87,7 +87,8 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		ret = mctp_smbus_init(mctp_inst, medium_conf);
 		break;
-#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+#if defined(CONFIG_PFR_MCTP_I3C) && \
+	(defined(CONFIG_I3C_ASPEED) || defined(CONFIG_I3C_MIPI_HCI))
 	case MCTP_MEDIUM_TYPE_I3C:
 		ret = mctp_i3c_init(mctp_inst, medium_conf);
 		break;
@@ -113,7 +114,8 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		mctp_smbus_deinit(mctp_inst);
 		break;
-#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+#if defined(CONFIG_PFR_MCTP_I3C) && \
+	(defined(CONFIG_I3C_ASPEED) || defined(CONFIG_I3C_MIPI_HCI))
 	case MCTP_MEDIUM_TYPE_I3C:
 	case MCTP_MEDIUM_TYPE_I3C_TARGET:
 		mctp_i3c_deinit(mctp_inst);
@@ -389,4 +391,3 @@ uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet)
 
 	return mctp_inst->read_data(mctp_inst, packet);
 }
-

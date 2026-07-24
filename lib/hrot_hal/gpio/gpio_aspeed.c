@@ -15,6 +15,7 @@
 #include <zephyr/drivers/gpio.h>
 #include "gpio_aspeed.h"
 #include "platform/platform_gpio_ctrl.h"
+#include "flash/flash_aspeed.h"
 
 #define LOG_MODULE_NAME gpio_api
 
@@ -42,6 +43,13 @@ struct aspeed_spim_config {
 
 static void bmc_srst_enable_ctrl(bool enable)
 {
+#if defined(CONFIG_SOC_AST1080_CM4)
+	/* TODO(AST1080 HW bring-up): BMC_SRST not wired on the AST1080 DCSCM
+	 * card yet - skip driving it instead of requiring a placeholder
+	 * bmc-srst-ctrl-out-gpios devicetree property.
+	 */
+	ARG_UNUSED(enable);
+#else
 	int ret;
 	const struct gpio_dt_spec srst_gpio =
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_common),
@@ -60,6 +68,7 @@ static void bmc_srst_enable_ctrl(bool enable)
 		return;
 
 	k_busy_wait(10000); /* 10ms */
+#endif
 }
 
 static void bmc_extrst_enable_ctrl(bool enable)
@@ -96,20 +105,20 @@ int BMCBootHold(void)
 		bmc_srst_enable_ctrl(true);
 	/* config spi monitor as master mode */
 	switch_spim_mux(BMC_SPI_MONITOR, SPIM_EXT_MUX_ROT);
-	flash_dev = device_get_binding("spi1@0");
+	flash_dev = device_get_binding(get_flash_device_name(BMC_SPI));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi1@0");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(BMC_SPI));
 	}
 #if defined(CONFIG_BMC_DUAL_FLASH)
 	/* config spi monitor as master mode */
 	switch_spim_mux(BMC_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
-	flash_dev = device_get_binding("spi1@1");
+	flash_dev = device_get_binding(get_flash_device_name(BMC_SPI_2));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi1@1");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(BMC_SPI_2));
 	}
 #endif
 	LOG_INF("hold BMC");
@@ -130,21 +139,21 @@ int PCHBootHold(void)
 
 	/* config spi monitor as master mode */
 	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_ROT);
-	flash_dev = device_get_binding("spi2@0");
+	flash_dev = device_get_binding(get_flash_device_name(PCH_SPI));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi2@0");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(PCH_SPI));
 	}
 
 #if defined(CONFIG_CPU_DUAL_FLASH)
 	/* config spi monitor as master mode */
 	switch_spim_mux(PCH_SPI_MONITOR_2, SPIM_EXT_MUX_ROT);
-	flash_dev = device_get_binding("spi2@1");
+	flash_dev = device_get_binding(get_flash_device_name(PCH_SPI_2));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi2@1");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(PCH_SPI_2));
 	}
 #endif
 	LOG_INF("hold PCH");
@@ -156,22 +165,22 @@ int BMCBootRelease(void)
 	const struct device *dev_m = NULL;
 	const struct device *flash_dev = NULL;
 
-	flash_dev = device_get_binding("spi1@0");
+	flash_dev = device_get_binding(get_flash_device_name(BMC_SPI));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi1@0");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(BMC_SPI));
 	}
 	dev_m = device_get_binding(BMC_SPI_MONITOR);
 	aspeed_spi_monitor_sw_rst(dev_m);
 	/* config spi monitor as monitor mode */
 	switch_spim_mux(BMC_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 #if defined(CONFIG_BMC_DUAL_FLASH)
-	flash_dev = device_get_binding("spi1@1");
+	flash_dev = device_get_binding(get_flash_device_name(BMC_SPI_2));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi1@1");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(BMC_SPI_2));
 	}
 	dev_m = device_get_binding(BMC_SPI_MONITOR_2);
 	aspeed_spi_monitor_sw_rst(dev_m);
@@ -194,11 +203,11 @@ int PCHBootRelease(void)
 	const struct device *flash_dev = NULL;
 	const struct platform_gpio_ctrl_ops *gpio_ops = get_platform_gpio_ctrl_ops();
 
-	flash_dev = device_get_binding("spi2@0");
+	flash_dev = device_get_binding(get_flash_device_name(PCH_SPI));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi2@0");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(PCH_SPI));
 	}
 	dev_m = device_get_binding(PCH_SPI_MONITOR);
 	aspeed_spi_monitor_sw_rst(dev_m);
@@ -206,11 +215,11 @@ int PCHBootRelease(void)
 	switch_spim_mux(PCH_SPI_MONITOR, SPIM_EXT_MUX_BMC_PCH);
 
 #if defined(CONFIG_CPU_DUAL_FLASH)
-	flash_dev = device_get_binding("spi2@1");
+	flash_dev = device_get_binding(get_flash_device_name(PCH_SPI_2));
 	if (flash_dev) {
 		spi_nor_rst_by_cmd(flash_dev);
 	} else {
-		LOG_ERR("Failed to bind spi2@1");
+		LOG_ERR("Failed to bind %s", get_flash_device_name(PCH_SPI_2));
 	}
 	dev_m = device_get_binding(PCH_SPI_MONITOR_2);
 	aspeed_spi_monitor_sw_rst(dev_m);

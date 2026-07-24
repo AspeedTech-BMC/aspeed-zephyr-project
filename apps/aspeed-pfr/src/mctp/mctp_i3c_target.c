@@ -10,6 +10,7 @@
 #include "i3c/i3c_util.h"
 #include "mctp.h"
 #include "mctp_i3c.h"
+#include "mctp_i3c_role.h"
 #include "cmd_channel_mctp.h"
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
@@ -20,8 +21,18 @@ extern const struct device dev_i3c_tmq[I3C_MAX_NUM];
 
 #define I3C_BUS_CPU          0x00
 #define I3C_BUS_BMC          0x02
+#define I3C_BUS_AST1080_BMC  0x03
 
-#if defined(CONFIG_BOARD_AST2700_DCSCM_FAMILY)
+#if defined(CONFIG_BOARD_AST1080_DCSCM_OKS)
+mctp_i3c_dev i3c_devs[] = {
+	{
+		/* AST1080 i3c3 is a target of the BMC controller. */
+		.i3c_conf.bus = I3C_BUS_AST1080_BMC,
+		.i3c_conf.addr = 0,
+		.i3c_conf.dest_eid = MCTP_I3C_REGISTRATION_EID,
+	},
+};
+#elif defined(CONFIG_BOARD_AST2700_DCSCM_FAMILY)
 mctp_i3c_dev i3c_devs[] = {
 	{
 		// For BMC to send mctp msg to PFR
@@ -45,6 +56,37 @@ mctp_i3c_dev i3c_devs[] = {
 		.i3c_conf.dest_eid = MCTP_I3C_REGISTRATION_EID,
 	},
 };
+#endif
+
+static int mctp_i3c_target_resolve_dest_eid(mctp *mctp_instance,
+					     uint8_t *dest_eid)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(i3c_devs); ++i) {
+		if (mctp_instance == i3c_devs[i].mctp_i3c_inst.mctp_inst) {
+			*dest_eid = i3c_devs[i].i3c_conf.dest_eid;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+const struct mctp_i3c_role_ops mctp_i3c_role = {
+	.resolve_dest_eid = mctp_i3c_target_resolve_dest_eid,
+};
+
+#if defined(CONFIG_BOARD_AST1080_DCSCM_OKS)
+static int mctp_i3c_target_obtain_address(mctp_i3c_dev *i3c_dev)
+{
+	return i3c_target_wait_for_daa(i3c_dev->i3c_conf.bus,
+				       &i3c_dev->i3c_conf.addr);
+}
+#else
+static int mctp_i3c_target_obtain_address(mctp_i3c_dev *i3c_dev)
+{
+	return i3c_get_assigned_addr(i3c_dev->i3c_conf.bus,
+				     &i3c_dev->i3c_conf.addr);
+}
 #endif
 
 static uint16_t mctp_i3c_tmq_read(void *mctp_p, void *msg_p)
@@ -248,8 +290,9 @@ void mctp_i3c_target_intf_init(void)
 		mctp_set_medium_configure(mctp_instance, MCTP_MEDIUM_TYPE_I3C_TARGET,
 				mctp_instance->medium_conf);
 
-		if (i3c_get_assigned_addr(i3c_dev_p->i3c_conf.bus, &i3c_dev_p->i3c_conf.addr)) {
-			LOG_ERR("Failed to get assigned i3c device address");
+		rc = mctp_i3c_target_obtain_address(i3c_dev_p);
+		if (rc) {
+			LOG_ERR("Failed to obtain i3c dynamic address, ret = %d", rc);
 			goto error;
 		}
 		mctp_instance->medium_conf.i3c_conf.bus = i3c_dev_p->i3c_conf.bus;
@@ -302,4 +345,10 @@ error:
 			mctp_i3c_instance->mctp_inst = NULL;
 		}
 	}
+}
+
+void mctp_i3c_configure_cpu_i3c_devs(void)
+{
+	if (is_pltrst_sync())
+		mctp_i3c_target_mctp_rerun_daa();
 }

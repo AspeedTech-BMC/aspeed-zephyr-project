@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Aspeed AST1080 DCSCM BHS board configuration
+#
+# Copyright (c) 2026 ASPEED Technology Inc.
+
+config BOARD_AST1080_DCSCM_BHS
+	# AST1080 is a dual-core SoC (cm4/arm + bootmcu/riscv). This board targets
+	# the CM4 only, pinned unconditionally so the bare `-b ast1080_dcscm_bhs`
+	# board name resolves the architecture without a /ast1080/cm4 qualifier.
+	select SOC_AST1080_CM4

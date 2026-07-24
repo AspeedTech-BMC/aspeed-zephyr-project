@@ -1,0 +1,5 @@
+board:
+  name: ast1080_dcscm_oks
+  vendor: aspeed
+  socs:
+    - name: ast1080
