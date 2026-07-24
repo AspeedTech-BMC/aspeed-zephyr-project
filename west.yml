@@ -12,7 +12,7 @@ manifest:
   projects:
     - name: zephyr
       remote: github
-      revision: 4d147ae3f88e0a89e27f345ccd68bf3183684d74
+      revision: 6f1d80dd2d3f23d81b9d266411f99fb0b473b796
       import:
         name-whitelist:
           - mcumgr
