@@ -69,6 +69,14 @@ For production, replace with your own ECDSA-P256 private key.
 
 ### 2. Build irot (chainload variant)
 
+irot depends on the `libspdm` submodule (`lib/dmtf/libspdm`). If it's not checked out yet,
+the build fails at the CMake Generate step with `Cannot find source file:
+libspdm/os_stub/cryptlib_null/pk/rsa_ext.c`. Init it once:
+
+```bash
+git submodule update --init lib/dmtf/libspdm
+```
+
 ```bash
 west build -p always \
     -b ast2700_evb_ast2700_ssp_cl/ast2700/ssp \
