@@ -95,8 +95,8 @@ struct ast_chip *ast_create_chip(void)
 	chip->scu1 = (struct ast2700_scu1 *)DT_REG_ADDR(DT_NODELABEL(syscon1));
 	chip->rev_id = sys_read32(SCU1_CHIP_REV_ID) & CHIP_ID_MASK;
 	chip->efuse = FIELD_GET(SCU_CPU_REVISION_ID_EFUSE, sys_read32(SCU0_REVISION_ID));
-	chip->pcie0_enable = sys_read32(SCU0_REG + 0xa00) & BIT(0);
-	chip->pcie1_enable = sys_read32(SCU0_REG + 0xa80) & BIT(0);
+	chip->pcie0_enable = sys_read32(SCU0_REG + 0xa70) & BIT(0);
+	chip->pcie1_enable = sys_read32(SCU0_REG + 0xaf0) & BIT(0);
 
 	return chip;
 }
