@@ -35,6 +35,8 @@ LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 
 #define PCIE_ALT_NODE(node) DT_PROP(node, alt_pcie_node)
 
+#define PCIE_BRIDGE_ALIASING(node) DT_PROP(node, bridge_aliasing)
+
 #define CHECK_INTx(node, prop) \
 	(strcmp(DT_PROP_OR(node, prop, "INTx"), "MSI") ? 0 : 1)
 
@@ -58,7 +60,9 @@ LOG_MODULE_REGISTER(pci, CONFIG_SOC_FMC_LOG_LEVEL);
 static void pcie_init_node(struct ast2700_scu0 *scu,
 			   uint32_t node_base,
 			   uint32_t clk_gate_mask,
-			   uint32_t rst_mask)
+			   uint32_t rst_mask,
+			   uint32_t *pci_misc,
+			   bool bridge_aliasing)
 {
 	/* setup preset for plda */
 	sys_write32(0x12600000, node_base + PLDA_PRESET0);
@@ -67,6 +71,11 @@ static void pcie_init_node(struct ast2700_scu0 *scu,
 	/* Enable bridge MSI and set INTA */
 	clrbits_le32((void *)(node_base + PLDA_MSI_CAP), BIT(3));
 	clrsetbits_le32((void *)(node_base + PLDA_MSI_CAP), GENMASK(2, 0), 0x1);
+
+	if (bridge_aliasing) {
+		/* Enable bridge aliasing */
+		setbits_le32(&pci_misc[30], BIT(29));
+	}
 
 #if !defined(CONFIG_PCIE_ECRC_DISABLE)
 	/* Enable ECRC */
@@ -90,6 +99,8 @@ int pci_init(struct ast_chip *chip)
 	uint8_t pcie0_intx = PCIE_INTx(DT_PATH(soc0, pcie0));
 	uint8_t pcie1_intx = PCIE_INTx(DT_PATH(soc0, pcie1));
 	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_PATH(soc0, pcie1));
+	bool pcie0_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_PATH(soc0, pcie0));
+	bool pcie1_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_PATH(soc0, pcie1));
 
 	if ((scu->modrst2_ctrl & (SCU0_RST2_E2M1 | SCU0_RST2_E2M0)) == 0) {
 		LOG_DBG("%s: PCIE already initialized\n", __func__);
@@ -113,11 +124,13 @@ int pci_init(struct ast_chip *chip)
 
 	/* cpu-die pcie node 1 */
 	pcie_init_node(scu, ASPEED_PLDA2_BASE,
-		       SCU0_CLKGATE1_E2M1, SCU0_RST2_E2M1);
+		       SCU0_CLKGATE1_E2M1, SCU0_RST2_E2M1,
+		       scu->pci1_misc, pcie1_bridge_aliasing);
 
 	/* cpu-die pcie node 0 */
 	pcie_init_node(scu, ASPEED_PLDA1_BASE,
-		       SCU0_CLKGATE1_E2M0, SCU0_RST2_E2M0);
+		       SCU0_CLKGATE1_E2M0, SCU0_RST2_E2M0,
+		       scu->pci0_misc, pcie0_bridge_aliasing);
 
 	/* io-die pcie node */
 	// Enable Bridge3 MSI
