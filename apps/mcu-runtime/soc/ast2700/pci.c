@@ -16,6 +16,9 @@
 #include <vga_ast2700.h>
 #include <ast_loader.h>
 #include <string.h>
+#include <usb.h>
+#include <wdt.h>
+#include <extrst.h>
 
 #define AST2700A2 0x2
 #define DISCPUE2M0RAW  BIT(2)
@@ -91,6 +94,42 @@ static void pcie_init_node(struct ast2700_scu0 *scu,
 	setbits_le32(&scu->modrst2_clr, rst_mask);
 }
 
+static void pci_update_xhci_phy_reset_mask(struct ast_chip *chip,
+					     uint8_t pcie0_en,
+					     uint8_t pcie1_en)
+{
+	uint32_t xhci_phy_reset_mask = 0;
+
+	/*
+	 * usb_init() tentatively marks each port's XHCI-PHY as BMC-owned.
+	 * After pcie0/pcie1's "xhci" property (bit3 of PCIE_CONF) is known,
+	 * clear the flag for any port whose XHCI is exposed as a PCIe endpoint
+	 * (PCIe-XHCI-PHY) instead of used natively by the BMC.
+	 */
+	chip->usb_porta_bmc_xhci_phy = chip->usb_porta_bmc_xhci_phy && !(pcie0_en & BIT(3));
+	chip->usb_portb_bmc_xhci_phy = chip->usb_portb_bmc_xhci_phy && !(pcie1_en & BIT(3));
+
+	/*
+	 * Fold only BMC-XHCI-PHY ports into the WDT reset domain (mask2 bit0 =
+	 * PortA, bit3 = PortB), so a WDT-triggered SoC reset also resets that
+	 * XHCI controller.
+	 *
+	 * PCIe-XHCI-PHY ports are left untouched since that XHCI controller
+	 * belongs to the PCIe host.
+	 */
+	if (chip->usb_porta_bmc_xhci_phy)
+		xhci_phy_reset_mask |= USB_XHCI_PHY_RESET_MASK2_PORTA;
+	if (chip->usb_portb_bmc_xhci_phy)
+		xhci_phy_reset_mask |= USB_XHCI_PHY_RESET_MASK2_PORTB;
+
+	if (xhci_phy_reset_mask) {
+		LOG_DBG("%s: BMC-XHCI-PHY on%s%s, adding to WDT reset mask2\n",
+			__func__, chip->usb_porta_bmc_xhci_phy ? " PortA" : "",
+			chip->usb_portb_bmc_xhci_phy ? " PortB" : "");
+		wdt_config_reset(chip, 1, xhci_phy_reset_mask, xhci_phy_reset_mask);
+	}
+}
+
 int pci_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = chip->scu0;
@@ -101,6 +140,8 @@ int pci_init(struct ast_chip *chip)
 	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_PATH(soc0, pcie1));
 	bool pcie0_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_PATH(soc0, pcie0));
 	bool pcie1_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_PATH(soc0, pcie1));
+
+	pci_update_xhci_phy_reset_mask(chip, pcie0_en, pcie1_en);
 
 	if ((scu->modrst2_ctrl & (SCU0_RST2_E2M1 | SCU0_RST2_E2M0)) == 0) {
 		LOG_DBG("%s: PCIE already initialized\n", __func__);

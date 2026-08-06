@@ -59,6 +59,14 @@ struct ast_chip {
 	uint32_t pcie1_enable;
 	void *scu0;
 	void *scu1;
+
+	/*
+	 * Set by usb_init(), then narrowed by pci_init(). This is true when the
+	 * port's XHCI-PHY is owned by the BMC (BMC-XHCI-PHY), rather than
+	 * exposed as a PCIe endpoint (PCIe-XHCI-PHY).
+	 */
+	uint32_t usb_porta_bmc_xhci_phy;
+	uint32_t usb_portb_bmc_xhci_phy;
 };
 
 struct ast_chip *ast_create_chip(void);

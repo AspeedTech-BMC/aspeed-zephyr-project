@@ -40,6 +40,15 @@
 
 #define AST_UDC_MAX_NUM_UART_PORTS	15
 
+/*
+ * WDT "mask2" reset-domain bits gate whether a WDT-triggered SoC reset also
+ * resets the port's XHCI-PHY.
+ *
+ * Only BMC-XHCI-PHY ports are asserted; PCIe-XHCI-PHY ports must stay out of
+ * this reset domain since the PCIe host owns that XHCI controller.
+ */
+#define USB_XHCI_PHY_RESET_MASK2_PORTA	BIT(0)
+#define USB_XHCI_PHY_RESET_MASK2_PORTB	BIT(3)
 
 int usb_init(struct ast_chip *chip);
 

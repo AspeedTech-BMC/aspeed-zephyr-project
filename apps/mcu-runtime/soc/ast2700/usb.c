@@ -250,6 +250,17 @@ static bool usb_func_has_ehci(enum scu0_usb_function func)
 		return false;
 	}
 }
+
+static bool usb_func_has_xhci_phy(enum scu0_usb_function func)
+{
+	switch (func) {
+	case EHCI_VHUB_AND_XHCI_PHY:
+	case XHCI_PHY:
+		return true;
+	default:
+		return false;
+	}
+}
 static int usb_usb2_init(struct ast_chip *chip, enum usb_port port, enum scu0_usb_function func)
 {
 	struct ast2700_scu0 *scu = chip->scu0;
@@ -434,6 +445,14 @@ int usb_init(struct ast_chip *chip)
 		else if (port == 1)
 			portb_func = VHUB_PHY;
 	}
+
+	/*
+	 * Record whether each port's XHCI-PHY is tentatively BMC-owned.
+	 * pci_init() will clear the flag for any port whose XHCI is actually
+	 * exposed as a PCIe endpoint (PCIe-XHCI-PHY).
+	 */
+	chip->usb_porta_bmc_xhci_phy = usb_func_has_xhci_phy(porta_func);
+	chip->usb_portb_bmc_xhci_phy = usb_func_has_xhci_phy(portb_func);
 
 	/* Switch PortA and PortB USB function */
 	usb_func_init(chip, PORT_A, porta_func);
