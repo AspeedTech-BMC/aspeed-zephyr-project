@@ -1372,8 +1372,8 @@ int dram_init(struct ast_chip *chip)
 	while (is_ddr_initialized(sdramc)) {
 		dwc_ddrphy_apb_wr(0xd0000, 0);
 
-		if (dwc_ddrphy_apb_rd(0x10056)) {
-			printf("DDR PHY is already initialized, but PHY RX FIFO is inconsistency. \n");
+		if (dwc_ddrphy_apb_rd(0x200d5) & BIT(1)) {
+			printf("DDR PHY is already initialized, but PHY PllUnlocked!!!\n");
 			break;
 		} else {
 			dwc_ddrphy_apb_wr(0xd0000, 1);
@@ -1396,6 +1396,13 @@ int dram_init(struct ast_chip *chip)
 		if (err)
 			continue;
 
+		sys_write32(0, 0x131a0000);
+		printf("DDRPHY unlock status=0x%08x\n", sys_read32(0x130401a8));
+		sys_write32(0x1, 0x130401ac);
+		printf("DDRPHY unlock clear set 1 status=0x%08x\n", sys_read32(0x130401a8));
+		sys_write32(0x0, 0x130401ac);
+		printf("DDRPHY unlock clear set 0 status=0x%08x\n", sys_read32(0x130401a8));
+		sys_write32(1, 0x131a0000);
 		sdramc_exit_self_refresh(sdramc);
 		sdramc_configure_mrs(sdramc, ac);
 		sdramc_enable_refresh(sdramc);
