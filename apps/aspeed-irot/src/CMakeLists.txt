@@ -15,6 +15,7 @@ target_sources(app
 
 	cptra/cptra_sample.c
 	cptra/cptra_idevid.c
+	cptra/cptra_vendor_key.c
 
 	cptra/cptra_mbedtls.c
 	cptra/cptra_api.c
