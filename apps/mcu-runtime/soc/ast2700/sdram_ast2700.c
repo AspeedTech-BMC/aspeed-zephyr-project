@@ -1264,13 +1264,13 @@ void sdramc_reset(struct sdramc *sdramc)
 	k_busy_wait(1000);
 }
 
-#define MPLL_RESET_BIT		BIT(24)
-#define MPLL_BYPASS_BIT		BIT(25)
+#define MPLL_RESET_BIT		BIT(25)
+#define MPLL_BYPASS_BIT		BIT(24)
 #define MPLL_CLKOD_MASK		GENMASK(22, 19)
 #define MPLL_CLKNR_MASK		GENMASK(18, 13)
 #define MPLL_CLKNF_MASK		GENMASK(12, 0)
 
-#define MPLL_1600
+#define MPLL_1600_nfc0_nr2_od0
 
 #if defined(MPLL_1600)
 #define MPLL_OD	1
@@ -1304,34 +1304,98 @@ void sdramc_reset(struct sdramc *sdramc)
 #define MPLL_OD	1
 #define MPLL_NR 1
 #define MPLL_NF (532575944704ULL  / 4 / 1024 / 1024 / 1024 / 2)
+#elif defined(MPLL_1550_nf7c_nr1_od0)
+#define MPLL_OD	1
+#define MPLL_NR 2
+#define MPLL_NF (0x7cULL)
+#elif defined(MPLL_1550_nff8_nr1_od1)
+#define MPLL_OD	2
+#define MPLL_NR 2
+#define MPLL_NF (0xf8ULL)
+#elif defined(MPLL_1550_nfba_nr2_od0)
+#define MPLL_OD	1
+#define MPLL_NR 3
+#define MPLL_NF (0xbaULL)
+#elif defined(MPLL_1600_nfc0_nr2_od0)
+#define MPLL_OD	1
+#define MPLL_NR 3
+#define MPLL_NF (0xc0ULL)
 #elif defined(MPLL_1500)
 #define MPLL_OD	1
 #define MPLL_NR 1
 #define MPLL_NF (515396075520ULL  / 4 / 1024 / 1024 / 1024 / 2)
 #endif
+#define DDR_CLK_STOP_REG      0x12c02240
+#define DDR_CLK_START_REG     0x12c02244
+
+#define MPLL_CTRL_REG         0x12c02310
+#define MPLL_STATUS_REG       0x12c02314
+
+#define DDR_CLK_GATE_VALUE    0x801
+#define MPLL_LOCK_BIT         BIT(31)
+
+#define MPLL_LOCK_TIMEOUT_US  100000
+
+static int mpll_wait_lock(uint32_t timeout_us)
+{
+    while (!(sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)) {
+        if (timeout_us == 0)
+            return -ETIMEDOUT;
+
+        k_busy_wait(1);
+        timeout_us--;
+    }
+
+    return 0;
+}
+
 void sdramc_pll_reset(struct sdramc *sdramc)
 {
-	uint32_t pll_para;
+    uint32_t pll_para;
 
-	printf("MPLL NF = 0x%llx, NR = %d, OD = %d\n", MPLL_NF, MPLL_NR, MPLL_OD);
+    ARG_UNUSED(sdramc);
 
-	/* clock stop for ddrphy and mclk */
-	sys_write32(0x801, 0x12c02240);
+    printf("MPLL NF=0x%llx NR=%d OD=%d\n",
+           MPLL_NF, MPLL_NR, MPLL_OD);
 
-	// mpll reset sequence
-	pll_para = sys_read32(0x12c02310);
-	pll_para &= ~(MPLL_CLKOD_MASK | MPLL_CLKNR_MASK | MPLL_CLKNF_MASK);
-	pll_para |= MPLL_NF | ((MPLL_NR - 1) << 13) | ((MPLL_OD - 1) << 19);
-	sys_write32(pll_para | MPLL_RESET_BIT | MPLL_BYPASS_BIT, 0x12c02310);
-	sys_write32(pll_para | MPLL_RESET_BIT, 0x12c02310);
-	sys_write32(pll_para, 0x12c02310);
+    /* Stop DDR clocks */
+    sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_STOP_REG);
 
-	// wait for mpll lock
-	while (!(sys_read32(0x12c02314) & BIT(31)))
-		;
+    /* Configure MPLL parameters */
+    pll_para = sys_read32(MPLL_CTRL_REG);
+    pll_para &= ~(MPLL_CLKOD_MASK |
+                  MPLL_CLKNR_MASK |
+                  MPLL_CLKNF_MASK);
 
-	/* clock start for ddrphy and mclk */
-	sys_write32(0x801, 0x12c02244);
+    pll_para |= MPLL_NF;
+    pll_para |= (MPLL_NR - 1) << 13;
+    pll_para |= (MPLL_OD - 1) << 19;
+
+    /* Assert reset + bypass */
+    sys_write32(pll_para | MPLL_RESET_BIT | MPLL_BYPASS_BIT,
+                MPLL_CTRL_REG);
+
+    k_busy_wait(10);
+
+    /* Release reset */
+    sys_write32(pll_para | MPLL_BYPASS_BIT,
+                MPLL_CTRL_REG);
+
+    if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US)) {
+        printk("MPLL lock timeout\n");
+        return;
+    }
+
+    /* Release bypass */
+    sys_write32(pll_para, MPLL_CTRL_REG);
+
+    if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US)) {
+        printk("MPLL is NOT lock\n");
+        return;
+    }
+
+    /* Restart DDR clocks */
+    sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_START_REG);
 }
 
 void sdramc_preset(struct sdramc *sdramc)
