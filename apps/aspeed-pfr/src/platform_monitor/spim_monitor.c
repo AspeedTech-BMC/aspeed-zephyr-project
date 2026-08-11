@@ -110,12 +110,14 @@ static void demo_spim_log_bmc_rst_work(struct k_work *item)
 	}
 }
 
+#if !defined(CONFIG_SOC_AST1080_CM4)
 static void demo_spim_isr_callback(const struct device *dev)
 {
 	uint32_t ctrl_idx = spim_get_ctrl_idx(dev);
 	/* notice: the ctrl_idx is from 1 to 4 */
 	k_work_submit(&log_ctrls[ctrl_idx - 1].log_work);
 }
+#endif
 
 void spim_irq_init(void)
 {
@@ -137,7 +139,9 @@ void spim_irq_init(void)
 		}
 		log_ctrls[i].dev = spim_devs[i];
 		k_work_init(&log_ctrls[i].log_work, demo_spim_log_work);
+#if !defined(CONFIG_SOC_AST1080_CM4)
 		spim_isr_callback_install(spim_devs[i], demo_spim_isr_callback);
+#endif
 	}
 	k_work_init(&log_bmc_rst_work, demo_spim_log_bmc_rst_work);
 }
