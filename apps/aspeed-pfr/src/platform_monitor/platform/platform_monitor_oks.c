@@ -125,6 +125,8 @@ static void platform_oks_smbus_rdy_monitor_init(void)
 	ret = gpio_pin_interrupt_configure_dt(&smbus0_rdy, GPIO_INT_EDGE_BOTH);
 	LOG_INF("Platform: gpio_pin_interrupt_configure_dt = %d", ret);
 	gpio_init_callback(&smbus_rdy_cb_data, platform_oks_smbus_rdy_handler, BIT(smbus0_rdy.pin));
+	ret = gpio_add_callback(smbus0_rdy.port, &smbus_rdy_cb_data);
+	LOG_INF("Platform: gpio_add_callback = %d", ret);
 
 #ifdef DUAL_NODE
 	ret = gpio_pin_configure_dt(&smbus1_rdy, GPIO_INPUT);
@@ -132,6 +134,8 @@ static void platform_oks_smbus_rdy_monitor_init(void)
 	ret = gpio_pin_interrupt_configure_dt(&smbus1_rdy, GPIO_INT_EDGE_BOTH);
 	LOG_INF("Platform: gpio_pin_interrupt_configure_dt = %d", ret);
 	gpio_init_callback(&smbus_rdy_cb_data, platform_oks_smbus_rdy_handler, BIT(smbus1_rdy.pin));
+	ret = gpio_add_callback(smbus1_rdy.port, &smbus_rdy_cb_data);
+	LOG_INF("Platform: gpio_add_callback = %d", ret);
 #endif
 }
 
@@ -597,4 +601,3 @@ const struct platform_monitor_ctrl_ops *get_platform_monitor_ctrl_ops(void)
 {
 	return &oks_platform_monitor_ops;
 }
-

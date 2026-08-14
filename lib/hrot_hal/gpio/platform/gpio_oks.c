@@ -55,11 +55,11 @@ void ClearS0Attestation(void)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s0_att_fail_out_gpios, 0);
 
 	LOG_INF("[PFR->CPLD] PFR_S0_ATT_FAIL De-assert[%s %d]", pfr_s0_att_fail.port->name, pfr_s0_att_fail.pin);
-	gpio_pin_configure_dt(&pfr_s0_att_fail, GPIO_OUTPUT);
 	gpio_pin_set(pfr_s0_att_fail.port, pfr_s0_att_fail.pin, 0);
-	LOG_INF("[PFR->CPLD] PFR_S0_ATT_DONE Assert[%s %d]", pfr_s0_att_done.port->name, pfr_s0_att_done.pin);
-	gpio_pin_configure_dt(&pfr_s0_att_done, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&pfr_s0_att_fail, GPIO_OUTPUT);
+	LOG_INF("[PFR->CPLD] PFR_S0_ATT_DONE De-assert[%s %d]", pfr_s0_att_done.port->name, pfr_s0_att_done.pin);
 	gpio_pin_set(pfr_s0_att_done.port, pfr_s0_att_done.pin, 0);
+	gpio_pin_configure_dt(&pfr_s0_att_done, GPIO_OUTPUT);
 }
 
 void S0AttestationDone(bool assert)
@@ -71,18 +71,18 @@ void S0AttestationDone(bool assert)
 
 	if (assert) {
 		LOG_INF("[PFR->CPLD] PFR_S0_ATT_FAIL De-assert[%s %d]", pfr_s0_att_fail.port->name, pfr_s0_att_fail.pin);
-		gpio_pin_configure_dt(&pfr_s0_att_fail, GPIO_OUTPUT);
 		gpio_pin_set(pfr_s0_att_fail.port, pfr_s0_att_fail.pin, 0);
+		gpio_pin_configure_dt(&pfr_s0_att_fail, GPIO_OUTPUT);
 		LOG_INF("[PFR->CPLD] PFR_S0_ATT_DONE Assert[%s %d]", pfr_s0_att_done.port->name, pfr_s0_att_done.pin);
-		gpio_pin_configure_dt(&pfr_s0_att_done, GPIO_OUTPUT);
 		gpio_pin_set(pfr_s0_att_done.port, pfr_s0_att_done.pin, 1);
+		gpio_pin_configure_dt(&pfr_s0_att_done, GPIO_OUTPUT);
 	} else {
 		LOG_INF("[PFR->CPLD] PFR_S0_ATT_FAIL Assert[%s %d]", pfr_s0_att_fail.port->name, pfr_s0_att_fail.pin);
-		gpio_pin_configure_dt(&pfr_s0_att_fail, GPIO_OUTPUT);
 		gpio_pin_set(pfr_s0_att_fail.port, pfr_s0_att_fail.pin, 1);
-		LOG_INF("[PFR->CPLD] PFR_S0_ATT_DONE De-assert[%s %d]", pfr_s0_att_done.port->name, pfr_s0_att_done.pin);
-		gpio_pin_configure_dt(&pfr_s0_att_done, GPIO_OUTPUT);
+		gpio_pin_configure_dt(&pfr_s0_att_fail, GPIO_OUTPUT);
+		LOG_INF("[PFR->CPLD] PFR_S0_ATT_DONE Assert[%s %d]", pfr_s0_att_done.port->name, pfr_s0_att_done.pin);
 		gpio_pin_set(pfr_s0_att_done.port, pfr_s0_att_done.pin, 1);
+		gpio_pin_configure_dt(&pfr_s0_att_done, GPIO_OUTPUT);
 	}
 }
 
@@ -94,11 +94,11 @@ void ClearS5Attestation(void)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s5_att_fail_out_gpios, 0);
 
 	LOG_INF("[PFR->CPLD] PFR_S5_ATT_FAIL De-assert[%s %d]", pfr_s5_att_fail.port->name, pfr_s5_att_fail.pin);
-	gpio_pin_configure_dt(&pfr_s5_att_fail, GPIO_OUTPUT);
 	gpio_pin_set(pfr_s5_att_fail.port, pfr_s5_att_fail.pin, 0);
-	LOG_INF("[PFR->CPLD] PFR_S5_ATT_DONE Assert[%s %d]", pfr_s5_att_done.port->name, pfr_s5_att_done.pin);
-	gpio_pin_configure_dt(&pfr_s5_att_done, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&pfr_s5_att_fail, GPIO_OUTPUT);
+	LOG_INF("[PFR->CPLD] PFR_S5_ATT_DONE De-assert[%s %d]", pfr_s5_att_done.port->name, pfr_s5_att_done.pin);
 	gpio_pin_set(pfr_s5_att_done.port, pfr_s5_att_done.pin, 0);
+	gpio_pin_configure_dt(&pfr_s5_att_done, GPIO_OUTPUT);
 }
 
 void S5AttestationDone(bool assert)
@@ -109,18 +109,18 @@ void S5AttestationDone(bool assert)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_s5_att_fail_out_gpios, 0);
 	if (assert) {
 		LOG_INF("[PFR->CPLD] PFR_S5_ATT_FAIL De-assert[%s %d]", pfr_s5_att_fail.port->name, pfr_s5_att_fail.pin);
-		gpio_pin_configure_dt(&pfr_s5_att_fail, GPIO_OUTPUT);
 		gpio_pin_set(pfr_s5_att_fail.port, pfr_s5_att_fail.pin, 0);
+		gpio_pin_configure_dt(&pfr_s5_att_fail, GPIO_OUTPUT);
 		LOG_INF("[PFR->CPLD] PFR_S5_ATT_DONE Assert[%s %d]", pfr_s5_att_done.port->name, pfr_s5_att_done.pin);
-		gpio_pin_configure_dt(&pfr_s5_att_done, GPIO_OUTPUT);
 		gpio_pin_set(pfr_s5_att_done.port, pfr_s5_att_done.pin, 1);
+		gpio_pin_configure_dt(&pfr_s5_att_done, GPIO_OUTPUT);
 	} else {
 		LOG_INF("[PFR->CPLD] PFR_S5_ATT_FAIL Assert[%s %d]", pfr_s5_att_fail.port->name, pfr_s5_att_fail.pin);
-		gpio_pin_configure_dt(&pfr_s5_att_fail, GPIO_OUTPUT);
 		gpio_pin_set(pfr_s5_att_fail.port, pfr_s5_att_fail.pin, 1);
-		LOG_INF("[PFR->CPLD] PFR_S5_ATT_DONE De-assert[%s %d]", pfr_s5_att_done.port->name, pfr_s5_att_done.pin);
-		gpio_pin_configure_dt(&pfr_s5_att_done, GPIO_OUTPUT);
+		gpio_pin_configure_dt(&pfr_s5_att_fail, GPIO_OUTPUT);
+		LOG_INF("[PFR->CPLD] PFR_S5_ATT_DONE Assert[%s %d]", pfr_s5_att_done.port->name, pfr_s5_att_done.pin);
 		gpio_pin_set(pfr_s5_att_done.port, pfr_s5_att_done.pin, 1);
+		gpio_pin_configure_dt(&pfr_s5_att_done, GPIO_OUTPUT);
 	}
 }
 
@@ -132,11 +132,11 @@ void ClearBtgAttestation(void)
 		GPIO_DT_SPEC_GET_BY_IDX(DT_INST(0, aspeed_pfr_gpio_oks), pfr_btg_att_fail_out_gpios, 0);
 
 	LOG_INF("[PFR->CPLD] PFR_BTG_ATT_FAIL De-assert[%s %d]", pfr_btg_att_fail.port->name, pfr_btg_att_fail.pin);
-	gpio_pin_configure_dt(&pfr_btg_att_fail, GPIO_OUTPUT);
 	gpio_pin_set(pfr_btg_att_fail.port, pfr_btg_att_fail.pin, 0);
-	LOG_INF("[PFR->CPLD] PFR_BTG_ATT_DONE Assert[%s %d]", pfr_btg_att_done.port->name, pfr_btg_att_done.pin);
-	gpio_pin_configure_dt(&pfr_btg_att_done, GPIO_OUTPUT);
+	gpio_pin_configure_dt(&pfr_btg_att_fail, GPIO_OUTPUT);
+	LOG_INF("[PFR->CPLD] PFR_BTG_ATT_DONE De-assert[%s %d]", pfr_btg_att_done.port->name, pfr_btg_att_done.pin);
 	gpio_pin_set(pfr_btg_att_done.port, pfr_btg_att_done.pin, 0);
+	gpio_pin_configure_dt(&pfr_btg_att_done, GPIO_OUTPUT);
 }
 
 void BtgAttestationDone(bool assert)
@@ -148,18 +148,18 @@ void BtgAttestationDone(bool assert)
 
 	if (assert) {
 		LOG_INF("[PFR->CPLD] PFR_BTG_ATT_FAIL De-assert[%s %d]", pfr_btg_att_fail.port->name, pfr_btg_att_fail.pin);
-		gpio_pin_configure_dt(&pfr_btg_att_fail, GPIO_OUTPUT);
 		gpio_pin_set(pfr_btg_att_fail.port, pfr_btg_att_fail.pin, 0);
+		gpio_pin_configure_dt(&pfr_btg_att_fail, GPIO_OUTPUT);
 		LOG_INF("[PFR->CPLD] PFR_BTG_ATT_DONE Assert[%s %d]", pfr_btg_att_done.port->name, pfr_btg_att_done.pin);
-		gpio_pin_configure_dt(&pfr_btg_att_done, GPIO_OUTPUT);
 		gpio_pin_set(pfr_btg_att_done.port, pfr_btg_att_done.pin, 1);
+		gpio_pin_configure_dt(&pfr_btg_att_done, GPIO_OUTPUT);
 	} else {
 		LOG_INF("[PFR->CPLD] PFR_BTG_ATT_FAIL Assert[%s %d]", pfr_btg_att_fail.port->name, pfr_btg_att_fail.pin);
-		gpio_pin_configure_dt(&pfr_btg_att_fail, GPIO_OUTPUT);
 		gpio_pin_set(pfr_btg_att_fail.port, pfr_btg_att_fail.pin, 1);
-		LOG_INF("[PFR->CPLD] PFR_BTG_ATT_DONE De-assert[%s %d]", pfr_btg_att_done.port->name, pfr_btg_att_done.pin);
-		gpio_pin_configure_dt(&pfr_btg_att_done, GPIO_OUTPUT);
+		gpio_pin_configure_dt(&pfr_btg_att_fail, GPIO_OUTPUT);
+		LOG_INF("[PFR->CPLD] PFR_BTG_ATT_DONE Assert[%s %d]", pfr_btg_att_done.port->name, pfr_btg_att_done.pin);
 		gpio_pin_set(pfr_btg_att_done.port, pfr_btg_att_done.pin, 1);
+		gpio_pin_configure_dt(&pfr_btg_att_done, GPIO_OUTPUT);
 	}
 }
 
@@ -173,8 +173,8 @@ void HPMStandbyReset(bool assert)
 		hpm_stanby_rst.port->name,
 		hpm_stanby_rst.pin);
 
-	gpio_pin_configure_dt(&hpm_stanby_rst, GPIO_OUTPUT);
 	gpio_pin_set(hpm_stanby_rst.port, hpm_stanby_rst.pin, assert);
+	gpio_pin_configure_dt(&hpm_stanby_rst, GPIO_OUTPUT);
 }
 
 void OksRTCRSTControl(bool assert)
