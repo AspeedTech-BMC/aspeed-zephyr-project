@@ -94,14 +94,11 @@ static void cptra_dump_fw_info(void)
 #define OTPCAL_IDEVID_TBS_OFFSET		0x62
 #define OTPCAL_IDEVID_SIGN_OFFSET		0x262
 
+#if defined(CONFIG_CPTRA_DICE)
 static int cptra_get_idevid_cert(struct cptra_get_idev_cert_ia *input,
 				 struct cptra_get_idev_cert_oa *output)
 {
-#if defined(CONFIG_CPTRA_DICE)
 	const struct device *dev = device_get_binding(CPTRA_DICE_DRV_NAME);
-#else
-	const struct device *dev = NULL;
-#endif
 	uint32_t cert_offset = OTPCAL_IDEVID_SIGN_OFFSET;
 	uint32_t tbs_offset = OTPCAL_IDEVID_TBS_OFFSET;
 	uint16_t *p16 = (uint16_t *)input->tbs;
@@ -218,10 +215,6 @@ static int cptra_populate_idevid(void)
 	struct cptra_populate_idev_cert_oa out_buff;
 	int ret;
 
-#if !defined(CONFIG_CPTRA_DICE)
-	return -ENODEV;
-#endif
-
 	if (!dev) {
 		LOG_ERR("Device %s not found", CPTRA_DICE_DRV_NAME);
 		return -ENODEV;
@@ -266,6 +259,7 @@ end:
 	LOG_ERR("%s: Failed", __func__);
 	return ret;
 }
+#endif /* CONFIG_CPTRA_DICE */
 
 #define CPTRA_IFC_BASE			DT_REG_ADDR(DT_NODELABEL(cptra_ifc))
 
