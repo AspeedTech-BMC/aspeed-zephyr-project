@@ -10,6 +10,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/spi_nor.h>
 #include <zephyr/drivers/misc/aspeed/abr_aspeed.h>
 #include <zephyr/drivers/i2c/pfr/i2c_filter.h>
 #include <zephyr/device.h>
@@ -622,7 +623,7 @@ static int cmd_afm(const struct shell *shell, size_t argc, char **argv)
 
 #if defined(CONFIG_ASPEED_DICE_SHELL)
 
-uint8_t buffer[PAGE_SIZE] __aligned(16);
+uint8_t buffer[PFR_PAGE_SIZE] __aligned(16);
 
 #define CDI_LENGTH                        64
 #define CDI_ADDRESS                       0x79001800
@@ -759,7 +760,7 @@ int hash_device_firmware(uint32_t addr, uint32_t fw_size, uint8_t *hash, uint32_
 	flash_dev = device_get_binding("fmc@0");
 	hash_engine_start(algo);
 	while (fw_size > 0) {
-		read_len = (fw_size < PAGE_SIZE) ? fw_size : PAGE_SIZE;
+		read_len = (fw_size < PFR_PAGE_SIZE) ? fw_size : PFR_PAGE_SIZE;
 		flash_read(flash_dev, addr, buffer, read_len);
 		hash_engine_update(buffer, read_len);
 		addr += read_len;
@@ -1088,7 +1089,7 @@ static int cmd_i2c_filter_dump(const struct shell *shell, size_t argc, char **ar
 			for (int devid = 0; devid < 16; devid++) {
 				shell_print(shell, "I2C_FILTER_%d Rule[%02d] Addr[%02x] :",
 						filter_id, devid, data->filter_idx[devid] << 1);
-				shell_hexdump(shell, &filter_tbl[filter_id].filter_tbl[devid + 1],
+				shell_hexdump(shell, (uint8_t *)&filter_tbl[filter_id].filter_tbl[devid + 1],
 						sizeof(struct ast_i2c_f_bitmap));
 				shell_print(shell,"\n");
 			}
@@ -1096,7 +1097,7 @@ static int cmd_i2c_filter_dump(const struct shell *shell, size_t argc, char **ar
 			size_t devid = strtol(argv[2], NULL, 16);
 			shell_print(shell, "I2C_FILTER_%d Rule[%02d] Addr[%02x] :",
 					filter_id, devid, data->filter_idx[devid] << 1);
-			shell_hexdump(shell, &filter_tbl[filter_id].filter_tbl[devid + 1],
+			shell_hexdump(shell, (uint8_t *)&filter_tbl[filter_id].filter_tbl[devid + 1],
 					sizeof(struct ast_i2c_f_bitmap));
 			shell_print(shell,"\n");
 		}
@@ -1115,7 +1116,7 @@ static int cmd_i2c_filter_dump(const struct shell *shell, size_t argc, char **ar
 		for (int devid = 0; devid < 16; devid++) {
 			shell_print(shell, "I2C_FILTER_%d Rule[%02d] Addr[%02x] :", i, devid,
 					data->filter_idx[devid] << 1);
-			shell_hexdump(shell, &filter_tbl[i].filter_tbl[devid + 1],
+			shell_hexdump(shell, (uint8_t *)&filter_tbl[i].filter_tbl[devid + 1],
 					sizeof(struct ast_i2c_f_bitmap));
 			shell_print(shell,"\n");
 		}
@@ -1415,7 +1416,7 @@ SHELL_CMD_REGISTER(mbedtls_perf, &sub_mbedtls_perf, "mbedtls performance test co
 // SPI flash read / read+hash performance test, to isolate whether a slow
 // firmware-verify hash is bottlenecked on flash I/O or on the SHA compute
 // itself. "read" times flash_read() alone; "hash" times flash_read() and
-// the SHA update separately over the same PAGE_SIZE chunking used by
+// the SHA update separately over the same PFR_PAGE_SIZE chunking used by
 // hash_device_firmware() so the split reflects the real verify path.
 
 static int cmd_flash_perf_read(const struct shell *shell, size_t argc, char **argv)
@@ -1521,15 +1522,15 @@ static int cmd_flash_perf_hash(const struct shell *shell, size_t argc, char **ar
 		return -EINVAL;
 	}
 
-	buf = k_malloc(PAGE_SIZE);
+	buf = k_malloc(PFR_PAGE_SIZE);
 	if (!buf) {
-		shell_error(shell, "Failed to allocate %u bytes", (uint32_t)PAGE_SIZE);
+		shell_error(shell, "Failed to allocate %u bytes", (uint32_t)PFR_PAGE_SIZE);
 		return -ENOMEM;
 	}
 
 	remaining = size;
 	while (remaining > 0) {
-		chunk = (remaining < PAGE_SIZE) ? remaining : PAGE_SIZE;
+		chunk = (remaining < PFR_PAGE_SIZE) ? remaining : PFR_PAGE_SIZE;
 
 		t0 = k_uptime_get_32();
 		ret = flash_read(dev, offset, buf, chunk);

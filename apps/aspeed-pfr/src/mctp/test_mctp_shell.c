@@ -69,8 +69,10 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 #if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
 static int cmd_mctp_send_msg_i3c(const struct shell *shell, size_t argc, char **argv)
 {
+#if !defined(CONFIG_PFR_MCTP_I3C_5_0)
 	extern mctp *mctp_i3c_bmc_inst;
 	extern mctp *mctp_i3c_cpu0_inst;
+#endif
 	struct mctp_interface *mctp_interface = NULL;
 	mctp *mctp_inst = NULL;
 	int req_len = argc - 4;
