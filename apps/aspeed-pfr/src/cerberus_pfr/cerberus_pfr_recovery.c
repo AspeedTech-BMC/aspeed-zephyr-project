@@ -309,7 +309,7 @@ int pfr_recover_update_action(struct pfr_manifest *manifest)
  * @return 0 if the recovery image is valid or an error code.
  */
 int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out,
+		    const struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length, struct pfm_manager *pfm)
 {
 	ARG_UNUSED(hash);

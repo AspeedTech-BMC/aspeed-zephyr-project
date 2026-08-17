@@ -267,7 +267,7 @@ int cerberus_pfr_verify_image(struct pfr_manifest *manifest)
 	return Success;
 }
 
-int rsa_verify_signature(struct signature_verification *verification,
+int rsa_verify_signature(const struct signature_verification *verification,
 		const uint8_t *digest, size_t length, const uint8_t *signature, size_t sig_length)
 {
 	if (!verification || !digest || !signature)
@@ -317,7 +317,7 @@ int signature_verification_init(struct signature_verification *verification)
 }
 
 int cerberus_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
+		const struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
 {
 	if (!manifest || !hash || !verification || !hash_out)
 		return Failure;
@@ -637,7 +637,7 @@ int cerberus_verify_regions(struct pfr_manifest *pfr_manifest)
  * @return 0 if the manifest is valid or an error code.
  */
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		struct signature_verification *verification, uint8_t *hash_out,
+		const struct signature_verification *verification, uint8_t *hash_out,
 		size_t hash_length)
 {
 	if (!manifest || !hash || !verification || !hash_out)

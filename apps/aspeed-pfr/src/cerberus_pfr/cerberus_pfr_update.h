@@ -11,6 +11,8 @@
 #include "firmware/firmware_image.h"
 #include "pfr/pfr_common.h"
 
+struct event_context;
+
 int cerberus_pfr_update_verify(struct firmware_image *fw, struct hash_engine *hash, struct rsa_engine *rsa);
 
 int firmware_image_verify(const struct firmware_image *fw, struct hash_engine *hash);

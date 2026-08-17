@@ -33,7 +33,7 @@ struct pfr_authentication {
 };
 
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		struct signature_verification *verification, uint8_t *hash_out,
+		const struct signature_verification *verification, uint8_t *hash_out,
 		size_t hash_length);
 int cerberus_pfr_verify_image(struct pfr_manifest *pfr_manifest);
 int cerberus_verify_regions(struct pfr_manifest *pfr_manifest);
