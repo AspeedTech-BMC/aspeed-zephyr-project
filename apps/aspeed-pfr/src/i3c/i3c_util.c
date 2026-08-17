@@ -58,7 +58,9 @@ void i3c_util_cpu_i3c_setup(void *a, void *b, void *c)
 
 void util_init_I3C(void)
 {
+#if defined(DEV_I3C_TMQ_0) || defined(DEV_I3C_TMQ_1) || defined(DEV_I3C_TMQ_2) || defined(DEV_I3C_TMQ_3)
 	const struct i3c_target_driver_api *api;
+#endif
 #ifdef DEV_I3C_TMQ_0
 	dev_i3c_tmq[0] = device_get_binding("i3c-tmq@7eca0030000");
 	api = dev_i3c_tmq[0]->api;
