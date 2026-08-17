@@ -440,6 +440,7 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 	mac_clk_disable(scu, index);
 	mac_reset_assert(scu, index);
 
+	set_rgmii_delay(scu, 0, 0, index, (uintptr_t)&scu->mac_delay);
 	set_rgmii_delay(scu, tx_en, rx_en, index, (uintptr_t)&scu->mac_100m_delay);
 	set_rgmii_delay(scu, tx_en, rx_en, index, (uintptr_t)&scu->mac_10m_delay);
 	record_rgmii_delay(scu, index, tx_dis, tx_en, rx_dis, rx_en,
