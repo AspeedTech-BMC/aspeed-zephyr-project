@@ -33,11 +33,11 @@ struct recovery_section {
 #pragma pack()
 
 int cerberus_pfr_recovery_verify(struct recovery_image *image, struct hash_engine *hash,
-			      struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
+			      const struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
 			      struct pfm_manager *pfm);
 
 int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out,
+		    const struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length, struct pfm_manager *pfm);
 int pfr_staging_pch_staging(struct pfr_manifest *manifest);
 int pfr_recover_active_region(struct pfr_manifest *manifest);
