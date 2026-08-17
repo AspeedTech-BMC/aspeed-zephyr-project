@@ -102,7 +102,7 @@
 #define SVN_MAX                         64
 #define MAX_READ_SIZE                   0x1000
 #define MAX_WRITE_SIZE                  0x1000
-#define PAGE_SIZE                       0x1000
+#define INTEL_PFR_PAGE_SIZE             0x1000
 #define BLOCK_SIZE                      0x10000
 #define UFM_PAGE_SIZE                   16
 

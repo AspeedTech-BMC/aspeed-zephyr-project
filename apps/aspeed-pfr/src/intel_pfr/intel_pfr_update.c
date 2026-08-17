@@ -272,7 +272,7 @@ int update_rot_fw(uint32_t address, uint32_t length, uint32_t flash_select)
 
 	region_size = pfr_spi_get_device_size(region_type);
 	length_page_align =
-		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
+		(length % INTEL_PFR_PAGE_SIZE) ? (length + (INTEL_PFR_PAGE_SIZE - (length % INTEL_PFR_PAGE_SIZE))) : length;
 
 	if (length_page_align > region_size) {
 		LOG_ERR("length(%x) exceed region size(%x)", length_page_align, region_size);
@@ -302,7 +302,7 @@ int update_afm_v30(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length
 	uint32_t length_page_align;
 
 	length_page_align =
-		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
+		(length % INTEL_PFR_PAGE_SIZE) ? (length + (INTEL_PFR_PAGE_SIZE - (length % INTEL_PFR_PAGE_SIZE))) : length;
 
 	if (part == AFM_PART_ACT_1) {
 		if (length_page_align > region_size) {
@@ -357,7 +357,7 @@ int update_afm_v40(enum AFM_PARTITION_TYPE part, uint32_t address, size_t length
 	struct pfr_manifest *manifest = get_pfr_manifest();
 
 	length_page_align =
-		(length % PAGE_SIZE) ? (length + (PAGE_SIZE - (length % PAGE_SIZE))) : length;
+		(length % INTEL_PFR_PAGE_SIZE) ? (length + (INTEL_PFR_PAGE_SIZE - (length % INTEL_PFR_PAGE_SIZE))) : length;
 	if (length_page_align > region_size) {
 		LOG_ERR("length(%x) exceed region size(%x)", length_page_align, region_size);
 		return Failure;

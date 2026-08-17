@@ -165,7 +165,7 @@ int intel_pfr_pit_level2_verify(void)
 #endif
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
+			      const struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length)
 {
 	struct pfr_manifest *pfr_manifest = (struct pfr_manifest *) manifest;
 	uint32_t pc_type = 0;
@@ -633,43 +633,45 @@ int intel_block1_csk_block0_entry_verify(struct pfr_manifest *manifest)
 int intel_block1_verify(struct pfr_manifest *manifest)
 {
 	int status = 0;
-	PFR_AUTHENTICATION_BLOCK1 *block1_buffer;
+	uint32_t *TagBlock1;
+	KEY_ENTRY *RootEntry;
 	uint8_t buffer[256] = { 0 };
 
 	status = pfr_spi_read(manifest->image_type, manifest->address +
 			sizeof(PFR_AUTHENTICATION_BLOCK0),
-			sizeof(block1_buffer->TagBlock1) + sizeof(block1_buffer->ReservedBlock1) +
-			sizeof(block1_buffer->RootEntry), buffer);
+			offsetof(PFR_AUTHENTICATION_BLOCK1, CskEntry), buffer);
 
 	if (status != Success) {
 		LOG_ERR("Block1: Flash read data failed");
 		return Failure;
 	}
 
-	block1_buffer = (PFR_AUTHENTICATION_BLOCK1 *)buffer;
+	TagBlock1 = (uint32_t *)buffer;
 
-	if (block1_buffer->TagBlock1 != BLOCK1TAG) {
-		LOG_ERR("Block1: Tag Not Found, %x", block1_buffer->TagBlock1);
+	if (*TagBlock1 != BLOCK1TAG) {
+		LOG_ERR("Block1: Tag Not Found, %x", *TagBlock1);
 		return Failure;
 	}
 
-	status = verify_root_key_entry(manifest, block1_buffer);
+	status = verify_root_key_entry(manifest, (PFR_AUTHENTICATION_BLOCK1 *)buffer);
 	if (status != Success) {
 		LOG_ERR("Block1 Root Entry: Validation failed");
 		return Failure;
 	}
 
 	LOG_INF("Block1 Root Entry: Validation success");
+	// Move to Root Key entry, ignore tag and reserved block
+	RootEntry = (KEY_ENTRY *)(buffer + sizeof(uint32_t) + 12);
 
-	if (block1_buffer->RootEntry.PubCurveMagic == PUBLIC_LMS384_TAG || block1_buffer->RootEntry.PubCurveMagic == PUBLIC_LMS256_TAG) {
-		PFR_AUTHENTICATION_BLOCK1_lms *block1_lms = (PFR_AUTHENTICATION_BLOCK1_lms *)block1_buffer;
+	if (RootEntry->PubCurveMagic == PUBLIC_LMS384_TAG || RootEntry->PubCurveMagic == PUBLIC_LMS256_TAG) {
+		KEY_ENTRY_lms *lms = (KEY_ENTRY_lms *)RootEntry;
 
-		manifest->verification->pubkey->lms_key_len = block1_lms->RootEntry.keylen - CONFIG_LMS_SIGN_SERIAL_OFFSET;
-		memcpy(manifest->verification->pubkey->lms_key, &block1_lms->RootEntry.pubkey[CONFIG_LMS_SIGN_SERIAL_OFFSET], manifest->verification->pubkey->lms_key_len);
+		manifest->verification->pubkey->lms_key_len = lms->keylen - CONFIG_LMS_SIGN_SERIAL_OFFSET;
+		memcpy(manifest->verification->pubkey->lms_key, &lms->pubkey[CONFIG_LMS_SIGN_SERIAL_OFFSET], manifest->verification->pubkey->lms_key_len);
 	} else {
 		// Update root key to validate csk entry if csk entry exist or b0 entry if csk entry does not exist
-		memcpy(manifest->verification->pubkey->x, block1_buffer->RootEntry.PubKeyX, sizeof(block1_buffer->RootEntry.PubKeyX));
-		memcpy(manifest->verification->pubkey->y, block1_buffer->RootEntry.PubKeyY, sizeof(block1_buffer->RootEntry.PubKeyY));
+		memcpy(manifest->verification->pubkey->x, RootEntry->PubKeyX, sizeof(RootEntry->PubKeyX));
+		memcpy(manifest->verification->pubkey->y, RootEntry->PubKeyY, sizeof(RootEntry->PubKeyY));
 	}
 
 	if (manifest->kc_flag == 0) {
@@ -1165,7 +1167,7 @@ void init_pfr_authentication(struct pfr_authentication *pfr_authentication)
  * @return 0 if the manifest is valid or an error code.
  */
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out,
+		    const struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length)
 {
 	return intel_pfr_manifest_verify(manifest, hash, verification, hash_out, hash_length);
