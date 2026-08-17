@@ -16,13 +16,6 @@
 
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define DEBUG_HALT() {				  \
-		volatile int halt = 1;		  \
-		while (halt) {			  \
-			__asm__ volatile ("nop"); \
-		}				  \
-}
-
 extern void aspeed_print_sysrst_info(void);
 
 #if defined(CONFIG_LED_GPIO)
@@ -58,7 +51,7 @@ K_TIMER_DEFINE(hbled_timer, hbled_tick, NULL);
 #endif
 #endif
 
-void main(void)
+int main(void)
 {
 	LOG_INF("*** ASPEED_PFR %s (%s) Board:%s ***",
 			ASPEED_ZEPHYR_PROJECT_VERSION, ASPEED_ZEPHYR_PROJECT_BUILD_TIMESTAMP, CONFIG_BOARD);
@@ -76,4 +69,6 @@ void main(void)
 #endif
 
 	AspeedStateMachine();
+
+	return 0;
 }
