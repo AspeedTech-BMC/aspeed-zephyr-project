@@ -179,7 +179,9 @@ BUILD_ASSERT(PCH_SPI_2 == PCH_SPI + 1, "get_flash_dev dual-flash overflow relies
 
 int get_flash_dev(uint8_t device_id, uint32_t *address, const struct device **dev)
 {
+#if defined(CONFIG_BMC_DUAL_FLASH) || defined(CONFIG_CPU_DUAL_FLASH)
 	uint32_t flash_sz = 0;
+#endif
 
 	if (device_id >= ARRAY_SIZE(Flash_Devices_List))
 		return -1;

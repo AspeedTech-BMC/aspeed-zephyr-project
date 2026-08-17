@@ -24,9 +24,7 @@ uint32_t flash_master_capabilities(struct flash_master *spi)
 int flash_master_wrapper_init(struct flash_master_wrapper *spi)
 {
 
-	spi->base.capabilities = (int (*)(struct flash_master *spi))flash_master_capabilities;
-	// spi->base.xfer = (int (*)(struct flash_master *spi, const struct flash_xfer *)) SPI_Command_Xfer;
-	spi->base.xfer = (int (*)(struct spi_flash *flash, const struct flash_xfer *))SPI_Command_Xfer;
+	spi->base.capabilities = (uint32_t (*)(const struct flash_master *))flash_master_capabilities;
 
 	return 0;
 }

@@ -11,6 +11,16 @@
 #include <stddef.h>
 #include <zephyr/device.h>
 
+/*
+ * struct pflash/pflash_master/pflash_xfer below are local copies of
+ * Cerberus's struct flash/flash_master/flash_xfer (same field layout), but
+ * their self-referencing vtable/member parameters still name the original,
+ * unprefixed Cerberus types. Include the real definitions here so those
+ * names resolve consistently regardless of include order in the caller.
+ */
+#include "flash/flash.h"
+#include "flash/flash_master.h"
+
 #define SECTOR_SIZE 0x1000
 #define BLOCK_SIZE  0x10000
 
