@@ -32,7 +32,7 @@ int get_cpld_status(uint32_t offset, uint8_t *data, uint32_t data_length)
 
 int set_cpld_status(uint32_t offset, uint8_t *data, uint32_t data_length)
 {
-	static uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+	static uint8_t buffer[PFR_PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
 	int status;
 
 	if (offset + data_length > sizeof(buffer))

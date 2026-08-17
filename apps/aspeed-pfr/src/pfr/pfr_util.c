@@ -44,7 +44,7 @@
 #define NON_CACHED_SRAM_END        (NON_CACHED_SRAM_START + NON_CACHED_SRAM_SIZE)
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
-uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+uint8_t buffer[PFR_PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
 
 int pfr_spi_read(uint8_t device_id, uint32_t address, uint32_t data_length, uint8_t *data)
 {
@@ -113,7 +113,7 @@ int pfr_spi_erase_region(uint8_t device_id,
 		} else {
 			if (pfr_spi_erase_4k(device_id, erase_addr))
 				return Failure;
-			erase_addr += PAGE_SIZE;
+			erase_addr += PFR_PAGE_SIZE;
 		}
 	}
 
@@ -152,10 +152,10 @@ int pfr_spi_get_block_size(uint8_t device_id)
 
 int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t target_address)
 {
-	static uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
-	if (pfr_spi_read(device_id, source_address, PAGE_SIZE, buffer))
+	static uint8_t buffer[PFR_PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+	if (pfr_spi_read(device_id, source_address, PFR_PAGE_SIZE, buffer))
 		return Failure;
-	if (pfr_spi_write(device_id, target_address, PAGE_SIZE, buffer))
+	if (pfr_spi_write(device_id, target_address, PFR_PAGE_SIZE, buffer))
 		return Failure;
 
 	return Success;
@@ -164,17 +164,17 @@ int pfr_spi_page_read_write(uint8_t device_id, uint32_t source_address, uint32_t
 int pfr_spi_region_read_write_between_spi(uint8_t src_dev, uint32_t src_addr,
 		uint8_t dest_dev, uint32_t dest_addr, size_t length)
 {
-	static uint8_t buffer[PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
+	static uint8_t buffer[PFR_PAGE_SIZE] NON_CACHED_BSS_ALIGN16;
 	int i;
 
-	for (i = 0; i < length / PAGE_SIZE; i++) {
-		if (pfr_spi_read(src_dev, src_addr, PAGE_SIZE, buffer))
+	for (i = 0; i < length / PFR_PAGE_SIZE; i++) {
+		if (pfr_spi_read(src_dev, src_addr, PFR_PAGE_SIZE, buffer))
 			return Failure;
-		if (pfr_spi_write(dest_dev, dest_addr, PAGE_SIZE, buffer))
+		if (pfr_spi_write(dest_dev, dest_addr, PFR_PAGE_SIZE, buffer))
 			return Failure;
 
-		src_addr += PAGE_SIZE;
-		dest_addr += PAGE_SIZE;
+		src_addr += PFR_PAGE_SIZE;
+		dest_addr += PFR_PAGE_SIZE;
 	}
 
 	return Success;
@@ -250,7 +250,7 @@ static int mbedtls_ecdsa_verify_middlelayer(struct pfr_pubkey *pubkey,
  *
  * @return 0 if the digest matches the signature or an error code.
  */
-int verify_signature(struct signature_verification *verification, const uint8_t *digest,
+int verify_signature(const struct signature_verification *verification, const uint8_t *digest,
 		     size_t length, const uint8_t *signature, size_t sig_length)
 {
 	struct pfr_manifest *manifest = (struct pfr_manifest *)verification;

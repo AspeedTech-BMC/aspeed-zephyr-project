@@ -13,6 +13,9 @@
 #include "recovery/recovery_image.h"
 #include "firmware/firmware_image.h"
 
+/* Flash page size shared by code common to both the intel_pfr and cerberus_pfr backends. */
+#define PFR_PAGE_SIZE 0x1000
+
 struct pfr_manifest {
 	// struct manifest_flash *base;
 	struct manifest *base;
