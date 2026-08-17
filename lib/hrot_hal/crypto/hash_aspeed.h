@@ -6,6 +6,16 @@
 
 #pragma once
 
+/*
+ * Some other header included ahead of this one may already define the same
+ * SHA*_BLOCK_SIZE macros (to the same values). Undefine them first so
+ * <zephyr/crypto/hash.h> below doesn't trigger redefinition warnings
+ * regardless of include order.
+ */
+#undef SHA1_BLOCK_SIZE
+#undef SHA256_BLOCK_SIZE
+#undef SHA384_BLOCK_SIZE
+#undef SHA512_BLOCK_SIZE
 #include <zephyr/crypto/hash.h>
 
 #define ZEPHYR_HASH_API_MIDLEYER_TEST_SUPPORT 1    // non-zero for support hash functions testing
