@@ -9,6 +9,8 @@
 #include <zephyr/kernel.h>
 #include "intel_pfr_definitions.h"
 
+struct event_context;
+
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 enum AFM_PARTITION_TYPE {
 	AFM_PART_ACT_1,

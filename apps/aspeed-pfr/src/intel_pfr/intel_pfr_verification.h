@@ -257,12 +257,12 @@ struct pfr_authentication {
 #pragma pack()
 
 int intel_pfr_manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-			      struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
+			      const struct signature_verification *verification, uint8_t *hash_out, uint32_t hash_length);
 
 void init_pfr_authentication(struct pfr_authentication *pfr_authentication);
 
 int manifest_verify(struct manifest *manifest, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out,
+		    const struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length);
 #if defined(CONFIG_PIT_PROTECTION)
 int intel_pfr_pit_level1_verify(void);

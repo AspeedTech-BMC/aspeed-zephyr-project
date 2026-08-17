@@ -81,7 +81,7 @@ int update_active_pfm(struct pfr_manifest *manifest, uint32_t pfm_size)
 
 	// Updating PFM from capsule to active region
 	length_page_align =
-		(pfm_size % PAGE_SIZE) ? (pfm_size + (PAGE_SIZE - (pfm_size % PAGE_SIZE))) : pfm_size;
+		(pfm_size % INTEL_PFR_PAGE_SIZE) ? (pfm_size + (INTEL_PFR_PAGE_SIZE - (pfm_size % INTEL_PFR_PAGE_SIZE))) : pfm_size;
 
 	LOG_INF("manifest->image_type=%d, source_address=%x, target_address=%x, length=%x, length_page_align=%x",
 		manifest->image_type, capsule_offset, manifest->active_pfm_addr, pfm_size, length_page_align);
@@ -104,8 +104,8 @@ int update_active_pfm(struct pfr_manifest *manifest, uint32_t pfm_size)
 int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_addr,
 		uint32_t active_bitmap, uint32_t bitmap_size)
 {
-	uint32_t region_start_bit = start_addr / PAGE_SIZE;
-	uint32_t region_end_bit = end_addr / PAGE_SIZE;
+	uint32_t region_start_bit = start_addr / INTEL_PFR_PAGE_SIZE;
+	uint32_t region_end_bit = end_addr / INTEL_PFR_PAGE_SIZE;
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	uint8_t *active_bitmap_byte;
 	uint32_t erase_start_bit = 0xffffffff;
@@ -146,15 +146,15 @@ int decompression_erase(uint32_t image_type, uint32_t start_addr, uint32_t end_a
 				if (erase_bits) {
 					pfr_spi_erase_region(image_type,
 							support_block_erase,
-							erase_start_bit * PAGE_SIZE,
-							erase_bits * PAGE_SIZE);
+							erase_start_bit * INTEL_PFR_PAGE_SIZE,
+							erase_bits * INTEL_PFR_PAGE_SIZE);
 					erase_start_bit = 0xffffffff;
 				}
 			}
 		}
 	}
 	if (erase_start_bit != 0xffffffff) {
-		start_addr = erase_start_bit * PAGE_SIZE;
+		start_addr = erase_start_bit * INTEL_PFR_PAGE_SIZE;
 		pfr_spi_erase_region(image_type, support_block_erase,
 				start_addr, end_addr - start_addr);
 	}
@@ -170,8 +170,8 @@ int decompression_write(uint32_t image_type,
 		uint32_t comp_bitmap,
 		uint32_t bitmap_size)
 {
-	uint32_t region_start_bit = start_addr / PAGE_SIZE;
-	uint32_t region_end_bit = end_addr / PAGE_SIZE;
+	uint32_t region_start_bit = start_addr / INTEL_PFR_PAGE_SIZE;
+	uint32_t region_end_bit = end_addr / INTEL_PFR_PAGE_SIZE;
 	uint8_t *comp_bitmap_byte;
 	uint32_t dest_addr = start_addr;
 	uint32_t bitmap_byte_idx = 0;
@@ -203,11 +203,11 @@ int decompression_write(uint32_t image_type,
 						return Failure;
 					}
 				}
-				dest_addr += PAGE_SIZE;
+				dest_addr += INTEL_PFR_PAGE_SIZE;
 			}
 
 			if (copy_this_page)
-				decomp_src_addr += PAGE_SIZE;
+				decomp_src_addr += INTEL_PFR_PAGE_SIZE;
 
 			cur_bit++;
 		}
@@ -235,7 +235,7 @@ int decompress_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 	bitmap_size = pbc->bitmap_nbit / 8;
 
 	// Supported decompression adrress range is 0 - 256MB
-	if (bitmap_size > (2 * PAGE_SIZE)) {
+	if (bitmap_size > (2 * INTEL_PFR_PAGE_SIZE)) {
 		LOG_ERR("bitmap size is too big");
 		return Failure;
 	}

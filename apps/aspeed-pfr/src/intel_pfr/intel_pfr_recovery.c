@@ -29,7 +29,7 @@
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
 int intel_pfr_recovery_verify(struct recovery_image *image, struct hash_engine *hash,
-		struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
+		const struct signature_verification *verification, uint8_t *hash_out, size_t hash_length,
 		struct pfm_manager *pfm)
 {
 	ARG_UNUSED(hash);
@@ -56,7 +56,7 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 	uint8_t staging_pfm_sig_b1[256] = { 0 };
 	PFR_AUTHENTICATION_BLOCK0 *act_block0_buffer;
 	PFR_AUTHENTICATION_BLOCK0 *staging_block0_buffer;
-	PFR_AUTHENTICATION_BLOCK1 *staging_block1_buffer;
+	KEY_ENTRY *RootEntry;
 	uint32_t act_pfm_image_type = 0;
 	uint8_t digest_length = 0;
 	uint32_t staging_address;
@@ -148,16 +148,16 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 	staging_block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)staging_pfm_sig_b0;
 
 	status = pfr_spi_read(manifest->image_type, staging_address + offset + sizeof(PFR_AUTHENTICATION_BLOCK0),
-				sizeof(staging_block1_buffer->TagBlock1) + sizeof(staging_block1_buffer->ReservedBlock1) +
-				sizeof(staging_block1_buffer->RootEntry), staging_pfm_sig_b1);
+				offsetof(PFR_AUTHENTICATION_BLOCK1, CskEntry), staging_pfm_sig_b1);
 	if (status != Success) {
 		LOG_ERR("Staging pfm block1: Flash read data failed");
 		return Failure;
 	}
 
-	staging_block1_buffer = (PFR_AUTHENTICATION_BLOCK1 *)staging_pfm_sig_b1;
+	// Move to Root Key entry, ignore tag and reserved block
+	RootEntry = (KEY_ENTRY *)(staging_pfm_sig_b1 + sizeof(uint32_t) + 12);
 
-	switch(staging_block1_buffer->RootEntry.PubCurveMagic) {
+	switch (RootEntry->PubCurveMagic) {
 		case PUBLIC_SECP256_TAG:
 		case PUBLIC_LMS256_TAG:
 			act_pfm_hash = act_block0_buffer->Sha256Pc;
@@ -171,7 +171,7 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 			digest_length = SHA384_DIGEST_LENGTH;
 			break;
 		default:
-		LOG_ERR("Staging block 1 root entry: Unsupported hash curve, %x", staging_block1_buffer->RootEntry.PubCurveMagic);
+		LOG_ERR("Staging block 1 root entry: Unsupported hash curve, %x", RootEntry->PubCurveMagic);
 		return Failure;
 	}
 
@@ -480,7 +480,7 @@ int intel_pfr_recover_update_action(struct pfr_manifest *manifest)
  * @return 0 if the recovery image is valid or an error code.
  */
 int recovery_verify(struct recovery_image *image, struct hash_engine *hash,
-		    struct signature_verification *verification, uint8_t *hash_out,
+		    const struct signature_verification *verification, uint8_t *hash_out,
 		    size_t hash_length, struct pfm_manager *pfm)
 {
 
