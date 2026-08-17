@@ -38,7 +38,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
  * So, strongly suggests users to update hcycle and delay_ns at the development stage
  * for users PROT module.
  */
-static int ast1060_prot_post_init(const struct device *arg)
+static int ast1060_prot_post_init(void)
 {
 #ifdef DEV_SPI_2
 	mm_reg_t spi2_ctrl_base = DT_REG_ADDR_BY_NAME(DT_NODELABEL(spi2), ctrl_reg);
@@ -111,7 +111,7 @@ static int ast1060_prot_gpio_post_init(void)
 	return 0;
 }
 
-static int ast1060_prot_init(const struct device *arg)
+static int ast1060_prot_init(void)
 {
 	return 0;
 }

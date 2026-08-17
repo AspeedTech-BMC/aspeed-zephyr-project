@@ -8,7 +8,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 
-static int ast1060_dcscm_post_init(const struct device *arg)
+static int ast1060_dcscm_post_init(void)
 {
 	// Enable flash power by GPIOL2 and GPIOL3
 	const struct device *dev;
@@ -19,7 +19,7 @@ static int ast1060_dcscm_post_init(const struct device *arg)
 	return 0;
 }
 
-static int ast1060_dcscm_init(const struct device *arg)
+static int ast1060_dcscm_init(void)
 {
 	return 0;
 }

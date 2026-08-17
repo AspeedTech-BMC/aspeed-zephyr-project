@@ -8,12 +8,12 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 
-static int ast10x0_dcscm_post_init(const struct device *arg)
+static int ast10x0_dcscm_post_init(void)
 {
 	return 0;
 }
 
-static int ast10x0_dcscm_init(const struct device *arg)
+static int ast10x0_dcscm_init(void)
 {
 	return 0;
 }

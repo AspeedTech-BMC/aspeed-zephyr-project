@@ -12,7 +12,7 @@
 #endif
 
 
-static int ast1060_dcscm_post_init(const struct device *arg)
+static int ast1060_dcscm_post_init(void)
 {
 	// Enable flash power by GPIOL2 and GPIOL3
 	const struct device *dev;
@@ -24,11 +24,12 @@ static int ast1060_dcscm_post_init(const struct device *arg)
 }
 
 #if defined(CONFIG_DT_HAS_ASPEED_PFR_GPIO_MP_ENABLED)
-static int ast1060_dcscm_init(const struct device *arg)
+static int ast1060_dcscm_init(void)
 {
+	return 0;
 }
 #else
-static int ast1060_dcscm_init(const struct device *arg)
+static int ast1060_dcscm_init(void)
 {
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
 	const struct device *dev;
