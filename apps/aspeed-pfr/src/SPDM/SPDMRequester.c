@@ -16,6 +16,7 @@
 
 #include "intel_pfr/intel_pfr_pfm_manifest.h"
 #include "intel_pfr/intel_pfr_definitions.h"
+#include "pfr/pfr_util.h"
 #include "include/SmbusMailBoxCom.h"
 #include "mctp/mctp_base_protocol.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
@@ -144,7 +145,7 @@ int retrieve_afm_list(void)
 
 		ret = pfr_spi_read(fidx,
 				afm_offset_idx * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET,
-				sizeof(magic_num), &magic_num);
+				sizeof(magic_num), (uint8_t *)&magic_num);
 		if (ret) {
 			LOG_ERR("Failed to read AFM partition [%d] offset [%08x] ret=%d", fidx,
 					afm_offset_idx * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET, ret);
@@ -165,7 +166,7 @@ int retrieve_afm_list(void)
 	return 0;
 }
 
-int read_afm_dev_info(uint8_t dev_idx, const uint8_t *buffer)
+int read_afm_dev_info(uint8_t dev_idx, uint8_t *buffer)
 {
 	int ret;
 	uint8_t flash_id;
@@ -322,9 +323,10 @@ int spdm_attestation_with_session(void *ctx, void *in, struct spdm_session_conte
 				break;
 			} else {
 				possible_measure =
-					(uint8_t *)possible_measure + MEASUREMENT_PAYLOAD_SIZE +
+					(AFM_DEVICE_MEASUREMENT_VALUE_v40 *)((uint8_t *)possible_measure +
+					MEASUREMENT_PAYLOAD_SIZE +
 					possible_measure->ValueSize *
-					possible_measure->PossibleMeasurements;
+					possible_measure->PossibleMeasurements);
 			}
 		} else if (ret == SPDM_MEASUREMENT_RESULT_NOT_FOUND) {
 			/* Measurement not found check next one */
@@ -503,8 +505,14 @@ static int spdm_attest_device(void *ctx, void *in, size_t index, bool create_ses
 					break;
 				} else {
 					possible_measure =
-						(uint8_t *)possible_measure + MEASUREMENT_PAYLOAD_SIZE +
-						possible_measure->ValueSize * possible_measure->PossibleMeasurements;
+#if (CONFIG_AFM_SPEC_VERSION == 4)
+						(AFM_DEVICE_MEASUREMENT_VALUE_v40 *)
+#elif (CONFIG_AFM_SPEC_VERSION == 3)
+						(AFM_DEVICE_MEASUREMENT_VALUE *)
+#endif
+						((uint8_t *)possible_measure +
+						MEASUREMENT_PAYLOAD_SIZE +
+						possible_measure->ValueSize * possible_measure->PossibleMeasurements);
 				}
 			} else if (ret == -1) {
 				/* Measurement not found check next one */
@@ -610,7 +618,7 @@ void spdm_heartbeat_handle(void)
 #endif
 }
 
-void spdm_attestation_handle(size_t device, const uint8_t *buffer,
+void spdm_attestation_handle(size_t device, uint8_t *buffer,
 		uint32_t events, const struct flash_area *afm_flash)
 {
 	int ret;
@@ -658,7 +666,7 @@ void spdm_attestation_handle(size_t device, const uint8_t *buffer,
 			buffer,
 			CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET);
 	snprintf(uuid_buf, sizeof(uuid_buf), "%04x", afm_device->UUID);
-	LOG_INF("Attestation device[%d][%08x] events=%08x",
+	LOG_INF("Attestation device[%d][%08lx] events=%08x",
 			device, afm_list[device], events);
 	LOG_INF("UUID=%s, BusId=%02x, DeviceAddress=%02x, BindingSpec=%02x, Policy=%02x",
 			uuid_buf,
@@ -884,7 +892,7 @@ void spdm_run_attester(void)
 			}
 			if (magic_num == BLOCK0TAG) {
 				afm_list[i] = (i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET) + offset;
-				LOG_INF("Add afm device offset [%08x]", afm_list[i]);
+				LOG_INF("Add afm device offset [%08lx]", afm_list[i]);
 			} else {
 				/* Offset 0x0000 is block0/1 header not AFM device structure,
 				 * so use this value as an empty slot
