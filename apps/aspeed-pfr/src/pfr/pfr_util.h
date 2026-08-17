@@ -33,7 +33,7 @@ int pfr_spi_get_block_size(uint8_t device_id);
 int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t *hash_out,
 	     size_t hash_length);
 
-int verify_signature(struct signature_verification *verification, const uint8_t *digest,
+int verify_signature(const struct signature_verification *verification, const uint8_t *digest,
 		     size_t length, const uint8_t *signature, size_t sig_length);
 
 void pfr_cpld_update_reboot(void);
