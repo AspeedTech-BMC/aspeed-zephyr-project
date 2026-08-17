@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
 extern void aspeed_print_sysrst_info(void);
 
-void main(void)
+int main(void)
 {
 	init_mp_status_gpios();
 
@@ -55,6 +55,8 @@ void main(void)
 	}
 #endif
 #endif
+
+	return 0;
 }
 
 static int do_mp_inject(const struct shell *shell, size_t argc, char **argv)
