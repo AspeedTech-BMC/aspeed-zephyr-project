@@ -130,7 +130,7 @@ cleanup:
 		mbedtls_x509_crt *ca_cert = spdm_get_root_certificate();
 		uint32_t flags;
 		mbedtls_x509_crt local_ca;
-		AFM_DEVICE_STRUCTURE_v40_p2 *pPubkey;
+		AFM_DEVICE_STRUCTURE_v40_p2 *pPubkey = NULL;
 
 		if (context->private_data) {
 			mbedtls_x509_crt_init(&local_ca);
@@ -193,7 +193,7 @@ cleanup:
 		if (ret == 0)
 			ret = mbedtls_x509_crt_verify(remote_cert, ca_cert, NULL, NULL, &flags, NULL, NULL);
 
-		if (context->private_data && pPubkey->CertificateSize)
+		if (pPubkey && pPubkey->CertificateSize)
 			mbedtls_x509_crt_free(ca_cert);
 
 		if (ret < 0 || flags != 0) {
