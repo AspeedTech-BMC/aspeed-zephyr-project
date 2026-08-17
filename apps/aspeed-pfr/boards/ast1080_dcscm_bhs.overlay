@@ -221,7 +221,6 @@
 		active_partition: partition@0 {
 			label = "active";
 			reg = <0x0 0x3C0000>;
-			read-only;
 		};
 
 		state_partition: partition@3c0000 {

@@ -86,7 +86,7 @@ int cmd_channel_mctp_send_packet(struct cmd_channel *channel, struct cmd_packet 
 
 	mctp *mctp_inst = CONTAINER_OF(channel, mctp, mctp_cmd_channel);
 
-	if (mctp_send_msg(mctp_inst, packet) != MCTP_SUCCESS)
+	if (mctp_send_packet(mctp_inst, packet) != MCTP_SUCCESS)
 		return CMD_CHANNEL_TX_FAILED;
 
 	return 0;
@@ -117,4 +117,3 @@ int cmd_channel_mctp_init(struct cmd_channel *channel, int id)
 
 	return 0;
 }
-

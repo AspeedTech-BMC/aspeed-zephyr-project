@@ -67,6 +67,7 @@ add_subdirectory_ifdef(CONFIG_CERBERUS_PFR cerberus_pfr)
 
 # Features
 add_subdirectory_ifdef(CONFIG_PFR_MCTP mctp)
+add_subdirectory_ifdef(CONFIG_PFR_PLDM_FW_UPDATE pldm)
 if(DEFINED CONFIG_PFR_SPDM_ATTESTATION OR DEFINED CONFIG_PFR_SPDM_RESPONDER)
     add_subdirectory(SPDM)
 endif()

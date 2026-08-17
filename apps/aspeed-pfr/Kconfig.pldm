@@ -1,0 +1,47 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config PFR_PLDM_FW_UPDATE
+	bool "PFR PLDM full-flash update through RAM"
+	depends on PFR_MCTP && PFR_MCTP_I3C
+	select PLDM
+	select PLDM_BASE
+	select PLDM_FW_UPDATE
+	help
+	  Receive one complete Caliptra flash-image component into CM4 RAM,
+	  validate its checksums, and replace the active FMC region.  There is
+	  no persistent inactive slot, so loss of power during apply can leave
+	  the active image unusable.
+
+config PFR_PLDM_MAX_IMAGE_SIZE
+	hex "Maximum RAM-staged flash image size"
+	depends on PFR_PLDM_FW_UPDATE
+	default 0x3c0000
+
+config PFR_PLDM_MAX_MESSAGE_SIZE
+	int "Maximum reassembled PLDM message size"
+	depends on PFR_PLDM_FW_UPDATE
+	default 4608
+	range 4096 8192
+
+config PFR_PLDM_INTEGRITY_ONLY_VERIFY
+	bool "UNSAFE: accept FLSH additive-checksum verification"
+	depends on PFR_PLDM_FW_UPDATE
+	help
+	  The AST1080 CM4 MCI currently has no command for Caliptra
+	  FIRMWARE_VERIFY or VERIFY_AUTH_MANIFEST.  Enabling this option allows
+	  apply after FLSH header, TOC, per-image checksum, and readback SHA-384
+	  checks only.  It does not authenticate the signer.
+
+# Compatibility symbols for the reusable PLDM protocol implementation.
+config PLDM
+	bool
+
+config PLDM_BASE
+	bool
+	depends on PLDM
+
+config PLDM_FW_UPDATE
+	bool
+	depends on PLDM
+
