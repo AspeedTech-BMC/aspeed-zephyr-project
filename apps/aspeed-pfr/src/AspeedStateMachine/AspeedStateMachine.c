@@ -61,8 +61,10 @@
 #include "mctp/mctp_i3c.h"
 #endif
 
-#if defined(CONFIG_PFR_SPDM_ATTESTATION)
+#if defined(CONFIG_PFR_SPDM_ATTESTATION) || defined(CONFIG_PFR_SPDM_RESPONDER)
 #include "SPDM/SPDMCommon.h"
+#endif
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 #if defined (CONFIG_INTEL_PFR)
 uint8_t AfmStatus = 0;
 #endif
@@ -856,7 +858,10 @@ void do_verify(void *o)
 		goto exit;
 #endif
 	handle_image_verification(o);
+#if defined(CONFIG_PIT_PROTECTION) || defined(CONFIG_CERBERUS_PFR) || \
+	(defined(CONFIG_BOARD_AST1060_PROT) && defined(CONFIG_INTEL_PFR_CPLD_UPDATE))
 exit:
+#endif
 	LOG_DBG("End");
 }
 
@@ -1293,7 +1298,9 @@ void handle_unprovisioned_checkpoint(void *o)
 
 void handle_checkpoint(void *o)
 {
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 	struct smf_context *state = (struct smf_context *)o;
+#endif
 	struct event_context *evt_ctx = ((struct smf_context *)o)->event_ctx;
 
 	switch (evt_ctx->data.bit8[0]) {
