@@ -14,6 +14,8 @@
 #define MCTP_SUCCESS 0
 #define MCTP_ERROR 1
 
+#define MCTP_MSG_TYPE_PLDM 0x01
+
 #define MCTP_TX_QUEUE_SIZE 16
 #define MCTP_RX_TASK_STACK_SIZE 3072
 #define MCTP_TX_TASK_STACK_SIZE 2048
@@ -38,12 +40,22 @@ typedef struct _mctp_smbus_ext_params {
 	uint8_t addr; /* 7 bit address */
 } mctp_smbus_ext_params;
 
+typedef struct _mctp_i3c_ext_params {
+	uint8_t addr;
+} mctp_i3c_ext_params;
+
 /* mctp extra parameters prototype */
 typedef struct _mctp_ext_params {
+	/* MCTP transport parameters used by PLDM request/response traffic. */
+	uint8_t tag_owner;
+	uint8_t msg_tag;
+	uint8_t ep;
+
 	/* medium parameters */
 	MCTP_MEDIUM_TYPE type;
 	union {
 		mctp_smbus_ext_params smbus_ext_params;
+		mctp_i3c_ext_params i3c_ext_params;
 	};
 } mctp_ext_params;
 
@@ -113,6 +125,12 @@ typedef struct _mctp {
 
 	/* sw mailbox device */
 	const struct device *sw_mbx_dev;
+
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+	/* PLDM requester instance IDs and transport reassembly context. */
+	uint32_t pldm_inst_table;
+	void *pldm_transport;
+#endif
 } mctp;
 
 /* public function */
@@ -133,10 +151,14 @@ uint8_t mctp_start(mctp *mctp_inst);
 uint8_t mctp_stop(mctp *mctp_inst);
 
 /* send/receive message to destination endpoint */
-uint8_t mctp_send_msg(mctp *mctp_inst, struct cmd_packet *packet);
+uint8_t mctp_send_packet(mctp *mctp_inst, struct cmd_packet *packet);
 uint8_t mctp_recv_msg(mctp *mctp_inst, struct cmd_packet *packet);
+
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+uint8_t mctp_send_msg(mctp *mctp_inst, uint8_t *buf, uint16_t len,
+			      mctp_ext_params ext_params);
+#endif
 
 /* medium init/deinit */
 uint8_t mctp_smbus_init(mctp *mctp_inst, mctp_medium_conf medium_conf);
 uint8_t mctp_smbus_deinit(mctp *mctp_inst);
-

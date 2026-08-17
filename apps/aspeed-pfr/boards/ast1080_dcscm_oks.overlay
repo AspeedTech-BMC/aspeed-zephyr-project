@@ -10,13 +10,13 @@
 
 #define AFM_VERSION 4
 
-&cptra_mci_mbox {
-	status = "okay";
-};
-
-&cptra_mci_sha {
-	status = "okay";
-};
+// &cptra_mci_mbox {
+// 	status = "okay";
+// };
+//
+// &cptra_mci_sha {
+// 	status = "okay";
+// };
 
 &i2cfilter {
 	status = "okay";
@@ -193,7 +193,6 @@
 		active_partition: partition@0 {
 			label = "active";
 			reg = <0x0 0x3C0000>;
-			read-only;
 		};
 
 		state_partition: partition@3c0000 {

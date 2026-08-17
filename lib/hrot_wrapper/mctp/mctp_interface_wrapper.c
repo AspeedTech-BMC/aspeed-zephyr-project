@@ -12,6 +12,8 @@
 #include "cmd_interface/cmd_interface_system.h"
 #include "mctp/mctp_base_protocol.h"
 #include "mctp/cmd_interface_mctp_control.h"
+#include "mctp/mctp_control_protocol.h"
+#include "mctp/mctp_control_protocol_commands.h"
 #include "mctp_interface_wrapper.h"
 
 extern int device_manager_update_not_attestable_device_entry (struct device_manager *mgr, int device_num,
@@ -19,6 +21,51 @@ extern int device_manager_update_not_attestable_device_entry (struct device_mana
 #define NOT_USED 0 // currently, pcd_component_index doesn't have any functionality in code, to set it to zero
 
 LOG_MODULE_REGISTER(mctp_interface_wrapper, CONFIG_LOG_DEFAULT_LEVEL);
+
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+#define MCTP_BASE_PROTOCOL_MSG_TYPE_PLDM 0x01
+
+static int (*mctp_control_process_request)(struct cmd_interface *intf,
+	struct cmd_interface_msg *request);
+
+static int pfr_mctp_control_process_request(struct cmd_interface *intf,
+	struct cmd_interface_msg *request)
+{
+	struct mctp_control_protocol_header *header;
+	struct mctp_control_get_message_type_response *response;
+	uint8_t *types;
+	bool get_message_types = false;
+	int status;
+
+	if ((request != NULL) &&
+	    (request->length >= sizeof(struct mctp_control_protocol_header))) {
+		header = (struct mctp_control_protocol_header *)request->data;
+		get_message_types = (header->command_code ==
+			MCTP_CONTROL_PROTOCOL_GET_MESSAGE_TYPE) && header->rq;
+	}
+
+	status = mctp_control_process_request(intf, request);
+	if ((status != 0) || !get_message_types)
+		return status;
+
+	response = (struct mctp_control_get_message_type_response *)request->data;
+	if (response->header.completion_code != MCTP_CONTROL_PROTOCOL_SUCCESS)
+		return status;
+
+	types = mctp_control_get_message_type_response_get_entries(response);
+	types[response->message_type_count++] = MCTP_BASE_PROTOCOL_MSG_TYPE_PLDM;
+	request->length = mctp_control_get_message_type_response_length(
+		response->message_type_count);
+
+	return status;
+}
+
+static void pfr_mctp_enable_pldm_type(struct cmd_interface_mctp_control *control)
+{
+	mctp_control_process_request = control->base.process_request;
+	control->base.process_request = pfr_mctp_control_process_request;
+}
+#endif
 
 /**
  * Helper function to setup the MCTP interface
@@ -61,6 +108,9 @@ int mctp_interface_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uin
 		LOG_ERR("mctp control command interface init failed");
 		goto error_device_mgr;
 	}
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+	pfr_mctp_enable_pldm_type(&mctp_wrapper->cmd_mctp_control);
+#endif
 
 	// TODO: if wants to fully support cerberus system commands,
 	// it should be changed to init cerberus protocol command cmd_interface_system_init.
@@ -133,6 +183,9 @@ int mctp_i3c_wrapper_init(struct mctp_interface_wrapper *mctp_wrapper, uint8_t r
 		LOG_ERR("mctp control command interface init failed");
 		goto error_device_mgr;
 	}
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+	pfr_mctp_enable_pldm_type(&mctp_wrapper->cmd_mctp_control);
+#endif
 
 	mctp_wrapper->cmd_cerberus.process_request = cmd_interface_system_process_request;
 	mctp_wrapper->cmd_cerberus.process_response = cmd_interface_system_process_response;

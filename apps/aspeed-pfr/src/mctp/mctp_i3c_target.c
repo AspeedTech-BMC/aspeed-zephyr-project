@@ -180,6 +180,17 @@ uint8_t mctp_i3c_target_init(mctp *mctp_instance, mctp_medium_conf medium_conf)
 	return MCTP_SUCCESS;
 }
 
+uint8_t mctp_i3c_deinit(mctp *mctp_instance)
+{
+	if (mctp_instance == NULL)
+		return MCTP_ERROR;
+
+	mctp_instance->read_data = NULL;
+	mctp_instance->write_data = NULL;
+	memset(&mctp_instance->medium_conf, 0, sizeof(mctp_instance->medium_conf));
+	return MCTP_SUCCESS;
+}
+
 uint8_t mctp_i3c_target_mctp_stop(void)
 {
 	int i;

@@ -44,6 +44,12 @@ LOG_MODULE_REGISTER(mctp_i3c, LOG_LEVEL_INF);
 #define I3C_3 DEVICE_DT_NAME(DT_NODELABEL(i3c3))
 
 static uint8_t i3c_data_in[256];
+/*
+ * mctp_i3c_read() (RX task) and mctp_i3c_write() (TX task) run on separate
+ * threads and can otherwise submit i3c_transfer() to the same controller
+ * concurrently, desyncing the HCI's transfer-descriptor tracking.
+ */
+static K_MUTEX_DEFINE(mctp_i3c_xfer_lock);
 mctp_i3c mctp_i3c_bmc_inst = {0};
 mctp_i3c mctp_i3c_cpu0_inst = {0};
 mctp_i3c mctp_i3c_cpu1_inst = {0};
@@ -272,7 +278,9 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 		return MCTP_ERROR;
 	}
 
+	LOG_DBG("i3c read: waiting for IBI");
 	mctp_i3c_sem_take(desc);
+	LOG_DBG("i3c read: IBI received, issuing read");
 	memset(i3c_data_in, 0, sizeof(i3c_data_in));
 
 	xfer.flags = I3C_MSG_READ | I3C_MSG_STOP;
@@ -285,7 +293,7 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 	}
 
 	rx_len = mctp_i3c_backend.received_len(&xfer);
-	LOG_DBG("i3c rx len = %zu", rx_len);
+	LOG_DBG("i3c read: got %zu bytes", rx_len);
 	LOG_HEXDUMP_DBG(xfer.buf, rx_len, "i3c read : ");
 	packet->dest_addr = mctp_inst->medium_conf.i3c_conf.addr;
 	packet->pkt_size = rx_len;
@@ -335,7 +343,7 @@ static uint16_t mctp_i3c_write(void *mctp_p, void *msg_p)
 	xfer.flags = I3C_MSG_WRITE | I3C_MSG_STOP;
 	xfer.buf = tx_msg->buf;
 	xfer.len = tx_msg->len;
-	LOG_DBG("write len : %d", xfer.len);
+	LOG_DBG("i3c write: sending %d bytes", xfer.len);
 	LOG_HEXDUMP_DBG(xfer.buf, xfer.len, "i3c write : ");
 	int ret = i3c_transfer(desc, &xfer, 1);
 	if (ret) {

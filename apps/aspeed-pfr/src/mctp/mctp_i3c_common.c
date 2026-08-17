@@ -26,6 +26,9 @@ void mctp_i3c_stop_discovery_notify(struct device_manager *mgr)
 
 	if (status != 0)
 		LOG_ERR("update self device state failed");
+
+	LOG_INF("PFR EID %02x is assigned by bus owner",
+		device_manager_get_device_eid(mgr, DEVICE_MANAGER_SELF_DEVICE_NUM));
 }
 
 int mctp_i3c_send_discovery_notify(mctp *mctp_instance, int *duration)

@@ -10,6 +10,9 @@
 #include <stdlib.h>
 #include "mctp.h"
 #include "mctp_i3c.h"
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+#include "pldm_transport.h"
+#endif
 
 LOG_MODULE_DECLARE(mctp, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -89,9 +92,11 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 		break;
 #if defined(CONFIG_PFR_MCTP_I3C) && \
 	(defined(CONFIG_I3C_ASPEED) || defined(CONFIG_I3C_MIPI_HCI))
+#if !defined(CONFIG_PFR_MCTP_I3C_5_0)
 	case MCTP_MEDIUM_TYPE_I3C:
 		ret = mctp_i3c_init(mctp_inst, medium_conf);
 		break;
+#endif
 #if defined(CONFIG_PFR_MCTP_I3C_5_0)
 	case MCTP_MEDIUM_TYPE_I3C_TARGET:
 		ret = mctp_i3c_target_init(mctp_inst, medium_conf);
@@ -153,8 +158,40 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 
 	LOG_INF("%s start %p", __func__, mctp_inst);
 
-	while (1)
-		cmd_channel_receive_and_process(&mctp_inst->mctp_cmd_channel, &mctp_inst->mctp_wrapper.mctp_interface, -1);
+	while (1) {
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+		struct cmd_packet packet;
+		struct cmd_message *message = NULL;
+		int status;
+
+		status = mctp_inst->mctp_cmd_channel.receive_packet(
+			&mctp_inst->mctp_cmd_channel, &packet, -1);
+		if (status != 0)
+			continue;
+
+		if (packet.state == CMD_OVERFLOW_PACKET) {
+			mctp_inst->mctp_cmd_channel.overflow = true;
+			mctp_interface_reset_message_processing(
+				&mctp_inst->mctp_wrapper.mctp_interface);
+			pldm_transport_reset(mctp_inst);
+			continue;
+		} else if (mctp_inst->mctp_cmd_channel.overflow) {
+			mctp_inst->mctp_cmd_channel.overflow = false;
+			continue;
+		}
+
+		if (pldm_transport_process_packet(mctp_inst, &packet))
+			continue;
+
+		status = mctp_interface_process_packet(
+			&mctp_inst->mctp_wrapper.mctp_interface, &packet, &message);
+		if ((status == 0) && (message != NULL))
+			cmd_channel_send_message(&mctp_inst->mctp_cmd_channel, message);
+#else
+		cmd_channel_receive_and_process(&mctp_inst->mctp_cmd_channel,
+			&mctp_inst->mctp_wrapper.mctp_interface, -1);
+#endif
+	}
 }
 
 /* mctp tx task */
@@ -228,6 +265,9 @@ uint8_t mctp_deinit(mctp *mctp_inst)
 
 	mctp_interface_wrapper_deinit(&mctp_inst->mctp_wrapper);
 
+#if defined(CONFIG_PFR_PLDM_FW_UPDATE)
+	pldm_transport_deinit(mctp_inst);
+#endif
 	free(mctp_inst);
 	return MCTP_SUCCESS;
 }
@@ -338,7 +378,7 @@ error:
 	return MCTP_ERROR;
 }
 
-uint8_t mctp_send_msg(mctp *mctp_inst, struct cmd_packet *packet)
+uint8_t mctp_send_packet(mctp *mctp_inst, struct cmd_packet *packet)
 {
 	if (!mctp_inst || !packet)
 		return MCTP_ERROR;
@@ -363,7 +403,10 @@ uint8_t mctp_send_msg(mctp *mctp_inst, struct cmd_packet *packet)
 	mctp_msg.ext_params.type = mctp_inst->medium_type;
 	mctp_msg.ext_params.smbus_ext_params.addr = packet->dest_addr;
 
-	int ret = k_msgq_put(&mctp_inst->mctp_tx_queue, &mctp_msg, K_NO_WAIT);
+	/* A PLDM response can span many MCTP packets.  Back-pressure the
+	 * producer instead of dropping packets when the TX queue is full.
+	 */
+	int ret = k_msgq_put(&mctp_inst->mctp_tx_queue, &mctp_msg, K_FOREVER);
 
 	if (ret) {
 		LOG_ERR("can't put msgq(%d)", ret);

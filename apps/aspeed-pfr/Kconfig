@@ -290,6 +290,7 @@ config SECURE_LOCK_MODE
 	  loose mode means to block the non-secure connection when provision mode is locked, restrict mode means to block the non-secure connection when provision data is presented
 
 rsource "Kconfig.spdm"
+rsource "Kconfig.pldm"
 rsource "Kconfig.rsu"
 
 config PFR_DEBUG_SHELL
