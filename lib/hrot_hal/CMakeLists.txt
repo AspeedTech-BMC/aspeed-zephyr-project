@@ -49,8 +49,12 @@ if (CONFIG_HROT_HAL)
 
 	zephyr_library_sources_ifdef(CONFIG_CERBERUS_PFR ${HROT_MIDDLEWARE_ROOT}/crypto/rsa_aspeed.c)
 
+	set(CERBERUS_ROOT $ENV{ZEPHYR_BASE}/../middlewares/cerberus)
+
 	zephyr_library_include_directories(
 	    .
+	    ${CERBERUS_ROOT}/core
+	    ${CERBERUS_ROOT}/projects/zephyr
 	    $ENV{ZEPHYR_BASE}/build/zephyr/include/generated/
 	    $ENV{ZEPHYR_BASE}/include/storage/
 	)
