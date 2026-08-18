@@ -76,7 +76,7 @@ static struct usb_dwc3_ctrl ctrl_data[DWC_CRTL_NUM] = {
 	{0xc12c, 0x0c854802},		/* Set DWC3 GUCTL for ref_clk */
 	{0xc630, 0x0c800020},		/* Set DWC3 GLADJ for ref_clk */
 };
-static bool phy_ext_load_quirk = false;
+static bool phy3_ext_load = true;
 
 static int _parse_ports(const char *config_str, uint32_t *ports, int max_ports)
 {
@@ -191,7 +191,7 @@ static int usb_usb3_init(struct ast_chip *chip, enum usb_port port)
 
 	val = sys_read32(phy3_reg + ASPEED_USB_PHY3_S00);
 
-	if (phy_ext_load_quirk)
+	if (phy3_ext_load)
 		val |= USB_PHY3_SRAM_EXT_LOAD;
 	else
 		val |= USB_PHY3_SRAM_BYPASS;
