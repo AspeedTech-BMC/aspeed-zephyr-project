@@ -9,6 +9,10 @@
 #include <zephyr/kernel.h>
 #include <mctp.h>
 
+#define MCTP_IPC_RX_FRAME_SIZE 2048U
+#define MCTP_IPC_RX_FRAME_COUNT 16U
+#define MCTP_IPC_TX_FRAME_COUNT 16U
+
 struct mctp_ipc_hdr {
 	uint32_t msg_len;
 };
