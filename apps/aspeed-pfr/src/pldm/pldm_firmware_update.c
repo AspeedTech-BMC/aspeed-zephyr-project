@@ -126,7 +126,9 @@ uint8_t pldm_fw_update(void *fw_update_param, const int flash_position)
 
 	CHECK_NULL_ARG_WITH_RETURN(p->data, 1);
 
+#if 0
 	uint8_t update_flag = 0;
+#endif
 
 	if (p->data_ofs == 0) {
 		// Set default fw update retry count at first package
@@ -1346,7 +1348,7 @@ uint8_t fill_descriptor_into_buf(struct pldm_descriptor_string *descriptor, uint
 	CHECK_NULL_ARG_WITH_RETURN(buf, PLDM_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(fill_length, PLDM_ERROR);
 
-	char data[2];
+	char data[3];
 	uint8_t val = 0;
 	uint8_t index = 0;
 	uint8_t data_ptr[sizeof(struct pldm_descriptor_tlv) +
@@ -1381,7 +1383,8 @@ uint8_t fill_descriptor_into_buf(struct pldm_descriptor_string *descriptor, uint
 		descriptor_count -= type_length;
 
 		for (index = 0; index < type_length; ++index) {
-			strncpy(data, &descriptor->descriptor_data[index * 2], 2);
+			memcpy(data, &descriptor->descriptor_data[index * 2], 2);
+			data[2] = '\0';
 			val = strtol(data, NULL, 16);
 			tlv_ptr->descriptor_data[index] = val;
 		}

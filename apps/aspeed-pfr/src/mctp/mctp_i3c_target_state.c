@@ -12,6 +12,7 @@
 #include "mctp_i3c.h"
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 
 #if defined(CONFIG_PFR_SPDM_ATTESTATION)
 #include "SPDM/SPDMRequester.h"
