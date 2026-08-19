@@ -14,6 +14,7 @@
 #include "cmd_channel_mctp.h"
 #include "gpio/gpio_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
+#include "AspeedStateMachine/AspeedStateMachine.h"
 
 LOG_MODULE_REGISTER(mctp_i3c_target);
 
