@@ -9,6 +9,7 @@
 #include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/ipm.h>
+#include <zephyr/drivers/ipm_ast.h>
 
 #include <zephyr/shell/shell.h>
 
@@ -17,35 +18,51 @@
 
 LOG_MODULE_REGISTER(ipm_app, LOG_LEVEL_INF);
 
-// TODO: Move to device tree
-uint8_t *tx_mmio = (uint8_t *)0x5580000; // TX to PSP 431280000
-uint8_t *rx_mmio = (uint8_t *)0x5480000; // RX from PSP 431080000
+#define IPM_MCTP_CHANNEL 0
 
 static void ipm_cb(const struct device *ipmdev, void *user_data,
 		uint32_t id, volatile void *data)
 {
-	// int max_data_size = ipm_max_data_size_get(ipmdev);
 	struct mctp_ipc_hdr *ipc_hdr = (struct mctp_ipc_hdr *)data;
+	void *hdr_ptr;
+	int ret;
+	mctp_ipc_packet pkt = {0};
 
 	LOG_DBG("IN dev %s msg id %x, msg hdr = %08x len = %d", ipmdev->name, id, *(uint32_t *)data, ipc_hdr->msg_len);
 
-	mctp_ipc_packet pkt = {0};
+	if (ipc_hdr->msg_len <= sizeof(mctp_hdr)) {
+		LOG_ERR("Invalid RX frame length %u", ipc_hdr->msg_len);
+		return;
+	}
+
 	memcpy(&pkt.ipc_hdr, (void *)data, sizeof(pkt.ipc_hdr));
-	memcpy(&pkt.hdr, rx_mmio, sizeof(pkt.hdr));
-	pkt.buf = rx_mmio + sizeof(pkt.hdr);
+
+	ret = ast_ipm_shmem_read(ipmdev, IPM_MCTP_CHANNEL, 0, &hdr_ptr, sizeof(pkt.hdr));
+	if (ret < 0) {
+		LOG_ERR("ast_ipm_shmem_read header failed, ret=%d", ret);
+		return;
+	}
+	memcpy(&pkt.hdr, hdr_ptr, sizeof(pkt.hdr));
+
+	ret = ast_ipm_shmem_read(ipmdev, IPM_MCTP_CHANNEL, sizeof(pkt.hdr), (void **)&pkt.buf,
+				 ipc_hdr->msg_len - sizeof(pkt.hdr));
+	if (ret < 0) {
+		LOG_ERR("ast_ipm_shmem_read payload failed, ret=%d", ret);
+		return;
+	}
 
 	LOG_HEXDUMP_DBG(&pkt.ipc_hdr, sizeof(pkt.ipc_hdr), "IPC RECV HEADER");
 	LOG_HEXDUMP_DBG(&pkt.hdr, sizeof(pkt.hdr), "MCTP RECV HEADER");
-	
-	int ret = mctp_ipc_send_raw(&pkt);
-	if (ret != 0) {
+
+	ret = mctp_ipc_send_raw(&pkt);
+	if (ret != 0)
 		LOG_ERR("mctp_ipc_send_raw failed, ret=%d", ret);
-	}
 }
 
 void ipm_mctp_main(void *a, void *b, void *c)
 {
 	const struct device *ipmdev = device_get_binding("ipc0@200");
+
 	if (!ipmdev) {
 		LOG_ERR("Failed to get binding for ipc0@200");
 		return;
@@ -70,16 +87,29 @@ void ipm_mctp_main(void *a, void *b, void *c)
 			payload_len = pkt.ipc_hdr.msg_len - sizeof(pkt.hdr);
 			LOG_DBG("OUT dev %s msg len %x", ipmdev->name,
 				pkt.ipc_hdr.msg_len);
-			memcpy((void *)tx_mmio, &pkt.hdr, sizeof(pkt.hdr));
-			memcpy((void *)(tx_mmio + sizeof(pkt.hdr)), pkt.buf, payload_len);
+			ret = ast_ipm_shmem_write(ipmdev, IPM_MCTP_CHANNEL, 0,
+						  &pkt.hdr, sizeof(pkt.hdr));
+			if (ret < 0) {
+				LOG_ERR("ast_ipm_shmem_write header failed, ret=%d", ret);
+				free(pkt.buf);
+				pkt.buf = NULL;
+				continue;
+			}
+			ret = ast_ipm_shmem_write(ipmdev, IPM_MCTP_CHANNEL, sizeof(pkt.hdr),
+						  pkt.buf, payload_len);
+			if (ret < 0) {
+				LOG_ERR("ast_ipm_shmem_write payload failed, ret=%d", ret);
+				free(pkt.buf);
+				pkt.buf = NULL;
+				continue;
+			}
 			send_len = sizeof(pkt.ipc_hdr);
 			LOG_HEXDUMP_DBG(&pkt.ipc_hdr, sizeof(pkt.ipc_hdr),
 					"IPC SEND HEADER");
 			LOG_HEXDUMP_DBG(&pkt.hdr, sizeof(pkt.hdr), "MCTP SEND HEADER");
 			ret = ipm_send(ipmdev, 1, 0, &pkt, send_len);
-			if (ret != 0) {
+			if (ret != 0)
 				LOG_ERR("MCTP IPC response send failed, ret=%d", ret);
-			}
 
 			/* ipm_send() is synchronous when wait is nonzero. */
 			free(pkt.buf);
@@ -90,7 +120,7 @@ void ipm_mctp_main(void *a, void *b, void *c)
 
 K_THREAD_DEFINE(ipm_mctp_tid, 1024, ipm_mctp_main, NULL, NULL, NULL, 5, 0, 0);
 
-int ipm_init()
+int ipm_init(void)
 {
 	int rc = 0;
 	const struct device *ipmdev;
