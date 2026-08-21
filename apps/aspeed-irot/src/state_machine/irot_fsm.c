@@ -32,32 +32,6 @@ struct irot_state_obj {
 	enum IROT_EVENT current_event;
 };
 
-/* Init State */
-static void test_ipm_cb(const struct device *dev, void *user_data,
-		uint32_t id, volatile void *data)
-{
-	ARG_UNUSED(dev);
-	ARG_UNUSED(id);
-	ARG_UNUSED(data);
-
-	LOG_DBG("Received IPC message with id: %d", id);
-}
-
-static void ca35_ns_ipc_enable(void)
-{
-	const struct device *ipmdev = device_get_binding("ipc0@200");
-	int ret, device_id = 0;
-
-	if (!ipmdev) {
-		LOG_ERR("Failed to get IPC device binding");
-		return;
-	}
-
-	ipm_register_id_callback(ipmdev, device_id, test_ipm_cb, NULL);
-	ret = ipm_set_id_enabled(ipmdev, device_id, true);
-
-}
-
 static void do_init_entry(void *state)
 {
 	struct irot_state_obj *state_obj = (struct irot_state_obj *)state;

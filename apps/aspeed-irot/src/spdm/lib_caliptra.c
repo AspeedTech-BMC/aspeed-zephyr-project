@@ -17,6 +17,7 @@
 #include "hal/library/responder/setcertlib.h"
 #include "hal/library/requester/reqasymsignlib.h"
 #include "hal/library/requester/psklib.h"
+#include "library/spdm_crypt_lib.h"
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>

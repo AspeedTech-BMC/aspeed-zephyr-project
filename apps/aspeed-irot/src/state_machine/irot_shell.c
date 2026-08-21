@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <stdlib.h>
+
 #include <state_machine/irot_fsm.h>
 #include <zephyr/shell/shell.h>
 
@@ -62,7 +64,7 @@ static int cmd_irot_flash_read(const struct shell *shell, size_t argc, char **ar
 	const struct device *dev = device_get_binding(argv[1]);
 	uint32_t offset = strtoul(argv[2], NULL, 0);
 	uint32_t size = strtoul(argv[3], NULL, 0);
-	void *buffer = strtoul(argv[4], NULL, 0);
+	void *buffer = (void *)strtoul(argv[4], NULL, 0);
 	
 	shell_print(shell, "Device: %s, Offset: %u, Size: %u", dev->name, offset, size);
 

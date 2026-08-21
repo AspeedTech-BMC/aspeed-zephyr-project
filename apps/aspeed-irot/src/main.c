@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <stdlib.h>
+
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -17,13 +19,6 @@ int main() {
 	irot_send_event(START_STATE_MACHINE, NULL);
 
 	return 0;
-}
-
-#define DEBUG_HALT() { \
-	volatile int halt = 1; \
-	while (halt) { \
-		__asm__ volatile ("nop"); \
-	} \
 }
 
 static int jtag_init(void)
