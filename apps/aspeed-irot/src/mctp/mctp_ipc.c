@@ -182,7 +182,7 @@ int mctp_ipc_send_recv(mctp_ipc_packet *pkt)
 	
 	mctp_ipc_packet pkt2;
 
-	int ret = mctp_ipc_send(&pkt2);
+	int ret = mctp_ipc_recv(&pkt2);
 
 	LOG_INF("ipc_msgq_tx ret=%d", ret);
 	LOG_HEXDUMP_DBG(&pkt2.hdr, pkt2.ipc_hdr.msg_len, "mctp_ipc responese");

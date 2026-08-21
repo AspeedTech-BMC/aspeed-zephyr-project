@@ -243,7 +243,7 @@ err:
 		LOG_ERR("Only %u images verified ret %d", image_verified, ret);
 	}
 
-	if (!noncache_ddr) {
+	if (noncache_ddr) {
 		shared_multi_heap_free(noncache_ddr);
 	}
 
