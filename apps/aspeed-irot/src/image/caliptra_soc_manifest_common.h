@@ -126,7 +126,7 @@ struct cptra_load_image {
 	uintptr_t load_addr;
 };
 
-static struct cptra_load_image cptra_image_list[] = {
+static struct cptra_load_image cptra_image_list[] __maybe_unused = {
 	{ "manifest", CPTRA_SOC_MANIFEST_HDR_ID, CPTRA_MANIFEST_FW_ID, CPTRA_NO_LOAD_ADDR},
 	{ "mcu_fmc", CPTRA_FMC_HDR_ID, CPTRA_FMC_FW_ID, CPTRA_NO_LOAD_ADDR},
 	{ "ddr4_imem", CPTRA_DDR4_IMEM_HDR_ID, CPTRA_DDR4_IMEM_FW_ID, CPTRA_NO_LOAD_ADDR},

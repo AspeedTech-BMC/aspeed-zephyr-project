@@ -1,6 +1,7 @@
 
 #define DT_DRV_COMPAT manifest_caliptra
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include <zephyr/drivers/flash.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/multi_heap/shared_multi_heap.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <image/firmware_manifest.h>
 #include <image/caliptra_soc_manifest.h>
@@ -22,13 +24,17 @@ LOG_MODULE_REGISTER(cptra_soc_manifest, LOG_LEVEL_DBG);
 
 struct firmware_manifest_handler cptra_soc_manifest_handler;
 
-static void le_to_be32(uint32_t *data, size_t len) {
+static void le_to_be32(uint8_t *data, size_t len)
+{
 	for (size_t i = 0; i < len; i++) {
-		data[i] = __builtin_bswap32(data[i]);
+		uint32_t word = sys_get_le32(data + i * sizeof(word));
+
+		sys_put_be32(word, data + i * sizeof(word));
 	}
 }
 
-static void cptra_key_reform(const struct cptra_soc_manifest_preamble_v2 *preamble) {
+static void cptra_key_reform(const struct cptra_soc_manifest_preamble_v2 *preamble)
+{
 	// Caliptra keys and signatures are stored in little-endian format u32 arrays
 	
 	/* caliptra-sw/image/types/src/lib.rs:
@@ -42,18 +48,18 @@ static void cptra_key_reform(const struct cptra_soc_manifest_preamble_v2 *preamb
 	 * */
 
 	// Reform the owner ECC public key and signature to big-endian
-	le_to_be32((uint32_t*)preamble->vendor_ecc_pub_key.x, sizeof(preamble->vendor_ecc_pub_key.x) / 4);
-	le_to_be32((uint32_t*)preamble->vendor_ecc_pub_key.y, sizeof(preamble->vendor_ecc_pub_key.y) / 4);
-	le_to_be32((uint32_t*)preamble->vendor_ecc_signature.r, sizeof(preamble->vendor_ecc_signature.r) / 4);
-	le_to_be32((uint32_t*)preamble->vendor_ecc_signature.s, sizeof(preamble->vendor_ecc_signature.s) / 4);
-	le_to_be32((uint32_t*)preamble->owner_ecc_pub_key.x, sizeof(preamble->owner_ecc_pub_key.x) / 4);
-	le_to_be32((uint32_t*)preamble->owner_ecc_pub_key.y, sizeof(preamble->owner_ecc_pub_key.y) / 4);
-	le_to_be32((uint32_t*)preamble->owner_ecc_signature.r, sizeof(preamble->owner_ecc_signature.r) / 4);
-	le_to_be32((uint32_t*)preamble->owner_ecc_signature.s, sizeof(preamble->owner_ecc_signature.s) / 4);
-	le_to_be32((uint32_t*)preamble->imc_vendor_ecc_signature.r, sizeof(preamble->imc_vendor_ecc_signature.r) / 4);
-	le_to_be32((uint32_t*)preamble->imc_vendor_ecc_signature.s, sizeof(preamble->imc_vendor_ecc_signature.s) / 4);
-	le_to_be32((uint32_t*)preamble->imc_owner_ecc_signature.r, sizeof(preamble->imc_owner_ecc_signature.r) / 4);
-	le_to_be32((uint32_t*)preamble->imc_owner_ecc_signature.s, sizeof(preamble->imc_owner_ecc_signature.s) / 4);
+	le_to_be32((uint8_t *)preamble->vendor_ecc_pub_key.x, sizeof(preamble->vendor_ecc_pub_key.x) / 4);
+	le_to_be32((uint8_t *)preamble->vendor_ecc_pub_key.y, sizeof(preamble->vendor_ecc_pub_key.y) / 4);
+	le_to_be32((uint8_t *)preamble->vendor_ecc_signature.r, sizeof(preamble->vendor_ecc_signature.r) / 4);
+	le_to_be32((uint8_t *)preamble->vendor_ecc_signature.s, sizeof(preamble->vendor_ecc_signature.s) / 4);
+	le_to_be32((uint8_t *)preamble->owner_ecc_pub_key.x, sizeof(preamble->owner_ecc_pub_key.x) / 4);
+	le_to_be32((uint8_t *)preamble->owner_ecc_pub_key.y, sizeof(preamble->owner_ecc_pub_key.y) / 4);
+	le_to_be32((uint8_t *)preamble->owner_ecc_signature.r, sizeof(preamble->owner_ecc_signature.r) / 4);
+	le_to_be32((uint8_t *)preamble->owner_ecc_signature.s, sizeof(preamble->owner_ecc_signature.s) / 4);
+	le_to_be32((uint8_t *)preamble->imc_vendor_ecc_signature.r, sizeof(preamble->imc_vendor_ecc_signature.r) / 4);
+	le_to_be32((uint8_t *)preamble->imc_vendor_ecc_signature.s, sizeof(preamble->imc_vendor_ecc_signature.s) / 4);
+	le_to_be32((uint8_t *)preamble->imc_owner_ecc_signature.r, sizeof(preamble->imc_owner_ecc_signature.r) / 4);
+	le_to_be32((uint8_t *)preamble->imc_owner_ecc_signature.s, sizeof(preamble->imc_owner_ecc_signature.s) / 4);
 }
 
 int cptra_verify_manifest_signature(struct cptra_soc_manifest_preamble_v2 *preamble, struct cptra_image_metadata_collection *imc) 
@@ -69,7 +75,8 @@ int cptra_verify_manifest_signature(struct cptra_soc_manifest_preamble_v2 *pream
 	/* Verify Magic Number */
 	if (preamble->marker != CPTRA_MANIFEST_MARKER) {
 		LOG_ERR("Invalid manifest marker: 0x%08x", preamble->marker);
-		LOG_HEXDUMP_ERR(preamble, sizeof(struct cptra_soc_manifest_preamble_v2), "Preamble Dump");
+		LOG_HEXDUMP_ERR(preamble, offsetof(struct cptra_soc_manifest_preamble_v2, vendor_ecc_pub_key),
+				"Preamble Header Dump");
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -244,7 +251,7 @@ err:
 	}
 
 	if (noncache_ddr) {
-		shared_multi_heap_free(noncache_ddr);
+		shared_multi_heap_free((void *)noncache_ddr);
 	}
 
 	// Preamble verifed

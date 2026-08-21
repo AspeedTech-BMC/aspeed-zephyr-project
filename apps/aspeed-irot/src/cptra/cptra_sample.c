@@ -489,7 +489,7 @@ static int cptra_test_get_idevid_csr(void)
 {
 	uint8_t csr[IDEVID_CSR_SIZE];
 
-	memcpy(csr, (volatile uint8_t *)IDEVID_CSR_BASE + IDEVID_CSR_OFFSET, IDEVID_CSR_SIZE);
+	memcpy(csr, (uint8_t *)IDEVID_CSR_BASE + IDEVID_CSR_OFFSET, IDEVID_CSR_SIZE);
 
 	LOG_HEXDUMP_INF(csr, IDEVID_CSR_SIZE, "IDEVID CSR:");
 
