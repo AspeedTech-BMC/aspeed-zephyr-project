@@ -1270,7 +1270,7 @@ void sdramc_reset(struct sdramc *sdramc)
 #define MPLL_CLKNR_MASK		GENMASK(18, 13)
 #define MPLL_CLKNF_MASK		GENMASK(12, 0)
 
-#define MPLL_1600_nf300_nrb_od0
+#define MPLL_1600
 
 #if defined(MPLL_1600)
 #define MPLL_OD	1
