@@ -116,22 +116,6 @@
 	};
 };
 
-&i2c4 {
-	status = "okay";
-};
-
-&i2c5 {
-	status = "okay";
-};
-
-&i2c6 {
-	status = "okay";
-};
-
-&i2c7 {
-	status = "okay";
-};
-
 // &i3c0 {
 // 	status = "okay";
 // 	sda-tx-hold-ns = <20>;
