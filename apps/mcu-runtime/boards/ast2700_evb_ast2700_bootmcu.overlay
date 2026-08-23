@@ -115,3 +115,8 @@
 	spi-max-buswidth = <1>;
 	spi-max-frequency = <25000000>;
 };
+
+/* boot watchdog, enabled by the mcu-runtime and never fed */
+&wdt0 {
+	status = "okay";
+};
