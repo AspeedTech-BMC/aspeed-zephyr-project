@@ -14,6 +14,7 @@
 #include <soc.h>
 #include <platform.h>
 #include <chip.h>
+#include <wdt.h>
 
 #include "aspeed_zephyr_project_version.h"
 
@@ -24,6 +25,13 @@ int main(void)
 	struct ast_chip *chip = NULL;
 	struct ast_board *board = NULL;
 	int err;
+
+	/*
+	 * Boot watchdog: it is never fed at mcu-runtime stage, so the SoC
+	 * is reset once the timeout expires unless the booted image
+	 * disables or takes over wdt0 at u-boot or Linux stage.
+	 */
+	boot_wdt_enable();
 
 	printf("Aspeed SoC FMC %s %s (%s)\n", CONFIG_BOARD_TARGET, \
 		ASPEED_ZEPHYR_PROJECT_VERSION, ASPEED_ZEPHYR_PROJECT_BUILD_TIMESTAMP);

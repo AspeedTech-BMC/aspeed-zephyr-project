@@ -32,6 +32,7 @@
 #define WDT_ENABLE		BIT(0)
 
 int wdt_init(struct ast_chip *chip);
+void boot_wdt_enable(void);
 int wdt_config_reset(struct ast_chip *chip, uint32_t mask_idx,
 		     uint32_t mask, uint32_t value);
 #endif

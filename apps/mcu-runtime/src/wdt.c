@@ -6,12 +6,21 @@
 #include <platform.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/watchdog.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <scu.h>
 #include <wdt.h>
+
+LOG_MODULE_REGISTER(ast_wdt, CONFIG_SOC_FMC_LOG_LEVEL);
 
 #define WDT_MASK_REG_COUNT	5
 #define WDT_COUNT		9
 #define WDT_INSTANCE_SIZE	0x80
+
+#define WDT_BOOT_NODE		DT_NODELABEL(wdt0)
+#define WDT_BOOT_TIMEOUT_MS	30000
 
 static void wdt_writel(uint32_t val, uint32_t addr)
 {
@@ -76,3 +85,54 @@ int wdt_config_reset(struct ast_chip *chip, uint32_t mask_idx,
 
 	return 0;
 }
+
+#if DT_NODE_HAS_STATUS(WDT_BOOT_NODE, okay)
+void boot_wdt_enable(void)
+{
+	const struct device *wdt_dev = DEVICE_DT_GET(WDT_BOOT_NODE);
+	const struct wdt_timeout_cfg wdt_cfg = {
+		.window.min = 0,
+		.window.max = WDT_BOOT_TIMEOUT_MS,
+		.callback = NULL,
+		.flags = WDT_FLAG_RESET_CPU_CORE,
+	};
+	int err;
+
+	/*
+	 * WDTA is the ABR watchdog. If a previous stage already started it,
+	 * leave the boot watchdog alone so that the two do not race to reset
+	 * the SoC.
+	 */
+	if (sys_read32(WDTA_REG + WDT_CTRL) & WDT_ENABLE) {
+		LOG_DBG("WDTA is enabled, skip the boot WDT");
+		return;
+	}
+
+	/*
+	 * Recovery mode waits for an image over USB/I2C/I3C/UART, which can
+	 * take arbitrarily long, so leave the boot watchdog off as well.
+	 */
+	if (sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_EN_RECOVERY_BOOT) {
+		LOG_DBG("Recovery mode is enabled, skip the boot WDT");
+		return;
+	}
+
+	if (!device_is_ready(wdt_dev)) {
+		LOG_ERR("Boot WDT device is not ready");
+		return;
+	}
+
+	err = wdt_install_timeout(wdt_dev, &wdt_cfg);
+	if (err) {
+		LOG_ERR("Failed to install boot WDT timeout, err=%d", err);
+		return;
+	}
+
+	err = wdt_setup(wdt_dev, wdt_cfg.flags);
+	if (err)
+		LOG_ERR("Failed to start boot WDT, err=%d", err);
+}
+#else
+/* No WDT instance available on this board */
+void boot_wdt_enable(void) { }
+#endif
