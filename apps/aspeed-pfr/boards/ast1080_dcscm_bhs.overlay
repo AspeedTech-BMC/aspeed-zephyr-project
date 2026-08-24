@@ -274,6 +274,7 @@
 &sgpiom0 {
 	status = "okay";
 	ngpios = <72>;
+	aspeed,bus-freq = <1000000>;
 
 	sgpiom0_0_31 {
 		status = "okay";
