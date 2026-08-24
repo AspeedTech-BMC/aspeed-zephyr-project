@@ -37,29 +37,29 @@
 &spim1 {
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	status = "okay";
+	pinctrl-0 = <pinctrl_spif0_default>;
 };
 
 &spim2 {
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	status = "okay";
+	pinctrl-0 = <pinctrl_spif1_default>;
 };
 
 &spim3 {
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	status = "okay";
+	pinctrl-0 = <pinctrl_spif2_default>;
 };
 
 &spi0 {
 	status = "okay";
 	cs-group-analog-mux-enable;
+	/* Pins shared with SPI monitor (spim1/spim2), so leave empty here. */
+	pinctrl-0 = <>;
 };
 
 &spi0_cs0 {
-	spi-monitor-ctrl = <&spim1>;
-	status = "okay";
-};
-
-&spi0_cs1 {
 	spi-monitor-ctrl = <&spim1>;
 	status = "okay";
 };
@@ -69,21 +69,13 @@
 	status = "okay";
 };
 
-&spi0_cs3 {
-	spi-monitor-ctrl = <&spim2>;
-	status = "okay";
-};
-
 &spi1 {
 	status = "okay";
+	/* Pins shared with SPI monitor (spim3), so leave empty here. */
+	pinctrl-0 = <>;
 };
 
 &spi1_cs0 {
-	spi-monitor-ctrl = <&spim3>;
-	status = "okay";
-};
-
-&spi1_cs1 {
 	spi-monitor-ctrl = <&spim3>;
 	status = "okay";
 };
