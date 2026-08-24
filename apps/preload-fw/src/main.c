@@ -44,15 +44,13 @@ int main(void)
 #else
 #if defined(CONFIG_ASPEED_DICE)
 	PROV_STATUS ret;
-	BMCBootHold();
-	PCHBootHold();
 
 	ret = cert_provision();
 
-	if (ret == PROV_ROT_UPDATE) {
-		BMCBootRelease();
-		PCHBootRelease();
+	if (ret) {
+		LOG_ERR("DICE provisioning failed");
 	}
+
 #endif
 #endif
 
