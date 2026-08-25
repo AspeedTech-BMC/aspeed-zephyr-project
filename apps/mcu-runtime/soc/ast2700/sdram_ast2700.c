@@ -1324,6 +1324,14 @@ void sdramc_reset(struct sdramc *sdramc)
 #define MPLL_OD	1
 #define MPLL_NR 0xc
 #define MPLL_NF (0x300ULL)
+#elif defined(MPLL_1600_nr16_od0)
+#define MPLL_OD	1
+#define MPLL_NR 16
+#define MPLL_NF (0x400ULL)	/* 1024 = 64 * 16, Fout = 25M*1024/16 = 1600MHz */
+#elif defined(MPLL_1600_nr64_od0)
+#define MPLL_OD	1
+#define MPLL_NR 64
+#define MPLL_NF (0x1000ULL)	/* 4096 = 64 * 64, SCU0_310[23:0]=0x07F000, Fout = 25M*4096/64 = 1600MHz */
 #elif defined(MPLL_1500)
 #define MPLL_OD	1
 #define MPLL_NR 1
