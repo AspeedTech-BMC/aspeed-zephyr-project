@@ -4,7 +4,7 @@
 
 # Note: This file should be placed to BSP after SLI move to driver layer
 
-if BOARD_AST2755_EVB
+if BOARD_AST2705_EVB
 config SLI_AST2700
 	bool "Enable AST2700 IO-die SLI calibration"
 	depends on SOC_AST2700_BOOTMCU
