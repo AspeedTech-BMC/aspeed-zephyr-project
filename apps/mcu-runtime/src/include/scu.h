@@ -8,7 +8,7 @@
 
 #if defined(CONFIG_SOC_AST1040_BOOTMCU)
 #include <scu_ast1040.h>
-#elif defined(CONFIG_SOC_AST2700_BOOTMCU)
+#elif defined(CONFIG_SOC_AST2700_BOOTMCU) || defined(CONFIG_SOC_AST2705_BOOTMCU)
 #include <scu_ast2700.h>
 #else
 #error "Unsupported SoC"	

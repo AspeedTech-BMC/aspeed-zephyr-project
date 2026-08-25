@@ -6,7 +6,7 @@
 #ifndef _ASPEED_PLATFORM_H_
 #define _ASPEED_PLATFORM_H_
 
-#if defined(CONFIG_SOC_AST2700_BOOTMCU)
+#if defined(CONFIG_SOC_AST2700_BOOTMCU) || defined(CONFIG_SOC_AST2705_BOOTMCU)
 #include <platform_ast2700.h>
 #elif defined(CONFIG_SOC_AST1040_BOOTMCU)
 #include <platform_ast1040.h>
