@@ -116,6 +116,13 @@
 	spi-max-frequency = <25000000>;
 };
 
+&pin_fwspics0  { drive-strength = <2>; };
+&pin_fwspiclk  { drive-strength = <2>; };
+&pin_fwspimosi { drive-strength = <2>; };
+&pin_fwspimiso { drive-strength = <2>; };
+&pin_fwspidq2  { drive-strength = <2>; };
+&pin_fwspidq3  { drive-strength = <2>; };
+
 /* boot watchdog, enabled by the mcu-runtime and never fed */
 &wdt0 {
 	status = "okay";
