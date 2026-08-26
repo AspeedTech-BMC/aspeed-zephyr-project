@@ -54,12 +54,8 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	vbios_mem_base = (uintptr_t)(vbios_base);
 	LOG_DBG("vbios_mem_base : 0x%x", vbios_mem_base);
 
-	/* Initial memory region and copy vbios into it */
-	/* If the memory region would not be loaded before */
-	if (*(uint16_t *)vbios_mem_base != BIOS_HEADER_TAG) {
-		memset((uint32_t *)vbios_base, 0x0, 0x10000);
-		ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0, true);
-	}
+	memset((uint32_t *)vbios_base, 0x0, 0x10000);
+	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0, true);
 
 	/* Remove riscv Dram base */
 	vbios_mem_base &= ~(ASPEED_DRAM_BASE);
