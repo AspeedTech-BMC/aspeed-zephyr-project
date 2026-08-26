@@ -95,6 +95,13 @@
 	spi-max-frequency = <25000000>;
 };
 
+&pin_fwspics0  { drive-strength = <2>; };
+&pin_fwspiclk  { drive-strength = <2>; };
+&pin_fwspimosi { drive-strength = <2>; };
+&pin_fwspimiso { drive-strength = <2>; };
+&pin_fwspidq2  { drive-strength = <2>; };
+&pin_fwspidq3  { drive-strength = <2>; };
+
 &spi0 {
 	status = "okay";
 	timing-calibration-disabled;
@@ -106,6 +113,13 @@
 	spi-max-buswidth = <4>;
 	spi-max-frequency = <25000000>;
 };
+
+&pin_spi0ck   { drive-strength = <2>; };
+&pin_spi0mosi { drive-strength = <2>; };
+&pin_spi0miso { drive-strength = <2>; };
+&pin_spi0dq2  { drive-strength = <2>; };
+&pin_spi0dq3  { drive-strength = <2>; };
+&pin_spi0cs1  { drive-strength = <2>; };
 
 &usb1 {
 	usb-function = "XHCI_VHUB";
