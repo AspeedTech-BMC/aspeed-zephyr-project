@@ -102,7 +102,7 @@ uint8_t mctp_ipc_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
 
-	mctp_inst->max_msg_size = 32768;
+	mctp_inst->max_msg_size = 2048 * 2;
 	mctp_inst->medium_conf = medium_conf;
 	mctp_inst->read_data = mctp_ipc_read;
 	mctp_inst->write_data = mctp_ipc_write;

@@ -4,4 +4,5 @@
 rsource "Kconfig.cptra"
 rsource "Kconfig.spdm"
 rsource "Kconfig.pldm"
+rsource "Kconfig.composite_eat"
 source "Kconfig.zephyr"

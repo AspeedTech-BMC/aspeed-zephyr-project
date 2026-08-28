@@ -1,0 +1,13 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config COMPOSITE_EAT
+	bool "Composite EAT"
+	select BMC_COMPOSITE_EAT_SDK
+	default n
+	help
+	  Enable Composite EAT (Entity Attestation Token) generation. The iRoT
+	  acts as the Lead Attester: it collects local evidence from Caliptra,
+	  builds the signed main token with the BMC Composite EAT SDK, and
+	  serves it over MCTP VDM-PCI. Disabling this drops the token builder,
+	  the evidence and attestation providers, and the VDM-PCI message type.

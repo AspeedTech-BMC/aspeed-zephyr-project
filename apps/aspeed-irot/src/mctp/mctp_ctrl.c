@@ -109,7 +109,7 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 
 	p->eid = plat_get_eid();
 	p->eid_type = STATIC_EID;
-	p->endpoint_type = BRIDGE;
+	p->endpoint_type = SIMPLE_ENDPOINT;
 	/* Not support fairness arbitration */
 	p->medium_specific_info = 0x00;
 
@@ -119,6 +119,29 @@ uint8_t mctp_ctrl_cmd_get_endpoint_id(void *mctp_inst, uint8_t *buf, uint16_t le
 
 	return MCTP_SUCCESS;
 }
+
+uint8_t mctp_ctrl_cmd_get_endpoint_uuid(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t *resp,
+				      uint16_t *resp_len, void *ext_params)
+{
+	ARG_UNUSED(ext_params);
+	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(buf, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp, MCTP_ERROR);
+	CHECK_NULL_ARG_WITH_RETURN(resp_len, MCTP_ERROR);
+
+	struct _get_uuid_resp *p = (struct _get_eid_resp *)resp;
+
+	for (size_t i=0; i<16; ++i) {
+		p->uuid[i] = i;
+	}
+
+	p->completion_code = (len != 0) ? MCTP_CTRL_CC_ERROR_INVALID_LENGTH : MCTP_CTRL_CC_SUCCESS;
+
+	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? sizeof(*p) : 1;
+
+	return MCTP_SUCCESS;
+}
+
 
 uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, uint16_t len,
 					       uint8_t *resp, uint16_t *resp_len, void *ext_params)
@@ -251,6 +274,7 @@ static uint8_t mctp_ctrl_cmd_resp_process(mctp *mctp_inst, uint8_t *buf, uint32_
 static mctp_ctrl_cmd_handler_t mctp_ctrl_cmd_tbl[] = {
 	{ MCTP_CTRL_CMD_SET_ENDPOINT_ID, mctp_ctrl_cmd_set_endpoint_id },
 	{ MCTP_CTRL_CMD_GET_ENDPOINT_ID, mctp_ctrl_cmd_get_endpoint_id },
+	{ MCTP_CTRL_CMD_GET_ENDPOINT_UUID, mctp_ctrl_cmd_get_endpoint_uuid },
 	{ MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT, mctp_ctrl_cmd_get_message_type_support }
 };
 

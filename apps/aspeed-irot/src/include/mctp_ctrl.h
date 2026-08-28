@@ -36,6 +36,7 @@ typedef struct _mctp_ctrl_cmd_handler {
 
 #define MCTP_CTRL_CMD_SET_ENDPOINT_ID 0x01
 #define MCTP_CTRL_CMD_GET_ENDPOINT_ID 0x02
+#define MCTP_CTRL_CMD_GET_ENDPOINT_UUID 0x03
 
 #define MCTP_CTRL_CMD_GET_MESSAGE_TYPE_SUPPORT 0x05
 
@@ -106,6 +107,11 @@ struct _get_eid_resp {
 	uint8_t endpoint_type : 2;
 	uint8_t : 2;
 	uint8_t medium_specific_info;
+} __attribute__((packed));
+
+struct _get_uuid_resp {
+	uint8_t completion_code;
+	uint8_t uuid[16];
 } __attribute__((packed));
 
 typedef struct __attribute__((packed)) {

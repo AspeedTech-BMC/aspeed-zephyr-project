@@ -48,8 +48,11 @@ static void do_init_entry(void *state)
 	};
 	shared_multi_heap_add(&region, NULL);
 	
+
 	/* Add user defined init code here */
 	cptra_ipc_enable();
+
+	cptra_load_certificate();
 
 	mctp_init_app();
 

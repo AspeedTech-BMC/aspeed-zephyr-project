@@ -7,4 +7,5 @@ rsource "lib/dmtf/Kconfig"
 rsource "lib/lms/Kconfig"
 rsource "lib/hrot_hal/Kconfig"
 rsource "lib/hrot_wrapper/Kconfig"
+rsource "lib/ocp/Kconfig"
 endmenu

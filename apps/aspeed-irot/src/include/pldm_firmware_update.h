@@ -24,7 +24,7 @@ extern "C" {
 #include "pldm.h"
 #include "plat_def.h"
 
-#define MAX_FWUPDATE_RSP_BUF_SIZE 32768
+//#define MAX_FWUPDATE_RSP_BUF_SIZE 32768
 #ifndef MAX_FWUPDATE_RSP_BUF_SIZE
 #define MAX_FWUPDATE_RSP_BUF_SIZE 4096
 #endif
