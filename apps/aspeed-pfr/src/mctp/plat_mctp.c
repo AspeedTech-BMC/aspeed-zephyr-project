@@ -19,22 +19,18 @@
 
 LOG_MODULE_REGISTER(plat_mctp, CONFIG_LOG_DEFAULT_LEVEL);
 
-/* i2c 7 bit address */
-#define I2C_ADDR_ROT_FOR_BMC 0x38
-#define I2C_ADDR_ROT_FOR_PCH 0x70
-
 extern const struct device *gSwMbxDev;
 
 static mctp_smbus_port smbus_port[] = {
 	{
 	 .conf.smbus_conf.bus = I2C_BUS_BMC,
 	 .conf.smbus_conf.rot_addr = I2C_ADDR_ROT_FOR_BMC,
-	 .conf.smbus_conf.mbx_port = 0
+	 .conf.smbus_conf.mbx_port = I2C_MBX_PORT_BMC
 	},
 	{
 	 .conf.smbus_conf.bus = I2C_BUS_PCH,
 	 .conf.smbus_conf.rot_addr = I2C_ADDR_ROT_FOR_PCH,
-	 .conf.smbus_conf.mbx_port = 1
+	 .conf.smbus_conf.mbx_port = I2C_MBX_PORT_PCH
 	},
 };
 

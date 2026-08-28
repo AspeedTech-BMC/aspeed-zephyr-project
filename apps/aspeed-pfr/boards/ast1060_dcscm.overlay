@@ -389,5 +389,7 @@
 		bmc-spi1 = &spi1_cs1;
 		pch-spi0 = &spi2_cs0;
 		pch-spi1 = &spi2_cs1;
+		bmc-mctp-i2c = &swmbx0;
+		pch-mctp-i2c = &swmbx1;
 	};
 };
