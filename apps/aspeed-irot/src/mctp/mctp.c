@@ -194,7 +194,7 @@ static uint8_t mctp_pkt_assembling(mctp *mctp_inst, uint8_t *buf, uint16_t len)
 		}
 		*offset_p = 0;
 
-		*buf_p = (uint8_t *)malloc(mctp_inst->max_msg_size * 4);
+		*buf_p = (uint8_t *)malloc(mctp_inst->max_msg_size * 8);
 		if (!*buf_p) {
 			LOG_WRN("cannot create memory... mctp_inst=%p size=%d",
 				mctp_inst, mctp_inst->max_msg_size);
@@ -210,7 +210,7 @@ static uint8_t mctp_pkt_assembling(mctp *mctp_inst, uint8_t *buf, uint16_t len)
 
 	/* Appending other packet after the first packet */
 	if (!hdr->eom && (*offset_p + len - sizeof(*hdr) > mctp_inst->max_msg_size)) {
-		LOG_WRN("Buffer overflow");
+		LOG_WRN("Buffer overflow offset_p=%d len=%d max_msg_size=%d", *offset_p, len, mctp_inst->max_msg_size);
 		free(*buf_p);
 		*buf_p = NULL;
 		*offset_p = 0;
@@ -268,6 +268,7 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 			continue;
 		}
 
+		LOG_INF("mctp rx read_len=%d", read_len);
 		LOG_HEXDUMP_DBG(read_buf, read_len, "mctp receive data");
 
 		mctp_hdr *hdr = (mctp_hdr *)read_buf;

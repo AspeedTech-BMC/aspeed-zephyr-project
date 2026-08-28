@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 zephyr_include_directories(include)
+zephyr_include_directories(composite_eat)
 
 target_sources(app
 	PRIVATE
@@ -19,6 +20,7 @@ target_sources(app
 
 	cptra/cptra_mbedtls.c
 	cptra/cptra_api.c
+	cptra/cptra_ca_certs.c
 
 	mctp/mctp.c
 	mctp/mctp_init.c
@@ -26,6 +28,17 @@ target_sources(app
 	mctp/mctp_ipc.c
 	mctp/hal_ipm.c
 )
+
+if (CONFIG_COMPOSITE_EAT)
+	zephyr_link_libraries(bmc_composite_eat_sdk)
+	target_sources(app
+		PRIVATE
+		mctp/mctp_vdm_pci.c
+		composite_eat/attestation_provider_irot.c
+		composite_eat/evidence_provider_irot.c
+		composite_eat/software_platform.c
+	)
+endif()
 
 if (CONFIG_SPDM_RESPONDER)
 	zephyr_link_libraries(dmtf_libspdm)

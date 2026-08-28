@@ -13,6 +13,13 @@
 
 LOG_MODULE_REGISTER(aspeed_irot);
 
+
+// int example_generate_composite_eat(const struct example_attestation_provider *attestation_provider,
+//                                    const struct example_evidence_provider *evidence_provider,
+//                                    const struct composite_eat_generation_request *request,
+//                                    struct composite_eat_workspace *workspace, uint8_t *response,
+//                                    size_t response_capacity, size_t *response_length);
+
 int main() {
 	LOG_INF("Aspeed IROT FW Started");
 
@@ -194,3 +201,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_test,
 
 SHELL_CMD_REGISTER(test, &sub_test, "test shell commands", NULL);
 #endif
+

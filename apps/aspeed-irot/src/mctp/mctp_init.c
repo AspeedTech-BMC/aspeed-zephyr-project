@@ -15,6 +15,8 @@
 #include <pldm.h>
 #endif
 
+#include <mctp_vdm_pci.h>
+
 LOG_MODULE_REGISTER(mctp_init);
 
 static mctp_port mctp_bus_port[] = {
@@ -58,6 +60,11 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 		mctp_spdm_cmd_handler(mctp_p, buf, len, ext_params);
 		break;
 #endif
+#if defined(CONFIG_COMPOSITE_EAT)
+	case MCTP_MSG_TYPE_VEN_DEF_PCI:
+		mctp_vdm_pci_cmd_handler(mctp_p, buf, len, ext_params);
+		break;
+#endif
 	default:
 		LOG_WRN("Cannot find message receive function!!");
 		return MCTP_ERROR;
@@ -77,6 +84,10 @@ int load_mctp_support_types(uint8_t *type_len, uint8_t *types)
 #endif
 #if defined(CONFIG_SPDM_RESPONDER)
 	types[*type_len] = MCTP_MSG_TYPE_SPDM;
+	(*type_len)++;
+#endif
+#if defined(CONFIG_COMPOSITE_EAT)
+	types[*type_len] = MCTP_MSG_TYPE_VEN_DEF_PCI;
 	(*type_len)++;
 #endif
 

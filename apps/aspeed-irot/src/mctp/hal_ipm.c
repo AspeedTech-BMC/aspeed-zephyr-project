@@ -98,7 +98,7 @@ void ipm_mctp_main(void *a, void *b, void *c)
 			ret = ast_ipm_shmem_write(ipmdev, IPM_MCTP_CHANNEL, sizeof(pkt.hdr),
 						  pkt.buf, payload_len);
 			if (ret < 0) {
-				LOG_ERR("ast_ipm_shmem_write payload failed, ret=%d", ret);
+				LOG_ERR("ast_ipm_shmem_write payload failed, ret=%d payload_len=%d", ret, payload_len);
 				free(pkt.buf);
 				pkt.buf = NULL;
 				continue;

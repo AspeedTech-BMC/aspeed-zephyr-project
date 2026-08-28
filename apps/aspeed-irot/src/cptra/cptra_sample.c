@@ -487,10 +487,11 @@ static int cptra_dpe_response_check(struct dpe_rsp_header *header)
 
 static int cptra_test_get_idevid_csr(void)
 {
-	uint8_t csr[IDEVID_CSR_SIZE];
+	uint8_t csr[IDEVID_CSR_SIZE] = {0};
 
 	memcpy(csr, (uint8_t *)IDEVID_CSR_BASE + IDEVID_CSR_OFFSET, IDEVID_CSR_SIZE);
 
+	LOG_WRN("TODO: Get IDEVID CSR from Caliptra");
 	LOG_HEXDUMP_INF(csr, IDEVID_CSR_SIZE, "IDEVID CSR:");
 
 	return 0;
@@ -1077,6 +1078,7 @@ static void cptra_test_certify_key_extended(void)
 {
 	struct cptra_certify_key_extended_ia input;
 	struct cptra_certify_key_extended_oa output;
+	struct dpe_certify_key_o *certify_key_resp;
 	int ret;
 
 	LOG_INF("Test caliptra_certify_key_extended...");
@@ -1103,8 +1105,29 @@ static void cptra_test_certify_key_extended(void)
 
 	LOG_DBG("output: chksum:0x%x, fips_status:0x%x",
 		output.chksum, output.fips_status);
-	LOG_HEXDUMP_DBG(output.certify_key_resp, sizeof(output.certify_key_resp),
-			"certify_key_resp:");
+
+	certify_key_resp = (struct dpe_certify_key_o *)output.certify_key_resp;
+	if (cptra_dpe_response_check(&certify_key_resp->rsp_hdr)) {
+		LOG_ERR("DPE command failed, magic:0x%08x status:0x%08x profile:0x%08x",
+			certify_key_resp->rsp_hdr.magic, certify_key_resp->rsp_hdr.status,
+			certify_key_resp->rsp_hdr.profile);
+		goto end;
+	}
+
+	if (certify_key_resp->cert_size >
+	    sizeof(output.certify_key_resp) - sizeof(struct dpe_certify_key_o)) {
+		LOG_ERR("Invalid cert_size:%u", certify_key_resp->cert_size);
+		goto end;
+	}
+
+	LOG_HEXDUMP_DBG(certify_key_resp->context_handle,
+			sizeof(certify_key_resp->context_handle), "context_handle:");
+	LOG_HEXDUMP_DBG(certify_key_resp->public_key_x,
+			sizeof(certify_key_resp->public_key_x), "public_key_x:");
+	LOG_HEXDUMP_DBG(certify_key_resp->public_key_y,
+			sizeof(certify_key_resp->public_key_y), "public_key_y:");
+	LOG_HEXDUMP_DBG(certify_key_resp->cert, certify_key_resp->cert_size, "cert:");
+
 
 	LOG_INF("%s: Pass", __func__);
 	return;

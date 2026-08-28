@@ -1,0 +1,12 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+config BMC_COMPOSITE_EAT_SDK
+	default n
+	bool "BMC composite EAT SDK"
+
+if BMC_COMPOSITE_EAT_SDK
+
+
+endif # BMC_COMPOSITE_EAT_SDK
+

@@ -245,7 +245,11 @@ bool libspdm_responder_data_sign(
     const uint8_t *message, size_t message_size,
     uint8_t *signature, size_t *sig_size)
 {
-    void *context;
+    /*
+     * Signing is delegated to Caliptra, which owns the private key, so there is
+     * no local asym context to allocate or release here.
+     */
+    void *context = NULL;
     bool result;
 
     if (is_data_hash) {
@@ -258,7 +262,6 @@ bool libspdm_responder_data_sign(
                                    message, message_size,
                                    signature, sig_size);
     }
-    libspdm_asym_free(base_asym_algo, context);
 
 #if LIBSPDM_SECRET_LIB_SIGN_LITTLE_ENDIAN
     if ((spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT) <= SPDM_MESSAGE_VERSION_11) {
@@ -457,7 +460,7 @@ bool libspdm_write_key_pair_info(
  *
  * Returns the DER size of the leaf certificate on success, 0 otherwise.
  */
-static uint32_t cptra_get_certify_key_leaf_cert(uint8_t *cert, size_t cert_max_size)
+uint32_t cptra_get_certify_key_leaf_cert(uint8_t *cert, size_t cert_max_size)
 {
 	struct cptra_certify_key_extended_ia input;
 	struct cptra_certify_key_extended_oa output;
