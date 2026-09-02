@@ -5,6 +5,7 @@ target_sources(app PRIVATE
 	chip_ast2700.c
 	board_ast2700.c
 	scu.c
+	dma.c
 	ssp_tsp_ast2700.c
 	extrst_ast2700.c
 	fpga_phy.c
