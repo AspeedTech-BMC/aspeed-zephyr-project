@@ -17,6 +17,7 @@
 #include <pci_ast2700.h>
 #include <mac_ast2700.h>
 #include <ast_loader.h>
+#include <dma.h>
 #include <wdt.h>
 #include <extrst.h>
 #include <usb.h>
@@ -67,6 +68,7 @@ static struct peripheral peri_tbl[] = {
 	{"SCU",		scu_init, NULL},
 	{"WDT",		wdt_init, NULL},
 	{"EXTRST",	extrst_mask_init, NULL},
+	{"DMA",		dma_stop, NULL},
 	{"LOADER",	ast_loader_init, NULL},
 	{"SLI1",	sli_init_f, NULL},
 	{"DP",		dp_init, NULL},
