@@ -34,6 +34,7 @@ if (CONFIG_SPDM_RESPONDER)
 		spdm/spdm_rsp.c
 		spdm/lib_caliptra.c
 		spdm/watchdog.c
+		spdm/ec.c
 	)
 endif()
 

@@ -237,71 +237,39 @@ bool libspdm_requester_data_sign(
 
 bool libspdm_responder_data_sign(
 #if LIBSPDM_HAL_PASS_SPDM_CONTEXT
-		void *spdm_context,
+    void *spdm_context,
 #endif
-		spdm_version_number_t spdm_version, uint8_t op_code,
-		uint32_t base_asym_algo,
-		uint32_t base_hash_algo, bool is_data_hash,
-		const uint8_t *message, size_t message_size, // Input
-		uint8_t *signature, size_t *sig_size) // Output
+    spdm_version_number_t spdm_version, uint8_t op_code,
+    uint32_t base_asym_algo,
+    uint32_t base_hash_algo, bool is_data_hash,
+    const uint8_t *message, size_t message_size,
+    uint8_t *signature, size_t *sig_size)
 {
-	struct cptra_invoke_dpe_command_ia input;
-	struct cptra_invoke_dpe_command_oa output;
-	struct dpe_sign_i *sign_input = NULL;
-	struct dpe_sign_o *sign_output = NULL;
-	int ret;
-	size_t sign_len = libspdm_get_asym_signature_size(base_asym_algo);
+    void *context;
+    bool result;
 
-	memset(&input, 0, sizeof(struct cptra_invoke_dpe_command_ia));
-	memset(&output, 0, sizeof(struct cptra_invoke_dpe_command_oa));
+    if (is_data_hash) {
+        result = libspdm_asym_sign_hash(spdm_version, op_code, base_asym_algo, base_hash_algo,
+                                        context,
+                                        message, message_size, signature, sig_size);
+    } else {
+        result = libspdm_asym_sign(spdm_version, op_code, base_asym_algo,
+                                   base_hash_algo, context,
+                                   message, message_size,
+                                   signature, sig_size);
+    }
+    libspdm_asym_free(base_asym_algo, context);
 
-	sign_input = (struct dpe_sign_i *)input.data;
-	sign_output = (struct dpe_sign_o *)output.data;
+#if LIBSPDM_SECRET_LIB_SIGN_LITTLE_ENDIAN
+    if ((spdm_version >> SPDM_VERSION_NUMBER_SHIFT_BIT) <= SPDM_MESSAGE_VERSION_11) {
+        if (result) {
+            libspdm_copy_signature_swap_endian(
+                base_asym_algo, signature, *sig_size, signature, *sig_size);
+        }
+    }
+#endif
 
-	input.data_size = sizeof(struct dpe_sign_i);
-	sign_input->cmd_hdr.magic = DPE_COMMAND_MAGIC;
-	sign_input->cmd_hdr.cmd = SIGN;
-	sign_input->cmd_hdr.profile = P384Sha384; // TODO: 384 vs 256
-
-	if (is_data_hash) {
-		// Input message is a digest
-		memcpy(sign_input->digest, message, message_size);
-	} else {
-		// Need to hash first then copy into sign->digest
-		if (base_hash_algo == SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_256) {
-			libspdm_hash_all(SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_256,
-					 message, message_size,
-					 sign_input->digest);
-		} else if (base_hash_algo == SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_384) {
-			libspdm_hash_all(SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_384,
-					 message, message_size,
-					 sign_input->digest);
-		} else {
-			return false;
-		}
-	}
-
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
-				 (uint8_t *)&input, sizeof(struct cptra_invoke_dpe_command_ia),
-				 CPTRA_IPC_RX_TYPE_EXTERNAL,
-				 (uint8_t *)&output, sizeof(struct cptra_invoke_dpe_command_oa));
-
-	LOG_HEXDUMP_DBG(&output, 32, "DPE Cmd Output:");
-	LOG_HEXDUMP_DBG(sign_output->signature_r, 48, "signature_r:");
-	LOG_HEXDUMP_DBG(sign_output->signature_s, 48, "signature_s:");
-
-	if (ret) {
-		LOG_ERR("Failed to send command to caliptra");
-		return false;
-	} else if (output.fips_status != 0) {
-		LOG_ERR("FIPS error from caliptra");
-		return false;
-	}
-
-	memcpy(signature, sign_output->signature_r, sign_len / 2);
-	memcpy(signature + sign_len / 2, sign_output->signature_s, sign_len / 2);
-
-	return true;
+    return result;
 }
 
 #if LIBSPDM_ENABLE_CAPABILITY_PSK_CAP
@@ -479,6 +447,58 @@ bool libspdm_write_key_pair_info(
 #endif /* #if LIBSPDM_ENABLE_CAPABILITY_SET_KEY_PAIR_INFO_CAP */
 
 
+#define CPTRA_CERT_CHAIN_BUF_SIZE 4096
+
+/*
+ * GetCertificateChain only returns the DICE certificates up to the Rt Alias.
+ * The DPE leaf certificate for the current context is obtained separately with
+ * the CERTIFY_KEY_EXTENDED mailbox command, and is appended to the chain so
+ * that the root-to-leaf chain handed to SPDM is complete.
+ *
+ * Returns the DER size of the leaf certificate on success, 0 otherwise.
+ */
+static uint32_t cptra_get_certify_key_leaf_cert(uint8_t *cert, size_t cert_max_size)
+{
+	struct cptra_certify_key_extended_ia input;
+	struct cptra_certify_key_extended_oa output;
+	struct dpe_certify_key_o *certify_key_resp;
+	uint32_t cert_size;
+	int ret;
+
+	memset(&input, 0, sizeof(input));
+	memset(&output, 0, sizeof(output));
+
+	/* All-zero request: default context handle, flags 0, FORMAT_X509, empty label */
+	ret = cptra_ipc_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
+				 (uint32_t *)&input, sizeof(input),
+				 CPTRA_IPC_RX_TYPE_EXTERNAL,
+				 (uint32_t *)&output, sizeof(output));
+	if (ret) {
+		LOG_ERR("caliptra_certify_key_extended is failure, ret:0x%x", ret);
+		return 0;
+	}
+
+	certify_key_resp = (struct dpe_certify_key_o *)output.certify_key_resp;
+	if (certify_key_resp->rsp_hdr.magic != DPE_RESPONSE_MAGIC ||
+	    certify_key_resp->rsp_hdr.status != 0) {
+		LOG_ERR("DPE CertifyKey failed, magic:0x%08x status:0x%08x profile:0x%08x",
+			certify_key_resp->rsp_hdr.magic, certify_key_resp->rsp_hdr.status,
+			certify_key_resp->rsp_hdr.profile);
+		return 0;
+	}
+
+	cert_size = certify_key_resp->cert_size;
+	if (cert_size == 0 ||
+	    cert_size > sizeof(output.certify_key_resp) - sizeof(struct dpe_certify_key_o) ||
+	    cert_size > cert_max_size) {
+		LOG_ERR("Invalid CertifyKey cert_size:%u", cert_size);
+		return 0;
+	}
+
+	memcpy(cert, certify_key_resp->cert, cert_size);
+
+	return cert_size;
+}
 
 void cptra_invoke_dpe_get_certificate_chain(void **cert_chain, uint32_t *chain_size)
 {
@@ -486,12 +506,13 @@ void cptra_invoke_dpe_get_certificate_chain(void **cert_chain, uint32_t *chain_s
 	struct cptra_invoke_dpe_command_oa output;
 	struct dpe_get_certificate_chain_i *get_certificate_chain_input = NULL;
 	struct dpe_get_certificate_chain_o *get_certificate_chain_output = NULL;
-	uint8_t *certificate_chain = malloc(4096); // Assuming the certificate chain won't exceed 4KB. Adjust as needed.
+	uint8_t *certificate_chain = malloc(CPTRA_CERT_CHAIN_BUF_SIZE * 2); // Assuming the certificate chain won't exceed 4KB. Adjust as needed.
 						    //
 	if (certificate_chain == NULL) {
 		LOG_ERR("Failed to allocate memory for certificate chain");
 		return;
 	}
+	uint32_t leaf_size;
 	uint32_t offset = 0;
 	int ret;
 
@@ -525,7 +546,14 @@ void cptra_invoke_dpe_get_certificate_chain(void **cert_chain, uint32_t *chain_s
 			LOG_INF("Successful offset=%u size=%u\n", offset,
 				get_certificate_chain_output->size);
 
-			memcpy(certificate_chain+offset,
+			if (get_certificate_chain_output->size >
+			    (CPTRA_CERT_CHAIN_BUF_SIZE*2) - offset) {
+				LOG_ERR("Certificate chain exceeds the %u byte buffer",
+					(CPTRA_CERT_CHAIN_BUF_SIZE*2));
+				goto exit;
+			}
+
+			memcpy(certificate_chain + offset,
 			       get_certificate_chain_output->cert_chain,
 			       get_certificate_chain_output->size);
 
@@ -537,6 +565,18 @@ void cptra_invoke_dpe_get_certificate_chain(void **cert_chain, uint32_t *chain_s
 		}
 
 	} while (1);
+
+	/*
+	 * GetCertificateChain already returns the DICE certificates in
+	 * root-to-leaf order (LDevID, FMC Alias, Rt Alias). Append the DPE leaf
+	 * certificate from CERTIFY_KEY_EXTENDED to complete the chain.
+	 */
+	leaf_size = cptra_get_certify_key_leaf_cert(certificate_chain + offset,
+						    (CPTRA_CERT_CHAIN_BUF_SIZE * 2) - offset);
+	if (leaf_size == 0)
+		LOG_WRN("No DPE leaf certificate, chain ends at the Rt Alias certificate");
+
+	offset += leaf_size;
 
 	*cert_chain = (void *)malloc(offset);
 	if (*cert_chain == NULL) {

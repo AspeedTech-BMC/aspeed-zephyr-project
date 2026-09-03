@@ -57,7 +57,7 @@ elseif(CONFIG_DMTF_LIBSPDM_OS_STUB_CRYPTLIB_NULL)
 		libspdm/os_stub/cryptlib_null/pk/sm2.c
 		libspdm/os_stub/cryptlib_null/pk/x509.c
 		libspdm/os_stub/cryptlib_null/pk/rsa_basic.c
-		libspdm/os_stub/cryptlib_null/pk/ec.c
+		# libspdm/os_stub/cryptlib_null/pk/ec.c
 		libspdm/os_stub/cryptlib_null/pem/pem.c
 		libspdm/os_stub/cryptlib_mbedtls/hash/sha3.c
 		libspdm/os_stub/cryptlib_mbedtls/hash/sha.c
