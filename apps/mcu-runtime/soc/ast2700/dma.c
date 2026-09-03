@@ -7,6 +7,7 @@
 #include <zephyr/logging/log.h>
 #include <chip.h>
 #include <dma.h>
+#include <mac_ast2700.h>
 
 LOG_MODULE_REGISTER(dma, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -14,6 +15,14 @@ struct dma_engine {
 	const char *name;
 	int (*stop)(struct ast_chip *chip);
 };
+
+static int mac_dma_stop(struct ast_chip *chip)
+{
+	sys_write32(0, ASPEED_IO_MAC0_BASE + MACCR);
+	sys_write32(0, ASPEED_IO_MAC1_BASE + MACCR);
+
+	return 0;
+}
 
 /*
  * A warm/SoC reset whose WDT reset mask doesn't cover a given IP's
@@ -28,6 +37,7 @@ struct dma_engine {
  * polarity not yet verified against the chip's init sequence).
  */
 static const struct dma_engine dma_engines[] = {
+	{ "MAC", mac_dma_stop },
 };
 
 int dma_stop(struct ast_chip *chip)
