@@ -950,9 +950,15 @@ int sli_init_r(struct ast_chip *chip)
 			setbits_le32(ASPEED_IO_INTC_BASE + INTC_PROT,
 				     INTC_ENABLE_CPUD_RESET_SRC);
 
+		retry = 10;
+		while (sys_read32(data->die0.sliv) == 0x52742700) {
+			k_msleep(10);
+			if (--retry == 0) break;
+		}
+
+		sys_write32(0, data->die1.sliv + SLI_CTRL_III);
 		sli_calibrate_video_delay(data, false, true);
 		if (IS_ENABLED(CONFIG_SLI_K_ON_CPU)) {
-			sys_write32(0, data->die1.sliv + SLI_CTRL_III);
 			sli_calibrate_video_delay(data, true, false);
 		} else {
 			sli_calibrate_video_delay(data, true, true);
