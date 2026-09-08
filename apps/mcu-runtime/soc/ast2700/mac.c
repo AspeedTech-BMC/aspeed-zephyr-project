@@ -182,6 +182,9 @@ static void mac_controller_init(struct ast2700_scu1 *scu, uint32_t index)
 	mac_clk_enable(scu, index);
 	mac_set_freq(scu);
 
+	/* Wait for the reset to complete */
+	k_busy_wait(1);
+
 	sys_write32(0, base + IER);
 
 	sys_write32(MAC_TX_DESC_OFFSET, base + TXR_BADR);
