@@ -402,36 +402,40 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 		/* Setup MCTP header and send to destination endpoint */
 		uint8_t msg_tag = mctp_inst->msg_tag;
 		uint32_t max_msg_size = mctp_inst->max_msg_size;
-		uint8_t i;
-		uint8_t split_pkt_num =
-			(mctp_msg.len / max_msg_size) + ((mctp_msg.len % max_msg_size) ? 1 : 0);
-		LOG_DBG("mctp_msg.len = %d", mctp_msg.len);
-		LOG_DBG("split_pkt_num = %d", split_pkt_num);
-		for (i = 0; i < split_pkt_num; i++) {
-			size_t buf_size = max_msg_size + MCTP_TRANSPORT_HEADER_SIZE;
+
+		/* max_msg_size is the whole packet size, including the transport header */
+		if (max_msg_size <= MCTP_TRANSPORT_HEADER_SIZE) {
+			LOG_ERR("mctp tx task invalid max_msg_size %u", max_msg_size);
+			free(mctp_msg.buf);
+			mctp_tx_task_response(mctp_msg.evt_msgq, MCTP_ERROR);
+			continue;
+		}
+
+		size_t packet_size = max_msg_size - MCTP_TRANSPORT_HEADER_SIZE;
+		size_t offset = 0;
+		uint32_t seq = 0;
+
+		LOG_DBG("mctp_msg.len = %u, packet_size = %zu", mctp_msg.len, packet_size);
+		while (offset < mctp_msg.len) {
+			size_t payload = MIN(packet_size, (size_t)mctp_msg.len - offset);
+			size_t buf_size = payload + MCTP_TRANSPORT_HEADER_SIZE;
 			uint8_t *buf = malloc(buf_size);
+
 			if (buf == NULL) {
 				LOG_ERR("mctp tx task malloc buf failed");
-				ret = MCTP_ERROR;
 				break;
 			}
 			memset(buf, 0, buf_size);
 			mctp_hdr *hdr = (mctp_hdr *)buf;
-			uint16_t cp_msg_size = max_msg_size;
 
 			/* The first packet should set SOM */
-			if (!i)
-				hdr->som = 1;
+			hdr->som = (offset == 0);
 
 			/* The last packet should set EOM */
-			if (i == (split_pkt_num - 1)) {
-				hdr->eom = 1;
-				uint16_t remain = mctp_msg.len % max_msg_size;
-				cp_msg_size = remain ? remain : max_msg_size; /* remain data */
-			}
+			hdr->eom = (offset + payload == mctp_msg.len);
 
 			hdr->to = mctp_msg.ext_params.tag_owner;
-			hdr->pkt_seq = i & MCTP_HDR_SEQ_MASK;
+			hdr->pkt_seq = seq++ & MCTP_HDR_SEQ_MASK;
 
 			/*
 			 * TODO: should avoid the msg_tag if there are pending mctp
@@ -445,24 +449,23 @@ static void mctp_tx_task(void *arg, void *dummy0, void *dummy1)
 			hdr->src_ep = mctp_inst->endpoint;
 			hdr->hdr_ver = MCTP_HDR_HDR_VER;
 
-			LOG_DBG("i = %d, cp_msg_size = %d", i, cp_msg_size);
+			LOG_DBG("offset = %zu, payload = %zu", offset, payload);
 			LOG_DBG("hdr->flags_seq_to_tag = %x", hdr->flags_seq_to_tag);
-			memcpy(buf + MCTP_TRANSPORT_HEADER_SIZE, mctp_msg.buf + i * max_msg_size,
-			       cp_msg_size);
-			ret = mctp_inst->write_data(mctp_inst, buf,
-						    cp_msg_size + MCTP_TRANSPORT_HEADER_SIZE,
-						    mctp_msg.ext_params);
+			memcpy(buf + MCTP_TRANSPORT_HEADER_SIZE, mctp_msg.buf + offset, payload);
+			ret = mctp_inst->write_data(mctp_inst, buf, buf_size, mctp_msg.ext_params);
 			free(buf);
 
 			if (ret != MCTP_SUCCESS) {
 				LOG_WRN("mctp write data failed");
 				break;
 			}
+
+			offset += payload;
 		}
 
 		free(mctp_msg.buf);
 		mctp_tx_task_response(mctp_msg.evt_msgq,
-				      (i == split_pkt_num) ? MCTP_SUCCESS : MCTP_ERROR);
+				      (offset == mctp_msg.len) ? MCTP_SUCCESS : MCTP_ERROR);
 
 		if (pal_is_need_mctp_interval(mctp_inst)) {
 			k_msleep(pal_get_mctp_interval_ms(mctp_inst));
