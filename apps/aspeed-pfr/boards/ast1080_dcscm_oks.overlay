@@ -110,10 +110,6 @@
 	};
 };
 
-&i3c0 {
-	status = "okay";
-};
-
 /* MCTP over I3C target mode, paired with CONFIG_I3C_TARGET and
  * CONFIG_I3C_TARGET_MQUEUE in ast1080_dcscm_oks.conf. i3c_util.h checks this
  * node with DT_NODE_EXISTS(), which calls device_get_binding() on it - if the
@@ -127,7 +123,7 @@
 
 	i3c3_tmq:i3c-tmq@3000 {
 		compatible = "i3c-target-mqueue";
-		reg = <0x0 0x7ec 0xa0033000>;
+		reg = <0x0 0x7ec 0x80003000>;
 		msg-size = <128>;
 		num-of-msgs = <8>;
 		mandatory-data-byte = <0xae>;
