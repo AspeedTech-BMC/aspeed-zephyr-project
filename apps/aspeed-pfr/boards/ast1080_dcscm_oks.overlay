@@ -125,7 +125,7 @@
 	dcr = <0xcc>;
 	secondary;
 
-	i3c3_tmq: i3c-tmq@7eca0033000 {
+	i3c3_tmq:i3c-tmq@3000 {
 		compatible = "i3c-target-mqueue";
 		reg = <0x0 0x7ec 0xa0033000>;
 		msg-size = <128>;

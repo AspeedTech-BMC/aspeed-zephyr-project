@@ -62,22 +62,22 @@ void util_init_I3C(void)
 	const struct i3c_target_driver_api *api;
 #endif
 #ifdef DEV_I3C_TMQ_0
-	dev_i3c_tmq[0] = device_get_binding("i3c-tmq@7eca0030000");
+	dev_i3c_tmq[0] = device_get_binding("i3c-tmq@0000");
 	api = dev_i3c_tmq[0]->api;
 	api->driver_register(dev_i3c_tmq[0]);
 #endif
 #ifdef DEV_I3C_TMQ_1
-	dev_i3c_tmq[1] = device_get_binding("i3c-tmq@7eca0031000");
+	dev_i3c_tmq[1] = device_get_binding("i3c-tmq@1000");
 	api = dev_i3c_tmq[1]->api;
 	api->driver_register(dev_i3c_tmq[1]);
 #endif
 #ifdef DEV_I3C_TMQ_2
-	dev_i3c_tmq[2] = device_get_binding("i3c-tmq@7eca0032000");
+	dev_i3c_tmq[2] = device_get_binding("i3c-tmq@2000");
 	api = dev_i3c_tmq[2]->api;
 	api->driver_register(dev_i3c_tmq[2]);
 #endif
 #ifdef DEV_I3C_TMQ_3
-	dev_i3c_tmq[3] = device_get_binding("i3c-tmq@7eca0033000");
+	dev_i3c_tmq[3] = device_get_binding("i3c-tmq@3000");
 	api = dev_i3c_tmq[3]->api;
 	api->driver_register(dev_i3c_tmq[3]);
 #endif
