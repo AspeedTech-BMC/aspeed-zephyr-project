@@ -4,6 +4,7 @@
 target_sources(app PRIVATE
 	chip_ast2700.c
 	board_ast2700.c
+	tamper.c
 	scu.c
 	dma.c
 	ssp_tsp_ast2700.c

@@ -22,6 +22,7 @@
 #include <extrst.h>
 #include <usb.h>
 #include <cptra_idevid.h>
+#include <tamper.h>
 
 LOG_MODULE_REGISTER(ast_chip, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -109,5 +110,6 @@ int ast_destroy_chip(struct ast_chip *chip)
 
 	err = ast_loader_deinit(chip);
 
+	tamper_check();
 	return err;
 }
