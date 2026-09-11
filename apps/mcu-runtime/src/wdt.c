@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(ast_wdt, CONFIG_SOC_FMC_LOG_LEVEL);
 #define WDT_INSTANCE_SIZE	0x80
 
 #define WDT_BOOT_NODE		DT_NODELABEL(wdt0)
-#define WDT_BOOT_TIMEOUT_MS	30000
+#define WDT_BOOT_TIMEOUT_MS	15000
 
 static void wdt_writel(uint32_t val, uint32_t addr)
 {
@@ -97,16 +97,6 @@ void boot_wdt_enable(void)
 		.flags = WDT_FLAG_RESET_CPU_CORE,
 	};
 	int err;
-
-	/*
-	 * WDTA is the ABR watchdog. If a previous stage already started it,
-	 * leave the boot watchdog alone so that the two do not race to reset
-	 * the SoC.
-	 */
-	if (sys_read32(WDTA_REG + WDT_CTRL) & WDT_ENABLE) {
-		LOG_DBG("WDTA is enabled, skip the boot WDT");
-		return;
-	}
 
 	/*
 	 * Recovery mode waits for an image over USB/I2C/I3C/UART, which can
