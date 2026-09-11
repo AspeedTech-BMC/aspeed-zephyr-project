@@ -55,7 +55,7 @@
 	status = "okay";
 };
 
-#if 1
+#if 0
 // For mctp over i3c
 // CPU0 and CPU1 -> i3chub -> AST1060 i3c-2
 &i3c0 {
