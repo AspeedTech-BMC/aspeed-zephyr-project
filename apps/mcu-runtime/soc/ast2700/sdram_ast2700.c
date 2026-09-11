@@ -13,6 +13,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/dt-bindings/memory-controller/ast27xx-mpu.h>
 #include <sdram_ast2700.h>
+#include <tamper.h>
 
 #define LOG_MODULE_NAME	sdram_ast2700
 LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_SOC_FMC_LOG_LEVEL);
@@ -1270,73 +1271,6 @@ void sdramc_reset(struct sdramc *sdramc)
 #define MPLL_CLKNR_MASK		GENMASK(18, 13)
 #define MPLL_CLKNF_MASK		GENMASK(12, 0)
 
-#define MPLL_1600
-
-#if defined(MPLL_1600)
-#define MPLL_OD	1
-#define MPLL_NR 1
-#define MPLL_NF (549755813888ULL / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1625)
-#define MPLL_OD	1
-#define MPLL_NR 1
-#define MPLL_NF (558345748480ULL / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1590)
-#define MPLL_OD	1
-#define MPLL_NR 5
-#define MPLL_NF (2731599200256ULL / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1586)
-#define MPLL_OD	1
-#define MPLL_NR 17
-#define MPLL_NF (9264072658780ULL / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1575)
-#define MPLL_OD	1
-#define MPLL_NR 1
-#define MPLL_NF (541165879296ULL  / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1560)
-#define MPLL_OD	1
-#define MPLL_NR 3
-#define MPLL_NF (1608035755622ULL / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1560_B)
-#define MPLL_OD	1
-#define MPLL_NR 5
-#define MPLL_NF (2680059592704ULL / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1550)
-#define MPLL_OD	1
-#define MPLL_NR 1
-#define MPLL_NF (532575944704ULL  / 4 / 1024 / 1024 / 1024 / 2)
-#elif defined(MPLL_1550_nf7c_nr1_od0)
-#define MPLL_OD	1
-#define MPLL_NR 2
-#define MPLL_NF (0x7cULL)
-#elif defined(MPLL_1550_nff8_nr1_od1)
-#define MPLL_OD	2
-#define MPLL_NR 2
-#define MPLL_NF (0xf8ULL)
-#elif defined(MPLL_1550_nfba_nr2_od0)
-#define MPLL_OD	1
-#define MPLL_NR 3
-#define MPLL_NF (0xbaULL)
-#elif defined(MPLL_1600_nfc0_nr2_od0)
-#define MPLL_OD	1
-#define MPLL_NR 3
-#define MPLL_NF (0xc0ULL)
-#elif defined(MPLL_1600_nf300_nrb_od0)
-#define MPLL_OD	1
-#define MPLL_NR 0xc
-#define MPLL_NF (0x300ULL)
-#elif defined(MPLL_1600_nr16_od0)
-#define MPLL_OD	1
-#define MPLL_NR 16
-#define MPLL_NF (0x400ULL)	/* 1024 = 64 * 16, Fout = 25M*1024/16 = 1600MHz */
-#elif defined(MPLL_1600_nr64_od0)
-#define MPLL_OD	1
-#define MPLL_NR 64
-#define MPLL_NF (0x1000ULL)	/* 4096 = 64 * 64, SCU0_310[23:0]=0x07F000, Fout = 25M*4096/64 = 1600MHz */
-#elif defined(MPLL_1500)
-#define MPLL_OD	1
-#define MPLL_NR 1
-#define MPLL_NF (515396075520ULL  / 4 / 1024 / 1024 / 1024 / 2)
-#endif
 #define DDR_CLK_STOP_REG      0x12c02240
 #define DDR_CLK_START_REG     0x12c02244
 
@@ -1347,6 +1281,121 @@ void sdramc_reset(struct sdramc *sdramc)
 #define MPLL_LOCK_BIT         BIT(31)
 
 #define MPLL_LOCK_TIMEOUT_US  100000
+
+/*
+ * MPLL configuration table for 1600MHz output (Fref=25MHz, OD=1).
+ * Fout = Fref * NF / NR / OD.  All entries produce exactly 1600MHz.
+ * nom_BW = Fref / (NR * 80).  Higher NR → lower BW → better supply-noise
+ * rejection but more VCO phase-noise accumulation.
+ *
+ * Each SRST (soft reset) advances to the next entry so different NR/BW
+ * combinations can be validated without a reflash.  The active index is
+ * kept in SCU0_REG+0x904 across warm resets and cleared on POR.
+ */
+struct mpll_cfg {
+	uint32_t nf;
+	uint32_t nr;
+	uint32_t od;
+	const char *desc;
+};
+
+/* NF = 64*NR (Fout=25*NF/NR/1=1600MHz), BW=312500/NR Hz, NR max=64 (6-bit NR-1 field) */
+static const struct mpll_cfg mpll_cfg_table[] = {
+	//{   62,  1, 1, "1550MHz NR= 1 NF=  64 BW=312.5kHz" }, /* idx= 0 */
+	{   64,  1, 1, "1600MHz NR= 1 NF=  64 BW=312.5kHz" }, /* idx= 0 */
+	//{  128,  2, 1, "1600MHz NR= 2 NF= 128 BW=156.3kHz" }, /* idx= 1 */
+	//{  192,  3, 1, "1600MHz NR= 3 NF= 192 BW=104.2kHz" }, /* idx= 2 */
+	//{  256,  4, 1, "1600MHz NR= 4 NF= 256 BW= 78.1kHz" }, /* idx= 3 */
+	//{  320,  5, 1, "1600MHz NR= 5 NF= 320 BW= 62.5kHz" }, /* idx= 4 */
+	//{  384,  6, 1, "1600MHz NR= 6 NF= 384 BW= 52.1kHz" }, /* idx= 5 */
+	//{  448,  7, 1, "1600MHz NR= 7 NF= 448 BW= 44.6kHz" }, /* idx= 6 */
+	//{  512,  8, 1, "1600MHz NR= 8 NF= 512 BW= 39.1kHz" }, /* idx= 7 */
+	//{  576,  9, 1, "1600MHz NR= 9 NF= 576 BW= 34.7kHz" }, /* idx= 8 */
+	//{  640, 10, 1, "1600MHz NR=10 NF= 640 BW= 31.3kHz" }, /* idx= 9 */
+	//{  704, 11, 1, "1600MHz NR=11 NF= 704 BW= 28.4kHz" }, /* idx=10 */
+	//{  768, 12, 1, "1600MHz NR=12 NF= 768 BW= 26.0kHz" }, /* idx=11 */
+	//{  832, 13, 1, "1600MHz NR=13 NF= 832 BW= 24.0kHz" }, /* idx=12 */
+	//{  896, 14, 1, "1600MHz NR=14 NF= 896 BW= 22.3kHz" }, /* idx=13 */
+	//{  960, 15, 1, "1600MHz NR=15 NF= 960 BW= 20.8kHz" }, /* idx=14 */
+	//{ 1024, 16, 1, "1600MHz NR=16 NF=1024 BW= 19.5kHz" }, /* idx=15 */
+	//{ 1088, 17, 1, "1600MHz NR=17 NF=1088 BW= 18.4kHz" }, /* idx=16 */
+	//{ 1152, 18, 1, "1600MHz NR=18 NF=1152 BW= 17.4kHz" }, /* idx=17 */
+	//{ 1216, 19, 1, "1600MHz NR=19 NF=1216 BW= 16.4kHz" }, /* idx=18 */
+	//{ 1280, 20, 1, "1600MHz NR=20 NF=1280 BW= 15.6kHz" }, /* idx=19 */
+	//{ 1344, 21, 1, "1600MHz NR=21 NF=1344 BW= 14.9kHz" }, /* idx=20 */
+	//{ 1408, 22, 1, "1600MHz NR=22 NF=1408 BW= 14.2kHz" }, /* idx=21 */
+	//{ 1472, 23, 1, "1600MHz NR=23 NF=1472 BW= 13.6kHz" }, /* idx=22 */
+	//{ 1536, 24, 1, "1600MHz NR=24 NF=1536 BW= 13.0kHz" }, /* idx=23 */
+	//{ 1600, 25, 1, "1600MHz NR=25 NF=1600 BW= 12.5kHz" }, /* idx=24 */
+	//{ 1664, 26, 1, "1600MHz NR=26 NF=1664 BW= 12.0kHz" }, /* idx=25 */
+	//{ 1728, 27, 1, "1600MHz NR=27 NF=1728 BW= 11.6kHz" }, /* idx=26 */
+	//{ 1792, 28, 1, "1600MHz NR=28 NF=1792 BW= 11.2kHz" }, /* idx=27 */
+	//{ 1856, 29, 1, "1600MHz NR=29 NF=1856 BW= 10.8kHz" }, /* idx=28 */
+	//{ 1920, 30, 1, "1600MHz NR=30 NF=1920 BW= 10.4kHz" }, /* idx=29 */
+	//{ 1984, 31, 1, "1600MHz NR=31 NF=1984 BW= 10.1kHz" }, /* idx=30 */
+	//{ 2048, 32, 1, "1600MHz NR=32 NF=2048 BW=  9.8kHz" }, /* idx=31 */
+	//{ 2112, 33, 1, "1600MHz NR=33 NF=2112 BW=  9.5kHz" }, /* idx=32 */
+	//{ 2176, 34, 1, "1600MHz NR=34 NF=2176 BW=  9.2kHz" }, /* idx=33 */
+	//{ 2240, 35, 1, "1600MHz NR=35 NF=2240 BW=  8.9kHz" }, /* idx=34 */
+	//{ 2304, 36, 1, "1600MHz NR=36 NF=2304 BW=  8.7kHz" }, /* idx=35 */
+	//{ 2368, 37, 1, "1600MHz NR=37 NF=2368 BW=  8.4kHz" }, /* idx=36 */
+	//{ 2432, 38, 1, "1600MHz NR=38 NF=2432 BW=  8.2kHz" }, /* idx=37 */
+	//{ 2496, 39, 1, "1600MHz NR=39 NF=2496 BW=  8.0kHz" }, /* idx=38 */
+	//{ 2560, 40, 1, "1600MHz NR=40 NF=2560 BW=  7.8kHz" }, /* idx=39 */
+	//{ 2624, 41, 1, "1600MHz NR=41 NF=2624 BW=  7.6kHz" }, /* idx=40 */
+	//{ 2688, 42, 1, "1600MHz NR=42 NF=2688 BW=  7.4kHz" }, /* idx=41 */
+	//{ 2752, 43, 1, "1600MHz NR=43 NF=2752 BW=  7.3kHz" }, /* idx=42 */
+	//{ 2816, 44, 1, "1600MHz NR=44 NF=2816 BW=  7.1kHz" }, /* idx=43 */
+	//{ 2880, 45, 1, "1600MHz NR=45 NF=2880 BW=  6.9kHz" }, /* idx=44 */
+	//{ 2944, 46, 1, "1600MHz NR=46 NF=2944 BW=  6.8kHz" }, /* idx=45 */
+	//{ 3008, 47, 1, "1600MHz NR=47 NF=3008 BW=  6.6kHz" }, /* idx=46 */
+	//{ 3072, 48, 1, "1600MHz NR=48 NF=3072 BW=  6.5kHz" }, /* idx=47 */
+	//{ 3136, 49, 1, "1600MHz NR=49 NF=3136 BW=  6.4kHz" }, /* idx=48 */
+	//{ 3200, 50, 1, "1600MHz NR=50 NF=3200 BW=  6.3kHz" }, /* idx=49 */
+	//{ 3264, 51, 1, "1600MHz NR=51 NF=3264 BW=  6.1kHz" }, /* idx=50 */
+	//{ 3328, 52, 1, "1600MHz NR=52 NF=3328 BW=  6.0kHz" }, /* idx=51 */
+	//{ 3392, 53, 1, "1600MHz NR=53 NF=3392 BW=  5.9kHz" }, /* idx=52 */
+	//{ 3456, 54, 1, "1600MHz NR=54 NF=3456 BW=  5.8kHz" }, /* idx=53 */
+	//{ 3520, 55, 1, "1600MHz NR=55 NF=3520 BW=  5.7kHz" }, /* idx=54 */
+	//{ 3584, 56, 1, "1600MHz NR=56 NF=3584 BW=  5.6kHz" }, /* idx=55 */
+	//{ 3648, 57, 1, "1600MHz NR=57 NF=3648 BW=  5.5kHz" }, /* idx=56 */
+	//{ 3712, 58, 1, "1600MHz NR=58 NF=3712 BW=  5.4kHz" }, /* idx=57 */
+	//{ 3776, 59, 1, "1600MHz NR=59 NF=3776 BW=  5.3kHz" }, /* idx=58 */
+	//{ 3840, 60, 1, "1600MHz NR=60 NF=3840 BW=  5.2kHz" }, /* idx=59 */
+	//{ 3904, 61, 1, "1600MHz NR=61 NF=3904 BW=  5.1kHz" }, /* idx=60 */
+	//{ 3968, 62, 1, "1600MHz NR=62 NF=3968 BW=  5.0kHz" }, /* idx=61 */
+	//{ 4032, 63, 1, "1600MHz NR=63 NF=4032 BW=  5.0kHz" }, /* idx=62 */
+	//{ 4096, 64, 1, "1600MHz NR=64 NF=4096 BW=  4.9kHz" }, /* idx=63, NR-1=63 max */
+};
+
+/* Scratch register for persisting PLL config index across warm resets.
+ * Located at VGA0-scratch+4 (SCU0+0x904); cleared by POR, survives SRST. */
+#define SCU0_MPLL_CFG_SCRATCH   (SCU0_REG + 0x904)
+#define MPLL_CFG_MAGIC          0x504C4C00U  /* "PLL\0" */
+#define MPLL_CFG_MAGIC_MASK     0xFFFFFF00U
+#define MPLL_CFG_IDX_MASK       0x000000FFU
+
+static int mpll_get_cfg_idx(void)
+{
+	uint32_t scratch = sys_read32(SCU0_MPLL_CFG_SCRATCH);
+	int idx;
+
+	if ((scratch & MPLL_CFG_MAGIC_MASK) == MPLL_CFG_MAGIC) {
+		/* Warm reset path: use stored index */
+		idx = scratch & MPLL_CFG_IDX_MASK;
+		if (idx >= (int)ARRAY_SIZE(mpll_cfg_table))
+			idx = 0;
+	} else {
+		/* POR or first boot: start from index 0 */
+		idx = 0;
+	}
+
+	/* Persist next index for the following boot */
+	sys_write32(MPLL_CFG_MAGIC | ((idx + 1) % ARRAY_SIZE(mpll_cfg_table)),
+		    SCU0_MPLL_CFG_SCRATCH);
+
+	return idx;
+}
 
 static int mpll_wait_lock(uint32_t timeout_us)
 {
@@ -1386,24 +1435,23 @@ void sdramc_pll_reset(struct sdramc *sdramc)
 {
 	uint32_t pll_para;
 	int retry;
+	int idx = 0;
+	const struct mpll_cfg *cfg = &mpll_cfg_table[idx];
 
 	ARG_UNUSED(sdramc);
 
-	printf("MPLL NF=0x%llx NR=%d OD=%d\n",
-		MPLL_NF, MPLL_NR, MPLL_OD);
+	printf("MPLL[%d] %s (NF=0x%x NR=%d OD=%d)\n",
+	       idx, cfg->desc, cfg->nf, cfg->nr, cfg->od);
 
 	/* Stop DDR clocks */
 	sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_STOP_REG);
 
-	/* Prepare MPLL parameters once */
+	/* Build MPLL parameter word from table entry */
 	pll_para = sys_read32(MPLL_CTRL_REG);
-	pll_para &= ~(MPLL_CLKOD_MASK |
-		      MPLL_CLKNR_MASK |
-		      MPLL_CLKNF_MASK);
-
-	pll_para |= MPLL_NF;
-	pll_para |= (MPLL_NR - 1) << 13;
-	pll_para |= (MPLL_OD - 1) << 19;
+	pll_para &= ~(MPLL_CLKOD_MASK | MPLL_CLKNR_MASK | MPLL_CLKNF_MASK);
+	pll_para |= cfg->nf;
+	pll_para |= (cfg->nr - 1) << 13;
+	pll_para |= (cfg->od - 1) << 19;
 
 	for (retry = 0; retry < 3; retry++) {
 		if (!mpll_reset_and_lock(pll_para))
@@ -1412,9 +1460,8 @@ void sdramc_pll_reset(struct sdramc *sdramc)
 		printk("MPLL retry %d failed\n", retry + 1);
 	}
 
-	if (retry == 3) {
+	if (retry == 3)
 		printk("MPLL failed to lock after 3 retries\n");
-	}
 
 	/* Restart DDR clocks */
 	sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_START_REG);
@@ -1449,7 +1496,7 @@ int dram_init(struct ast_chip *chip)
 	struct sdramc_ac_timing *ac = NULL;
 	uint32_t bistcfg;
 	int err = -1;
-	int retry = 3;
+	int retry = 0;
 
 	sdramc->chip = chip;
 	sdramc->regs = (struct sdramc_regs *)DRAMC_BASE;
@@ -1476,9 +1523,16 @@ int dram_init(struct ast_chip *chip)
 	}
 
 	sdramc_preset(sdramc);
-	while (retry--) {
+	while (retry++ < 10) {
 
 		sdramc_full_reset(sdramc);
+
+		if (tamper_init(1, 0)) {
+			printf("Tamper init failed, retry=%d\n", retry);
+			sys_write32(0x8, 0x12c021c4);
+			continue;
+		}
+
 		sdramc_unlock(sdramc);
 
 		err = sdramc_init(sdramc, &ac);
@@ -1495,7 +1549,7 @@ int dram_init(struct ast_chip *chip)
 		printf("DDRPHY unlock clear set 1 status=0x%08x\n", sys_read32(0x130401a8));
 		sys_write32(0x0, 0x130401ac);
 		printf("DDRPHY unlock clear set 0 status=0x%08x\n", sys_read32(0x130401a8));
-		sys_write32(1, 0x131a0000);
+
 		sdramc_exit_self_refresh(sdramc);
 		sdramc_configure_mrs(sdramc, ac);
 		sdramc_enable_refresh(sdramc);
