@@ -1459,8 +1459,15 @@ int dram_init(struct ast_chip *chip)
 		dwc_ddrphy_apb_wr(0xd0000, 0);
 
 		if (dwc_ddrphy_apb_rd(0x200d5) & BIT(1)) {
-			printf("DDR PHY is already initialized, but PHY PllUnlocked!!!\n");
-			break;
+			/* A simple test to check if mbus is lost */
+			sys_write32(0x5aa5e77e, 0x80000000);
+			/* Prevent RAW hazard */
+			k_busy_wait(10);
+			sys_read32(0x80000000);
+			if (sys_read32(0x80000000) != 0x5aa5e77e) {
+				printf("DDR PHY is already initialized, but PHY PllUnlocked!!!\n");
+				break;
+			}
 		} else {
 			dwc_ddrphy_apb_wr(0xd0000, 1);
 		}
