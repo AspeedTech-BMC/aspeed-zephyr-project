@@ -115,7 +115,7 @@
 
 	pinctrl-0 = < pinctrl_i3c2_default >;
 
-	i3c2_tmq:i3c-tmq@7eca0032000 {
+	i3c2_tmq:i3c-tmq@2000 {
 		compatible = "i3c-target-mqueue";
 		reg = <0x0 0x7ec 0xa0032000>;
 		msg-size = <128>;
