@@ -90,13 +90,12 @@ static uint32_t cal_delay32_ring(struct ast2700_scu1 *scu, uint8_t rgmii_chain)
 	reg |= SCU_FREQ_OSC_ENABLE;
 	sys_write32(reg, base);
 	ret = readl_poll_timeout(base, reg, (reg & SCU_FREQ_DONE), 1000);
-	if (ret < 0)
-		return 0;
-
 	sys_write32(0, base);
 	sys_write32(sys_read32((uintptr_t)&scu->rsv_0xC4) &
 		    ~SCU_DBGSEL_RING_SEL_MASK,
 		    (uintptr_t)&scu->rsv_0xC4);
+	if (ret < 0)
+		return 0;
 
 	return counter_to_delay_ps(SCU_FREQ_COUNTER(reg));
 }
@@ -149,6 +148,13 @@ static void mac_init_rx_desc(void)
 	rxdes->des3 = MAC_RX_PKT_OFFSET;
 	rxdes->des0 = MAC_RXDES0_EDORR;
 	rxdes->des1 = 0;
+}
+
+static void mac_stop_dma(uint32_t index)
+{
+	uintptr_t base = mac_base(index);
+
+	sys_write32(0, base + MACCR);
 }
 
 static void mac_set_loopback(uint32_t index, bool enable)
@@ -367,6 +373,11 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 	if (check_calibration_delay(scu, index))
 		return;
 
+	mac_stop_dma(index);
+	mac_set_loopback(index, false);
+	mac_clk_disable(scu, index);
+	mac_reset_assert(scu, index);
+
 	if (revision == 1) {
 		tx_average_delay = cal_delay32_ring(scu, 0);
 		tx_average_delay /= 32;
@@ -439,6 +450,7 @@ static void find_rgmii_delay(struct ast_chip *chip, uint32_t index)
 	rx_dis = find_rx_center(result) + 1;
 	rx_en = rx_dis + 2000 / rx_average_delay;
 
+	mac_stop_dma(index);
 	mac_set_loopback(index, false);
 	mac_clk_disable(scu, index);
 	mac_reset_assert(scu, index);
