@@ -329,19 +329,25 @@ void mctp_i3c_target_intf_init(void)
 		mctp_interface_set_channel_id(&mctp_instance->mctp_wrapper.mctp_interface,
 				mctp_channel_id);
 
-		mctp_start(mctp_instance);
-		if (mctp_i3c_instance->state == MCTP_I3C_TARGET_INITIALIZED_DETACHED) {
-			mctp_i3c_instance->state = MCTP_I3C_TARGET_ATTACHED;
-			if (mctp_i3c_instance->i3c_state_sem.count <= 0)
-				k_sem_give(&mctp_i3c_instance->i3c_state_sem);
-		} else {
+		rc = mctp_start(mctp_instance);
+		if (rc != MCTP_SUCCESS) {
+			LOG_ERR("Failed to start i3c mctp service");
+			goto error;
+		}
+
+		/* Keep mctp_i3c_eid_assignment_thread_create() from running
+		 * k_thread_create() twice on the same struct k_thread.
+		 */
+		mctp_i3c_instance->state = MCTP_I3C_TARGET_ATTACHED;
+		if (mctp_i3c_instance->i3c_state_tid == NULL) {
 			k_sem_init(&mctp_i3c_instance->i3c_state_sem, 1, 1);
 			k_timer_init(&mctp_i3c_instance->i3c_state_timer, mctp_i3c_state_expiry_fn,
 					NULL);
 			k_timer_user_data_set(&mctp_i3c_instance->i3c_state_timer,
 					&mctp_i3c_instance->i3c_state_sem);
-			mctp_i3c_instance->state = MCTP_I3C_TARGET_ATTACHED;
-			mctp_i3c_eid_assignment_thread_create(&i3c_dev_p->mctp_i3c_inst);
+			mctp_i3c_eid_assignment_thread_create(mctp_i3c_instance);
+		} else if (mctp_i3c_instance->i3c_state_sem.count <= 0) {
+			k_sem_give(&mctp_i3c_instance->i3c_state_sem);
 		}
 
 		LOG_INF("MCTP over I3C for bus %02x start", i3c_dev_p->i3c_conf.bus);
