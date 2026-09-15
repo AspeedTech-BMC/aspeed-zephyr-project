@@ -126,7 +126,7 @@ static void mac_set_freq(struct ast2700_scu1 *scu)
 
 static void mac_clk_disable(struct ast2700_scu1 *scu, uint32_t index)
 {
-	sys_write32(BIT(9 + index), (uintptr_t)&scu->clkgate_ctrl1);
+	sys_write32(BIT(8 + index), (uintptr_t)&scu->clkgate_ctrl1);
 }
 
 static void mac_init_rx_desc_only_desc0(void)
