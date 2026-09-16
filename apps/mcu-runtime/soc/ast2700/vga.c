@@ -54,7 +54,6 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	vbios_mem_base = (uintptr_t)(vbios_base);
 	LOG_DBG("vbios_mem_base : 0x%x", vbios_mem_base);
 
-	memset((uint32_t *)vbios_base, 0x0, 0x10000);
 	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0, true);
 
 	/* Remove riscv Dram base */
