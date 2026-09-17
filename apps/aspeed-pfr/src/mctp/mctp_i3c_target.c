@@ -24,7 +24,8 @@ extern const struct device dev_i3c_tmq[I3C_MAX_NUM];
 #define I3C_BUS_BMC          0x02
 #define I3C_BUS_AST1080_BMC  0x03
 
-#if defined(CONFIG_BOARD_AST1080_DCSCM_OKS)
+#if defined(CONFIG_BOARD_AST1080_DCSCM_OKS) || \
+    defined(CONFIG_BOARD_AST1080_DCSCM_BHS)
 mctp_i3c_dev i3c_devs[] = {
 	{
 		/* AST1080 i3c3 is a target of the BMC controller. */
@@ -76,7 +77,7 @@ const struct mctp_i3c_role_ops mctp_i3c_role = {
 	.resolve_dest_eid = mctp_i3c_target_resolve_dest_eid,
 };
 
-#if defined(CONFIG_BOARD_AST1080_DCSCM_OKS)
+#if defined(CONFIG_I3C_MIPI_HCI_TARGET)
 static int mctp_i3c_target_obtain_address(mctp_i3c_dev *i3c_dev)
 {
 	return i3c_target_wait_for_daa(i3c_dev->i3c_conf.bus,
