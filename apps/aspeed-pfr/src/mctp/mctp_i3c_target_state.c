@@ -85,11 +85,14 @@ static void mctp_i3c_target_state_handler(void *arg, void *unused1, void *unused
 			mctp_i3c_pre_attestation(mgr, &duration);
 		} else if (state == DEVICE_MANAGER_ATTESTATION) {
 			mctp_i3c_attestation(mgr, &duration);
-		} else if (state == DEVICE_MANAGER_RUNTIME) {
-			if (is_pltrst_sync())
-				RSTPlatformReset(false);
-			duration = 0;
 #endif
+		} else if (state == DEVICE_MANAGER_RUNTIME) {
+			if (is_pltrst_sync()) {
+				RSTPlatformReset(false);
+				duration = 0;
+			} else {
+				duration = 1;
+			}
 		} else {
 			duration = 0;
 		}

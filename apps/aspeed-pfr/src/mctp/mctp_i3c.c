@@ -232,17 +232,16 @@ void mctp_i3c_state_handler(void *a, void *b, void *c)
 		} else if (dev_state == DEVICE_MANAGER_ATTESTATION) {
 			/* Start S3M attestation then release PLTRST_CPU0_N */
 			mctp_i3c_attestation(device_mgr, &duration);
-		} else if (dev_state == DEVICE_MANAGER_RUNTIME) {
-			/* TODO: Start S3M attestation then release PLTRST_CPU0_N */
-
-			if (is_pltrst_sync())
-				RSTPlatformReset(false);
-			else
-				LOG_WRN("PLTRST_SYNC# not asserted yet");
-			duration = 0;
-		}
 #endif
-		else {
+		} else if (dev_state == DEVICE_MANAGER_RUNTIME) {
+			if (is_pltrst_sync()) {
+				RSTPlatformReset(false);
+				duration = 0;
+			} else {
+				LOG_WRN("PLTRST_SYNC# not asserted yet");
+				duration = 1;
+			}
+		} else {
 			duration = 0;
 		}
 
