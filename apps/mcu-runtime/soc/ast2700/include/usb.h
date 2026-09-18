@@ -182,16 +182,6 @@
 #define  ASPEED_USB_VHUB_EP_CONFIG          0x00
 #define  ASPEED_USB_VHUB_EP_CFG_ENABLE            BIT(0)
 
-/*
- * WDT "mask2" reset-domain bits gate whether a WDT-triggered SoC reset also
- * resets the port's XHCI-PHY.
- *
- * Only BMC-XHCI-PHY ports are asserted; PCIe-XHCI-PHY ports must stay out of
- * this reset domain since the PCIe host owns that XHCI controller.
- */
-#define USB_XHCI_PHY_RESET_MASK2_PORTA	BIT(0)
-#define USB_XHCI_PHY_RESET_MASK2_PORTB	BIT(3)
-
 int usb_init(struct ast_chip *chip);
 int usb_ehci_stop(struct ast_chip *chip);
 int usb_uhci_stop(struct ast_chip *chip);
