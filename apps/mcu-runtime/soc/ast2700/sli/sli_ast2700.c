@@ -149,12 +149,18 @@ struct sli_data {
 	uint32_t flags;
 };
 
-#define SLIH_COARSE_D_BEGIN		6
+#define SLIH_COARSE_D_BEGIN		3
 #define SLIH_COARSE_D_END		28
 
 #define SLIM_COARSE_D_BEGIN		0
 #define SLIM_COARSE_D_END		28
 #define SLIM_FINE_MARGIN		5
+
+/*
+ * Coarse-window selection policy shared by SLIH and SLIM calibration.
+ */
+#define SLI_WIN_START_MAX		0x0a
+#define SLI_WIN_SIZE_MIN		3
 
 #define SLIV_COARSE_D_BEGIN		0
 #define SLIV_COARSE_D_END		28
@@ -291,12 +297,31 @@ static void sli_get_ahb_pad_delay(struct sli_data *data, int *first, int *last)
 	*last = (value >> 8) & 0xff;
 }
 
+/*
+ * A window starting at <= SLI_WIN_START_MAX and at least SLI_WIN_SIZE_MIN
+ * wide is always preferred; a window starting later is only used if no such
+ * qualifying window exists. Within the same tier, the wider window wins.
+ */
+static bool sli_win_is_better(int new_first, int new_last, int cur_first, int cur_last)
+{
+	bool new_ok = (new_first <= SLI_WIN_START_MAX) &&
+		      ((new_last - new_first) >= SLI_WIN_SIZE_MIN);
+	bool cur_ok = (cur_first <= SLI_WIN_START_MAX) &&
+		      ((cur_last - cur_first) >= SLI_WIN_SIZE_MIN);
+
+	if (new_ok != cur_ok)
+		return new_ok;
+
+	return (new_last - new_first) > (cur_last - cur_first);
+}
+
 static void sli_calibrate_ahb_delay(struct sli_data *data)
 {
 	int dc;
 	int d_first_pass = -1;
 	int d_last_pass = -1;
-	int win_size = 0;
+	int win_first = -1;
+	int win_last = -1;
 
 	setbits_le32(data->die1.slih + SLI_CTRL_I, SLI_AUTO_SEND_TRN_OFF);
 
@@ -318,18 +343,27 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 
 			d_last_pass = dc;
 		} else if (d_last_pass != -1) {
-			if ((d_last_pass - d_first_pass) > win_size) {
-				win_size = d_last_pass - d_first_pass;
-				sli_log_ahb_pad_delay(data, d_first_pass, d_last_pass);
-				LOG_DBG("IOD SLIH DS coarse win: {%d, %d}\n", d_first_pass, d_last_pass);
+			if (win_first == -1 ||
+			    sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
+				win_first = d_first_pass;
+				win_last = d_last_pass;
 			}
 			d_first_pass = -1;
 			d_last_pass = -1;
 		}
 	}
 
-	if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
-		win_size = d_last_pass - d_first_pass;
+	// if the last window valid til the end of loop
+	if (d_last_pass != -1 &&
+	    (win_first == -1 ||
+	     sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last))) {
+		win_first = d_first_pass;
+		win_last = d_last_pass;
+	}
+
+	if (win_first != -1) {
+		d_first_pass = win_first;
+		d_last_pass = win_last;
 		sli_log_ahb_pad_delay(data, d_first_pass, d_last_pass);
 		LOG_DBG("IOD SLIH DS coarse win: {%d, %d}\n", d_first_pass, d_last_pass);
 	} else {
@@ -479,7 +513,8 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 	int begin, end;
 	int d_first_pass = -1;
 	int d_last_pass = -1;
-	int win_size = 0;
+	int win_first = -1;
+	int win_last = -1;
 	int count = 0;
 	mem_addr_t tx, rx, kx, scu;
 	char *die_name = (is_DS ^ is_k_rx) ? "CPUD" : "IOD";
@@ -521,25 +556,33 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 
 				d_last_pass = dc;
 			} else if (d_last_pass != -1) {
-				if ((d_last_pass - d_first_pass) > win_size) {
-					win_size = d_last_pass - d_first_pass;
-					sli_log_mbus_pad_delay(scu, 0, d_first_pass, d_last_pass);
-					LOG_DBG("%s SLIM %s coarse win: {%d, %d}\n", die_name, dir, d_first_pass, d_last_pass);
+				if (win_first == -1 ||
+				    sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
+					win_first = d_first_pass;
+					win_last = d_last_pass;
 				}
 				d_first_pass = -1;
 				d_last_pass = -1;
 			}
 		}
 
-		if (d_last_pass != -1 && (d_last_pass - d_first_pass) > win_size) {
-			win_size = d_last_pass - d_first_pass;
+		if (d_last_pass != -1 &&
+		    (win_first == -1 ||
+		     sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last))) {
+			win_first = d_first_pass;
+			win_last = d_last_pass;
+		}
+
+		if (win_first != -1) {
+			d_first_pass = win_first;
+			d_last_pass = win_last;
 			sli_log_mbus_pad_delay(scu, 0, d_first_pass, d_last_pass);
 			LOG_DBG("%s SLIM %s coarse win: {%d, %d}\n", die_name, dir, d_first_pass, d_last_pass);
 		} else {
 			sli_get_mbus_pad_delay(scu, 0, &d_first_pass, &d_last_pass);
 		}
 
-		if ((d_last_pass - d_first_pass) >= 3)
+		if ((d_last_pass - d_first_pass) >= SLI_WIN_SIZE_MIN)
 			break;
 		LOG_DBG("%s SLIM %s win: {%d, %d} retry %d\n", die_name, dir, d_first_pass, d_last_pass, count);
 		d_first_pass = -1;
@@ -557,7 +600,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 	begin = MAX(dc - SLIM_FINE_MARGIN, 0);
 	end = MIN(dc + SLIM_FINE_MARGIN, 31);
 
-	if (win_size) {
+	if (win_last - win_first > 0) {
 		/* Fine-tune per-PAD delay */
 		d0 = sli_calibrate_mbus_pad_delay(data, 0, begin, end, is_DS, is_k_rx);
 		sli_set_mbus_delay_single(kx, 0, d0, is_k_rx);
