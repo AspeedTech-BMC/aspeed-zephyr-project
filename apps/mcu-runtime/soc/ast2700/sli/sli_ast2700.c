@@ -343,8 +343,7 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 
 			d_last_pass = dc;
 		} else if (d_last_pass != -1) {
-			if (win_first == -1 ||
-			    sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
+			if (sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
 				win_first = d_first_pass;
 				win_last = d_last_pass;
 			}
@@ -355,8 +354,7 @@ static void sli_calibrate_ahb_delay(struct sli_data *data)
 
 	// if the last window valid til the end of loop
 	if (d_last_pass != -1 &&
-	    (win_first == -1 ||
-	     sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last))) {
+	    sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
 		win_first = d_first_pass;
 		win_last = d_last_pass;
 	}
@@ -556,8 +554,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 
 				d_last_pass = dc;
 			} else if (d_last_pass != -1) {
-				if (win_first == -1 ||
-				    sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
+				if (sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
 					win_first = d_first_pass;
 					win_last = d_last_pass;
 				}
@@ -567,8 +564,7 @@ static void sli_calibrate_mbus_delay(struct sli_data *data, bool is_DS, bool is_
 		}
 
 		if (d_last_pass != -1 &&
-		    (win_first == -1 ||
-		     sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last))) {
+		    sli_win_is_better(d_first_pass, d_last_pass, win_first, win_last)) {
 			win_first = d_first_pass;
 			win_last = d_last_pass;
 		}
