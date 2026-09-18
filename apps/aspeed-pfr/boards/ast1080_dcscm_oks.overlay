@@ -10,13 +10,31 @@
 
 #define AFM_VERSION 4
 
-// &cptra_mci_mbox {
-// 	status = "okay";
-// };
-//
-// &cptra_mci_sha {
-// 	status = "okay";
-// };
+&cptra_mci_mbox {
+	status = "okay";
+};
+
+&cptra_mci_sha {
+	status = "okay";
+};
+
+/* DMA-path SHA engine: what the PFR hash path runs on. */
+&cptra_mci_sha_acc {
+	status = "okay";
+};
+
+/* Unused by the verify path; CPTRA_MCI_SHELL depends on every engine. */
+&cptra_mci_ecdsa {
+	status = "okay";
+};
+
+&cptra_mci_lms {
+	status = "okay";
+};
+
+&cptra_mci_mldsa {
+	status = "okay";
+};
 
 &i2cfilter {
 	status = "okay";

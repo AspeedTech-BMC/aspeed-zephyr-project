@@ -8,6 +8,8 @@ target_sources(app PRIVATE
 	pfr_util.c
 	pfr_verification.c
 	)
+# Both self-guarded by their CONFIG_CPTRA_MCI_* option.
+target_sources(app PRIVATE pfr_sha_acc.c pfr_ecdsa_cptra.c)
 # No-op ABR API stubs for SoCs without an ABR driver yet (e.g. AST1080/G2).
 # Self-guarded with !CONFIG_ABR_FLOW_CTRL_ASPEED, so it compiles to nothing
 # when the real driver is present.

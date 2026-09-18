@@ -9,7 +9,7 @@ choice HROT_HASH_BACKEND
 	depends on HROT_WRAPPER
 	prompt "HROT hash backend"
 	default HROT_HASH_BACKEND_ASPEED if CRYPTO_ASPEED
-	default HROT_HASH_BACKEND_CPTRA if CPTRA_MCI_SHA
+	default HROT_HASH_BACKEND_CPTRA if CPTRA_MCI_SHA_ACC
 	default HROT_HASH_BACKEND_MBEDTLS if MBEDTLS
 	help
 	  Select the backend used by the HROT hash wrapper.
@@ -40,11 +40,12 @@ config HROT_HASH_MBEDTLS_BYPASS
 	  backend. Never enable in production builds.
 
 config HROT_HASH_BACKEND_CPTRA
-	bool "Caliptra-SS MCI mailbox hardware hash"
-	depends on CPTRA_MCI_SHA
+	bool "Caliptra-SS MCI hardware hash"
+	depends on CPTRA_MCI_SHA_ACC
 	help
-	  Use the Caliptra-SS MCI mailbox SHA engine (MC_SHA_INIT/UPDATE/FINAL)
-	  through the HROT hash wrapper. SHA-256 is not supported by this
-	  hardware; calculate_sha256/start_sha256 always fail.
+	  Use the Caliptra-SS MCI SHA_ACC engine, which DMA-reads the source
+	  instead of copying it through the mailbox. SHA-256 is unsupported;
+	  calculate_sha256/start_sha256 always fail.
 
 endchoice
+
