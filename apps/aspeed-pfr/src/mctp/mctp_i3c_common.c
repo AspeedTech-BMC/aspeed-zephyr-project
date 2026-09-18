@@ -83,7 +83,11 @@ int mctp_i3c_send_eid_announcement(mctp *mctp_instance, int *duration)
 	if (status == 0) {
 		device_manager_update_device_state(mgr,
 				DEVICE_MANAGER_SELF_DEVICE_NUM,
+#if defined(CONFIG_PFR_SPDM_ATTESTATION)
 				DEVICE_MANAGER_PRE_ATTESTATION);
+#else
+				DEVICE_MANAGER_RUNTIME);
+#endif
 	}
 	*duration = 2;
 
