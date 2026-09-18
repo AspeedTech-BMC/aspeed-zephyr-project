@@ -39,18 +39,18 @@ int wdt_init(struct ast_chip *chip)
 			wdt_base_addr = ASPEED_WDT_BASE + idx * WDT_INSTANCE_SIZE;
 
 			/* SoC reset mask */
-			wdt_writel(0x8207ff79, wdt_base_addr + WDT_RST_MASK_1);
-			wdt_writel(0x000003f6, wdt_base_addr + WDT_RST_MASK_2);
+			wdt_writel(0x8207FF79, wdt_base_addr + WDT_RST_MASK_1);
+			wdt_writel(0x000003E4, wdt_base_addr + WDT_RST_MASK_2);
 			wdt_writel(0x000093ec, wdt_base_addr + WDT_RST_MASK_3);
 			wdt_writel(0x40303803, wdt_base_addr + WDT_RST_MASK_4);
-			wdt_writel(0x003a0000, wdt_base_addr + WDT_RST_MASK_5);
+			wdt_writel(0x00000000, wdt_base_addr + WDT_RST_MASK_5);
 
 			/* SW reset mask */
-			wdt_writel(0x8207ff79, wdt_base_addr + WDT_SW_RST_MASK_1);
-			wdt_writel(0x000003f6, wdt_base_addr + WDT_SW_RST_MASK_2);
+			wdt_writel(0x8207FF79, wdt_base_addr + WDT_SW_RST_MASK_1);
+			wdt_writel(0x000003E4, wdt_base_addr + WDT_SW_RST_MASK_2);
 			wdt_writel(0x000093ec, wdt_base_addr + WDT_SW_RST_MASK_3);
 			wdt_writel(0x40303803, wdt_base_addr + WDT_SW_RST_MASK_4);
-			wdt_writel(0x003a0000, wdt_base_addr + WDT_SW_RST_MASK_5);
+			wdt_writel(0x00000000, wdt_base_addr + WDT_SW_RST_MASK_5);
 		}
 	}
 
