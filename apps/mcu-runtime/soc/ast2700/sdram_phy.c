@@ -14,6 +14,10 @@ LOG_MODULE_REGISTER(sdram_phy, CONFIG_SOC_FMC_LOG_LEVEL);
 #define SCU0_DDR_PHY_CLOCK	BIT(11)
 #define SCU0_CLOCK_STOP_CLR_REG	(SCU0_REG + 0x244)
 
+#define DWC_MAILBOX_POLL_TIMEOUT_US	1000000
+#define DRAMC_PHY_INIT_DONE_TIMEOUT_US	1000000
+#define DWC_PHY_HANDSHAKE_TIMEOUT_US	1000000
+
 void dwc_decode_streaming_message(void);
 #define DWC_UCTWRITEPROTSHADOW		BIT(0)
 #define DWC_UCTSHADOWREGS		(0xd0004)
@@ -22,11 +26,17 @@ void dwc_decode_streaming_message(void);
 #define	DWC_UCTWRITEPROT		(0xc0033)
 #define DWC_UCTDATWRITEONLYSHADOW	(0xd0034)
 
-void dwc_get_mailbox(const int mode, uint32_t *mail)
+int dwc_get_mailbox(const int mode, uint32_t *mail)
 {
+	uint32_t timeout;
+
 	/* 1. Poll the UctWriteProtShadow, looking for a 0 */
-	while (dwc_ddrphy_apb_rd(DWC_UCTSHADOWREGS) & DWC_UCTWRITEPROTSHADOW)
-		;
+	timeout = DWC_MAILBOX_POLL_TIMEOUT_US;
+	while (dwc_ddrphy_apb_rd(DWC_UCTSHADOWREGS) & DWC_UCTWRITEPROTSHADOW) {
+		if (!timeout--)
+			return -ETIMEDOUT;
+		k_busy_wait(1);
+	}
 
 	/* 2. When a 0 is seen, read the UctWriteOnlyShadow register to get the major message number. */
 	*mail = dwc_ddrphy_apb_rd(DWC_UCTWRITEONLYSHADOW) & 0xffff;
@@ -39,11 +49,17 @@ void dwc_get_mailbox(const int mode, uint32_t *mail)
 	dwc_ddrphy_apb_wr(DWC_DCTWRITEPROT, 0);
 
 	/* 5. Poll the UctWriteProtShadow, looking for a 1 */
-	while (!(dwc_ddrphy_apb_rd(DWC_UCTSHADOWREGS) & DWC_UCTWRITEPROTSHADOW))
-		;
+	timeout = DWC_MAILBOX_POLL_TIMEOUT_US;
+	while (!(dwc_ddrphy_apb_rd(DWC_UCTSHADOWREGS) & DWC_UCTWRITEPROTSHADOW)) {
+		if (!timeout--)
+			return -ETIMEDOUT;
+		k_busy_wait(1);
+	}
 
 	/* 6. When a 1 is seen, write the DctWriteProt to 1 to complete the protocol */
 	dwc_ddrphy_apb_wr(DWC_DCTWRITEPROT, 1);
+
+	return 0;
 }
 
 void dwc_init_mailbox(void)
@@ -150,7 +166,10 @@ void dwc_decode_streaming_message(void)
 {
 	uint32_t str, msg, msg2, count, i;
 
-	dwc_get_mailbox(1, &msg);
+	if (dwc_get_mailbox(1, &msg)) {
+		LOG_ERR("%s: mailbox timeout\n", __func__);
+		return;
+	}
 
 	printf("\n");
 	printf("Message:\n");
@@ -161,7 +180,10 @@ void dwc_decode_streaming_message(void)
 
 	printf("Para:\n");
 	for (i = 0; i < count; i++) {
-		dwc_get_mailbox(1, &msg2);
+		if (dwc_get_mailbox(1, &msg2)) {
+			LOG_ERR("%s: mailbox timeout\n", __func__);
+			return;
+		}
 		printf("0x%x ", msg2);
 	}
 
@@ -180,7 +202,8 @@ int dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
 
 	while (timeout_ms--) {
 
-		dwc_get_mailbox(0, &mail);
+		if (dwc_get_mailbox(0, &mail))
+			return -ETIMEDOUT;
 		message = mail & 0xFFFF;
 
 		/* Training completed */
@@ -200,10 +223,11 @@ int dwc_ddrphy_phyinit_userCustom_G_waitFwDone(void)
 	return -ETIMEDOUT;
 }
 
-void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
+int dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
 {
 	struct sdramc_regs *regs = sdramc->regs;
 	uint32_t val;
+	uint32_t timeout;
 
 	/*
 	 * 1. Set the PHY input clocks to the desired frequency.
@@ -223,13 +247,23 @@ void dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(struct sdramc *sdramc)
 	sys_write32(val, (uint32_t)&regs->mctl);
 
 	/* wait phy complete */
-	while ((sys_read32((uint32_t)&regs->intr_status) & DRAMC_IRQSTA_PHY_INIT_DONE) != DRAMC_IRQSTA_PHY_INIT_DONE)
-		;
+	timeout = DRAMC_PHY_INIT_DONE_TIMEOUT_US;
+	while ((sys_read32((uint32_t)&regs->intr_status) & DRAMC_IRQSTA_PHY_INIT_DONE) != DRAMC_IRQSTA_PHY_INIT_DONE) {
+		if (!timeout--)
+			return -ETIMEDOUT;
+		k_busy_wait(1);
+	}
 
 	sys_write32(0xffff, (uint32_t)&regs->intr_clear);
 
-	while (sys_read32((uint32_t)&regs->intr_status))
-		;
+	timeout = DRAMC_PHY_INIT_DONE_TIMEOUT_US;
+	while (sys_read32((uint32_t)&regs->intr_status)) {
+		if (!timeout--)
+			return -ETIMEDOUT;
+		k_busy_wait(1);
+	}
+
+	return 0;
 }
 
 int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
@@ -270,13 +304,24 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 int dwc_phy_init(struct sdramc *sdramc)
 {
 	uint32_t err = -1;
+	uint32_t timeout;
 
 	sys_write32(0xabcd2700, 0x13c00000);
-	while (sys_read32(0x13c00000) != 1);
+	timeout = DWC_PHY_HANDSHAKE_TIMEOUT_US;
+	while (sys_read32(0x13c00000) != 1) {
+		if (!timeout--)
+			return -ETIMEDOUT;
+		k_busy_wait(1);
+	}
 	sys_write32(0x16c, 0x13c00050);
 	sys_write32(0x16c, 0x13c00054);
 	sys_write32(0xaaa, 0x13c00000);
-	while (sys_read32(0x13c00000) != 0);
+	timeout = DWC_PHY_HANDSHAKE_TIMEOUT_US;
+	while (sys_read32(0x13c00000) != 0) {
+		if (!timeout--)
+			return -ETIMEDOUT;
+		k_busy_wait(1);
+	}
 
 	if (is_ddr4()) {
 		LOG_DBG("%s: Starting ddr4 training\n", __func__);
