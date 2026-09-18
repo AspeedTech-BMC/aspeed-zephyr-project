@@ -6929,7 +6929,9 @@ dwc_ddrphy_phyinit_userCustom_customPostTrain();
 ////
 ////##############################################################
 //
-dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(sdramc);
+err = dwc_ddrphy_phyinit_userCustom_J_enterMissionMode(sdramc);
+if (err)
+	return err;
 
 //
 //// [dwc_ddrphy_phyinit_userCustom_J_enterMissionMode] End of dwc_ddrphy_phyinit_userCustom_J_enterMissionMode()
