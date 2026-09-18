@@ -8,6 +8,7 @@
 #include <chip.h>
 #include <dma.h>
 #include <mac_ast2700.h>
+#include <usb.h>
 
 LOG_MODULE_REGISTER(dma, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -38,6 +39,10 @@ static int mac_dma_stop(struct ast_chip *chip)
  */
 static const struct dma_engine dma_engines[] = {
 	{ "MAC", mac_dma_stop },
+	{ "USB EHCI", usb_ehci_stop },
+	{ "USB UHCI", usb_uhci_stop },
+	{ "USB XHCI", usb_xhci_stop },
+	{ "USB VHUB", usb_vhub_stop },
 };
 
 int dma_stop(struct ast_chip *chip)
@@ -48,7 +53,7 @@ int dma_stop(struct ast_chip *chip)
 	for (i = 0; i < ARRAY_SIZE(dma_engines); i++) {
 		ret = dma_engines[i].stop(chip);
 		if (ret)
-			LOG_WRN("%s dma stop failed: %d\n", dma_engines[i].name, ret);
+			LOG_WRN("%s dma stop failed: %d", dma_engines[i].name, ret);
 	}
 
 	return 0;

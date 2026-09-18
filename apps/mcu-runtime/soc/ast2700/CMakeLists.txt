@@ -18,6 +18,7 @@ target_sources(app PRIVATE
 	ufs.c
 	usb_recovery_ast2700.c
 	usb.c
+	usb_dma_stop.c
 	mmc.c
 	stor_ast2700.c
 	mac.c
