@@ -22,9 +22,11 @@
 #include <mbedtls/sha512.h>
 #elif defined(CONFIG_HROT_HASH_BACKEND_CPTRA)
 #include <zephyr/sys/printk.h>
+#include <zephyr/cache.h>
 #include <zephyr/crypto/crypto.h>
 #include <zephyr/crypto/hash.h>
 #include <zephyr/drivers/misc/aspeed/cptra_mci_mbox.h>
+#include <soc.h>
 #endif
 
 #if defined(CONFIG_HROT_HASH_BACKEND_ASPEED)
@@ -294,11 +296,13 @@ static void hash_wrapper_cancel(struct hash_engine *engine)
 }
 #elif defined(CONFIG_HROT_HASH_BACKEND_CPTRA)
 /*
- * The Caliptra-SS MCI mailbox SHA engine (cptra_mci_sha) only implements
- * SHA-384/SHA-512 (see cptra_mci_sha_session_setup()), so calculate_sha256/
- * start_sha256 just print a warning and fail rather than silently doing
- * nothing. Callers that need SHA-256 (e.g. PFR provisioning's root key hash)
- * are not supported on this backend yet.
+ * SHA_ACC DMA-reads its source, so hash_pkt.in_buf carries a bus address, not
+ * a pointer; hash_wrapper_cptra_src() converts and flushes.
+ *
+ * The engine does not implement SHA-256 (see cptra_mci_sha_session_setup()), so
+ * calculate_sha256/start_sha256 just print a warning and fail rather than
+ * silently doing nothing. Callers that need SHA-256 (e.g. PFR provisioning's
+ * root key hash) are not supported on this backend yet.
  */
 static int hash_wrapper_calculate_sha256(struct hash_engine *engine, const uint8_t *data,
 					 size_t length, uint8_t *hash, size_t hash_length)
@@ -323,7 +327,15 @@ static int hash_wrapper_start_sha256(struct hash_engine *engine)
 
 static const struct device *hash_wrapper_cptra_dev(void)
 {
-	return DEVICE_DT_GET_ANY(aspeed_cptra_mci_sha);
+	return DEVICE_DT_GET_ANY(aspeed_cptra_mci_sha_acc);
+}
+
+/* The flush is what makes CM4 writes visible to Caliptra's DMA. */
+static uint8_t *hash_wrapper_cptra_src(const uint8_t *data, size_t length)
+{
+	sys_cache_data_flush_range((void *)data, length);
+
+	return (uint8_t *)(uintptr_t)TO_PHY_ADDR((uintptr_t)data);
 }
 
 static struct {
@@ -373,7 +385,7 @@ static int hash_wrapper_calculate_sha384(struct hash_engine *engine, const uint8
 		return HASH_ENGINE_START_SHA384_FAILED;
 	}
 
-	pkt.in_buf = (uint8_t *)data;
+	pkt.in_buf = hash_wrapper_cptra_src(data, length);
 	pkt.in_len = length;
 	pkt.out_buf = hash;
 	status = hash_compute(&ctx, &pkt);
@@ -426,7 +438,7 @@ static int hash_wrapper_update(struct hash_engine *engine, const uint8_t *data, 
 		return HASH_ENGINE_NO_ACTIVE_HASH;
 	}
 
-	pkt.in_buf = (uint8_t *)data;
+	pkt.in_buf = hash_wrapper_cptra_src(data, length);
 	pkt.in_len = length;
 
 	return hash_update(&hash_wrapper_cptra.ctx, &pkt) ? HASH_ENGINE_UPDATE_FAILED : 0;
