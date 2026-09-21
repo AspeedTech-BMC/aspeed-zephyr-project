@@ -975,10 +975,6 @@ int sli_init_r(struct ast_chip *chip)
 		reg_val = sys_read32((mem_addr_t)ASPEED_IO_INTC_BASE + INTC_STATUS);
 		sys_write32(reg_val, (mem_addr_t)ASPEED_IO_INTC_BASE + INTC_STATUS);
 
-		if (data->flags & SLI_FLAG_AST2700A2)
-			setbits_le32(ASPEED_IO_INTC_BASE + INTC_PROT,
-				     INTC_ENABLE_CPUD_RESET_SRC);
-
 		sli_calibrate_video_delay(data, false, true);
 		if (IS_ENABLED(CONFIG_SLI_K_ON_CPU)) {
 			sys_write32(0, data->die1.sliv + SLI_CTRL_III);
