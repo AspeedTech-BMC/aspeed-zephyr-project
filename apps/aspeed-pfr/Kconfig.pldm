@@ -45,3 +45,25 @@ config PLDM_FW_UPDATE
 	bool
 	depends on PLDM
 
+choice PLDM_FW_UPDATE_VERSION
+	prompt "PLDM firmware update protocol version"
+	depends on PLDM_FW_UPDATE
+	default PLDM_FW_UPDATE_VERSION_1_3
+	help
+	  Select the DSP0267 protocol version advertised by the firmware
+	  device.  Version-specific commands are exposed only when they are
+	  defined by the selected revision.
+
+config PLDM_FW_UPDATE_VERSION_1_0
+	bool "DSP0267 1.0"
+	help
+	  Advertise PLDM firmware update protocol version 1.0.0 and omit
+	  downstream-device commands, which were introduced in DSP0267 1.1.
+
+config PLDM_FW_UPDATE_VERSION_1_3
+	bool "DSP0267 1.3"
+	help
+	  Advertise PLDM firmware update protocol version 1.3.0 and expose
+	  the implemented downstream-device commands.
+
+endchoice

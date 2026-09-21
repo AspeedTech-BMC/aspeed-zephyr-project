@@ -1154,6 +1154,7 @@ static uint8_t query_device_identifiers(void *mctp_inst, uint8_t *buf, uint16_t 
 	return plat_pldm_query_device_identifiers(buf, len, resp, resp_len);
 }
 
+#if defined(CONFIG_PLDM_FW_UPDATE_VERSION_1_3)
 static uint8_t query_downstream_devices(void *mctp_inst, uint8_t *buf, uint16_t len,
 					uint8_t instance_id, uint8_t *resp, uint16_t *resp_len,
 					void *ext_params)
@@ -1256,6 +1257,7 @@ static uint8_t get_downstream_firmware_parameters(void *mctp_inst, uint8_t *buf,
 
 	return PLDM_SUCCESS;
 }
+#endif
 
 __weak uint8_t plat_pldm_query_device_identifiers(const uint8_t *buf, uint16_t len, uint8_t *resp,
 						  uint16_t *resp_len)
@@ -1305,10 +1307,12 @@ __weak uint8_t plat_pldm_query_downstream_identifiers(const uint8_t *buf, uint16
 static pldm_cmd_handler pldm_fw_update_cmd_tbl[] = {
 	{ PLDM_FW_UPDATE_CMD_CODE_QUERY_DEVICE_IDENTIFIERS, query_device_identifiers },
 	{ PLDM_FW_UPDATE_CMD_CODE_GET_FIRMWARE_PARAMETERS, get_firmware_parameter },
+#if defined(CONFIG_PLDM_FW_UPDATE_VERSION_1_3)
 	{ PLDM_FW_UPDATE_CMD_CODE_QUERY_DOWNSTREAM_DEVICES, query_downstream_devices },
 	{ PLDM_FW_UPDATE_CMD_CODE_QUERY_DOWNSTREAM_IDENTIFIERS, query_downstream_identifiers },
 	{ PLDM_FW_UPDATE_CMD_CODE_GET_DOWNSTREAM_FW_PARAMETERS,
 	  get_downstream_firmware_parameters },
+#endif
 	{ PLDM_FW_UPDATE_CMD_CODE_REQUEST_UPDATE, request_update },
 	{ PLDM_FW_UPDATE_CMD_CODE_PASS_COMPONENT_TABLE, pass_component_table },
 	{ PLDM_FW_UPDATE_CMD_CODE_UPDATE_COMPONENT, update_component },
