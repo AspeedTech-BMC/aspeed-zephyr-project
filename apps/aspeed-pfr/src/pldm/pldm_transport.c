@@ -70,6 +70,26 @@ static void pldm_reset_context(struct pldm_transport_context *ctx)
 	ctx->active = false;
 }
 
+/*
+ * Whether packet->pkt_size still counts the trailing MCTP-over-I3C PEC byte
+ * depends on which read path filled it in:
+ *
+ *  - Target mode (mctp_i3c_target.c) reads through the i3c-mctp chardev
+ *    transport, whose kernel driver verifies and strips the PEC first.
+ *  - Controller mode (mctp_i3c.c) reports the raw private-read transfer
+ *    count, which still includes the PEC.
+ *
+ * Only PLDM notices: its handlers validate their payload size exactly, so a
+ * stray byte makes them answer ERROR_INVALID_LENGTH. The plain MCTP paths
+ * ignore trailing bytes, which is why this must not be corrected in the
+ * shared receive path.
+ */
+#if defined(CONFIG_PFR_MCTP_I3C_5_0)
+#define PLDM_I3C_PEC_LEN 0
+#else
+#define PLDM_I3C_PEC_LEN 1
+#endif
+
 bool pldm_transport_process_packet(mctp *mctp_inst, struct cmd_packet *packet)
 {
 	struct mctp_base_protocol_transport_i3c_header *header;
@@ -79,16 +99,12 @@ bool pldm_transport_process_packet(mctp *mctp_inst, struct cmd_packet *packet)
 	size_t payload_len;
 
 	if ((mctp_inst == NULL) || (packet == NULL) || !pldm_is_i3c(mctp_inst) ||
-	    (packet->pkt_size <= sizeof(*header)))
+	    (packet->pkt_size <= sizeof(*header) + PLDM_I3C_PEC_LEN))
 		return false;
 
 	header = (struct mctp_base_protocol_transport_i3c_header *)packet->data;
 	payload = packet->data + sizeof(*header);
-	/* The i3c-mctp chardev transport does not put a PEC on the wire; the
-	 * kernel driver owns PEC generation/verification, so packet->data holds
-	 * only the transport header and the raw MCTP payload.
-	 */
-	payload_len = packet->pkt_size - sizeof(*header);
+	payload_len = packet->pkt_size - sizeof(*header) - PLDM_I3C_PEC_LEN;
 
 	ctx = pldm_get_context(mctp_inst);
 	if (ctx == NULL)

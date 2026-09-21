@@ -26,7 +26,11 @@
 LOG_MODULE_DECLARE(pldm, LOG_LEVEL_DBG);
 
 #define PLDM_VERSION_BASE 0xF1F1F000u
+#if defined(CONFIG_PLDM_FW_UPDATE_VERSION_1_0)
+#define PLDM_VERSION_FW_UPDATE 0xF1F0F000u
+#else
 #define PLDM_VERSION_FW_UPDATE 0xF1F3F000u
+#endif
 
 static void advertise_fw_update_exchange_commands(uint8_t *commands)
 {
@@ -162,6 +166,12 @@ uint8_t get_pldm_commands(void *mctp_inst, uint8_t *buf, uint16_t len, uint8_t i
 
 	if (len != sizeof(struct _get_pldm_commands_req)) {
 		resp_p->completion_code = PLDM_ERROR_INVALID_LENGTH;
+		*resp_len = 1;
+		return PLDM_SUCCESS;
+	}
+	if ((req_p->type == PLDM_TYPE_FW_UPDATE) &&
+	    (req_p->version != PLDM_VERSION_FW_UPDATE)) {
+		resp_p->completion_code = INVALID_PLDM_VERSION_IN_REQUEST_DATA;
 		*resp_len = 1;
 		return PLDM_SUCCESS;
 	}
