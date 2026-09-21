@@ -35,16 +35,22 @@
  * mux (cs-group-analog-mux-enable below) - see commit 2fc2393be21.
  */
 &spim1 {
+	pinctrl-0 = <pinctrl_spif0_default_i>;
+	pinctrl-names = "default";
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	status = "okay";
 };
 
 &spim2 {
+	pinctrl-0 = <pinctrl_spif1_default_i>;
+	pinctrl-names = "default";
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	status = "okay";
 };
 
 &spim3 {
+	pinctrl-0 = <pinctrl_spif2_default_i>;
+	pinctrl-names = "default";
 	allow-cmds = [03 13 0b 0c 6b 6c 01 05 35 06 04 20 21 9f 5a b7 e9 32 34 d8 dc 02 12 3b 3c 70 bb bc 50 eb ec c2];
 	status = "okay";
 };
@@ -54,8 +60,8 @@
 	cs-group-analog-mux-enable;
 	/* Pins shared with SPI monitor (spim1/spim2). DCSCM does not use spif0_cs1/spif1_cs1. */
 	pinctrl-0 = <
-		pinctrl_spif0_default
-		pinctrl_spif1_default
+		pinctrl_spif0_default_o
+		pinctrl_spif1_default_o
 	>;
 };
 
@@ -73,7 +79,7 @@
 	status = "okay";
 	/* Pins shared with SPI monitor (spim3). DCSCM does not use spif2_cs1. */
 	pinctrl-0 = <
-		pinctrl_spif2_default
+		pinctrl_spif2_default_o
 	>;
 };
 
@@ -110,41 +116,11 @@
 	};
 };
 
-// &i3c0 {
-// 	status = "okay";
-// 	sda-tx-hold-ns = <20>;
-// 	i3c-pp-scl-hi-period-ns = <380>;
-// 	i3c-pp-scl-lo-period-ns = <620>;
-// 	pinctrl-0 = <pinctrl_i3c0_default>;
-//
-// 	// i3chub
-// 	i3cdev@4cdffffffff {
-// 		compatible = "i3c-dummy-device";
-// 		reg = <0x0 0x4cd 0xffffffff>;
-// 		status = "okay";
-// 		zephyr,deferred-init;
-// 	};
-//
-// 	// cpu0
-// 	i3cdev@20a012900ef {
-// 		compatible = "i3c-dummy-device";
-// 		reg = <0x0 0x20a 0x012900ef>;
-// 		status = "okay";
-// 		zephyr,deferred-init;
-// 	};
-//
-// 	// cpu1
-// 	i3cdev@20a012910ef {
-// 		compatible = "i3c-dummy-device";
-// 		reg = <0x0 0x20a 0x012910ef>;
-// 		status = "okay";
-// 		zephyr,deferred-init;
-// 	};
-// };
 
 /* MCTP over I3C (AST2700 i3c-4 -> AST1080 i3c-3), same DC-SCM card / CPU
  * platform PIDs as ast2700_dcscm_bhs - only the BMC SoC differs.
  */
+#if 1
 &i3c3 {
 	status = "okay";
 	i3c-scl-hz = <12500000>;
@@ -163,6 +139,23 @@
 		zephyr,deferred-init;
 	};
 };
+#else
+&i3c3 {
+	status = "okay";
+	dcr = <0xcc>;
+	secondary;
+
+	i3c3_tmq:i3c-tmq@3000 {
+		compatible = "i3c-target-mqueue";
+		reg = <0x0 0x7ec 0x80003000>;
+		msg-size = <128>;
+		num-of-msgs = <8>;
+		mandatory-data-byte = <0xae>;
+		ibi-append-pec = <0>;
+		status = "okay";
+	};
+};
+#endif
 
 &wdt0 {
 	status = "okay";
