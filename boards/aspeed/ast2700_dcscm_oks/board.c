@@ -16,11 +16,18 @@ static int ast2700_dcscm_oks_post_init(void)
 {
 	// SMB Mux set to OE_N and Selet 0
 	const struct device *dev;
+	LOG_INF("SMB_SCM_EN (GPIOL2) and SMB_BMC_PFR_SCM_SW (GPIOL3) to 0");
 	dev = device_get_binding("gpio0_i_l");
 	gpio_pin_configure(dev, 26, GPIO_OUTPUT);
 	gpio_pin_set_raw(dev, 26, 0);
 	gpio_pin_configure(dev, 27, GPIO_OUTPUT);
 	gpio_pin_set_raw(dev, 27, 0);
+
+	// I3C_SCM_EN (GPIO_N5)
+	LOG_INF("I3C_SCM_EN (GPIO_N5) to 0");
+	dev = device_get_binding("gpio0_m_p");
+	gpio_pin_configure(dev, 13, GPIO_OUTPUT);
+	gpio_pin_set_raw(dev, 13, 0);
 	return 0;
 }
 

@@ -36,15 +36,25 @@ void aspeed_print_sysrst_info(void)
  *   - AST1060 GPIOL2 -> AST1080 GPIO190, bank gpio0_160_191, offset 30
  *   - AST1060 GPIOL3 -> AST1080 GPIO192, bank gpio0_192_193, offset 0
  *   - AST1060 GPIOH3 -> AST1080 GPIO45,  bank gpio0_32_63,   offset 13
+ *   - AST1060 GPION5 -> AST1080 GPIO152, bank gpio0_128_159, offset 24
  */
 static int ast1080_dcscm_oks_post_init(void)
 {
 	// Enable flash power by SMB_SCM_EN (GPIO190) and SMB_BMC_PFR_SCM_SW (GPIO192)
 	const struct device *dev;
+	LOG_INF("SMB_SCM_EN (GPIO190) and SMB_BMC_PFR_SCM_SW (GPIO192) to 0");
 	dev = device_get_binding("gpio0_160_191");
-	gpio_pin_configure(dev, 30, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure(dev, 30, GPIO_OUTPUT);
+	gpio_pin_set_raw(dev, 30, 0);
 	dev = device_get_binding("gpio0_192_193");
-	gpio_pin_configure(dev, 0, GPIO_OUTPUT_ACTIVE);
+	gpio_pin_configure(dev, 0, GPIO_OUTPUT);
+	gpio_pin_set_raw(dev, 0, 0);
+
+	// I3C_SCM_EN (GPIO152)
+	LOG_INF("I3C_SCM_EN (GPIO152) to 0");
+	dev = device_get_binding("gpio0_128_159");
+	gpio_pin_configure(dev, 24, GPIO_OUTPUT);
+	gpio_pin_set_raw(dev, 24, 0);
 	k_busy_wait(10000);
 	return 0;
 }
