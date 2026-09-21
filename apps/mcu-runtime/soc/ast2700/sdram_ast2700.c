@@ -1384,28 +1384,6 @@ static const struct mpll_cfg mpll_cfg_table[] = {
 #define MPLL_CFG_MAGIC_MASK     0xFFFFFF00U
 #define MPLL_CFG_IDX_MASK       0x000000FFU
 
-static int mpll_get_cfg_idx(void)
-{
-	uint32_t scratch = sys_read32(SCU0_MPLL_CFG_SCRATCH);
-	int idx;
-
-	if ((scratch & MPLL_CFG_MAGIC_MASK) == MPLL_CFG_MAGIC) {
-		/* Warm reset path: use stored index */
-		idx = scratch & MPLL_CFG_IDX_MASK;
-		if (idx >= (int)ARRAY_SIZE(mpll_cfg_table))
-			idx = 0;
-	} else {
-		/* POR or first boot: start from index 0 */
-		idx = 0;
-	}
-
-	/* Persist next index for the following boot */
-	sys_write32(MPLL_CFG_MAGIC | ((idx + 1) % ARRAY_SIZE(mpll_cfg_table)),
-		    SCU0_MPLL_CFG_SCRATCH);
-
-	return idx;
-}
-
 static int mpll_wait_lock(uint32_t timeout_us)
 {
 	while (!(sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)) {
@@ -1534,14 +1512,18 @@ int dram_init(struct ast_chip *chip)
 	sdramc_preset(sdramc);
 	while (retry++ < 10) {
 
-		sdramc_full_reset(sdramc);
+		/* Stop DDR clocks */
+		sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_STOP_REG);
 
-		if (tamper_init(1, 0)) {
-			printf("Tamper init failed, retry=%d\n", retry);
-			sys_write32(0x8, 0x12c021c4);
+		if (pll_calibration(0, 3)) {
+			printf("mpll calibration failed, retry=%d\n", retry);
 			continue;
 		}
 
+		/* Restart DDR clocks */
+		sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_START_REG);
+
+		sdramc_reset(sdramc);
 		sdramc_unlock(sdramc);
 
 		err = sdramc_init(sdramc, &ac);
