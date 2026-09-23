@@ -27,16 +27,11 @@ LOG_MODULE_REGISTER(pfr_pldm_update, CONFIG_LOG_DEFAULT_LEVEL);
 #define PFR_READBACK_CHUNK (16 * 1024)
 
 /*
- * The PLDM-staged image is the bare FLSH bundle (Caliptra FMC/RT + SoC
- * manifest + MCU runtime) built as "manifest_image" and, per
- * manifest_image_seek_kb in ast1080/ast1080a0/dcscm/BUILD.bazel, it belongs
- * at this offset within active_partition, not at offset 0: the first 1 MiB
- * holds ssmcu_rom (ssmcu_rom_seek_kb=0); bootmcu_rom has been removed along
- * with its caliptra-mcu-sw support, leaving 0x080000-0x100000 unused rather
- * than reclaimed. Writing the bundle at offset 0 overwrites the ssmcu ROM
- * image and bricks the board.
+ * FLSH bundle (Caliptra FMC/RT + SoC manifest + MCU runtime) offset in
+ * active_partition; must match manifest_image_seek_kb. The region below
+ * holds ssmcu_rom, so writing at offset 0 bricks the board.
  */
-#define PFR_FLSH_MANIFEST_IMAGE_OFFSET (1024 * 1024)
+#define PFR_FLSH_MANIFEST_IMAGE_OFFSET (320 * 1024)
 
 extern uint8_t pldm_fw_update(void *fw_update_param, const int flash_position);
 
