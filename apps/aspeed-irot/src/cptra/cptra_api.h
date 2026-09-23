@@ -11,7 +11,6 @@ enum {
 	CPTRA_CACHED_LDEVID_CERT,
 	CPTRA_CACHED_FMC_ALIAS_CERT,
 	CPTRA_CACHED_RT_ALIAS_CERT,
-	CPTRA_CACHED_DPE_LEAF_CERT,
 	CPTRA_CACHED_MAX,
 };
 
@@ -37,3 +36,9 @@ int cptra_set_auth_manifest(const struct cptra_set_auth_manifest_ia *input);
 
 int cptra_authorize_and_stash(uint32_t fw_id, uint8_t digest[48], bool skip_stash);
 int cptra_get_cached_certificate(int cert, void** cert_data, uint32_t *cert_size);
+
+/*
+ * The DPE leaf certificate is fetched on demand rather than cached; see the
+ * definition. The caller frees *cert_data.
+ */
+int cptra_get_dpe_leaf_certificate(void **cert_data, uint32_t *cert_size);
