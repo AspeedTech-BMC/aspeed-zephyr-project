@@ -119,7 +119,9 @@ int begin_snapshot(void *context, void **snapshot_handle,
 	uint32_t SCU1_814 = 0x74c02814;
 	static uint32_t unique_id[2] = {0};
 
-	static uint8_t profile[] = "https://github.com/aspeedtech-bmc/profile/composite_eat";
+	/* EAT profile URI (claim 265) the reference integration expects. */
+	static uint8_t profile[] =
+		"https://datatracker.ietf.org/doc/draft-sun-rats-composite-eat/";
 
 	struct irot_evidence_snapshot *snapshot;
 	struct cptra_quote_pcrs_oa *quote;
