@@ -865,46 +865,79 @@ end:
 	free(chain);
 	LOG_INF("%s: Failed", __func__);
 }
-static void cptra_get_certify_key_cert(struct cert_info *cached_cert)
+/*
+ * Fetch the DPE leaf certificate with DPE CertifyKey. This is deliberately not
+ * cached: CertifyKey certifies the key of the current DPE context, so the
+ * certificate is only valid for as long as that context is, and a stale copy
+ * would no longer match the key that signs the token. Callers take ownership of
+ * *cert_data and free it, as with cptra_get_cached_certificate().
+ */
+int cptra_get_dpe_leaf_certificate(void **cert_data, uint32_t *cert_size)
 {
-	struct cptra_certify_key_extended_ia input;
-	struct cptra_certify_key_extended_oa output;
+	struct cptra_certify_key_extended_ia *input = NULL;
+	struct cptra_certify_key_extended_oa *output = NULL;
 	struct dpe_certify_key_o *certify_key_resp;
-	uint32_t cert_size;
-	int ret;
+	uint32_t size;
+	int ret = -1;
 
-	memset(&input, 0, sizeof(input));
-	memset(&output, 0, sizeof(output));
+	if (!cert_data || !cert_size)
+		return -1;
+
+	*cert_data = NULL;
+	*cert_size = 0;
+
+	input = (struct cptra_certify_key_extended_ia *)malloc(sizeof(*input));
+	output = (struct cptra_certify_key_extended_oa *)malloc(sizeof(*output));
+	if (!input || !output) {
+		LOG_ERR("Failed to allocate CertifyKey buffers");
+		goto out;
+	}
+
+	memset(input, 0, sizeof(*input));
+	memset(output, 0, sizeof(*output));
 
 	/* All-zero request: default context handle, flags 0, FORMAT_X509, empty label */
 	ret = cptra_ipc_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
-				 (uint32_t *)&input, sizeof(input),
+				 (uint32_t *)input, sizeof(*input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
-				 (uint32_t *)&output, sizeof(output));
+				 (uint32_t *)output, sizeof(*output));
 	if (ret) {
 		LOG_ERR("caliptra_certify_key_extended is failure, ret:0x%x", ret);
-		return ;
+		goto out;
 	}
 
-	certify_key_resp = (struct dpe_certify_key_o *)output.certify_key_resp;
+	certify_key_resp = (struct dpe_certify_key_o *)output->certify_key_resp;
 	if (certify_key_resp->rsp_hdr.magic != DPE_RESPONSE_MAGIC ||
 	    certify_key_resp->rsp_hdr.status != 0) {
 		LOG_ERR("DPE CertifyKey failed, magic:0x%08x status:0x%08x profile:0x%08x",
 			certify_key_resp->rsp_hdr.magic, certify_key_resp->rsp_hdr.status,
 			certify_key_resp->rsp_hdr.profile);
-		return ;
+		ret = -1;
+		goto out;
 	}
 
-	cert_size = certify_key_resp->cert_size;
-	if (cert_size == 0 ||
-	    cert_size > sizeof(output.certify_key_resp) - sizeof(struct dpe_certify_key_o) ||
-	    cert_size > sizeof(cached_cert->data)) {
-		LOG_ERR("Invalid CertifyKey cert_size:%u", cert_size);
-		return ;
+	size = certify_key_resp->cert_size;
+	if (size == 0 ||
+	    size > sizeof(output->certify_key_resp) - sizeof(struct dpe_certify_key_o)) {
+		LOG_ERR("Invalid CertifyKey cert_size:%u", size);
+		ret = -1;
+		goto out;
 	}
 
-	memcpy(cached_cert->data, certify_key_resp->cert, cert_size);
-	cached_cert->length = cert_size;
+	*cert_data = malloc(size);
+	if (*cert_data == NULL) {
+		LOG_ERR("Failed to allocate %u bytes for the DPE leaf certificate", size);
+		ret = -1;
+		goto out;
+	}
+
+	memcpy(*cert_data, certify_key_resp->cert, size);
+	*cert_size = size;
+	ret = 0;
+out:
+	free(input);
+	free(output);
+	return ret;
 }
 
 static void cptra_load_static_cert(struct cert_info *cached_cert, const uint8_t *der,
@@ -993,7 +1026,6 @@ int cptra_load_certificate()
 	cptra_load_static_cert(&caliptra_cached_certificate[CPTRA_CACHED_ASPEED_ROOT_CA_CERT],
 			       cptra_aspeed_root_ca_der, cptra_aspeed_root_ca_der_len,
 			       "aspeed_root_ca_cert");
-	cptra_get_certify_key_cert(&caliptra_cached_certificate[CPTRA_CACHED_DPE_LEAF_CERT]);
 	cptra_get_rt_alias_cert(&caliptra_cached_certificate[CPTRA_CACHED_RT_ALIAS_CERT]);
 	cptra_get_fmc_alias_cert(&caliptra_cached_certificate[CPTRA_CACHED_FMC_ALIAS_CERT]);
 	cptra_get_ldev_cert(&caliptra_cached_certificate[CPTRA_CACHED_LDEVID_CERT]);

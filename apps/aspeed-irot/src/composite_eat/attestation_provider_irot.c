@@ -36,7 +36,8 @@ int begin_identity(void *context, void **identity_handle,
 			COMPOSITE_EAT_MAX_CERTIFICATES * sizeof(struct composite_eat_der_certificate)
 		);
 
-	result = cptra_get_cached_certificate(CPTRA_CACHED_DPE_LEAF_CERT, &cert_data, &cert_length);
+	/* Fetched fresh every time: the leaf certifies the current DPE context. */
+	result = cptra_get_dpe_leaf_certificate(&cert_data, &cert_length);
 	if (result == 0) {
 		struct composite_eat_der_certificate cert_der = {cert_data, cert_length};
 		memcpy(&identity->certificates[identity->certificate_count], &cert_der,
