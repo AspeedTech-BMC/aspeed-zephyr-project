@@ -6,6 +6,7 @@ target_sources(app PRIVATE
 	board_ast2700.c
 	tamper.c
 	scu.c
+	dma.c
 	ssp_tsp_ast2700.c
 	extrst_ast2700.c
 	fpga_phy.c
@@ -17,6 +18,7 @@ target_sources(app PRIVATE
 	ufs.c
 	usb_recovery_ast2700.c
 	usb.c
+	usb_dma_stop.c
 	mmc.c
 	stor_ast2700.c
 	mac.c
