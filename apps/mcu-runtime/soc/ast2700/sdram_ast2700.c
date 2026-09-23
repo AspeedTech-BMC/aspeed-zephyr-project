@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME, CONFIG_SOC_FMC_LOG_LEVEL);
 #define SDRAMMC_NODE DT_NODELABEL(sdrammc)
 
 #define SDRAMC_AES_ENABLED		DT_PROP(SDRAMMC_NODE, aes_enable)
+#define SDRAMC_HARD_LOCK_ENABLED	DT_PROP(SDRAMMC_NODE, hard_lock)
 
 #if SDRAMC_AES_ENABLED
 #define TRNG_NODE DT_CHOSEN(zephyr_entropy)
@@ -1592,7 +1593,9 @@ int dram_init(struct ast_chip *chip)
 				     DARB2_RECOVERY_TSP_DATA | DARB2_RECOVERY_SSP_DATA);
 
 	sdramc_aes_lock(sdramc);
-	sdramc_hard_lock(sdramc);
+
+	if (SDRAMC_HARD_LOCK_ENABLED)
+		sdramc_hard_lock(sdramc);
 
 	LOG_DBG("%s is successfully initialized\n", ac->desc);
 	sdramc_set_flag(DRAMC_INIT_DONE);
