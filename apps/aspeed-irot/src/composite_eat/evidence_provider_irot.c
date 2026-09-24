@@ -32,17 +32,44 @@ LOG_MODULE_DECLARE(composite_eat);
 #define IROT_UEID_OTP_WORDS			(16u / 2u)
 #define IROT_UEID_LENGTH			(1u + 16u)
 
-#define IROT_LOCAL_EVIDENCE_CONTENT_FORMAT	60u
+/* CoAP Content-Format application/tcg-dice-concise-evidence+cbor. */
+#define IROT_LOCAL_EVIDENCE_CONTENT_FORMAT	10571u
 
-/* Encoded quote is ~1830 bytes; stays below COMPOSITE_EAT_MAX_LOCAL_EVIDENCE_LENGTH. */
+/* Encoded evidence is ~120 bytes; stays below COMPOSITE_EAT_MAX_LOCAL_EVIDENCE_LENGTH. */
 #define IROT_LOCAL_EVIDENCE_MAX			2048u
 
-/* Profile-defined map keys of the encoded Caliptra PCR quote. */
-#define IROT_MEAS_KEY_PCRS			1
-#define IROT_MEAS_KEY_RESET_COUNTERS		2
-#define IROT_MEAS_KEY_NONCE			3
-#define IROT_MEAS_KEY_DIGEST			4
-#define IROT_MEAS_KEY_SIGNATURE			5
+/*
+ * TCG DICE Concise Evidence map keys, which follow the CoRIM/CoMID data model:
+ *
+ *   concise-evidence = { ev-triples => { evidence => [ + ev-triple-record ] } }
+ *   ev-triple-record = [ environment-map, [ + measurement-map ] ]
+ *
+ * One measurement-map per PCR, keyed by the register index, with the value in
+ * digests. The verifier appraises digests entries and has no comparison for
+ * integrity-registers, so that key is not used here:
+ *
+ *   { 0: <index>, 1: { 2: [ [ 7, h'<48-byte digest>' ] ] } }
+ *
+ * These are draft-tracking assignments; they track the revision the reference
+ * integration consumes.
+ */
+#define COEV_KEY_EV_TRIPLES			0
+#define COEV_EV_TRIPLES_KEY_EVIDENCE		0
+#define COEV_ENVIRONMENT_KEY_CLASS		0
+#define COEV_CLASS_KEY_VENDOR			1
+#define COEV_CLASS_KEY_MODEL			2
+#define COEV_MEASUREMENT_KEY_MKEY		0
+#define COEV_MEASUREMENT_KEY_MVAL		1
+#define COEV_MVAL_KEY_DIGESTS			2
+
+/* sha-384 in the IANA Named Information Hash Algorithm registry. */
+#define COEV_HASH_ALG_SHA_384			7
+
+/* Only this PCR is reported as an integrity register. */
+#define IROT_REPORTED_PCR_INDEX			31
+
+#define IROT_EVIDENCE_VENDOR			"ASPEED Technology Inc."
+#define IROT_EVIDENCE_MODEL			"AST2700"
 
 /*
  * One allocation backing a pinned snapshot. The local evidence descriptor and
@@ -116,44 +143,71 @@ static int irot_get_pcr_quote(struct cptra_quote_pcrs_oa *output)
 	return 0;
 }
 
+/* Emit one measurement-map: the PCR index as mkey, its digest under digests. */
+static void irot_encode_pcr_measurement(QCBOREncodeContext *encoder,
+					const struct cptra_quote_pcrs_oa *quote, size_t index)
+{
+	QCBOREncode_OpenMap(encoder);					/* measurement-map */
+	QCBOREncode_AddUInt64ToMapN(encoder, COEV_MEASUREMENT_KEY_MKEY, index);
+	QCBOREncode_OpenMapInMapN(encoder, COEV_MEASUREMENT_KEY_MVAL);
+	QCBOREncode_OpenArrayInMapN(encoder, COEV_MVAL_KEY_DIGESTS);	/* digests-type */
+	QCBOREncode_OpenArray(encoder);					/* digest */
+	QCBOREncode_AddUInt64(encoder, COEV_HASH_ALG_SHA_384);
+	QCBOREncode_AddBytes(encoder,
+			     (UsefulBufC){quote->PCRs[index], sizeof(quote->PCRs[index])});
+	QCBOREncode_CloseArray(encoder);				/* digest */
+	QCBOREncode_CloseArray(encoder);				/* digests */
+	QCBOREncode_CloseMap(encoder);					/* mval */
+	QCBOREncode_CloseMap(encoder);					/* measurement-map */
+}
+
+/*
+ * Serialize the reported Caliptra PCR as TCG DICE Concise Evidence: one
+ * integrity register, keyed by its PCR index, holding a [alg, digest] pair.
+ *
+ * The quote nonce, composite digest and signature are deliberately not carried:
+ * Concise Evidence states measurements, and the token's own COSE_Sign1 over the
+ * DPE leaf key is what signs them. Freshness comes from EAT claim 10.
+ */
 static int irot_encode_measurement(const struct cptra_quote_pcrs_oa *quote, uint8_t *buffer,
 				   size_t capacity, size_t *length)
 {
-	uint8_t signature[COMPOSITE_EAT_ES384_SIGNATURE_LENGTH];
 	QCBOREncodeContext encoder;
 	QCBORError error;
 	UsefulBufC encoded;
-	size_t index;
+	const size_t index = IROT_REPORTED_PCR_INDEX;
 
-	memcpy(signature, quote->signature_r, sizeof(quote->signature_r));
-	memcpy(signature + sizeof(quote->signature_r), quote->signature_s,
-	       sizeof(quote->signature_s));
+	if (index >= ARRAY_SIZE(quote->PCRs)) {
+		LOG_ERR("PCR index %u is outside the quote", (uint32_t)index);
+		return -1;
+	}
 
 	QCBOREncode_Init(&encoder, (UsefulBuf){buffer, capacity});
 
-	QCBOREncode_OpenMap(&encoder);
+	QCBOREncode_OpenMap(&encoder);					/* concise-evidence */
+	QCBOREncode_OpenMapInMapN(&encoder, COEV_KEY_EV_TRIPLES);
+	QCBOREncode_OpenArrayInMapN(&encoder, COEV_EV_TRIPLES_KEY_EVIDENCE);
 
-	QCBOREncode_OpenArrayInMapN(&encoder, IROT_MEAS_KEY_PCRS);
-	for (index = 0; index < ARRAY_SIZE(quote->PCRs); ++index) {
-		QCBOREncode_AddBytes(&encoder,
-				     (UsefulBufC){quote->PCRs[index], sizeof(quote->PCRs[index])});
-	}
-	QCBOREncode_CloseArray(&encoder);
+	QCBOREncode_OpenArray(&encoder);				/* ev-triple-record */
 
-	QCBOREncode_OpenArrayInMapN(&encoder, IROT_MEAS_KEY_RESET_COUNTERS);
-	for (index = 0; index < ARRAY_SIZE(quote->reset_ctrs); ++index) {
-		QCBOREncode_AddUInt64(&encoder, quote->reset_ctrs[index]);
-	}
-	QCBOREncode_CloseArray(&encoder);
+	QCBOREncode_OpenMap(&encoder);					/* environment-map */
+	QCBOREncode_OpenMapInMapN(&encoder, COEV_ENVIRONMENT_KEY_CLASS);
+	QCBOREncode_AddTextToMapN(&encoder, COEV_CLASS_KEY_VENDOR,
+				  UsefulBuf_FROM_SZ_LITERAL(IROT_EVIDENCE_VENDOR));
+	QCBOREncode_AddTextToMapN(&encoder, COEV_CLASS_KEY_MODEL,
+				  UsefulBuf_FROM_SZ_LITERAL(IROT_EVIDENCE_MODEL));
+	QCBOREncode_CloseMap(&encoder);					/* class-map */
+	QCBOREncode_CloseMap(&encoder);					/* environment-map */
 
-	QCBOREncode_AddBytesToMapN(&encoder, IROT_MEAS_KEY_NONCE,
-				   (UsefulBufC){quote->nonce, sizeof(quote->nonce)});
-	QCBOREncode_AddBytesToMapN(&encoder, IROT_MEAS_KEY_DIGEST,
-				   (UsefulBufC){quote->digest, sizeof(quote->digest)});
-	QCBOREncode_AddBytesToMapN(&encoder, IROT_MEAS_KEY_SIGNATURE,
-				   (UsefulBufC){signature, sizeof(signature)});
+	QCBOREncode_OpenArray(&encoder);				/* [ + measurement-map ] */
+	irot_encode_pcr_measurement(&encoder, quote, index);
+	QCBOREncode_CloseArray(&encoder);				/* measurement list */
 
-	QCBOREncode_CloseMap(&encoder);
+	QCBOREncode_CloseArray(&encoder);				/* ev-triple-record */
+
+	QCBOREncode_CloseArray(&encoder);				/* evidence */
+	QCBOREncode_CloseMap(&encoder);					/* ev-triples */
+	QCBOREncode_CloseMap(&encoder);					/* concise-evidence */
 
 	error = QCBOREncode_Finish(&encoder, &encoded);
 	if (error != QCBOR_SUCCESS) {
