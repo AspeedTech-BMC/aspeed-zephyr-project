@@ -142,7 +142,6 @@
 &i3c3 {
 	status = "okay";
 	i3c-scl-hz = <12500000>;
-	// io-mode = "dma";
 
 	i3cdev@00000007ec06000000 {
 		compatible = "i3c-dummy-device";

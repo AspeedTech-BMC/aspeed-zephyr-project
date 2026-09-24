@@ -35,6 +35,7 @@ LOG_MODULE_DECLARE(pldm);
 #define ACTIVATE_REBOOT_STACK_SIZE 512
 #define ACTIVATE_REBOOT_DELAY_SECOND 3
 #define MIN_FW_UPDATE_BASELINE_TRANS_SIZE (32)
+#define I3C_TARGET_FW_DATA_CHUNK_SIZE 256U
 #define PLDM_NO_SUPPORT_PROGRESS_PERCENT 0x65
 #define PLDM_FW_UPDATE_MODE_TIMEOUT 60
 #define UPDATE_REQUEST_DATA_MAX_RETRY_COUNT 3
@@ -643,6 +644,11 @@ static uint8_t request_update(void *mctp_inst, uint8_t *buf, uint16_t len, uint8
 		LOG_WRN("Maximum transfer size 0x%x over mctp response buffer size limit 0x%x, set to default.",
 			fw_update_cfg.max_buff_size, MAX_FWUPDATE_RSP_BUF_SIZE);
 		fw_update_cfg.max_buff_size = MAX_FWUPDATE_RSP_BUF_SIZE;
+	}
+	/* Keep each target response below the 512-byte I3C DMA receive ring. */
+	if (((mctp *)mctp_inst)->medium_type == MCTP_MEDIUM_TYPE_I3C_TARGET &&
+	    fw_update_cfg.max_buff_size > I3C_TARGET_FW_DATA_CHUNK_SIZE) {
+		fw_update_cfg.max_buff_size = I3C_TARGET_FW_DATA_CHUNK_SIZE;
 	}
 
 	resp_p->fd_meta_data_len = 0x0000;

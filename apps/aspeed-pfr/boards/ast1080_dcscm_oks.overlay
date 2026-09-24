@@ -149,7 +149,7 @@
 		compatible = "i3c-target-mqueue";
 		reg = <0x0 0x7ec 0x80003000>;
 		msg-size = <128>;
-		num-of-msgs = <8>;
+		num-of-msgs = <128>;
 		mandatory-data-byte = <0xae>;
 		ibi-append-pec = <0>;
 		status = "okay";
