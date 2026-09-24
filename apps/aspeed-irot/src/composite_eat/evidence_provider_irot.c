@@ -12,6 +12,7 @@
 
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
+#include <zephyr/drivers/misc/aspeed/otp_ast27xx.h>
 
 #include <qcbor/qcbor_encode.h>
 
@@ -20,6 +21,17 @@ LOG_MODULE_DECLARE(composite_eat);
 #include "evidence_provider_irot.h"
 
 /* CoAP Content-Format for the encoded local evidence: application/cbor. */
+/*
+ * EAT UEID (claim 256), per RFC 9711: a type byte followed by the identifier.
+ * The identifier is the 16 bytes at byte offset 0x70 of the OTP Caliptra
+ * region. otp_read_cptra() adds the region base (CAL_REGION_START_ADDR,
+ * 0x1c00) itself and indexes in 16-bit words, so byte 0x70 is word 0x38.
+ */
+#define IROT_UEID_TYPE_RAND			0x01u
+#define IROT_UEID_OTP_WORD_OFFSET		(0x70u / 2u)
+#define IROT_UEID_OTP_WORDS			(16u / 2u)
+#define IROT_UEID_LENGTH			(1u + 16u)
+
 #define IROT_LOCAL_EVIDENCE_CONTENT_FORMAT	60u
 
 /* Encoded quote is ~1830 bytes; stays below COMPOSITE_EAT_MAX_LOCAL_EVIDENCE_LENGTH. */
@@ -38,8 +50,48 @@ LOG_MODULE_DECLARE(composite_eat);
  */
 struct irot_evidence_snapshot {
 	struct composite_eat_local_evidence local[1];
+	uint8_t ueid[IROT_UEID_LENGTH];
 	uint8_t encoded[IROT_LOCAL_EVIDENCE_MAX];
 };
+
+/*
+ * Build the UEID from OTP. The OTP byte stream is the little-endian
+ * serialization of each 16-bit word, so the words are staged in an aligned
+ * buffer and copied out without swapping; this matches how the IDevID TBS is
+ * read in cptra_idevid.c. Staging also avoids an unaligned 16-bit access,
+ * since the type byte puts the identifier at an odd offset.
+ */
+static int irot_read_ueid(uint8_t *ueid)
+{
+	uint16_t words[IROT_UEID_OTP_WORDS];
+	bool provisioned = false;
+	int ret;
+
+	for (uint32_t i = 0; i < IROT_UEID_OTP_WORDS; i++) {
+		ret = otp_read_cptra(IROT_UEID_OTP_WORD_OFFSET + i, &words[i]);
+		if (ret) {
+			LOG_ERR("otp_read_cptra failed (word %u, ret:0x%x)",
+				IROT_UEID_OTP_WORD_OFFSET + i, ret);
+			return -1;
+		}
+
+		if (words[i] != 0)
+			provisioned = true;
+	}
+
+	/* An all-zero field means the UEID was never fused. Fail rather than
+	 * attest under an identifier that is not ours.
+	 */
+	if (!provisioned) {
+		LOG_ERR("UEID is not provisioned in OTP");
+		return -1;
+	}
+
+	ueid[0] = IROT_UEID_TYPE_RAND;
+	memcpy(&ueid[1], words, sizeof(words));
+
+	return 0;
+}
 
 static int irot_get_pcr_quote(struct cptra_quote_pcrs_oa *output)
 {
@@ -115,10 +167,6 @@ static int irot_encode_measurement(const struct cptra_quote_pcrs_oa *quote, uint
 
 int begin_snapshot(void *context, void **snapshot_handle,
                           struct composite_eat_evidence_snapshot *evidence) {
-	uint32_t SCU1_810 = 0x74c02810;
-	uint32_t SCU1_814 = 0x74c02814;
-	static uint32_t unique_id[2] = {0};
-
 	/* EAT profile URI (claim 265) the reference integration expects. */
 	static uint8_t profile[] =
 		"https://datatracker.ietf.org/doc/draft-sun-rats-composite-eat/";
@@ -132,12 +180,6 @@ int begin_snapshot(void *context, void **snapshot_handle,
 		return -1;
 	}
 
-	unique_id[0] = sys_read32(SCU1_810);
-	unique_id[1] = sys_read32(SCU1_814);
-
-	evidence->ueid.data = (uint8_t *)unique_id;
-	evidence->ueid.length = sizeof(unique_id);
-
 	evidence->profile.data = profile;
 	evidence->profile.length = sizeof(profile) - 1;
 
@@ -147,6 +189,13 @@ int begin_snapshot(void *context, void **snapshot_handle,
 		LOG_ERR("Failed to allocate evidence snapshot");
 		goto error;
 	}
+
+	if (irot_read_ueid(snapshot->ueid)) {
+		goto error;
+	}
+
+	evidence->ueid.data = snapshot->ueid;
+	evidence->ueid.length = sizeof(snapshot->ueid);
 
 	if (irot_get_pcr_quote(quote)) {
 		goto error;
