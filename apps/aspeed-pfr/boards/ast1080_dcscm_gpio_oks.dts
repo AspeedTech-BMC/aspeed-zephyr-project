@@ -22,7 +22,7 @@
 		fp1-pwr-btn-in-gpios = <&sgpiom0_32_63 25 0>;     /* SGPI57 */
 		bmc-onctl-in-gpios = <&sgpiom0_64_95 4 0>;        /* SGPI68 */
 
-		// i3c-mng-mux-sel-out-gpios = <&gpio0_96_127 12 0>; /* GPIO_N4 */ TP229
+		i3c-mng-mux-sel-out-gpios = <&gpio0_32_63 20 0>;   /* GPIO52 */
 		scm-board-id0-in-gpios = <&sgpiom0_0_31 1 0>;     /* SGPI1 */
 		scm-rsu-hide-done-in-gpios = <&sgpiom0_32_63 10 0>; /* SGPI42 */
 
