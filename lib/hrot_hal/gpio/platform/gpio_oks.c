@@ -209,8 +209,29 @@ void OksRTCRSTControl(bool assert)
 extern int i3c_mng_mux_owner;
 void OksSwitchI3cMng(int owner)
 {
-	LOG_WRN("I3C Takeover feature is dropped in Oks");
-	return;
+	const struct gpio_dt_spec i3c_mng_owner =
+		GPIO_DT_SPEC_GET_OR(DT_INST(0, aspeed_pfr_gpio_oks),
+						i3c_mng_mux_sel_out_gpios,
+						{0});
+
+	/* I3C takeover is dropped on OKS: the MUX is always owned by the BMC,
+	 * so the requested owner is ignored and the pin is forced to 0.
+	 */
+	ARG_UNUSED(owner);
+
+	if (gpio_is_ready_dt(&i3c_mng_owner) == false) {
+		LOG_ERR("I3C MNG Owner GPIO is not ready");
+		return;
+	}
+
+	gpio_pin_configure_dt(&i3c_mng_owner, GPIO_OUTPUT);
+	LOG_WRN("OKS force I3C MNG Owner to BMC");
+	LOG_INF("[PFR->MUX] I3C_MNG [%s %d] = %d",
+		i3c_mng_owner.port->name,
+		i3c_mng_owner.pin,
+		I3C_MNG_OWNER_BMC);
+	gpio_pin_set(i3c_mng_owner.port, i3c_mng_owner.pin, I3C_MNG_OWNER_BMC);
+	i3c_mng_mux_owner = I3C_MNG_OWNER_BMC;
 }
 #endif
 

@@ -23,9 +23,15 @@
 
 #define MCTP_I3C_STATE_HANDLER_STACK_SIZE    1024
 
+#if defined(CONFIG_BOARD_AST2700_DCSCM_OKS) || \
+    defined(CONFIG_BOARD_AST1080_DCSCM_OKS)
+#define MCTP_I3C_CPU0_EID                   0x09
+#define MCTP_I3C_REGISTRATION_EID           0x09
+#else
 #define MCTP_I3C_CPU0_EID                   0x1D
 #define MCTP_I3C_CPU1_EID                   0x9D
 #define MCTP_I3C_REGISTRATION_EID           0x1D
+#endif
 
 typedef enum {
 	MCTP_MEDIUM_TYPE_UNKNOWN = 0,

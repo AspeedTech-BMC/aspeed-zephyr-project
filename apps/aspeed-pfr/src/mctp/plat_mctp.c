@@ -52,7 +52,7 @@ mctp *find_mctp_by_smbus(uint8_t bus)
 
 void plat_mctp_init(void)
 {
-	LOG_INF("plat_mctp_init");
+	LOG_INF("plat_mctp_init, MCTP_I3C_CPU0_EID = 0x%02x", MCTP_I3C_CPU0_EID);
 	uint8_t i;
 	int rc;
 
