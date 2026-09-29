@@ -52,16 +52,17 @@ int main(void)
 				}
 			}
 
-			if (board->boot)
-				board->boot();
-
 			ast_destroy_chip(chip);
 		}
 	}
 
-	/* Runtime ipc loop */
-	if (board && board->runtime_loop)
-		board->runtime_loop();
+	if (board) {
+		if (board->boot)
+			board->boot();
+
+		if (board->runtime_loop)
+			board->runtime_loop();
+	}
 
 	return 0;
 }
