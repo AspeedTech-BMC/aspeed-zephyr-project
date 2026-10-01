@@ -463,43 +463,52 @@ bool libspdm_write_key_pair_info(
 uint32_t cptra_get_certify_key_leaf_cert(uint8_t *cert, size_t cert_max_size)
 {
 	struct cptra_certify_key_extended_ia input;
-	struct cptra_certify_key_extended_oa output;
+	struct cptra_certify_key_extended_oa *output;
 	struct dpe_certify_key_o *certify_key_resp;
-	uint32_t cert_size;
+	uint32_t cert_size = 0;
 	int ret;
 
+	/* The response holds a certificate of up to 6KB, keep it off the stack */
+	output = malloc(sizeof(*output));
+	if (!output) {
+		LOG_ERR("Failed to allocate CertifyKey response buffer");
+		return 0;
+	}
+
 	memset(&input, 0, sizeof(input));
-	memset(&output, 0, sizeof(output));
+	memset(output, 0, sizeof(*output));
 
 	/* All-zero request: default context handle, flags 0, FORMAT_X509, empty label */
 	ret = cptra_ipc_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
 				 (uint32_t *)&input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
-				 (uint32_t *)&output, sizeof(output));
+				 (uint32_t *)output, sizeof(*output));
 	if (ret) {
 		LOG_ERR("caliptra_certify_key_extended is failure, ret:0x%x", ret);
-		return 0;
+		goto out;
 	}
 
-	certify_key_resp = (struct dpe_certify_key_o *)output.certify_key_resp;
+	certify_key_resp = (struct dpe_certify_key_o *)output->certify_key_resp;
 	if (certify_key_resp->rsp_hdr.magic != DPE_RESPONSE_MAGIC ||
 	    certify_key_resp->rsp_hdr.status != 0) {
 		LOG_ERR("DPE CertifyKey failed, magic:0x%08x status:0x%08x profile:0x%08x",
 			certify_key_resp->rsp_hdr.magic, certify_key_resp->rsp_hdr.status,
 			certify_key_resp->rsp_hdr.profile);
-		return 0;
+		goto out;
+	}
+
+	if (certify_key_resp->cert_size == 0 ||
+	    certify_key_resp->cert_size >
+		    sizeof(output->certify_key_resp) - sizeof(struct dpe_certify_key_o) ||
+	    certify_key_resp->cert_size > cert_max_size) {
+		LOG_ERR("Invalid CertifyKey cert_size:%u", certify_key_resp->cert_size);
+		goto out;
 	}
 
 	cert_size = certify_key_resp->cert_size;
-	if (cert_size == 0 ||
-	    cert_size > sizeof(output.certify_key_resp) - sizeof(struct dpe_certify_key_o) ||
-	    cert_size > cert_max_size) {
-		LOG_ERR("Invalid CertifyKey cert_size:%u", cert_size);
-		return 0;
-	}
-
 	memcpy(cert, certify_key_resp->cert, cert_size);
-
+out:
+	free(output);
 	return cert_size;
 }
 
