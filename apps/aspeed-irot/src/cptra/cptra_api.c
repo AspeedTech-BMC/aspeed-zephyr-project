@@ -874,22 +874,8 @@ end:
  */
 int cptra_get_dpe_leaf_certificate(void **cert_data, uint32_t *cert_size)
 {
-	/*
-	struct cptra_certify_key_extended_oa {
-		uint32_t chksum;
-		uint32_t fips_status;
-		uint8_t certify_key_resp[2176]; // should be 6272
-	};
-	*/
-
-	struct cptra_certify_key_extended_oa_ext {
-		uint32_t chksum;
-		uint32_t fips_status;
-		uint8_t certify_key_resp[6272]; // should be 6272
-	};
-
 	struct cptra_certify_key_extended_ia *input = NULL;
-	struct cptra_certify_key_extended_oa_ext *output = NULL;
+	struct cptra_certify_key_extended_oa *output = NULL;
 	struct dpe_certify_key_o *certify_key_resp;
 	uint32_t size;
 	int ret = -1;
@@ -901,7 +887,7 @@ int cptra_get_dpe_leaf_certificate(void **cert_data, uint32_t *cert_size)
 	*cert_size = 0;
 
 	input = (struct cptra_certify_key_extended_ia *)malloc(sizeof(*input));
-	output = (struct cptra_certify_key_extended_oa_ext *)malloc(sizeof(*output));
+	output = (struct cptra_certify_key_extended_oa *)malloc(sizeof(*output));
 	if (!input || !output) {
 		LOG_ERR("Failed to allocate CertifyKey buffers");
 		goto out;
