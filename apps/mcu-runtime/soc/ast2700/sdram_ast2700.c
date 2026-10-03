@@ -919,6 +919,7 @@ static int sdramc_size_detect(struct sdramc *sdramc)
 	uint32_t val;
 	int vga_size;
 	int sz, ddr4;
+	uint32_t map1;
 	uint32_t pattern = 0xdeadbeef;
 	void *test_addr = (void *)0xc0000000;
 	void *start_addr = (void *)0x80000000;
@@ -947,6 +948,13 @@ static int sdramc_size_detect(struct sdramc *sdramc)
 
 	sz--;
 	sdramc->sz = sz;
+
+	/* restore mcu0 upper 1G window to the probe address of the detected size */
+	map1 = ram_size[sz].size;
+	sys_write32((sys_read32((uint32_t)SCU_IO_MCU0_CTRL) & ~SCU_MCU0_MAP1_MASK)
+		    | (map1 << SCU_MCU0_MAP1_SHIFT),
+		    (uint32_t)SCU_IO_MCU0_CTRL);
+	sys_read32((uint32_t)SCU_IO_MCU0_CTRL);
 
 	/* re-configure ram size to dramc. */
 	val = sys_read32((uint32_t)&regs->mcfg);

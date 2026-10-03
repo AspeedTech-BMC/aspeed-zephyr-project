@@ -153,10 +153,6 @@ int tamper_check(void)
 	tamper = sys_read32(0x12c021c4);
 	phyunlock = sys_read32(0x130401a8);
 
-	// reconfigure mcu0 remap for upper 1GB.
-	sys_write32((0x44 << 16) | (sys_read32(0x14c02110) & 0xff00ffff), 0x14c02110);
-	printf("SCU1_110=0x%x\n", sys_read32(0x14c02110));
-
 	if (tamper & TAMPER_ALERT) {
 		printf("Tamper Attention!!!\n");
 		printf("SCU_3b0=0x%x\n", sys_read32(0x12c023b0));
