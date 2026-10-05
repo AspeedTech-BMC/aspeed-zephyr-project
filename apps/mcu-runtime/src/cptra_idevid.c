@@ -51,6 +51,7 @@ static const struct cptra_fw_tag_entry cptra_fw_tag_table[] = {
 	{ .rt_sha384 = { 0x89865e07, 0x491547ec }, .tag = "rt-1.2.3" }, /* 075e8689ec471549 */
 	{ .rt_sha384 = { 0x4aac73bf, 0xe46d0999 }, .tag = "rt-1.2.4" }, /* bf73ac4a99096de4 */
 	{ .rt_sha384 = { 0x67406db5, 0x1e0a2315 }, .tag = "rt-1.2.5" }, /* b56d406715230a1e */
+	{ .rt_sha384 = { 0xe59fd0ae, 0xa3263499 }, .tag = "rt-1.3.0" }, /* aed09fe5993426a3 */
 };
 
 static const char *cptra_lookup_fw_tag(const uint32_t *rt_sha384)
