@@ -21,6 +21,17 @@
 #define TAMPER_RUNTIME_DIFF	0x0
 #define TAMPER_RUNTIME_STEP	0x2
 
+/* SCU scratch reg 0x12c029B8: upper 16 bits hold sticky event counters
+ * that survive the WDT reset below, so they can be inspected post-mortem.
+ */
+#define SCU_SCRATCH_REG		0x14c021a0
+#define TAMPER_RETRY_CNT_SHIFT	0
+#define TAMPER_RETRY_CNT_MASK	(0xffU << TAMPER_RETRY_CNT_SHIFT)
+#define TAMPER_CNT_SHIFT	8
+#define TAMPER_CNT_MASK		(0xffU << TAMPER_CNT_SHIFT)
+#define UNLOCK_CNT_SHIFT	16
+#define UNLOCK_CNT_MASK		(0xffU << UNLOCK_CNT_SHIFT)
+
 #define readl_poll_timeout(addr, val, cond, timeout_us) \
 ({ \
 	uint32_t start__ = k_cycle_get_32(); \
@@ -154,14 +165,30 @@ int tamper_check(void)
 	phyunlock = sys_read32(0x130401a8);
 
 	if (tamper & TAMPER_ALERT) {
+		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
+		uint32_t cnt = (scratch & TAMPER_CNT_MASK) >> TAMPER_CNT_SHIFT;
+
 		printf("Tamper Attention!!!\n");
 		printf("SCU_3b0=0x%x\n", sys_read32(0x12c023b0));
+
+		if (cnt < 0xff)
+			cnt++;
+		scratch = (scratch & ~TAMPER_CNT_MASK) | (cnt << TAMPER_CNT_SHIFT);
+		sys_write32(scratch, SCU_SCRATCH_REG);
 		reset++;
 	}
 
 	if (phyunlock & UNLOCK_ALERT) {
+		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
+		uint32_t cnt = (scratch & UNLOCK_CNT_MASK) >> UNLOCK_CNT_SHIFT;
+
 		printf("DDRPHY Unlock Attention!!!\n");
 		printf("SOC MPLL setting=0x%x, status=0x%08x\n", sys_read32(0x12c02310), sys_read32(0x12c02314));
+
+		if (cnt < 0xff)
+			cnt++;
+		scratch = (scratch & ~UNLOCK_CNT_MASK) | (cnt << UNLOCK_CNT_SHIFT);
+		sys_write32(scratch, SCU_SCRATCH_REG);
 
 		// clear ddrphy unlock status.
 		sys_write32(0x1, 0x130401ac);
@@ -192,6 +219,10 @@ int tamper_check(void)
 		};
 	}
 
+	/* Change tamper detection to runtime setting */
+	sys_write32(TAMPER_RUNTIME_STEP, 0x12c023a4);
+	sys_write32(TAMPER_RUNTIME_DIFF, 0x12c023a8);
+
 	return 0;
 }
 
@@ -211,7 +242,7 @@ int tamper_init(int step, int diff)
 
 	sys_write32(TAMPER_ALERT, 0x12c021c4);
 
-	sys_write32(0x0, 0x12c023a0);
+	sys_write32(0x14, 0x12c023a0);
 	sys_write32(step, 0x12c023a4); //Maximum Stepping error
 	sys_write32(diff, 0x12c023a8); //Maximum Difference error
 
@@ -224,6 +255,16 @@ int tamper_init(int step, int diff)
 	reg = sys_read32(0x12c021c4);
 	printf("Initial Tamper=%d \n", reg & 8);
 	printf("0x12c023a0=0x%08x, 0x12c023b0=0x%08x\n", sys_read32(0x12c023a0), sys_read32(0x12c023b0));
+
+	if (reg & 8) {
+		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
+		uint32_t cnt = (scratch & TAMPER_RETRY_CNT_MASK) >> TAMPER_RETRY_CNT_SHIFT;
+
+		if (cnt < 0xff)
+			cnt++;
+		scratch = (scratch & ~TAMPER_RETRY_CNT_MASK) | (cnt << TAMPER_RETRY_CNT_SHIFT);
+		sys_write32(scratch, SCU_SCRATCH_REG);
+	}
 
 	return reg & 8;
 }
