@@ -211,13 +211,13 @@ void mctp_i3c_state_handler(void *a, void *b, void *c)
 		dev_state = device_manager_get_device_state(device_mgr,
 				DEVICE_MANAGER_SELF_DEVICE_NUM);
 		if (dev_state == DEVICE_MANAGER_SEND_DISCOVERY_NOTIFY) {
-			LOG_DBG("Send discovery notify");
+			LOG_INF("Send discovery notify");
 			stat = (I3C_MNG_OWNER_BMC == owner) ?
 				PFR_ACT1_DAA_I3C_BMC : PFR_ACT1_DAA_I3C_CPU;
 			SetPfrActivityInfo1(stat);
 			mctp_i3c_send_discovery_notify(mctp_instance, &duration);
 		} else if (dev_state == DEVICE_MANAGER_EID_ANNOUNCEMENT) {
-			LOG_DBG("Announce EID");
+			LOG_INF("Announce EID");
 			stat = (I3C_MNG_OWNER_BMC == owner) ?
 				PFR_ACT1_SET_EID_I3C_BMC : PFR_ACT1_SET_EID_I3C_CPU;
 			SetPfrActivityInfo1(stat);
@@ -262,19 +262,19 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 	struct i3c_device_desc* desc;
 	size_t rx_len;
 
-	LOG_DBG("mctp_inst=%p, msg_p=%p", mctp_inst, msg_p);
+	LOG_DBG("i3c read: mctp_inst=%p, msg_p=%p", mctp_inst, msg_p);
 	// read request from slave device.
 	dev = get_mctp_i3c_dev(mctp_inst->medium_conf.i3c_conf.bus);
-	LOG_DBG("mctp_inst->medium_conf.i3c_conf.bus=%d", mctp_inst->medium_conf.i3c_conf.bus);
+	LOG_DBG("i3c read: mctp_inst->medium_conf.i3c_conf.bus=%d", mctp_inst->medium_conf.i3c_conf.bus);
 	if (dev == NULL) {
-		LOG_ERR("Failed to get i3c dev");
+		LOG_ERR("i3c read: Failed to get i3c dev");
 		return MCTP_ERROR;
 	}
 	data = (struct i3c_driver_data *)dev->data;
 	desc = i3c_dev_list_i3c_addr_find(&data->attached_dev, mctp_inst->medium_conf.i3c_conf.addr);
-	LOG_DBG("mctp_inst->medium_conf.i3c_conf.addr=%d", mctp_inst->medium_conf.i3c_conf.addr);
+	LOG_DBG("i3c read: mctp_inst->medium_conf.i3c_conf.addr=%d", mctp_inst->medium_conf.i3c_conf.addr);
 	if (desc == NULL) {
-		LOG_ERR("Device not found");
+		LOG_ERR("i3c read: Device not found");
 		return MCTP_ERROR;
 	}
 
@@ -288,7 +288,7 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 	xfer.len = sizeof(i3c_data_in);
 	int ret = i3c_transfer(desc, &xfer, 1);
 	if (ret) {
-		LOG_ERR("Failed to read data, ret = %d", ret);
+		LOG_ERR("i3c read: Failed to read data, ret = %d", ret);
 		return MCTP_ERROR;
 	}
 
@@ -302,7 +302,7 @@ static uint16_t mctp_i3c_read(void *mctp_p, void *msg_p)
 	packet->state = CMD_VALID_PACKET;
 
 	if (rx_len > CMD_MAX_PACKET_SIZE) {
-		LOG_WRN("Buffer is smaller than received data");
+		LOG_WRN("i3c read: Buffer is smaller than received data");
 		rx_len = CMD_MAX_PACKET_SIZE;
 	}
 
@@ -320,7 +320,7 @@ static uint16_t mctp_i3c_write(void *mctp_p, void *msg_p)
 	struct i3c_driver_data* data;
 	struct i3c_device_desc* desc;
 
-	LOG_DBG("mctp_inst=%p, msg_p=%p", mctp_inst, msg_p);
+	LOG_DBG("i3c write: mctp_inst=%p, msg_p=%p", mctp_inst, msg_p);
 	if (tx_msg->ext_params.type != MCTP_MEDIUM_TYPE_I3C)
 		return MCTP_ERROR;
 
@@ -331,12 +331,16 @@ static uint16_t mctp_i3c_write(void *mctp_p, void *msg_p)
 		return MCTP_ERROR;
 
 	dev = get_mctp_i3c_dev(mctp_inst->medium_conf.i3c_conf.bus);
-	LOG_DBG("mctp_inst->medium_conf.i3c_conf.bus=%d", mctp_inst->medium_conf.i3c_conf.bus);
+	LOG_DBG("i3c write: mctp_inst->medium_conf.i3c_conf.bus=%d", mctp_inst->medium_conf.i3c_conf.bus);
+	if (dev == NULL) {
+		LOG_ERR("i3c write: Failed to get i3c dev");
+		return MCTP_ERROR;
+	}
 	data = (struct i3c_driver_data *)dev->data;
 	desc = i3c_dev_list_i3c_addr_find(&data->attached_dev, mctp_inst->medium_conf.i3c_conf.addr);
-	LOG_DBG("mctp_inst->medium_conf.i3c_conf.addr=%d", mctp_inst->medium_conf.i3c_conf.addr);
+	LOG_DBG("i3c write: mctp_inst->medium_conf.i3c_conf.addr=%d", mctp_inst->medium_conf.i3c_conf.addr);
 	if (desc == NULL) {
-		LOG_ERR("Device not found");
+		LOG_ERR("i3c write: Device not found");
 		return MCTP_ERROR;
 	}
 
