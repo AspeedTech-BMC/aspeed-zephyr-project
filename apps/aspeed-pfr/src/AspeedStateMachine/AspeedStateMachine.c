@@ -379,6 +379,9 @@ void enter_tmin1(void *o)
 		gWdtBootStatus &= ~WDT_BMC_BOOT_DONE_MASK;
 		SetBmcCheckpoint(0);
 #if defined(CONFIG_PFR_MCTP_I3C)
+		/* Clear PfrActivityInfo1 if the mng mux belongs to BMC. */
+		if (get_i3c_mng_owner() == I3C_MNG_OWNER_BMC)
+			SetPfrActivityInfo1(0);
 #if defined(CONFIG_PFR_MCTP_I3C_5_0)
 		mctp_i3c_target_mctp_stop();
 #else
@@ -401,6 +404,14 @@ void enter_tmin1(void *o)
 		SetAcmCheckpoint(0);
 #endif
 		SetBiosCheckpoint(0);
+#if defined(CONFIG_PFR_MCTP_I3C)
+		/*
+		 * Clear PfrActivityInfo1 if the mng mux belongs to ROT. The mux
+		 * is still taken over at this point, so keep its indicator.
+		 */
+		if (get_i3c_mng_owner() == I3C_MNG_OWNER_ROT)
+			SetPfrActivityInfo1(PFR_ACT1_I3C_MUX_TAKEOVER);
+#endif
 	} else {
 		init_i2c_filters();
 		evt_ctx->data.bit8[2] &= ~(BmcOnlyReset | PchOnlyReset);
@@ -422,6 +433,14 @@ void enter_tmin1(void *o)
 		SetBmcCheckpoint(0);
 		SetBiosCheckpoint(0);
 #if defined(CONFIG_PFR_MCTP_I3C)
+		/*
+		 * Both BMC and PCH are held, so whichever side owns the mng mux
+		 * has to redo DAA and EID assignment. Clear PfrActivityInfo1
+		 * regardless of the current owner, except for the mux takeover
+		 * indicator, which is still valid while ROT owns the mux.
+		 */
+		SetPfrActivityInfo1((get_i3c_mng_owner() == I3C_MNG_OWNER_ROT) ?
+				PFR_ACT1_I3C_MUX_TAKEOVER : 0);
 #if defined(CONFIG_PFR_MCTP_I3C_5_0)
 		mctp_i3c_target_mctp_stop();
 #else

@@ -80,11 +80,13 @@ static void mctp_i3c_target_state_handler(void *arg, void *unused1, void *unused
 		state = device_manager_get_device_state(mgr,
 				DEVICE_MANAGER_SELF_DEVICE_NUM);
 		if (state == DEVICE_MANAGER_SEND_DISCOVERY_NOTIFY) {
+			LOG_INF("Send discovery notify");
 			stat = (I3C_MNG_OWNER_BMC == owner) ?
 				PFR_ACT1_DAA_I3C_BMC : PFR_ACT1_DAA_I3C_CPU;
 			SetPfrActivityInfo1(stat);
 			mctp_i3c_send_discovery_notify(mctp_instance, &duration);
 		} else if (state == DEVICE_MANAGER_EID_ANNOUNCEMENT) {
+			LOG_INF("Announce EID");
 			stat = (I3C_MNG_OWNER_BMC == owner) ?
 				PFR_ACT1_SET_EID_I3C_BMC : PFR_ACT1_SET_EID_I3C_CPU;
 			SetPfrActivityInfo1(stat);
