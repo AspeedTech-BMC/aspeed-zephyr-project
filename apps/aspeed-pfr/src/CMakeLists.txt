@@ -17,6 +17,12 @@ if(ASPEED_ZEPHYR_PROJECT_TAG MATCHES "^v([0-9]+)\\.([0-9]+)")
   set(PFR_PROJECT_VERSION_MINOR ${CMAKE_MATCH_2})
 endif()
 endif()
+# Strip leading zeros so the C macros are decimal, not octal (e.g. "08")
+foreach(ver PFR_PROJECT_VERSION_MAJOR PFR_PROJECT_VERSION_MINOR)
+  if(DEFINED ${ver})
+    string(REGEX REPLACE "^0+([0-9])" "\\1" ${ver} "${${ver}}")
+  endif()
+endforeach()
 execute_process(
   COMMAND git rev-parse --short HEAD
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
