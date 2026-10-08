@@ -17,6 +17,7 @@
 #include <mbedtls/sha512.h>
 #include <mbedtls/ecdsa.h>
 #include <cptra/cptra_api.h>
+#include <psp/abr.h>
 
 LOG_MODULE_REGISTER(cptra_soc_manifest, LOG_LEVEL_DBG);
 
@@ -197,7 +198,7 @@ int cptra_verify_manifest(const struct device* manifest_device, const struct dev
 			uint32_t read_offset = 0;
 			while (read_offset < image_size) {
 				uint32_t current_chunk_size = MIN(noncache_size, image_size - read_offset);
-				ret = flash_read(fmc_dev, image_offset + read_offset, (void *)noncache_ddr, current_chunk_size);
+				ret = abr_flash_read(fmc_dev, image_offset + read_offset, (void *)noncache_ddr, current_chunk_size);
 				if (ret != 0) {
 					LOG_ERR("Image %d Failed to read from flash at offset %u", i, read_offset);
 					mbedtls_sha512_free(&sha_ctx);

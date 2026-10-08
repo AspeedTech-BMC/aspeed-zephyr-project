@@ -188,6 +188,12 @@ uint8_t pldm_sd_ast2700_image_apply(void *arg)
 			}
 		}
 
+		/*
+		 * The erase above and the write below use raw fmc@0 offsets and do
+		 * not follow the ABR offset, so the update always programs the
+		 * primary image region, even when booted from the backup region.
+		 * TODO: let the user select which image region to install to.
+		 */
 		ret = flash_write(flash_dev, offset,
 				  (const uint8_t *)ast2700_image_state.buffer + offset,
 				  chunk_size);

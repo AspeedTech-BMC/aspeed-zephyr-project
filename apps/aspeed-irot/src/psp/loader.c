@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/flash.h>
+#include <psp/abr.h>
 
 LOG_MODULE_REGISTER(psp_loader, LOG_LEVEL_DBG);
 
@@ -79,7 +80,7 @@ uint32_t fwspi_flash_read(uint32_t flash_addr, void *ram_dest, uint32_t size)
 		return 0;
 	}
 
-	if (flash_read(flash_dev, flash_addr, ram_dest, size) != 0) {
+	if (abr_flash_read(flash_dev, flash_addr, ram_dest, size) != 0) {
 		LOG_ERR("Flash read failed");
 		return 0;
 	}

@@ -7,6 +7,7 @@ zephyr_include_directories(composite_eat)
 target_sources(app
 	PRIVATE
 	main.c
+	psp/abr.c
 	psp/loader.c
 	psp/loader_shell.c
 	state_machine/irot_fsm.c
