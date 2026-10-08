@@ -83,9 +83,15 @@ imgtool sign --version 1.1.1 --align 8 --header-size 1024 --slot-size 393216 --l
 # Building ASPEED-IROT Firmware
 
 ```
+git submodule update --init
 west build -b ast2700_evb/ast2700/ssp -p auto aspeed-zephyr-project/apps/aspeed-irot
 ```
 
+# Building MCU-RUNTIME for ASPEED-IROT
+```
+git submodule update --init
+west build -b ast2700_evb/ast2700/bootmcu -p auto aspeed-zephyr-project/apps/mcu-runtime -- -DEXTRA_DTC_OVERLAY_FILE=boards/irot.overlay 
+```
 
 # Building DMTF/LibSPDM Emulator
 This spdm emualtor will create two threads as a requester and a responder.
