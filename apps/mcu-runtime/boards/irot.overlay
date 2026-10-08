@@ -17,7 +17,7 @@
 
 	prictrl_ssp: prictrl-ssp {
 		compatible = "aspeed,prictrl-prot";
-		protect-dev = <IO_S_FMC RW_PROT>, <IO_S_FMC_REG RW_PROT>;
+		protect-dev = <IO_S_FMC RW_PROT>, <IO_S_FMC_REG RW_PROT>, <C_S_HACE RW_PROT>;
 		status = "okay";
 	};
 };
@@ -54,3 +54,10 @@
 	mpus = < &ca35_s >, < &ssp >, < &share_1 >, < &share_2 >, < &share_3 >, < &vb >, <&share_4 >;
 };
 
+&sysclk0 {
+	ssp = <SCU0_CLK_GATE_HACCLK>;
+};
+
+&sysrst0 {
+	ssp = <SCU0_RESET_HACE>;
+};
