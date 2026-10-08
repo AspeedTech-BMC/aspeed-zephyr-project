@@ -12,6 +12,7 @@
 #include <image/caliptra_soc_manifest.h>
 #include <image/caliptra_soc_manifest_v1.h>
 #include <image/firmware_manifest.h>
+#include <psp/abr.h>
 #include <mbedtls/sha512.h>
 #include <zephyr/device.h>
 #include <zephyr/crypto/crypto.h>
@@ -498,9 +499,9 @@ static void spi_reader_thread_entry(void *p1, void *p2, void *p3)
 #if LOAD_IO_TIMING
 			t0 = k_cycle_get_32();
 #endif
-			ret = flash_read(pipe->flash_dev,
-					 pipe->image_offset + (pipe->image_size - remaining),
-					 pipe->buf[idx], chunk_size);
+			ret = abr_flash_read(pipe->flash_dev,
+					     pipe->image_offset + (pipe->image_size - remaining),
+					     pipe->buf[idx], chunk_size);
 #if LOAD_IO_TIMING
 			pipe->read_cycles += k_cycle_get_32() - t0;
 			pipe->read_chunks++;
@@ -883,7 +884,7 @@ static int cptra_verify_manifest_from_flash(const struct device *manifest_device
 		return -ENOMEM;
 	}
 
-	ret = flash_read(manifest_device, off, flash_header, sizeof(*flash_header));
+	ret = abr_flash_read(manifest_device, off, flash_header, sizeof(*flash_header));
 	if (ret) {
 		ret = -ENXIO;
 		goto err;
@@ -903,8 +904,8 @@ static int cptra_verify_manifest_from_flash(const struct device *manifest_device
 		goto err;
 	}
 
-	ret = flash_read(manifest_device, off + sizeof(*flash_header), image_info_array,
-			 image_info_array_size);
+	ret = abr_flash_read(manifest_device, off + sizeof(*flash_header), image_info_array,
+			     image_info_array_size);
 	if (ret) {
 		ret = -ENXIO;
 		goto err;
@@ -928,7 +929,7 @@ static int cptra_verify_manifest_from_flash(const struct device *manifest_device
 		goto err;
 	}
 
-	ret = flash_read(manifest_device, manifest_image_info->image_offset, manifest_buffer, manifest_size);
+	ret = abr_flash_read(manifest_device, manifest_image_info->image_offset, manifest_buffer, manifest_size);
 	if (ret) {
 		ret = -ENXIO;
 		goto err;
