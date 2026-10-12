@@ -268,7 +268,7 @@ static void mctp_rx_task(void *arg, void *dummy0, void *dummy1)
 			continue;
 		}
 
-		LOG_INF("mctp rx read_len=%d", read_len);
+		LOG_DBG("mctp rx read_len=%d", read_len);
 		LOG_HEXDUMP_DBG(read_buf, read_len, "mctp receive data");
 
 		mctp_hdr *hdr = (mctp_hdr *)read_buf;

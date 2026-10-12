@@ -11,7 +11,7 @@
 #include <image/caliptra_soc_manifest.h>
 #include <mbedtls/sha512.h>
 
-LOG_MODULE_REGISTER(cptra_api, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(cptra_api, LOG_LEVEL_INF);
 
 // Refactor this function into init, update and final function.
 int cptra_sha384_init(void)
