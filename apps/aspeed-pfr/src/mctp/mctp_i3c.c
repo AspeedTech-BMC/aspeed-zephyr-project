@@ -649,6 +649,10 @@ int mctp_i3c_hub_configuration(void)
 
 	LOG_INF("Configuring I3C hub");
 	dev = get_mctp_i3c_dev(CONFIG_PFR_SPDM_CPU_I3C_BUS);
+	if (dev == NULL) {
+		LOG_ERR("Failed to get i3c dev");
+		goto end;
+	}
 	desc = i3c_device_find(dev, &i3c_id);
 	if (desc == NULL) {
 		LOG_ERR("I3C Hub not found");
