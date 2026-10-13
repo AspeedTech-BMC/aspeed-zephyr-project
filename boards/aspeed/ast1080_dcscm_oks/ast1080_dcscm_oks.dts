@@ -39,10 +39,11 @@
 		zephyr,memory-region = "RAM_NC";
 	};
 
+	/* 256 KB IO SRAM staging buffer for the SHA_ACC verify path (pfr_sha_acc.c). */
 	sram_buf: memory@74b80000 {
 		compatible = "zephyr,memory-region", "mmio-sram";
 		device_type = "memory";
-		reg = <0x74b80000 DT_SIZE_K(512)>;
+		reg = <0x74b80000 0x40000>;
 		zephyr,memory-region = "SRAM_BUF";
 	};
 };

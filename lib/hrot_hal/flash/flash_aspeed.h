@@ -359,6 +359,11 @@ int bmc_pch_get_flash_size(uint8_t device_id);
 int rot_get_region_size(uint8_t device_id);
 int get_block_erase_size(uint8_t device_id);
 const char *get_flash_device_name(uint8_t device_id);
+
+/* Device lookups shared by flash_aspeed_ast1060.c / flash_aspeed_ast1080.c. */
+struct flash_area;
+int get_flash_dev(uint8_t device_id, uint32_t *address, const struct device **dev);
+int get_rot_region(uint8_t device_id, const struct flash_area **fa);
 #if defined(CONFIG_SPI_DMA_SUPPORT_ASPEED) || defined(CONFIG_SPI_WRITE_DMA_SUPPORT_ASPEED)
 void init_flash_rw_buf_mutex(void);
 #endif
