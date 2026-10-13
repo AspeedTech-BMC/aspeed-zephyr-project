@@ -194,7 +194,7 @@ static int ast_loader_probe(struct ast_chip *chip, struct ast_loader *loader)
 	loader->verify = ast_loader_verify;
 #endif
 
-#ifdef CONFIG_CPTRA_MANIFEST_SIGNATURE
+#if defined(CONFIG_CPTRA_MANIFEST_SIGNATURE) && defined(CONFIG_BOARD_AST2700_EVB_AST2700_A1_BOOTMCU)
 	if (is_ast2700_a1()) {
 		err = cptra_verify_abb_loader();
 	}
