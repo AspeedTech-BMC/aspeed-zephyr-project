@@ -171,6 +171,7 @@ bool cptra_rt_ready(void)
 	return (sys_read32(SCU1_REG + SCU1_CPTRA) & SCU1_CPTRA_RDY_FOR_RT);
 }
 
+#if defined(CONFIG_CPTRA_MANIFEST_SIGNATURE) && defined(CONFIG_BOARD_AST2700_EVB_AST2700_A1_BOOTMCU)
 static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 {
 	int ret = 0;
@@ -202,6 +203,7 @@ static int cptra_read_abb_soc_manifest(struct cptra_image_context *ctx)
 
 	return CPTRA_SUCCESS;
 }
+#endif /* CONFIG_CPTRA_MANIFEST_SIGNATURE && CONFIG_BOARD_AST2700_EVB_AST2700_A1_BOOTMCU */
 
 static struct cptra_image_context cptra_ctx;
 static void cptra_deinit_abb_loader(int ret)
@@ -237,6 +239,7 @@ static int cptra_init_abb_loader(void)
 	return ret;
 }
 
+#if defined(CONFIG_CPTRA_MANIFEST_SIGNATURE) && defined(CONFIG_BOARD_AST2700_EVB_AST2700_A1_BOOTMCU)
 int cptra_verify_abb_loader(void)
 {
 	int ret = 0;
@@ -258,6 +261,7 @@ int cptra_verify_abb_loader(void)
 	// cptra_deinit_abb_loader(ret);
 	return ret;
 }
+#endif /* CONFIG_CPTRA_MANIFEST_SIGNATURE && CONFIG_BOARD_AST2700_EVB_AST2700_A1_BOOTMCU */
 
 int cptra_load_abb_image(void)
 {
