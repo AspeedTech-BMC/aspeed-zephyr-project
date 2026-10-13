@@ -198,12 +198,18 @@ int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t
 #endif
 
 	/* SHA_ACC streams the region in large chunks; declines fall through. */
-	if (pfr_manifest->pfr_hash->type == HASH_TYPE_SHA384 &&
-	    pfr_sha_acc_hash_region(pfr_manifest->flash->state->device_id[0],
-				    pfr_manifest->pfr_hash->start_address,
-				    pfr_manifest->pfr_hash->length,
-				    hash_out, hash_length) == 0) {
-		return Success;
+	if (pfr_manifest->pfr_hash->type == HASH_TYPE_SHA384) {
+		int ret = pfr_sha_acc_hash_region(pfr_manifest->flash->state->device_id[0],
+						  pfr_manifest->pfr_hash->start_address,
+						  pfr_manifest->pfr_hash->length,
+						  hash_out, hash_length);
+
+		if (ret == 0)
+			return Success;
+
+		/* The fallback hashes 4 KB per mailbox round-trip: very slow on big images. */
+		if (ret != -ENOTSUP)
+			LOG_WRN("SHA_ACC hash failed (%d), falling back to slow path", ret);
 	}
 
 	return flash_hash_contents((struct flash *)pfr_manifest->flash,

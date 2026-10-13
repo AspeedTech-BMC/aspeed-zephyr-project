@@ -31,6 +31,8 @@
 #include "gpio/gpio_aspeed.h"
 #include "pfr/pfr_ufm.h"
 #include "pfr/pfr_util.h"
+#include "pfr/pfr_sha_acc.h"
+#include <soc.h>
 
 #include <zephyr/net/net_ip.h>
 #if defined(CONFIG_ASPEED_DICE_SHELL)
@@ -1188,7 +1190,8 @@ static uint32_t perf_parse_size(const char *s)
 // Optional trailing "sram" arg on mbedtls_perf sha256/sha384: run the hash
 // over the fixed SRAM_BUF DT region instead of a heap allocation, to compare
 // crypto throughput out of tightly-coupled SRAM vs. DRAM. Only boards that
-// define a sram_buf DT node (e.g. ast1080_dcscm_*) can use it.
+// define a sram_buf DT node (e.g. ast1080_dcscm_*) can use it. sram_buf is
+// held locked until perf_put_buf() so a verify cannot use it meanwhile.
 static uint8_t *perf_get_buf(const struct shell *shell, uint32_t size, bool use_sram)
 {
 #if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
@@ -1198,6 +1201,7 @@ static uint8_t *perf_get_buf(const struct shell *shell, uint32_t size, bool use_
 					(uint32_t)DT_REG_SIZE(DT_NODELABEL(sram_buf)));
 			return NULL;
 		}
+		pfr_sha_acc_sram_lock();
 		return (uint8_t *)DT_REG_ADDR(DT_NODELABEL(sram_buf));
 	}
 #else
@@ -1211,7 +1215,9 @@ static uint8_t *perf_get_buf(const struct shell *shell, uint32_t size, bool use_
 
 static void perf_put_buf(uint8_t *buf, bool use_sram)
 {
-	if (!use_sram)
+	if (use_sram)
+		pfr_sha_acc_sram_unlock();
+	else
 		k_free(buf);
 }
 
@@ -1574,9 +1580,472 @@ static int cmd_flash_perf_hash(const struct shell *shell, size_t argc, char **ar
 	return 0;
 }
 
+// flash_perf copy: read the same flash range in 256 KB chunks into a HyperRAM
+// heap buffer and then into the sram_buf IO SRAM, to compare SPI DMA
+// throughput into each. Only flash_read() is timed; a checksum of each pass is
+// compared to catch a bad DMA target. Nothing is allocated until it runs.
+
+#define FLASH_PERF_COPY_CHUNK	(256UL * 1024)
+
+// Whole sram_buf per chunk.
+#define FLASH_PERF_SRAM_CHUNK	(256UL * 1024)
+
+// SSMCU/Caliptra AXI sees AHB 0x1xxx_xxxx at 0x3xxx_xxxx
+// (caliptra-mcu-sw platforms/ast1040/config/src/peri.rs).
+#define FLASH_PERF_AHB_TO_SSMCU	0x20000000UL
+
+static uint32_t flash_perf_csum(uint32_t csum, const uint8_t *buf, uint32_t len)
+{
+	for (uint32_t i = 0; i < len; i++)
+		csum = ((csum << 5) | (csum >> 27)) ^ buf[i];
+
+	return csum;
+}
+
+static int flash_perf_copy_pass(const struct shell *shell, const struct device *dev,
+		off_t offset, uint32_t size, uint8_t *buf, uint32_t chunk_max,
+		uint32_t *elapsed_ms, uint32_t *csum)
+{
+	uint32_t remaining = size, chunk, t0;
+	int ret;
+
+	*elapsed_ms = 0;
+	*csum = 0;
+
+	while (remaining > 0) {
+		chunk = MIN(remaining, chunk_max);
+
+		t0 = k_uptime_get_32();
+		ret = flash_read(dev, offset, buf, chunk);
+		*elapsed_ms += k_uptime_get_32() - t0;
+		if (ret) {
+			shell_error(shell, "flash_read failed(%d) at offset 0x%lx", ret,
+					(unsigned long)offset);
+			return ret;
+		}
+
+		*csum = flash_perf_csum(*csum, buf, chunk);
+		offset += chunk;
+		remaining -= chunk;
+	}
+
+	return 0;
+}
+
+static void flash_perf_copy_report(const struct shell *shell, const char *name,
+		const uint8_t *buf, uint32_t size, uint32_t elapsed_ms, uint32_t csum)
+{
+	shell_print(shell, "%-7s buf=%p: %u ms (%u KB/s) csum=0x%08x", name, buf, elapsed_ms,
+			elapsed_ms ? (uint32_t)(((uint64_t)size * 1000) / elapsed_ms / 1024) : 0,
+			csum);
+}
+
+static int cmd_flash_perf_copy(const struct shell *shell, size_t argc, char **argv)
+{
+	const struct device *dev;
+	off_t offset;
+	uint32_t size, hpram_ms, hpram_csum;
+	uint8_t *hpram;
+	int ret;
+
+	if (argc != 4) {
+		shell_error(shell, "Usage: flash_perf copy <dev> <offset> <size[K|M]>");
+		return -EINVAL;
+	}
+
+	dev = device_get_binding(argv[1]);
+	if (!dev) {
+		shell_error(shell, "Device %s not found", argv[1]);
+		return -ENODEV;
+	}
+
+	offset = (off_t)strtoul(argv[2], NULL, 0);
+	size = perf_parse_size(argv[3]);
+	if (size == 0) {
+		shell_error(shell, "size must be > 0");
+		return -EINVAL;
+	}
+
+	shell_print(shell, "flash copy: dev=%s offset=0x%lx size=%u", argv[1],
+			(unsigned long)offset, size);
+
+	/* Line aligned so the SPI driver takes the DMA path, not PIO. */
+	hpram = k_aligned_alloc(CONFIG_DCACHE_LINE_SIZE, FLASH_PERF_COPY_CHUNK);
+	if (!hpram) {
+		shell_error(shell, "Failed to allocate %u bytes", (uint32_t)FLASH_PERF_COPY_CHUNK);
+		return -ENOMEM;
+	}
+
+	ret = flash_perf_copy_pass(shell, dev, offset, size, hpram,
+			FLASH_PERF_COPY_CHUNK, &hpram_ms, &hpram_csum);
+	if (!ret)
+		flash_perf_copy_report(shell, "hyperram", hpram, size, hpram_ms, hpram_csum);
+	k_free(hpram);
+	if (ret)
+		return ret;
+
+#if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
+	uint8_t *sram = (uint8_t *)DT_REG_ADDR(DT_NODELABEL(sram_buf));
+	uint32_t sram_ms, sram_csum;
+
+	pfr_sha_acc_sram_lock();
+	ret = flash_perf_copy_pass(shell, dev, offset, size, sram, FLASH_PERF_SRAM_CHUNK,
+			&sram_ms, &sram_csum);
+	if (!ret)
+		flash_perf_copy_report(shell, "sram", sram, size, sram_ms, sram_csum);
+	pfr_sha_acc_sram_unlock();
+	if (ret)
+		return ret;
+
+	if (sram_csum != hpram_csum)
+		shell_error(shell, "checksum mismatch: sram data differs from hyperram");
+#else
+	shell_warn(shell, "SRAM_BUF not available on this board, sram pass skipped");
+#endif
+
+	return 0;
+}
+
+#define FLASH_PERF_PIPE_MAX_BUFS	8
+
+struct flash_perf_result {
+	uint32_t read_ms;
+	uint32_t hash_ms;
+	uint32_t total_ms;
+	uint8_t hash[48];
+};
+
+// Hashes @size bytes from @offset through @nbuf back-to-back @chunk buffers
+// starting at @base. SHA_ACC gets each buffer's bus address plus @axi_offset.
+// nbuf 1 is the read + SHA_ACC loop without a pipeline (pfr_sha_acc_perf()).
+static int flash_perf_sha_acc_run(const struct device *dev, uint32_t offset, uint32_t size,
+		uint8_t *base, uintptr_t axi_offset, uint32_t nbuf, uint32_t chunk,
+		struct flash_perf_result *res)
+{
+	uint8_t *buf[FLASH_PERF_PIPE_MAX_BUFS];
+	uintptr_t addr[FLASH_PERF_PIPE_MAX_BUFS];
+	int ret;
+
+	for (uint32_t i = 0; i < nbuf; i++) {
+		buf[i] = base + i * chunk;
+		addr[i] = (uintptr_t)TO_PHY_ADDR((uintptr_t)buf[i]) + axi_offset;
+	}
+
+	if (nbuf == 1) {
+		uint32_t t0 = k_uptime_get_32();
+
+		ret = pfr_sha_acc_perf(dev, offset, size, buf[0], addr[0], chunk, res->hash,
+				&res->read_ms, &res->hash_ms);
+		res->total_ms = k_uptime_get_32() - t0;
+	} else {
+		ret = pfr_sha_acc_perf_pipe(dev, offset, size, buf, addr, nbuf, chunk, res->hash,
+				&res->read_ms, &res->hash_ms, &res->total_ms);
+	}
+
+	return ret;
+}
+
+static uint32_t flash_perf_kbps(uint32_t size, uint32_t ms)
+{
+	return ms ? (uint32_t)(((uint64_t)size * 1000) / ms / 1024) : 0;
+}
+
+#if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
+#define FLASH_PERF_SRAM_BASE	((uint8_t *)DT_REG_ADDR(DT_NODELABEL(sram_buf)))
+#define FLASH_PERF_SRAM_SIZE	DT_REG_SIZE(DT_NODELABEL(sram_buf))
+
+// flash_perf sha_acc ... pipe [nbuf] [bufsize]: the flash read of one buffer
+// overlaps SHA_ACC on another (pfr_sha_acc_perf_pipe()), with @nbuf buffers of
+// @chunk bytes back to back in sram_buf. The default, 2 x 32K, is the boot
+// path's layout.
+static int flash_perf_sha_acc_pipe(const struct shell *shell, const struct device *dev,
+		uint32_t offset, uint32_t size, const char *dev_name, uint32_t nbuf,
+		uint32_t chunk)
+{
+	struct flash_perf_result res;
+	int ret;
+
+	if (nbuf < 1 || nbuf > FLASH_PERF_PIPE_MAX_BUFS) {
+		shell_error(shell, "nbuf must be 1..%d", FLASH_PERF_PIPE_MAX_BUFS);
+		return -EINVAL;
+	}
+
+	/* Cache-line multiple, and over 128 bytes, or the SPI driver drops to PIO. */
+	if (chunk <= 128 || chunk % CONFIG_DCACHE_LINE_SIZE) {
+		shell_error(shell, "bufsize must be > 128 and a multiple of %d",
+				CONFIG_DCACHE_LINE_SIZE);
+		return -EINVAL;
+	}
+
+	if ((uint64_t)nbuf * chunk > FLASH_PERF_SRAM_SIZE) {
+		shell_error(shell, "%u x %u bytes exceeds sram_buf (%u bytes)", nbuf, chunk,
+				(uint32_t)FLASH_PERF_SRAM_SIZE);
+		return -EINVAL;
+	}
+
+	shell_print(shell, "sha_acc pipe: dev=%s offset=0x%x size=%u nbuf=%u bufsize=%u "
+			"buf=%p", dev_name, offset, size, nbuf, chunk, FLASH_PERF_SRAM_BASE);
+
+	ret = flash_perf_sha_acc_run(dev, offset, size, FLASH_PERF_SRAM_BASE,
+			FLASH_PERF_AHB_TO_SSMCU, nbuf, chunk, &res);
+	if (ret) {
+		shell_error(shell, "sha_acc pipe failed (%d) after read %u ms, hash %u ms", ret,
+				res.read_ms, res.hash_ms);
+		return ret;
+	}
+
+	shell_print(shell, "flash_read: %u ms busy", res.read_ms);
+	shell_print(shell, "sha_acc:    %u ms busy", res.hash_ms);
+	shell_print(shell, "total:      %u ms (%u KB/s)", res.total_ms,
+			flash_perf_kbps(size, res.total_ms));
+	shell_hexdump(shell, res.hash, sizeof(res.hash));
+
+	return 0;
+}
+
+static const struct {
+	const char *name;
+	bool sram;
+	uint8_t nbuf;
+	uint32_t chunk;
+} flash_perf_sweep_cfg[] = {
+	{ "hyperram 256K x 1", false, 1, 256 * 1024 },	/* original boot layout */
+	{ "hyperram 128K x 2", false, 2, 128 * 1024 },
+	{ "sram     256K x 1", true,  1, 256 * 1024 },
+	{ "sram     128K x 2", true,  2, 128 * 1024 },
+	{ "sram      64K x 2", true,  2,  64 * 1024 },
+	{ "sram      64K x 4", true,  4,  64 * 1024 },
+	{ "sram      32K x 2", true,  2,  32 * 1024 },
+	{ "sram      32K x 4", true,  4,  32 * 1024 },
+};
+
+// flash_perf sha_acc_sweep: runs every flash_perf_sweep_cfg layout over the
+// same range and prints one table. Read and hash speed come from each side's
+// busy time; total is wall clock. All digests must match.
+static int cmd_flash_perf_sha_acc_sweep(const struct shell *shell, size_t argc, char **argv)
+{
+	struct flash_perf_result res[ARRAY_SIZE(flash_perf_sweep_cfg)];
+	int rc[ARRAY_SIZE(flash_perf_sweep_cfg)];
+	const struct device *dev;
+	uint32_t offset, size;
+	bool match = true;
+	int ref = -1;	/* first run that succeeded; the others' digests must equal it */
+	uint8_t *hpram;
+
+	if (argc != 4) {
+		shell_error(shell, "Usage: flash_perf sha_acc_sweep <dev> <offset> <size[K|M]>");
+		return -EINVAL;
+	}
+
+	dev = device_get_binding(argv[1]);
+	if (!dev) {
+		shell_error(shell, "Device %s not found", argv[1]);
+		return -ENODEV;
+	}
+
+	offset = strtoul(argv[2], NULL, 0);
+	size = perf_parse_size(argv[3]);
+	if (size == 0) {
+		shell_error(shell, "size must be > 0");
+		return -EINVAL;
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(flash_perf_sweep_cfg); i++) {
+		uint32_t bytes = flash_perf_sweep_cfg[i].nbuf * flash_perf_sweep_cfg[i].chunk;
+
+		shell_print(shell, "[%u/%u] %s ...", (uint32_t)i + 1,
+				(uint32_t)ARRAY_SIZE(flash_perf_sweep_cfg),
+				flash_perf_sweep_cfg[i].name);
+
+		if (flash_perf_sweep_cfg[i].sram) {
+			rc[i] = flash_perf_sha_acc_run(dev, offset, size, FLASH_PERF_SRAM_BASE,
+					FLASH_PERF_AHB_TO_SSMCU, flash_perf_sweep_cfg[i].nbuf,
+					flash_perf_sweep_cfg[i].chunk, &res[i]);
+			continue;
+		}
+
+		/* Line aligned so the SPI driver takes the DMA path, not PIO. */
+		hpram = k_aligned_alloc(CONFIG_DCACHE_LINE_SIZE, bytes);
+		if (!hpram) {
+			rc[i] = -ENOMEM;
+			continue;
+		}
+		rc[i] = flash_perf_sha_acc_run(dev, offset, size, hpram, 0,
+				flash_perf_sweep_cfg[i].nbuf, flash_perf_sweep_cfg[i].chunk,
+				&res[i]);
+		k_free(hpram);
+	}
+
+	shell_print(shell, "\nsha_acc sweep: dev=%s offset=0x%x size=%u", argv[1], offset, size);
+	shell_print(shell, "%-20s   %15s   %17s   %10s", "config", "flash read KB/s",
+			"sha_acc hash KB/s", "total ms");
+	for (size_t i = 0; i < ARRAY_SIZE(flash_perf_sweep_cfg); i++) {
+		if (rc[i]) {
+			shell_print(shell, "%-20s   failed (%d)", flash_perf_sweep_cfg[i].name, rc[i]);
+			match = false;
+			continue;
+		}
+		shell_print(shell, "%-20s   %15u   %17u   %10u", flash_perf_sweep_cfg[i].name,
+				flash_perf_kbps(size, res[i].read_ms),
+				flash_perf_kbps(size, res[i].hash_ms), res[i].total_ms);
+		if (ref < 0) {
+			ref = i;
+		} else if (memcmp(res[i].hash, res[ref].hash, sizeof(res[i].hash))) {
+			shell_error(shell, "  digest differs from %s",
+					flash_perf_sweep_cfg[ref].name);
+			match = false;
+		}
+	}
+
+	if (match) {
+		shell_print(shell, "digest (all match):");
+		shell_hexdump(shell, res[ref].hash, sizeof(res[ref].hash));
+	}
+
+	return match ? 0 : -EIO;
+}
+#endif
+
+// flash_perf sha_acc: the boot verify loop (flash_read + Caliptra SHA_ACC
+// SHA-384, 256 KB chunks) staged through a HyperRAM heap buffer or, with
+// "sram", through sram_buf, so the digests and read/hash split can be compared
+// before the boot path is switched. Run without "sram" first for a reference.
+// With "sram", SHA_ACC is handed the SSMCU AXI address of sram_buf
+// (0x34b80000) unless [sha_acc_addr] overrides it.
+static int cmd_flash_perf_sha_acc(const struct shell *shell, size_t argc, char **argv)
+{
+	const struct device *dev;
+	uint32_t offset, size, read_ms, hash_ms;
+	uint8_t hash[48];
+	uint8_t *buf;
+	uintptr_t sha_acc_addr = 0;
+	uint32_t chunk = FLASH_PERF_COPY_CHUNK;
+	bool use_sram = false;
+	int ret;
+
+	/* pipe always stages in IO SRAM, so "sram pipe ..." means the same thing. */
+	int pipe_arg = (argc >= 6 && !strcmp(argv[4], "sram") && !strcmp(argv[5], "pipe")) ? 5 :
+		       (argc >= 5 && !strcmp(argv[4], "pipe")) ? 4 : 0;
+
+	if (pipe_arg && argc <= pipe_arg + 3) {
+		uint32_t nbuf = 2;
+		uint32_t bufsize = 32 * 1024;
+
+		dev = device_get_binding(argv[1]);
+		if (!dev) {
+			shell_error(shell, "Device %s not found", argv[1]);
+			return -ENODEV;
+		}
+		size = perf_parse_size(argv[3]);
+		if (size == 0) {
+			shell_error(shell, "size must be > 0");
+			return -EINVAL;
+		}
+		if (argc > pipe_arg + 1)
+			nbuf = strtoul(argv[pipe_arg + 1], NULL, 0);
+		if (argc > pipe_arg + 2)
+			bufsize = perf_parse_size(argv[pipe_arg + 2]);
+#if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
+		return flash_perf_sha_acc_pipe(shell, dev, strtoul(argv[2], NULL, 0), size,
+				argv[1], nbuf, bufsize);
+#else
+		shell_error(shell, "SRAM_BUF not available on this board");
+		return -EINVAL;
+#endif
+	} else if ((argc == 5 || argc == 6) && !strcmp(argv[4], "sram")) {
+		use_sram = true;
+		chunk = FLASH_PERF_SRAM_CHUNK;
+		if (argc == 6) {
+			char *end;
+
+			sha_acc_addr = strtoul(argv[5], &end, 0);
+			if (*end != '\0' || sha_acc_addr == 0) {
+				shell_error(shell, "Bad sha_acc_addr: %s", argv[5]);
+				return -EINVAL;
+			}
+		}
+	} else if (argc != 4) {
+		shell_error(shell, "Usage: flash_perf sha_acc <dev> <offset> <size[K|M]> "
+				"[sram [sha_acc_addr] | pipe [nbuf] [bufsize[K]]]");
+		return -EINVAL;
+	}
+
+	dev = device_get_binding(argv[1]);
+	if (!dev) {
+		shell_error(shell, "Device %s not found", argv[1]);
+		return -ENODEV;
+	}
+
+	offset = strtoul(argv[2], NULL, 0);
+	size = perf_parse_size(argv[3]);
+	if (size == 0) {
+		shell_error(shell, "size must be > 0");
+		return -EINVAL;
+	}
+
+#if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
+	buf = use_sram ? (uint8_t *)DT_REG_ADDR(DT_NODELABEL(sram_buf)) :
+			 k_aligned_alloc(CONFIG_DCACHE_LINE_SIZE, FLASH_PERF_COPY_CHUNK);
+#else
+	if (use_sram) {
+		shell_error(shell, "SRAM_BUF not available on this board");
+		return -EINVAL;
+	}
+	buf = k_aligned_alloc(CONFIG_DCACHE_LINE_SIZE, FLASH_PERF_COPY_CHUNK);
+#endif
+	if (!buf) {
+		shell_error(shell, "Failed to allocate %u bytes", (uint32_t)FLASH_PERF_COPY_CHUNK);
+		return -ENOMEM;
+	}
+
+	if (sha_acc_addr == 0) {
+		sha_acc_addr = (uintptr_t)TO_PHY_ADDR((uintptr_t)buf);
+		if (use_sram)
+			sha_acc_addr += FLASH_PERF_AHB_TO_SSMCU;
+	}
+
+	ret = pfr_sha_acc_perf(dev, offset, size, buf, sha_acc_addr, chunk, hash,
+			&read_ms, &hash_ms);
+
+	if (!use_sram)
+		k_free(buf);
+
+	shell_print(shell, "sha_acc: dev=%s offset=0x%x size=%u buf=%p (%s) chunk=%u "
+			"sha_acc_addr=0x%lx", argv[1], offset, size, buf,
+			use_sram ? "sram" : "hyperram", chunk, (unsigned long)sha_acc_addr);
+	if (ret) {
+		shell_error(shell, "sha_acc failed (%d) after read %u ms, hash %u ms", ret,
+				read_ms, hash_ms);
+		return ret;
+	}
+
+	shell_print(shell, "flash_read: %u ms (%u KB/s)", read_ms,
+			read_ms ? (uint32_t)(((uint64_t)size * 1000) / read_ms / 1024) : 0);
+	shell_print(shell, "sha_acc:    %u ms (%u KB/s)", hash_ms,
+			hash_ms ? (uint32_t)(((uint64_t)size * 1000) / hash_ms / 1024) : 0);
+	shell_print(shell, "total:      %u ms", read_ms + hash_ms);
+	shell_hexdump(shell, hash, sizeof(hash));
+
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash_perf,
 	SHELL_CMD(read, NULL, "flash read perf test\n\tread <dev> <offset> <size[K|M]> <loop>",
 			cmd_flash_perf_read),
+	SHELL_CMD(copy, NULL,
+			"flash read into hyperram vs sram_buf (256K chunks)\n"
+			"\tcopy <dev> <offset> <size[K|M]>",
+			cmd_flash_perf_copy),
+	SHELL_CMD(sha_acc, NULL,
+			"flash read + Caliptra SHA_ACC SHA-384, hyperram or sram_buf staging\n"
+			"\tsha_acc <dev> <offset> <size[K|M]> [sram [sha_acc_addr] | pipe [nbuf] [bufsize[K]]]",
+			cmd_flash_perf_sha_acc),
+#if DT_NODE_EXISTS(DT_NODELABEL(sram_buf))
+	SHELL_CMD(sha_acc_sweep, NULL,
+			"sha_acc over every hyperram/sram buffer layout, as one table\n"
+			"\tsha_acc_sweep <dev> <offset> <size[K|M]>",
+			cmd_flash_perf_sha_acc_sweep),
+#endif
 	SHELL_CMD(hash, NULL,
 			"flash read+hash perf test, reports read/hash split\n"
 			"\thash <dev> <offset> <size[K|M]> <sha256|sha384>",

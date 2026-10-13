@@ -85,11 +85,13 @@
 
 &spi0_cs0 {
 	spi-monitor-ctrl = <&spim1>;
+	spi-max-frequency = <50000000>;
 	status = "okay";
 };
 
 &spi0_cs2 {
 	spi-monitor-ctrl = <&spim2>;
+	spi-max-frequency = <50000000>;
 	status = "okay";
 };
 
@@ -103,6 +105,7 @@
 
 &spi1_cs0 {
 	spi-monitor-ctrl = <&spim3>;
+	spi-max-frequency = <50000000>;
 	status = "okay";
 };
 
@@ -199,6 +202,7 @@
 };
 
 &fmc_cs0 {
+	spi-max-frequency = <50000000>;
 	status = "okay";
 
 	partitions {
@@ -239,6 +243,7 @@
 };
 
 &fmc_cs1 {
+	spi-max-frequency = <50000000>;
 	status = "okay";
 
 	partitions {

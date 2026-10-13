@@ -40,6 +40,13 @@ if (CONFIG_HROT_HAL)
 			${HROT_MIDDLEWARE_ROOT}/gpio/platform/gpio_venice.c
 		)
 	endif()
+	# AST1080's SPI driver DMAs into any buffer; AST1060 bounces via RAM_NC.
+	if (CONFIG_SOC_AST1080_CM4)
+		zephyr_library_sources(${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed_ast1080.c)
+	else()
+		zephyr_library_sources(${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed_ast1060.c)
+	endif()
+
 	zephyr_library_sources(
 	    ${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/gpio/gpio_aspeed.c
