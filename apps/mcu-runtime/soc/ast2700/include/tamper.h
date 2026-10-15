@@ -21,9 +21,6 @@
 #define MPLL_LOCK_TIMEOUT_US	100000
 
 int tamper_init(int step, int diff);
-int tamper_kick(void);
 int tamper_check(void);
-int tamper_stop(void);
-int tamper_reboot(void);
 int pll_calibration(int step, int diff);
 #endif

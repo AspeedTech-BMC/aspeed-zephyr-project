@@ -29,6 +29,18 @@
 #define TAMPER_RUNTIME_STEP	0x2
 #define TAMPER_CLEAR_TIMEOUT_US	100000
 
+/* DDRPHY registers for unlock detection */
+#define DDRPHY_UNLOCK_STATUS_REG	0x130401a8
+#define DDRPHY_UNLOCK_CLEAR_REG		0x130401ac
+
+/* MBUS hang-check: write/read-back test addresses at top of 32-bit space */
+#define MBUS_TEST_ADDR_A		0xfffffff0
+#define MBUS_TEST_ADDR_B		0xfffffff4
+#define MBUS_TEST_ADDR_C		0xfffffff8
+#define MBUS_TEST_PAT_A			0x87654321U
+#define MBUS_TEST_PAT_B			0x12345678U
+#define MBUS_TEST_PAT_C			0x89abcdefU
+
 /* SCU scratch reg 0x12c029B8: upper 16 bits hold sticky event counters
  * that survive the WDT reset below, so they can be inspected post-mortem.
  */
@@ -58,18 +70,25 @@
 	ret__; \
 })
 
+#define SCU_FREQ_COUNTER_MASK 	GENMASK(17, 0)
+#define SCU_FREQ_RING_ENABLE 	BIT(0)
+#define SCU_FREQ_RING_STG(x)	FIELD_PREP(GENMASK(14, 9), (x))
+#define SCU_FREQ_MAX_RING_STG	31U
+#define SCU_FREQ_OSC_ENABLE	BIT(1)
+#define SCU_FREQ_DONE		BIT(6)
+#define SCU_FREQ_COUNTER(x)	FIELD_GET(SCU_FREQ_COUNTER_MASK, (x))
+
+/* FREQ_COUNTER_CTRL source-select (pre-shifted to bits[4:2]) and combined control words */
+#define FREQ_SRC_DLY32			(0x3U << 2)	/* dly32 ring oscillator */
+#define FREQ_SRC_MPLL_DIV4		(0x5U << 2)	/* MPLL / 4 */
+#define FREQ_CTRL_TAMPER_DISABLE	(0x180000U | FREQ_SRC_MPLL_DIV4)
+#define FREQ_CTRL_TAMPER_ENABLE		(0x190000U | FREQ_SRC_MPLL_DIV4)
+
+#ifdef ENABLE_TAMPER_TIMER
 static uint32_t counter_to_delay_ps(uint32_t value)
 {
 	return (25000000U / 512) * (value + 1);
 }
-
-#define SCU_FREQ_COUNTER_MASK 	GENMASK(17, 0)
-#define SCU_FREQ_RING_ENABLE 	BIT(0)
-#define SCU_FREQ_RING_STG(x)	FIELD_PREP(GENMASK(14, 9), (x))
-#define SCU_FREQ_OSC_ENABLE	BIT(1)
-#define SCU_FREQ_DONE		BIT(6)
-//#define SCU_FREQ_COUNTER_MASK	GENMASK(29, 16)
-#define SCU_FREQ_COUNTER(x)	FIELD_GET(SCU_FREQ_COUNTER_MASK, (x))
 
 static uint32_t cal_src(int src)
 {
@@ -81,15 +100,13 @@ static uint32_t cal_src(int src)
 	sys_write32(0, FREQ_COUNTER_CTRL_REG);
 
 	if (src == 0)
-		sel = 0x3; //dly32
+		sel = FREQ_SRC_DLY32;
 	else if (src == 1)
-		sel = 0x5; //mpll/4
+		sel = FREQ_SRC_MPLL_DIV4;
 	else
 		return 0;
 
-	sel = sel << 2;
-
-	reg = sel | SCU_FREQ_RING_ENABLE | SCU_FREQ_RING_STG(31);
+	reg = sel | SCU_FREQ_RING_ENABLE | SCU_FREQ_RING_STG(SCU_FREQ_MAX_RING_STG);
 
 	sys_write32(reg, base);
 	k_busy_wait(2000);
@@ -112,9 +129,9 @@ static void tamper_timer_cb(struct k_timer *timer)
 	ARG_UNUSED(timer);
 
 	tamper = sys_read32(TAMPER_STATUS_REG);
-	phyunlock = sys_read32(0x130401a8);
+	phyunlock = sys_read32(DDRPHY_UNLOCK_STATUS_REG);
 
-	printf("***** Tamper=%d C, DDRPHY unlock status=0x%x *****\n", tamper & 8, phyunlock);
+	printf("***** Tamper=%ld C, DDRPHY unlock status=0x%x *****\n", tamper & TAMPER_ALERT, phyunlock);
 
 	if (tamper & TAMPER_ALERT) {
 		printf("Tamper Alert!!!\n");
@@ -127,11 +144,11 @@ static void tamper_timer_cb(struct k_timer *timer)
 		// restart tamper detection.
 		tamper_init(TAMPER_RUNTIME_STEP, TAMPER_RUNTIME_DIFF);
 
-		sys_write32(0x87654321, 0xfffffff0);
+		sys_write32(MBUS_TEST_PAT_A, MBUS_TEST_ADDR_A);
 		k_busy_wait(1000);
 
 		// check if mbus hang.
-		if (sys_read32(0xfffffff0) != 0x87654321)
+		if (sys_read32(MBUS_TEST_ADDR_A) != MBUS_TEST_PAT_A)
 			printf("DDRPHY unlock cannot write to DRAM!!!\n");
 	}
 
@@ -139,23 +156,23 @@ static void tamper_timer_cb(struct k_timer *timer)
 	if (phyunlock & UNLOCK_ALERT) {
 		printf("Unlock Alert!!!\n");
 
-		sys_write32(0x12345678, 0xfffffff4);
+		sys_write32(MBUS_TEST_PAT_B, MBUS_TEST_ADDR_B);
 		k_busy_wait(1000);
 
 		// check if mbus hang.
-		if (sys_read32(0xfffffff4) != 0x12345678) {
+		if (sys_read32(MBUS_TEST_ADDR_B) != MBUS_TEST_PAT_B) {
 			// keep alert message but not clear status until wdt recovery.
 			printf("DDRPHY unlock cannot write to DRAM!!!\n");
 		} else {
 			// clear ddrphy unlock status.
-			sys_write32(0x1, 0x130401ac);
-			sys_write32(0x0, 0x130401ac);
+			sys_write32(BIT(0), DDRPHY_UNLOCK_CLEAR_REG);
+			sys_write32(0, DDRPHY_UNLOCK_CLEAR_REG);
 		}
 	}
 }
 
 K_TIMER_DEFINE(tamper_progress_timer, tamper_timer_cb, NULL);
-int tamper_kick(void)
+static int tamper_kick(void)
 {
 	sys_write32(TAMPER_RUNTIME_STEP, FREQ_COUNTER_STEP_REG);
 	sys_write32(TAMPER_RUNTIME_DIFF, FREQ_COUNTER_DIFF_REG);
@@ -165,13 +182,14 @@ int tamper_kick(void)
 
 	return 0;
 }
+#endif
 
 int tamper_check(void)
 {
 	uint32_t tamper, phyunlock;
 
 	tamper = sys_read32(TAMPER_STATUS_REG);
-	phyunlock = sys_read32(0x130401a8);
+	phyunlock = sys_read32(DDRPHY_UNLOCK_STATUS_REG);
 
 	if (tamper & TAMPER_ALERT) {
 		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
@@ -199,14 +217,14 @@ int tamper_check(void)
 		sys_write32(scratch, SCU_SCRATCH_REG);
 
 		// clear ddrphy unlock status.
-		sys_write32(0x1, 0x130401ac);
-		sys_write32(0x0, 0x130401ac);
+		sys_write32(BIT(0), DDRPHY_UNLOCK_CLEAR_REG);
+		sys_write32(0, DDRPHY_UNLOCK_CLEAR_REG);
 
-		sys_write32(0x89abcdef, 0xfffffff8);
+		sys_write32(MBUS_TEST_PAT_C, MBUS_TEST_ADDR_C);
 		k_busy_wait(1000);
 
 		// check if mbus hang.
-		if (sys_read32(0xfffffff8) != 0x89abcdef)
+		if (sys_read32(MBUS_TEST_ADDR_C) != MBUS_TEST_PAT_C)
 			printf("DDRPHY unlock cannot write to DRAM!!!\n");
 	}
 
@@ -214,14 +232,9 @@ int tamper_check(void)
 	sys_write32(TAMPER_RUNTIME_STEP, FREQ_COUNTER_STEP_REG);
 	sys_write32(TAMPER_RUNTIME_DIFF, FREQ_COUNTER_DIFF_REG);
 
-	return 0;
-}
-
-int tamper_stop(void)
-{
-	k_timer_stop(&tamper_progress_timer);
-
-	printf("Tamper stop\n");
+#ifdef ENABLE_TAMPER_TIMER
+	tamper_kick();
+#endif
 	return 0;
 }
 
@@ -229,25 +242,21 @@ int tamper_init(int step, int diff)
 {
 	uint32_t reg;
 
-	//printf("Tamper detection start\n");
-
-	sys_write32(0, FREQ_COUNTER_STEP_REG); //Maximum Stepping error
-	sys_write32(0, FREQ_COUNTER_DIFF_REG); //Maximum Difference error
-	sys_write32(0x180014, FREQ_COUNTER_CTRL_REG); //Disable tamper and keep mpll source
+	sys_write32(0, FREQ_COUNTER_STEP_REG);
+	sys_write32(0, FREQ_COUNTER_DIFF_REG);
+	sys_write32(FREQ_CTRL_TAMPER_DISABLE, FREQ_COUNTER_CTRL_REG);
 	// wait for tamper settle.
 	k_busy_wait(10);
 
-	sys_write32(0x14, FREQ_COUNTER_CTRL_REG);
-	sys_write32(step, FREQ_COUNTER_STEP_REG); //Maximum Stepping error
-	sys_write32(diff, FREQ_COUNTER_DIFF_REG); //Maximum Difference error
+	sys_write32(FREQ_SRC_MPLL_DIV4, FREQ_COUNTER_CTRL_REG);
+	sys_write32(step, FREQ_COUNTER_STEP_REG);
+	sys_write32(diff, FREQ_COUNTER_DIFF_REG);
 
 	k_busy_wait(100);
 	sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
 
-	// 0x15:64 refclk cycles. 25MHz / 64 = 390.625kHz, ~400KHz x 4 = 1.6MHz. 1.6GHz +- 1.6MHz => assert alert.
-	// 0x19:16 refclk cycles. 25MHz / 16 = 1.562Mhz, 1.5MHz x 4 = 6MHz. 1.6GHz +- 6MHz => assert alert.
-	// 0xb: 16384 refclk cycles. 25MHz / 16384 = 1.525kHz, 1.5kHz x 4 = 6kHz. 1.6GHz +- 6kHz => assert alert.
-	sys_write32(0x190014, FREQ_COUNTER_CTRL_REG);
+	// 16 refclk cycles: 25MHz / 16 = 1.5MHz x 4 = 6MHz -> 1.6GHz +- 6MHz => alert
+	sys_write32(FREQ_CTRL_TAMPER_ENABLE, FREQ_COUNTER_CTRL_REG);
 
 	// wait 100 us for tamper settle.
 	k_busy_wait(100);
@@ -282,8 +291,8 @@ int tamper_init(int step, int diff)
  * tamper.h, shared with sdram_ast2700.c's sdramc_pll_reset().
  */
 #define MPLL_REFCLK_HZ		25000000U
-#define MPLL_DEFAULT_M		0x40U//1024U
-#define MPLL_DEFAULT_NR		1U//16U
+#define MPLL_DEFAULT_M		0x40U
+#define MPLL_DEFAULT_NR		1U
 #define MPLL_DEFAULT_OD		1U
 #define MPLL_STEP_HZ		(MPLL_REFCLK_HZ / MPLL_DEFAULT_NR)	/* Hz per M count */
 #define MPLL_DEFAULT_FREQ_HZ	(MPLL_STEP_HZ * MPLL_DEFAULT_M)	/* 1600MHz */
