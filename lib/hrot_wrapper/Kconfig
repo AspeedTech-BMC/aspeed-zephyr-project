@@ -29,7 +29,7 @@ config HROT_HASH_BACKEND_MBEDTLS
 	  Use mbedTLS software SHA-256/SHA-384 through the HROT hash wrapper.
 
 config HROT_HASH_BACKEND_CPTRA
-	bool "Caliptra-SS MCI hardware hash"
+	bool "Caliptra-SS MCI SHA_ACC hardware hash"
 	depends on CPTRA_MCI_SHA_ACC
 	help
 	  Use the Caliptra-SS MCI SHA_ACC engine, which DMA-reads the source

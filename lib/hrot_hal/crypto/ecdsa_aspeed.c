@@ -4,29 +4,30 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <errno.h>
 #include <zephyr/kernel.h>
+#include "ecdsa_aspeed.h"
 #include <zephyr/crypto/ecdsa_structs.h>
 #include <zephyr/crypto/ecdsa.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(ecdsa_middle_aspeed, CONFIG_LOG_DEFAULT_LEVEL);
 
-#ifdef CONFIG_ECDSA_ASPEED
-#define ECDSA_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_ecdsa))
+#define ECDSA_P384_SCALAR_SIZE 48
+
+static const struct device *ecdsa_verify_device(void)
+{
+#if defined(CONFIG_PFR_ECDSA_P384_BACKEND_CPTRA)
+	return DEVICE_DT_GET_ANY(aspeed_cptra_mci_ecdsa);
+#elif defined(CONFIG_ECDSA_ASPEED)
+	return DEVICE_DT_GET_ANY(aspeed_ecdsa);
 #else
-/*
- * TODO(AST1080): AST1080 (G2) has no ECDSA engine; crypto is provided by the
- * Caliptra subsystem, which is not yet wired into this HAL. Placeholder so the
- * build links - device_get_binding() returns NULL and ECDSA is non-functional.
- */
-#define ECDSA_DRV_NAME "ECDSA_NONE"
+	return NULL;
 #endif
+}
 
 /**
- * This function verifies the expected SHA384 hash and EC signature (for secp384) for a given data.
- *
- * The function calculate_sha is called initially to obtain the hash output of the data
- * and this hash data will be transfered to the ecdsa block to be used for signature
- * verification.
+ * Verify a P-384 signature over an already computed SHA-384 digest through
+ * the selected Zephyr ECDSA device (ASPEED or Caliptra MCI).
  *
  * @param public_key_x : Q(x) public key
  * @param public_key_y : Q(y) public key
@@ -41,20 +42,20 @@ LOG_MODULE_REGISTER(ecdsa_middle_aspeed, CONFIG_LOG_DEFAULT_LEVEL);
 int aspeed_ecdsa_verify_middlelayer(uint8_t *public_key_x, uint8_t *public_key_y,
 	const uint8_t *digest, size_t length, uint8_t *signature_r, uint8_t *signature_s)
 {
-	const struct device *dev = device_get_binding(ECDSA_DRV_NAME);
-	struct ecdsa_ctx ini;
-	struct ecdsa_pkt pkt;
-	struct ecdsa_key ek;
-	int status = 1;
+	const struct device *dev = ecdsa_verify_device();
+	struct ecdsa_ctx ini = { 0 };
+	struct ecdsa_pkt pkt = { 0 };
+	struct ecdsa_key ek = { 0 };
+	int status;
 
-	if (dev == NULL) {
-		LOG_ERR("device not found");
-		return status;
+	if (public_key_x == NULL || public_key_y == NULL || digest == NULL ||
+	    signature_r == NULL || signature_s == NULL || length != ECDSA_P384_SCALAR_SIZE) {
+		return -EINVAL;
 	}
 
-	if (length != 48) {
-		LOG_ERR("digest length not support, %d", length);
-		return status;
+	if (dev == NULL || !device_is_ready(dev)) {
+		LOG_ERR("ECDSA device not ready");
+		return -ENODEV;
 	}
 
 	ek.curve_id = ECC_CURVE_NIST_P384;

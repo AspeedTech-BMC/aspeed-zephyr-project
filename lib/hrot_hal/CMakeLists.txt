@@ -50,9 +50,18 @@ if (CONFIG_HROT_HAL)
 	zephyr_library_sources(
 	    ${HROT_MIDDLEWARE_ROOT}/flash/flash_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/gpio/gpio_aspeed.c
-	    ${HROT_MIDDLEWARE_ROOT}/crypto/hash_aspeed.c
 	    ${HROT_MIDDLEWARE_ROOT}/crypto/ecdsa_aspeed.c
 	)
+
+	# Same hash_engine_* API, backed by HACE, Caliptra SHA_ACC or mbedTLS.
+	if (CONFIG_HROT_HASH_BACKEND_CPTRA)
+		zephyr_library_sources(${HROT_MIDDLEWARE_ROOT}/crypto/hash_cptra.c)
+	elseif (CONFIG_HROT_HASH_BACKEND_MBEDTLS)
+		zephyr_library_sources(${HROT_MIDDLEWARE_ROOT}/crypto/hash_mbedtls.c)
+		zephyr_library_link_libraries(mbedTLS)
+	else()
+		zephyr_library_sources(${HROT_MIDDLEWARE_ROOT}/crypto/hash_aspeed.c)
+	endif()
 
 	zephyr_library_sources_ifdef(CONFIG_CERBERUS_PFR ${HROT_MIDDLEWARE_ROOT}/crypto/rsa_aspeed.c)
 
