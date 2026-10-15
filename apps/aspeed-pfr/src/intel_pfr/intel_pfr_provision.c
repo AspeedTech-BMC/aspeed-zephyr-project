@@ -58,7 +58,6 @@ int verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *pubkey_x, uint8
 		return status;
 	}
 
-#if !defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
 	if (memcmp(sha_buffer, ufm_sha_data, digest_length)) {
 		LOG_ERR("Block1 Root Entry: hash not matched");
 		LOG_HEXDUMP_INF(root_public_key, digest_length * 2, "Public key:");
@@ -66,7 +65,6 @@ int verify_root_key_hash(struct pfr_manifest *manifest, uint8_t *pubkey_x, uint8
 		LOG_HEXDUMP_INF(ufm_sha_data, digest_length, "Expected hash:");
 		return Failure;
 	}
-#endif
 
 	return Success;
 }
@@ -105,7 +103,6 @@ int verify_root_key_hash_lms(struct pfr_manifest *manifest, uint8_t *lms_verify_
 		return status;
 	}
 
-#if !defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
 	if (memcmp(sha_buffer, ufm_sha_data, digest_length)) {
 		LOG_ERR("Block1 Root Entry: hash not matched");
 		LOG_HEXDUMP_INF(lms_verify_pubkey, lms_verify_pubkey_len, "Public key:");
@@ -113,7 +110,6 @@ int verify_root_key_hash_lms(struct pfr_manifest *manifest, uint8_t *lms_verify_
 		LOG_HEXDUMP_INF(ufm_sha_data, digest_length, "Expected hash:");
 		return Failure;
 	}
-#endif
 
 	return Success;
 }

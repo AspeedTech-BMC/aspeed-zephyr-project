@@ -113,11 +113,6 @@ static int hash_wrapper_calculate_sha256(struct hash_engine *engine, const uint8
 		return HASH_ENGINE_HASH_BUFFER_TOO_SMALL;
 	}
 
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-	hash_wrapper_mbedtls.active = HASH_ACTIVE_NONE;
-	return 0;
-#endif
-
 	hash_wrapper_mbedtls_free_context();
 
 	mbedtls_sha256_init(&ctx);
@@ -145,11 +140,6 @@ static int hash_wrapper_start_sha256(struct hash_engine *engine)
 		return HASH_ENGINE_HASH_IN_PROGRESS;
 	}
 
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-	hash_wrapper_mbedtls.active = HASH_ACTIVE_SHA256;
-	return 0;
-#endif
-
 	mbedtls_sha256_init(&hash_wrapper_mbedtls.sha256);
 	status = mbedtls_sha256_starts(&hash_wrapper_mbedtls.sha256, 0);
 	if (status) {
@@ -174,11 +164,6 @@ static int hash_wrapper_calculate_sha384(struct hash_engine *engine, const uint8
 	if (hash_length < SHA384_HASH_LENGTH) {
 		return HASH_ENGINE_HASH_BUFFER_TOO_SMALL;
 	}
-
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-	hash_wrapper_mbedtls.active = HASH_ACTIVE_NONE;
-	return 0;
-#endif
 
 	hash_wrapper_mbedtls_free_context();
 
@@ -207,11 +192,6 @@ static int hash_wrapper_start_sha384(struct hash_engine *engine)
 		return HASH_ENGINE_HASH_IN_PROGRESS;
 	}
 
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-	hash_wrapper_mbedtls.active = HASH_ACTIVE_SHA384;
-	return 0;
-#endif
-
 	mbedtls_sha512_init(&hash_wrapper_mbedtls.sha512);
 	status = mbedtls_sha512_starts(&hash_wrapper_mbedtls.sha512, 1);
 	if (status) {
@@ -232,11 +212,6 @@ static int hash_wrapper_update(struct hash_engine *engine, const uint8_t *data, 
 	if (length == 0) {
 		return 0;
 	}
-
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-	return (hash_wrapper_mbedtls.active == HASH_ACTIVE_NONE) ?
-		HASH_ENGINE_NO_ACTIVE_HASH : 0;
-#endif
 
 	switch (hash_wrapper_mbedtls.active) {
 	case HASH_ACTIVE_SHA256:
@@ -261,21 +236,13 @@ static int hash_wrapper_finish(struct hash_engine *engine, uint8_t *hash, size_t
 		if (hash_length < SHA256_HASH_LENGTH) {
 			return HASH_ENGINE_HASH_BUFFER_TOO_SMALL;
 		}
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-		status = 0;
-#else
 		status = mbedtls_sha256_finish(&hash_wrapper_mbedtls.sha256, hash);
-#endif
 		break;
 	case HASH_ACTIVE_SHA384:
 		if (hash_length < SHA384_HASH_LENGTH) {
 			return HASH_ENGINE_HASH_BUFFER_TOO_SMALL;
 		}
-#if defined(CONFIG_HROT_HASH_MBEDTLS_BYPASS)
-		status = 0;
-#else
 		status = mbedtls_sha512_finish(&hash_wrapper_mbedtls.sha512, hash);
-#endif
 		break;
 	default:
 		return HASH_ENGINE_NO_ACTIVE_HASH;

@@ -790,14 +790,12 @@ int intel_block0_verify(struct pfr_manifest *manifest)
 	}
 
 	LOG_INF("Block0: Verification PC, address = %x, length = %x", manifest->pfr_hash->start_address, manifest->pfr_hash->length);
-#if !defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
 	if (memcmp(ptr_sha, sha_buffer, hash_length)) {
 		LOG_ERR("Block0: Verification PC failed");
 		LOG_HEXDUMP_INF(sha_buffer, hash_length, "Calculated hash:");
 		LOG_HEXDUMP_INF(ptr_sha, hash_length, "Expected hash:");
 		return Failure;
 	}
-#endif
 
 	LOG_INF("Block0: Hash Matched");
 	return Success;
