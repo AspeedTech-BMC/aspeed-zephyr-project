@@ -41,8 +41,10 @@
 #define MBUS_TEST_PAT_B			0x12345678U
 #define MBUS_TEST_PAT_C			0x89abcdefU
 
-/* SCU scratch reg 0x12c029B8: upper 16 bits hold sticky event counters
- * that survive the WDT reset below, so they can be inspected post-mortem.
+/* The SCU scratch register is used to store the tamper retry count, tamper count, and unlock count.
+ * The register is located at address 0x14c021a0. The tamper retry count is stored in bits [7:0],
+ * the tamper count is stored in bits [15:8], and the unlock count is stored in bits [23:16].
+ * The masks and shifts for each field are defined below.
  */
 #define SCU_SCRATCH_REG		0x14c021a0
 #define TAMPER_RETRY_CNT_SHIFT	0
