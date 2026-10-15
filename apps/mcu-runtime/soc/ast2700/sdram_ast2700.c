@@ -377,7 +377,7 @@ static int sdramc_init(struct sdramc *sdramc, struct sdramc_ac_timing **ac)
 		} else if (IS_ENABLED(CONFIG_ASPEED_DDR_3200)) {
 			speed = DDR4_3200;
 		} else {
-			printf("Speed %d is not supported!!!\n", speed);
+			LOG_ERR("Speed %d is not supported!!!", speed);
 			return 1;
 		}
 	} else {
@@ -755,7 +755,7 @@ static int sdramc_aes_enable(struct sdramc *sdramc)
 	int err;
 
 	if (!device_is_ready(trng)) {
-		printf("aes: TRNG is not ready\n");
+		LOG_ERR("aes: TRNG is not ready");
 		return -ENODEV;
 	}
 
@@ -767,7 +767,7 @@ static int sdramc_aes_enable(struct sdramc *sdramc)
 	if (!err)
 		err = sdramc_write_random(trng, regs->enc_iv, ARRAY_SIZE(regs->enc_iv));
 	if (err) {
-		printf("aes: failed to generate key/iv, err=%d\n", err);
+		LOG_ERR("aes: failed to generate key/iv, err=%d", err);
 		return err;
 	}
 
@@ -839,7 +839,7 @@ static int sdramc_get_vga_mem_size(struct sdramc *sdramc)
 		vga_cnt =  0;
 		break;
 	default:
-		printf("Unknown efuse setting %x\n", efuse);
+		LOG_ERR("Unknown efuse setting %x", efuse);
 		return -1;
 	};
 
@@ -880,7 +880,7 @@ static int sdramc_ecc_enable(struct sdramc *sdramc)
 	bistcfg = DRAMC_BISTCFG_INIT_MODE | DRAMC_BISTCFG_ENABLE;
 	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 5000);
 	if (err) {
-		printf("ecc bist failed, err=%d\n", err);
+		LOG_ERR("ecc bist failed, err=%d", err);
 		return err;
 	}
 
@@ -1152,7 +1152,7 @@ static int sdramc_init_mpu(struct sdramc *sdramc)
                         strcat(name, ",");
                 }
 
-                printf("[mpu-%d:%s:	0x%08x~0x%08x] %s\n", i, sdramc->mpu[i].name, sdramc->mpu[i].start, sdramc->mpu[i].end, name);
+                LOG_INF("[mpu-%d:%s:	0x%08x~0x%08x] %s", i, sdramc->mpu[i].name, sdramc->mpu[i].start, sdramc->mpu[i].end, name);
                 free(name);
         }
 
@@ -1318,7 +1318,7 @@ int dram_init(struct ast_chip *chip)
 			k_busy_wait(10);
 			sys_read32(0x80000000);
 			if (sys_read32(0x80000000) != 0x5aa5e77e) {
-				printf("DDR PHY is already initialized, but PHY PllUnlocked!!!\n");
+				LOG_ERR("DDR PHY is already initialized, but PHY PllUnlocked!!!");
 				break;
 			}
 		} else {
@@ -1335,7 +1335,7 @@ int dram_init(struct ast_chip *chip)
 		sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_STOP_REG);
 
 		if (pll_calibration(0, 3)) {
-			printf("mpll calibration failed, retry=%d\n", retry);
+			LOG_ERR("mpll calibration failed, retry=%d", retry);
 			continue;
 		}
 
@@ -1354,11 +1354,11 @@ int dram_init(struct ast_chip *chip)
 			continue;
 
 		sys_write32(0, 0x131a0000);
-		printf("DDRPHY unlock status=0x%08x\n", sys_read32(0x130401a8));
+		LOG_INF("DDRPHY unlock status=0x%08x", sys_read32(0x130401a8));
 		sys_write32(0x1, 0x130401ac);
-		printf("DDRPHY unlock clear set 1 status=0x%08x\n", sys_read32(0x130401a8));
+		LOG_INF("DDRPHY unlock clear set 1 status=0x%08x", sys_read32(0x130401a8));
 		sys_write32(0x0, 0x130401ac);
-		printf("DDRPHY unlock clear set 0 status=0x%08x\n", sys_read32(0x130401a8));
+		LOG_INF("DDRPHY unlock clear set 0 status=0x%08x", sys_read32(0x130401a8));
 
 		sdramc_exit_self_refresh(sdramc);
 		sdramc_configure_mrs(sdramc, ac);
@@ -1375,7 +1375,7 @@ int dram_init(struct ast_chip *chip)
 	};
 
 	if (err) {
-		printf("%s init is failed, err=%d\n",
+		LOG_ERR("%s init is failed, err=%d",
 			ac ? ac->desc : "unknow", err);
 		return err;
 	}
