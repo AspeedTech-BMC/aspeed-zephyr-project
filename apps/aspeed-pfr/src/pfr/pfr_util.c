@@ -193,10 +193,6 @@ int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t
 		return Failure;
 	}
 
-#if defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
-	return Success;
-#endif
-
 	/* SHA_ACC streams the region in large chunks; declines fall through. */
 	if (pfr_manifest->pfr_hash->type == HASH_TYPE_SHA384) {
 		int ret = pfr_sha_acc_hash_region(pfr_manifest->flash->state->device_id[0],
@@ -275,10 +271,6 @@ int verify_signature(const struct signature_verification *verification, const ui
 
 	ARG_UNUSED(signature);
 	ARG_UNUSED(sig_length);
-
-#if defined(CONFIG_INTEL_PFR_UNSAFE_BYPASS)
-	return Success;
-#endif
 
 	if (length == SHA256_HASH_LENGTH) {
 		LOG_DBG("MBEDTLS ECDSA Start");
