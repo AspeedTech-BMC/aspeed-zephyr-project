@@ -32,7 +32,6 @@
 #endif
 #include "crypto/ecdsa_aspeed.h"
 #include "pfr_sha_acc.h"
-#include "pfr_ecdsa_cptra.h"
 #include <zephyr/sys/reboot.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -203,9 +202,9 @@ int get_hash(struct manifest *manifest, struct hash_engine *hash_engine, uint8_t
 		if (ret == 0)
 			return Success;
 
-		/* The fallback hashes 4 KB per mailbox round-trip: very slow on big images. */
+		/* The generic path uses the selected hash backend, also SHA_ACC on CPTRA. */
 		if (ret != -ENOTSUP)
-			LOG_WRN("SHA_ACC hash failed (%d), falling back to slow path", ret);
+			LOG_WRN("SHA_ACC hash failed (%d), falling back to generic hash path", ret);
 	}
 
 	return flash_hash_contents((struct flash *)pfr_manifest->flash,
@@ -289,27 +288,15 @@ int verify_signature(const struct signature_verification *verification, const ui
 							  manifest->verification->pubkey->signature_r,
 							  manifest->verification->pubkey->signature_s);
 		LOG_DBG("MBEDTLS ECDSA P-384 End, status = %d", status);
-#elif defined(CONFIG_PFR_ECDSA_P384_BACKEND_ASPEED)
-		LOG_DBG("ASPEED ECDSA Start");
+#else
+		LOG_DBG("Hardware ECDSA P-384 Start");
 		status = aspeed_ecdsa_verify_middlelayer(manifest->verification->pubkey->x,
 							 manifest->verification->pubkey->y,
 							 digest,
 							 length,
 							 manifest->verification->pubkey->signature_r,
 							 manifest->verification->pubkey->signature_s);
-		LOG_DBG("ASPEED ECDSA End, status = %d", status);
-#elif defined(CONFIG_PFR_ECDSA_P384_BACKEND_CPTRA)
-		LOG_DBG("CPTRA ECDSA Start");
-		status = cptra_ecdsa_verify_middlelayer(manifest->verification->pubkey->x,
-							manifest->verification->pubkey->y,
-							digest,
-							length,
-							manifest->verification->pubkey->signature_r,
-							manifest->verification->pubkey->signature_s);
-		LOG_DBG("CPTRA ECDSA End, status = %d", status);
-#else
-		LOG_ERR("No P-384 ECDSA backend selected");
-		status = Failure;
+		LOG_DBG("Hardware ECDSA P-384 End, status = %d", status);
 #endif
 	} else
 		LOG_ERR("Unsupported digest length, %d", length);
