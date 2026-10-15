@@ -18,9 +18,6 @@
 //#define PLL_ALL_BAND_SCAN_DOWNUP 1
 //#define ENABLE_TAMPER 1
 
-#define MPLL_CTRL_REG		0x12c02310
-#define MPLL_STATUS_REG		0x12c02314
-
 #define FREQ_COUNTER_CTRL_REG	0x12c023a0
 #define FREQ_COUNTER_STEP_REG	0x12c023a4
 #define FREQ_COUNTER_DIFF_REG	0x12c023a8
@@ -281,15 +278,9 @@ int tamper_init(int step, int diff)
  * OD=1; NR/OD are held fixed for the whole scan and only M is stepped, so
  * each 1-count change of M is Fref/NR = 25MHz - a deliberately coarse,
  * full-band shmoo (+-MPLL_SHMOO_STEPS*25MHz), not a fine band-edge search.
+ * MPLL_CTRL_REG/MPLL_STATUS_REG and the field masks/bits are declared in
+ * tamper.h, shared with sdram_ast2700.c's sdramc_pll_reset().
  */
-#define MPLL_RESET_BIT		BIT(25)
-#define MPLL_BYPASS_BIT		BIT(24)
-#define MPLL_CLKNF_MASK		GENMASK(12, 0)	/* M */
-#define MPLL_CLKNR_MASK		GENMASK(18, 13)	/* NR - 1 */
-#define MPLL_CLKOD_MASK		GENMASK(22, 19)	/* OD - 1 */
-#define MPLL_LOCK_BIT		BIT(31)
-#define MPLL_LOCK_TIMEOUT_US	100000
-
 #define MPLL_REFCLK_HZ		25000000U
 #define MPLL_DEFAULT_M		0x40U//1024U
 #define MPLL_DEFAULT_NR		1U//16U
@@ -328,6 +319,24 @@ static int mpll_program_nf(uint32_t reg_val)
 
 	return readl_poll_timeout(MPLL_STATUS_REG, reg, (reg & MPLL_LOCK_BIT),
 				   MPLL_LOCK_TIMEOUT_US);
+}
+
+/*
+ * Reconfigures the full MPLL control word (new NF/NR/OD) via reset+bypass,
+ * settling MPLL_SETTLE_US between each step, then confirms lock. Used both
+ * to bring the PLL to its default operating point here and by
+ * sdram_ast2700.c's sdramc_pll_reset() for a full table-driven reconfigure.
+ */
+static int mpll_reconfigure(uint32_t pll_para)
+{
+	sys_write32(pll_para | MPLL_RESET_BIT | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
+	k_busy_wait(MPLL_SETTLE_US);
+	sys_write32(pll_para | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
+	k_busy_wait(MPLL_SETTLE_US);
+	sys_write32(pll_para, MPLL_CTRL_REG);
+	k_busy_wait(MPLL_SETTLE_US);
+
+	return (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT) ? 0 : -1;
 }
 
 /*
@@ -405,14 +414,7 @@ int pll_calibration(int step, int diff)
 	}
 
 	// init pll to the default 1600MHz operating point via reset+bypass.
-	sys_write32(MPLL_DEFAULT_REG_VAL | MPLL_RESET_BIT | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
-	k_busy_wait(MPLL_SETTLE_US);
-	sys_write32(MPLL_DEFAULT_REG_VAL | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
-	k_busy_wait(MPLL_SETTLE_US);
-	sys_write32(MPLL_DEFAULT_REG_VAL, MPLL_CTRL_REG);
-	k_busy_wait(MPLL_SETTLE_US);
-
-	if (!(sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)) {
+	if (mpll_reconfigure(MPLL_DEFAULT_REG_VAL)) {
 		printf("pll is not locking\n");
 		return -1;
 	}
