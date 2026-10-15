@@ -14,6 +14,8 @@
 #include <sdram_ast2700.h>
 #include <tamper.h>
 
+LOG_MODULE_REGISTER(tamper, CONFIG_SOC_FMC_LOG_LEVEL);
+
 #define PLL_ALL_BAND_SWEEP_UPDOWN 1
 //#define PLL_ALL_BAND_SCAN_DOWNUP 1
 //#define ENABLE_TAMPER 1
@@ -133,15 +135,15 @@ static void tamper_timer_cb(struct k_timer *timer)
 	tamper = sys_read32(TAMPER_STATUS_REG);
 	phyunlock = sys_read32(DDRPHY_UNLOCK_STATUS_REG);
 
-	printf("***** Tamper=%ld C, DDRPHY unlock status=0x%x *****\n", tamper & TAMPER_ALERT, phyunlock);
+	LOG_INF("***** Tamper=%ld C, DDRPHY unlock status=0x%x *****", tamper & TAMPER_ALERT, phyunlock);
 
 	if (tamper & TAMPER_ALERT) {
-		printf("Tamper Alert!!!\n");
+		LOG_WRN("Tamper Alert!!!");
 
 		// clear tamper interrupt.
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
-		printf("SCU_3b0=0x%x\n", sys_read32(FREQ_COUNTER_READBACK));
-		printf("MPLL=%d Hz, dly32=%d Hz\n", cal_src(1), cal_src(0));
+		LOG_INF("SCU_3b0=0x%x", sys_read32(FREQ_COUNTER_READBACK));
+		LOG_INF("MPLL=%d Hz, dly32=%d Hz", cal_src(1), cal_src(0));
 
 		// restart tamper detection.
 		tamper_init(TAMPER_RUNTIME_STEP, TAMPER_RUNTIME_DIFF);
@@ -151,12 +153,12 @@ static void tamper_timer_cb(struct k_timer *timer)
 
 		// check if mbus hang.
 		if (sys_read32(MBUS_TEST_ADDR_A) != MBUS_TEST_PAT_A)
-			printf("DDRPHY unlock cannot write to DRAM!!!\n");
+			LOG_INF("DDRPHY unlock cannot write to DRAM!!!");
 	}
 
 	// check if DDRPHY is unlocked
 	if (phyunlock & UNLOCK_ALERT) {
-		printf("Unlock Alert!!!\n");
+		LOG_WRN("Unlock Alert!!!");
 
 		sys_write32(MBUS_TEST_PAT_B, MBUS_TEST_ADDR_B);
 		k_busy_wait(1000);
@@ -164,7 +166,7 @@ static void tamper_timer_cb(struct k_timer *timer)
 		// check if mbus hang.
 		if (sys_read32(MBUS_TEST_ADDR_B) != MBUS_TEST_PAT_B) {
 			// keep alert message but not clear status until wdt recovery.
-			printf("DDRPHY unlock cannot write to DRAM!!!\n");
+			LOG_INF("DDRPHY unlock cannot write to DRAM!!!");
 		} else {
 			// clear ddrphy unlock status.
 			sys_write32(BIT(0), DDRPHY_UNLOCK_CLEAR_REG);
@@ -197,8 +199,8 @@ int tamper_check(void)
 		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
 		uint32_t cnt = (scratch & TAMPER_CNT_MASK) >> TAMPER_CNT_SHIFT;
 
-		printf("Tamper Attention!!!\n");
-		printf("SCU_3b0=0x%x\n", sys_read32(FREQ_COUNTER_READBACK));
+		LOG_WRN("Tamper Attention!!!");
+		LOG_INF("SCU_3b0=0x%x", sys_read32(FREQ_COUNTER_READBACK));
 
 		if (cnt < 0xff)
 			cnt++;
@@ -210,8 +212,8 @@ int tamper_check(void)
 		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
 		uint32_t cnt = (scratch & UNLOCK_CNT_MASK) >> UNLOCK_CNT_SHIFT;
 
-		printf("DDRPHY Unlock Attention!!!\n");
-		printf("SOC MPLL setting=0x%x, status=0x%08x\n", sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
+		LOG_WRN("DDRPHY Unlock Attention!!!");
+		LOG_INF("SOC MPLL setting=0x%x, status=0x%08x", sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
 
 		if (cnt < 0xff)
 			cnt++;
@@ -227,7 +229,7 @@ int tamper_check(void)
 
 		// check if mbus hang.
 		if (sys_read32(MBUS_TEST_ADDR_C) != MBUS_TEST_PAT_C)
-			printf("DDRPHY unlock cannot write to DRAM!!!\n");
+			LOG_ERR("DDRPHY unlock cannot write to DRAM!!!");
 	}
 
 	/* Change tamper detection to runtime setting */
@@ -265,7 +267,7 @@ int tamper_init(int step, int diff)
 
 	reg = sys_read32(TAMPER_STATUS_REG);
 	if (reg & TAMPER_ALERT) {
-		printf("Tamper alert!! FREQ_COUNTER_CTRL_REG=0x%08x, FREQ_COUNTER_READBACK=0x%08x\n",
+		LOG_WRN("Tamper alert!! FREQ_COUNTER_CTRL_REG=0x%08x, FREQ_COUNTER_READBACK=0x%08x",
 				sys_read32(FREQ_COUNTER_CTRL_REG),
 				sys_read32(FREQ_COUNTER_READBACK));
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
@@ -363,26 +365,26 @@ static int mpll_try_m(int m, const char *phase)
 	tamper_init(0, 8);
 
 	if (mpll_program_nf(reg)) {
-		printf("PLL shmoo (%s): lock lost at M=%d (%u.%03uMHz)\n",
+		LOG_INF("PLL shmoo (%s): lock lost at M=%d (%u.%03uMHz)",
 		       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 		return -1;
 	}
 
 	if (sys_read32(TAMPER_STATUS_REG) & TAMPER_ALERT) {
-		printf("PLL shmoo (%s): tamper trip at M=%d (%u.%03uMHz)\n",
+		LOG_INF("PLL shmoo (%s): tamper trip at M=%d (%u.%03uMHz)",
 		       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
 		if (readl_poll_timeout(TAMPER_STATUS_REG, reg, !(reg & TAMPER_ALERT),
 				       TAMPER_CLEAR_TIMEOUT_US))
-			printf("PLL shmoo (%s): tamper alert stuck at M=%d\n", phase, m);
+			LOG_INF("PLL shmoo (%s): tamper alert stuck at M=%d", phase, m);
 		return -1;
 	}
 
-	printf("PLL shmoo (%s): M=%d (%u.%03uMHz) OK\n",
+	LOG_INF("PLL shmoo (%s): M=%d (%u.%03uMHz) OK",
 	       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 #else
 	if (mpll_program_nf(reg)) {
-		printf("PLL shmoo (%s): lock lost at M=%d (%u.%03uMHz)\n",
+		LOG_INF("PLL shmoo (%s): lock lost at M=%d (%u.%03uMHz)",
 		       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 		return -1;
 	}
@@ -417,16 +419,16 @@ int pll_calibration(int step, int diff)
 {
 	int ret = 0;
 
-	printf("PLL calibration start\n");
+	LOG_INF("PLL calibration start");
 
 	if (!(sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)) {
-		printf("Power on pll is not locked\n");
+		LOG_WRN("Power on pll is not locked");
 		return -1;
 	}
 
 	// init pll to the default 1600MHz operating point via reset+bypass.
 	if (mpll_reconfigure(MPLL_DEFAULT_REG_VAL)) {
-		printf("pll is not locking\n");
+		LOG_ERR("pll is not locking");
 		return -1;
 	}
 
@@ -441,58 +443,58 @@ int pll_calibration(int step, int diff)
 #ifdef PLL_ALL_BAND_SWEEP_UPDOWN
 	for (int i = MPLL_SHMOO_STEPS; i >= 0; i--) {
 		if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M + i, "up1")) {
-			printf("pll failed to i=%d:up1 upper frequency\n", i);
-			printf("pll lock status=0x%x\n", sys_read32(MPLL_STATUS_REG));
+			LOG_WRN("pll failed to i=%d:up1 upper frequency", i);
+			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
 			ret = -1;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M + i, (int)MPLL_DEFAULT_M, "down1")) {
-			printf("pll failed to i=%d:down1 default frequency\n", i);
-			printf("pll lock status=0x%x\n", sys_read32(MPLL_STATUS_REG));
+			LOG_WRN("pll failed to i=%d:down1 default frequency", i);
+			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
 			ret = -1;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M - i, "down2")) {
-			printf("pll failed to i=%d:down2 lower frequency\n", i);
-			printf("pll lock status=0x%x\n", sys_read32(MPLL_STATUS_REG));
+			LOG_WRN("pll failed to i=%d:down2 lower frequency", i);
+			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
 			ret = -1;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M - i, (int)MPLL_DEFAULT_M, "up2")) {
-			printf("pll failed to i=%d:up2 default frequency\n", i);
-			printf("pll lock status=0x%x\n", sys_read32(MPLL_STATUS_REG));
+			LOG_WRN("pll failed to i=%d:up2 default frequency", i);
+			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
 			ret = -1;
 		}
 	}
 
 #elif defined(PLL_ALL_BAND_SCAN_DOWNUP)
 	if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M - MPLL_SHMOO_STEPS, "down2")) {
-		printf("pll failed to down2 lower frequency\n");
+		LOG_WRN("pll failed to down2 lower frequency");
 		ret = -1;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M - MPLL_SHMOO_STEPS, (int)MPLL_DEFAULT_M, "up2")) {
-		printf("pll failed to up2 default frequency\n");
+		LOG_WRN("pll failed to up2 default frequency");
 		ret = -1;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M + MPLL_SHMOO_STEPS, "up1")) {
-		printf("pll failed to up1 upper frequency\n");
+		LOG_WRN("pll failed to up1 upper frequency");
 		ret = -1;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M + MPLL_SHMOO_STEPS, (int)MPLL_DEFAULT_M, "down1")) {
-		printf("pll failed to down1 default frequency\n");
+		LOG_WRN("pll failed to down1 default frequency");
 		ret = -1;
 	}
 #endif
 
-	printf("PLL calibration done\n");
+	LOG_INF("PLL calibration done");
 
 	if (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)
-		printf("PLL lock OK\n");
+		LOG_INF("PLL lock OK");
 	else {
-		printf("PLL lock failed\n");
+		LOG_ERR("PLL lock failed");
 		ret = -1;
 	}
 
 	tamper_init(step, diff);
 	if (sys_read32(TAMPER_STATUS_REG) & TAMPER_ALERT) {
-		printf("Tamper alert after pll_calibration!! FREQ_COUNTER_CTRL_REG=0x%08x, FREQ_COUNTER_READBACK=0x%08x\n",
+		LOG_WRN("Tamper alert after pll_calibration!! FREQ_COUNTER_CTRL_REG=0x%08x, FREQ_COUNTER_READBACK=0x%08x",
 				sys_read32(FREQ_COUNTER_CTRL_REG),
 				sys_read32(FREQ_COUNTER_READBACK));
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
