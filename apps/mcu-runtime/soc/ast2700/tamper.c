@@ -423,7 +423,7 @@ int pll_calibration(int step, int diff)
 
 	if (!(sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)) {
 		LOG_WRN("Power on pll is not locked");
-		return -1;
+		k_busy_wait(MPLL_SETTLE_US);
 	}
 
 	// init pll to the default 1600MHz operating point via reset+bypass.
