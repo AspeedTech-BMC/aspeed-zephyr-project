@@ -445,51 +445,44 @@ int pll_calibration(int step, int diff)
 		if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M + i, "up1")) {
 			LOG_WRN("pll failed to i=%d:up1 upper frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
-			ret = -1;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M + i, (int)MPLL_DEFAULT_M, "down1")) {
 			LOG_WRN("pll failed to i=%d:down1 default frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
-			ret = -1;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M - i, "down2")) {
 			LOG_WRN("pll failed to i=%d:down2 lower frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
-			ret = -1;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M - i, (int)MPLL_DEFAULT_M, "up2")) {
 			LOG_WRN("pll failed to i=%d:up2 default frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
-			ret = -1;
 		}
 	}
 
 #elif defined(PLL_ALL_BAND_SCAN_DOWNUP)
 	if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M - MPLL_SHMOO_STEPS, "down2")) {
 		LOG_WRN("pll failed to down2 lower frequency");
-		ret = -1;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M - MPLL_SHMOO_STEPS, (int)MPLL_DEFAULT_M, "up2")) {
 		LOG_WRN("pll failed to up2 default frequency");
-		ret = -1;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M + MPLL_SHMOO_STEPS, "up1")) {
 		LOG_WRN("pll failed to up1 upper frequency");
-		ret = -1;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M + MPLL_SHMOO_STEPS, (int)MPLL_DEFAULT_M, "down1")) {
 		LOG_WRN("pll failed to down1 default frequency");
-		ret = -1;
 	}
 #endif
 
 	LOG_INF("PLL calibration done");
 
-	if (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)
+	if (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT) {
 		LOG_INF("PLL lock OK");
-	else {
+		ret = 0;
+	} else {
 		LOG_ERR("PLL lock failed");
-		ret = -1;
+		return -1;
 	}
 
 	tamper_init(step, diff);
