@@ -1334,7 +1334,7 @@ int dram_init(struct ast_chip *chip)
 		/* Stop DDR clocks */
 		sys_write32(DDR_CLK_GATE_VALUE, DDR_CLK_STOP_REG);
 
-		if (pll_calibration(0, 3)) {
+		if (pll_calibration(2, 0)) {
 			LOG_ERR("mpll calibration failed, retry=%d", retry);
 			continue;
 		}
