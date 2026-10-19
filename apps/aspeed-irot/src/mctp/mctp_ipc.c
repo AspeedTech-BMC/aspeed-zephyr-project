@@ -6,6 +6,8 @@
 
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/ipm_ast.h>
 #include <stdlib.h>
 #include <mctp.h>
 #include <libutil.h>
@@ -100,9 +102,38 @@ static uint32_t mctp_ipc_write(void *mctp_p, uint8_t *buf, uint32_t len,
 
 uint8_t mctp_ipc_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 {
+	const struct device *ipmdev;
+	int tx_shmem_size;
+
 	CHECK_NULL_ARG_WITH_RETURN(mctp_inst, MCTP_ERROR);
 
-	mctp_inst->max_msg_size = 2048 * 2;
+	ipmdev = device_get_binding(MCTP_IPC_DEV_NAME);
+	if (!ipmdev) {
+		LOG_ERR("Failed to get binding for %s", MCTP_IPC_DEV_NAME);
+		return MCTP_ERROR;
+	}
+
+	/*
+	 * Each TX packet, including its MCTP transport header, is written to the
+	 * IPC TX shared memory, so the packet size is bounded by that region.
+	 * max_msg_size also sizes the RX and reassembly buffers, so it must hold
+	 * a full RX frame and is capped at MCTP_IPC_MAX_MSG_SIZE.
+	 */
+	tx_shmem_size = ast_ipm_max_tx_shmem_size(ipmdev, MCTP_IPC_CHANNEL);
+	if (tx_shmem_size <= 0) {
+		LOG_ERR("Failed to get TX shared memory size: %d", tx_shmem_size);
+		return MCTP_ERROR;
+	}
+
+	if (tx_shmem_size < (int)MCTP_IPC_RX_FRAME_SIZE) {
+		LOG_ERR("TX shared memory size %d is smaller than the RX frame size %u",
+			tx_shmem_size, MCTP_IPC_RX_FRAME_SIZE);
+		return MCTP_ERROR;
+	}
+
+	mctp_inst->max_msg_size = MIN((uint32_t)tx_shmem_size, MCTP_IPC_MAX_MSG_SIZE);
+	LOG_INF("MCTP IPC max_msg_size %u (TX shared memory %d)", mctp_inst->max_msg_size,
+		tx_shmem_size);
 	mctp_inst->medium_conf = medium_conf;
 	mctp_inst->read_data = mctp_ipc_read;
 	mctp_inst->write_data = mctp_ipc_write;

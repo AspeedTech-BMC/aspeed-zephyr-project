@@ -18,8 +18,6 @@
 
 LOG_MODULE_REGISTER(ipm_app, LOG_LEVEL_INF);
 
-#define IPM_MCTP_CHANNEL 0
-
 static void ipm_cb(const struct device *ipmdev, void *user_data,
 		uint32_t id, volatile void *data)
 {
@@ -37,14 +35,14 @@ static void ipm_cb(const struct device *ipmdev, void *user_data,
 
 	memcpy(&pkt.ipc_hdr, (void *)data, sizeof(pkt.ipc_hdr));
 
-	ret = ast_ipm_shmem_read(ipmdev, IPM_MCTP_CHANNEL, 0, &hdr_ptr, sizeof(pkt.hdr));
+	ret = ast_ipm_shmem_read(ipmdev, MCTP_IPC_CHANNEL, 0, &hdr_ptr, sizeof(pkt.hdr));
 	if (ret < 0) {
 		LOG_ERR("ast_ipm_shmem_read header failed, ret=%d", ret);
 		return;
 	}
 	memcpy(&pkt.hdr, hdr_ptr, sizeof(pkt.hdr));
 
-	ret = ast_ipm_shmem_read(ipmdev, IPM_MCTP_CHANNEL, sizeof(pkt.hdr), (void **)&pkt.buf,
+	ret = ast_ipm_shmem_read(ipmdev, MCTP_IPC_CHANNEL, sizeof(pkt.hdr), (void **)&pkt.buf,
 				 ipc_hdr->msg_len - sizeof(pkt.hdr));
 	if (ret < 0) {
 		LOG_ERR("ast_ipm_shmem_read payload failed, ret=%d", ret);
@@ -61,10 +59,10 @@ static void ipm_cb(const struct device *ipmdev, void *user_data,
 
 void ipm_mctp_main(void *a, void *b, void *c)
 {
-	const struct device *ipmdev = device_get_binding("ipc0@200");
+	const struct device *ipmdev = device_get_binding(MCTP_IPC_DEV_NAME);
 
 	if (!ipmdev) {
-		LOG_ERR("Failed to get binding for ipc0@200");
+		LOG_ERR("Failed to get binding for %s", MCTP_IPC_DEV_NAME);
 		return;
 	}
 
@@ -87,7 +85,7 @@ void ipm_mctp_main(void *a, void *b, void *c)
 			payload_len = pkt.ipc_hdr.msg_len - sizeof(pkt.hdr);
 			LOG_DBG("OUT dev %s msg len %x", ipmdev->name,
 				pkt.ipc_hdr.msg_len);
-			ret = ast_ipm_shmem_write(ipmdev, IPM_MCTP_CHANNEL, 0,
+			ret = ast_ipm_shmem_write(ipmdev, MCTP_IPC_CHANNEL, 0,
 						  &pkt.hdr, sizeof(pkt.hdr));
 			if (ret < 0) {
 				LOG_ERR("ast_ipm_shmem_write header failed, ret=%d", ret);
@@ -95,7 +93,7 @@ void ipm_mctp_main(void *a, void *b, void *c)
 				pkt.buf = NULL;
 				continue;
 			}
-			ret = ast_ipm_shmem_write(ipmdev, IPM_MCTP_CHANNEL, sizeof(pkt.hdr),
+			ret = ast_ipm_shmem_write(ipmdev, MCTP_IPC_CHANNEL, sizeof(pkt.hdr),
 						  pkt.buf, payload_len);
 			if (ret < 0) {
 				LOG_ERR("ast_ipm_shmem_write payload failed, ret=%d payload_len=%d", ret, payload_len);
@@ -143,9 +141,9 @@ int ipm_init(void)
 		goto fail;
 	}
 
-	ipmdev = device_get_binding("ipc0@200");
+	ipmdev = device_get_binding(MCTP_IPC_DEV_NAME);
 	if (!ipmdev) {
-		LOG_ERR("%s: device_get_binding failed to find device", "ipc0@200");
+		LOG_ERR("%s: device_get_binding failed to find device", MCTP_IPC_DEV_NAME);
 		rc = 1;
 		goto fail;
 	}
@@ -155,7 +153,7 @@ int ipm_init(void)
 	ipm_register_id_callback(ipmdev, device_id, ipm_cb, NULL);
 	rc = ipm_set_id_enabled(ipmdev, device_id, enable);
 	if (rc) {
-		LOG_ERR("%s: cannot ipm_set_enabled", "ipc0@200");
+		LOG_ERR("%s: cannot ipm_set_enabled", MCTP_IPC_DEV_NAME);
 		goto fail;
 	}
 
