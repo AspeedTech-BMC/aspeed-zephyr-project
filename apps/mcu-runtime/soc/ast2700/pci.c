@@ -80,6 +80,9 @@ static void pcie_init_node(struct ast2700_scu0 *scu,
 		setbits_le32(&pci_misc[30], BIT(29));
 	}
 
+	/* disable io-resources requirement on pcie */
+	clrbits_le32(&pci_misc[30], BIT(17));
+
 #if !defined(CONFIG_PCIE_ECRC_DISABLE)
 	/* Enable ECRC */
 	setbits_le32(node_base + PLDA_MISC_48,
