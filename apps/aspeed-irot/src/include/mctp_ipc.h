@@ -9,7 +9,13 @@
 #include <zephyr/kernel.h>
 #include <mctp.h>
 
+/* IPM device and shared memory channel used for MCTP over IPC. */
+#define MCTP_IPC_DEV_NAME "ipc0@200"
+#define MCTP_IPC_CHANNEL 0
+
 #define MCTP_IPC_RX_FRAME_SIZE 2048U
+/* Upper bound for max_msg_size, which also sizes the RX and reassembly buffers. */
+#define MCTP_IPC_MAX_MSG_SIZE 4096U
 #define MCTP_IPC_RX_FRAME_COUNT 16U
 #define MCTP_IPC_TX_FRAME_COUNT 16U
 
