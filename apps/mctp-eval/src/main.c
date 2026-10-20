@@ -12,7 +12,8 @@
  * it an EID. Every other message is logged and counted, and requests can
  * optionally be echoed back to their sender. The mbench commands pair with
  * the BMC's mctp-bench for one-way throughput in either direction. With
- * CONFIG_MCTP_EVAL_PLDM, PLDM messages go to the libpldm responder (pldm.c).
+ * CONFIG_MCTP_EVAL_PLDM, PLDM messages go to the libpldm responder (pldm.c);
+ * with CONFIG_MCTP_EVAL_SPDM_BRIDGE, SPDM goes to the SSMCU (spdm_bridge.c).
  */
 
 #include <stdlib.h>
@@ -486,6 +487,12 @@ static void mctp_eval_rx(uint8_t src_eid, bool tag_owner, uint8_t msg_tag, void 
 	}
 #endif
 
+#ifdef CONFIG_MCTP_EVAL_SPDM_BRIDGE
+	if (mctp_eval_spdm_rx(bus, src_eid, tag_owner, msg_tag, msg, len)) {
+		return;
+	}
+#endif
+
 	key = k_spin_lock(&stats_lock);
 	stats.msgs++;
 	stats.bytes += len;
@@ -530,6 +537,14 @@ static int mctp_eval_bus_init(struct eval_bus *bus, struct mctp_binding *binding
 	ret = mctp_eval_pldm_bus_init(bus);
 	if (ret) {
 		LOG_ERR("%s: adding PLDM message type failed (%d)", bus->name, ret);
+		goto err;
+	}
+#endif
+
+#ifdef CONFIG_MCTP_EVAL_SPDM_BRIDGE
+	ret = mctp_eval_spdm_bus_init(bus);
+	if (ret) {
+		LOG_ERR("%s: adding SPDM message type failed (%d)", bus->name, ret);
 		goto err;
 	}
 #endif
@@ -624,6 +639,14 @@ int main(void)
 	ret = mctp_eval_pldm_init();
 	if (ret) {
 		LOG_ERR("PLDM responder not started (%d)", ret);
+	}
+#endif
+
+#ifdef CONFIG_MCTP_EVAL_SPDM_BRIDGE
+	/* Likewise for SPDM */
+	ret = mctp_eval_spdm_init();
+	if (ret) {
+		return ret;
 	}
 #endif
 
