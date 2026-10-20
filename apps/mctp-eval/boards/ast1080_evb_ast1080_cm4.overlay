@@ -1,0 +1,48 @@
+/*
+ * Copyright (c) 2026 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * AST1080 EVB: i3c0 as an MCTP-over-I3C target. The app finds the queue by
+ * the i3c0_tmq label.
+ */
+
+&i3c0 {
+	status = "okay";
+	/* DSP0233: MCTP over I3C devices report DCR 0xCC */
+	dcr = <0xcc>;
+	secondary;
+	pid-extra-info = <0x000>;
+	io-mode = "dma";
+
+	i3c0_tmq: i3c-tmq@7ec80000000 {
+		compatible = "i3c-target-mqueue";
+		reg = <0x0 0x7ec 0x80000000>;
+		/*
+		 * Packets stay at the baseline 69 bytes (with PEC) unless
+		 * CONFIG_MCTP_I3C_TMQ_LARGE_PACKETS lets them use all of this
+		 */
+		msg-size = <128>;
+		/*
+		 * Must be a power of two; one slot stays empty, so 32 holds 31
+		 * packets: a whole CONFIG_MCTP_MAX_MESSAGE_SIZE (1024-byte)
+		 * message in 64-byte-payload packets, even if the bus delivers it
+		 * faster than the rx loop drains it.
+		 */
+		num-of-msgs = <32>;
+		mandatory-data-byte = <0xae>;
+		/* MCTP pending-read IBI carries the MDB only; packet PEC is
+		 * handled by the libmctp binding (CONFIG_MCTP_I3C_TMQ_PEC)
+		 */
+		ibi-append-pec = <0>;
+		status = "okay";
+	};
+};
+
+/*
+ * USB port C device controller, for MCTP over USB. Driven by the new USB
+ * device stack (udc_aspeed); zephyr_udc0 is the label USB classes look up.
+ */
+zephyr_udc0: &udc0 {
+	status = "okay";
+};

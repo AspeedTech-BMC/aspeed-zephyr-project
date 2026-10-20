@@ -8,6 +8,8 @@ manifest:
   remotes:
     - name: github
       url-base: https://github.com/AspeedTech-BMC
+    - name: zephyrproject
+      url-base: https://github.com/zephyrproject-rtos
 
   projects:
     - name: zephyr
@@ -27,3 +29,7 @@ manifest:
       remote: github
       revision: d9567c74fa40eb96d081349d521dc12604ed82ec
       path: bootloader/mcuboot
+    - name: libmctp
+      remote: zephyrproject
+      revision: b6be45dfc5c67c43c3a5e12589ae3845ea00ab5e
+      path: modules/lib/libmctp

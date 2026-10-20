@@ -1,0 +1,40 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+
+menu "MCTP eval"
+
+config MCTP_EVAL_LOCAL_EID
+	int "Local MCTP endpoint ID"
+	range 0 254
+	default 0
+	help
+	  EID the endpoint starts with. 0 (the null EID) leaves it unassigned
+	  until the bus owner sets one with the Set Endpoint ID control
+	  command. Otherwise 8..254: DSP0236 reserves 1-7, and the build
+	  rejects them.
+
+config MCTP_EVAL_USB
+	bool "MCTP over USB endpoint"
+	depends on MCTP_USB
+	default y
+	help
+	  Also expose the endpoint over USB (DSP0283) on zephyr_udc0, with its
+	  own libmctp instance.
+
+if MCTP_EVAL_USB
+
+config MCTP_EVAL_USB_VID
+	hex "USB vendor ID"
+	default 0x2fe3
+	help
+	  0x2fe3 is the Zephyr project's VID, for development and testing only.
+
+config MCTP_EVAL_USB_PID
+	hex "USB product ID"
+	default 0x0100
+
+endif # MCTP_EVAL_USB
+
+endmenu
+
+source "Kconfig.zephyr"

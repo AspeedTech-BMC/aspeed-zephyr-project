@@ -1,0 +1,121 @@
+# Copyright (c) 2024 Intel Corporation
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Zephyr glue for the libmctp module (modules/lib/libmctp), adapted from
+# Zephyr 4.x subsys/pmci/mctp/Kconfig. The symbol names match upstream
+# because libmctp's zephyr/CMakeLists.txt keys off CONFIG_MCTP,
+# CONFIG_MCTP_MAX_MESSAGE_SIZE and CONFIG_LIBMCTP_CONTROL_HANDLER_ENABLED.
+# Sourced from modules/Kconfig: libmctp's module.yml has no kconfig-ext, so
+# the ZEPHYR_LIBMCTP_KCONFIG hook is not available.
+
+menuconfig MCTP
+	bool "Management Component Transport Protocol (libmctp)"
+	depends on ZEPHYR_LIBMCTP_MODULE
+	# libmctp uses C11 static_assert()
+	select REQUIRES_STD_C11
+	help
+	  Enable libmctp and its Zephyr glue.
+
+if MCTP
+
+config MCTP_HEAP_SIZE
+	int "MCTP heap size"
+	default 4096
+	help
+	  Dedicated heap libmctp allocates packet buffers and message
+	  reassembly buffers from. It must hold at least one MCTP context plus
+	  one CONFIG_MCTP_MAX_MESSAGE_SIZE reassembly buffer per active
+	  endpoint.
+
+config MCTP_MAX_MESSAGE_SIZE
+	int "Maximum MCTP reassembly message size"
+	default 1024
+	help
+	  Largest MCTP message, in bytes, libmctp reassembles from multiple
+	  packets.
+
+config MCTP_LOG_CUSTOM_ZEPHYR
+	bool "Bridge libmctp logs into Zephyr logging"
+	depends on LOG
+	default y
+	help
+	  Route libmctp's own log output through Zephyr logging at the
+	  configured MCTP log level.
+
+config MCTP_I3C_TARGET_MQUEUE
+	bool "MCTP I3C target binding over i3c-target-mqueue"
+	depends on I3C_TARGET_MQUEUE
+	help
+	  libmctp binding for an I3C target (secondary) controller. Received
+	  packets are taken from an i3c-target-mqueue device; packets are sent
+	  with i3c_target_mqueue_write(), which raises the MCTP pending-read
+	  IBI and waits for the bus controller to read them.
+
+config MCTP_I3C_TMQ_PEC
+	bool "PEC on MCTP-over-I3C packets"
+	depends on MCTP_I3C_TARGET_MQUEUE
+	default y
+	select CRC
+	help
+	  DSP0233 frames each MCTP packet on I3C with a trailing PEC byte:
+	  CRC-8 (polynomial 0x07) over the target's dynamic address with the
+	  R/W bit, then the packet. Received packets are checked and stripped,
+	  and transmitted packets get one appended. Linux mctp-i3c bus owners
+	  require it.
+
+config MCTP_I3C_TMQ_LARGE_PACKETS
+	bool "MCTP-over-I3C packets larger than the baseline"
+	depends on MCTP_I3C_TARGET_MQUEUE
+	help
+	  Send and accept packets as large as the i3c-target-mqueue node's
+	  msg-size allows. DSP0236 limits packets to the baseline transmission
+	  unit (64-byte payload) until a larger one is negotiated, which
+	  libmctp does not do, and a bus owner reading at the baseline can
+	  truncate or reject larger ones. Enable only for a bus owner known
+	  to take them, e.g. to measure throughput. Without it, packets are
+	  sent at the baseline and larger received ones are dropped.
+
+config MCTP_USB
+	bool "MCTP USB binding (DSP0283)"
+	depends on USB_DEVICE_STACK_NEXT
+	imply UDC_WORKQUEUE
+	help
+	  libmctp binding for MCTP over USB: a USB device class (interface
+	  class 0x14) on the new USB device stack, with bulk IN and OUT
+	  endpoints. Ported from Zephyr 4.x.
+
+	  Received packets are parsed in the system workqueue, and a reply
+	  spanning several packets blocks there until each IN transfer
+	  completes. The UDC driver must therefore not complete transfers
+	  from the system workqueue too (UDC_WORKQUEUE).
+
+if MCTP_USB
+
+config MCTP_USB_TX_TIMEOUT
+	int "MCTP USB transmit timeout (ms)"
+	default 1000
+	help
+	  How long a transmit waits for the previous USB IN transfer to
+	  complete.
+
+config MCTP_USB_CLASS_INSTANCES_COUNT
+	int "Number of MCTP USB class instances"
+	range 1 4
+	default 1
+	help
+	  Must match the number of MCTP_USB_DEFINE() instances.
+
+endif # MCTP_USB
+
+config LIBMCTP_CONTROL_HANDLER_ENABLED
+	bool "libmctp control message handler"
+	help
+	  Let libmctp answer MCTP control messages itself. Leave disabled to
+	  receive control messages in the application.
+
+module = MCTP
+module-str = MCTP
+source "subsys/logging/Kconfig.template.log_config"
+
+endif
