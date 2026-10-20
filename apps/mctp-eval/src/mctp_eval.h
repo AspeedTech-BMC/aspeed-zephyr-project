@@ -44,4 +44,16 @@ bool mctp_eval_pldm_rx(struct eval_bus *bus, uint8_t src_eid, bool tag_owner, ui
 		       const uint8_t *msg, size_t len);
 #endif
 
+#ifdef CONFIG_MCTP_EVAL_SPDM_BRIDGE
+int mctp_eval_spdm_init(void);
+/* Advertise SPDM and secured SPDM in the bus's Get Message Type Support response */
+int mctp_eval_spdm_bus_init(struct eval_bus *bus);
+/*
+ * Called from the bus rx callback with the bus lock held; true if the
+ * message was SPDM or secured SPDM (and has been queued for the SSMCU).
+ */
+bool mctp_eval_spdm_rx(struct eval_bus *bus, uint8_t src_eid, bool tag_owner, uint8_t msg_tag,
+		       const uint8_t *msg, size_t len);
+#endif
+
 #endif /* MCTP_EVAL_H_ */

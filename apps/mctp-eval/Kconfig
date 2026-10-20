@@ -109,6 +109,35 @@ config MCTP_EVAL_PLDM_TRANSFER_SIZE
 
 endif # MCTP_EVAL_PLDM
 
+config MCTP_EVAL_SPDM_BRIDGE
+	bool "SPDM bridge to the SSMCU"
+	depends on IPM
+	default y if $(dt_nodelabel_enabled,ipc0_cm4_ssmcu)
+	help
+	  Forward SPDM requests (MCTP message type 0x05) from every bus to the
+	  SSMCU's SPDM responder over the PSP IPC channel (ipc0_cm4_ssmcu doorbells,
+	  bodies in its shmem_ch0 window), and send its responses back.
+
+config MCTP_EVAL_SPDM_TIMEOUT_MS
+	int "SPDM response timeout (ms)"
+	depends on MCTP_EVAL_SPDM_BRIDGE
+	default 5000
+	help
+	  How long to wait for the SSMCU's response before dropping the
+	  request. It must cover the slowest SPDM operation the SSMCU does,
+	  such as signing measurements.
+
+config MCTP_EVAL_SPDM_ACK_TIMEOUT_MS
+	int "SSMCU acknowledgement timeout (ms)"
+	depends on MCTP_EVAL_SPDM_BRIDGE
+	range 1 1000
+	default 50
+	help
+	  How long to wait for the SSMCU to acknowledge a request (or a
+	  SYNC), which it does once it has copied the request out of the
+	  shared window. Without one, the bridge leaves the request buffer
+	  alone and resynchronizes the channel before its next request.
+
 endmenu
 
 source "Kconfig.zephyr"

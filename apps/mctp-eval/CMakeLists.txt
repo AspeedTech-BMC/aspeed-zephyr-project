@@ -9,3 +9,4 @@ project(mctp_eval)
 
 target_sources(app PRIVATE src/main.c)
 target_sources_ifdef(CONFIG_MCTP_EVAL_PLDM app PRIVATE src/pldm.c)
+target_sources_ifdef(CONFIG_MCTP_EVAL_SPDM_BRIDGE app PRIVATE src/spdm_bridge.c)
