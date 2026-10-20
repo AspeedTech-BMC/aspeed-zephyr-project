@@ -7,14 +7,48 @@
  * the i3c0_tmq label.
  */
 
-/ {
-	chosen {
+&fmc {
+	status = "okay";
+};
+
+/* Boot SPI flash: the image the SoC boots sits at offset 0 */
+&fmc_cs0 {
+	status = "okay";
+	spi-max-buswidth = <4>;
+	spi-max-frequency = <50000000>;
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
 		/*
-		 * The board points this at an app-defined FMC partition; this app
-		 * runs from SRAM (no XIP) and doesn't use flash, so drop it.
+		 * The 1 MiB flash in halves. The first is the board's
+		 * zephyr,code-partition, which the SoC boots, and where PLDM
+		 * firmware updates are programmed with
+		 * CONFIG_MCTP_EVAL_PLDM_FLASH; an update downloads into the
+		 * second and is copied into the first once it verifies. The
+		 * image runs from SRAM, so it never outgrows its half.
 		 */
-		/delete-property/ zephyr,code-partition;
+		slot0_partition: pldm_update_partition: partition@0 {
+			label = "image-0";
+			reg = <0x0 0x80000>;
+		};
+
+		pldm_staging_partition: partition@80000 {
+			label = "staging";
+			reg = <0x80000 0x80000>;
+		};
 	};
+};
+
+/* sys_reboot() resets the chip through wdt1 */
+&wdt0 {
+	status = "okay";
+};
+
+&wdt1 {
+	status = "okay";
 };
 
 &i3c0 {

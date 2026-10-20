@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: MIT
 
 add_subdirectory(libmctp)
+add_subdirectory(libpldm)

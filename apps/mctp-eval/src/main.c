@@ -11,7 +11,8 @@
  * Type), so a bus owner such as the BMC can discover the endpoint and assign
  * it an EID. Every other message is logged and counted, and requests can
  * optionally be echoed back to their sender. The mbench commands pair with
- * the BMC's mctp-bench for one-way throughput in either direction.
+ * the BMC's mctp-bench for one-way throughput in either direction. With
+ * CONFIG_MCTP_EVAL_PLDM, PLDM messages go to the libpldm responder (pldm.c).
  */
 
 #include <stdlib.h>
@@ -22,6 +23,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <libmctp.h>
 #include <mctp/mctp_i3c_tmq.h>
+#include "mctp_eval.h"
 #ifdef CONFIG_MCTP_EVAL_USB
 #include <zephyr/usb/usbd.h>
 #include <mctp/mctp_usb.h>
@@ -34,23 +36,9 @@ BUILD_ASSERT(CONFIG_MCTP_EVAL_LOCAL_EID == 0 || CONFIG_MCTP_EVAL_LOCAL_EID >= 8,
 	     "CONFIG_MCTP_EVAL_LOCAL_EID must be 0 or 8..254: DSP0236 reserves 1-7");
 
 #define RX_POLL_US		100
-#define MCTP_MSG_TYPE_MASK	0x7f
 #define MCTP_MSG_TYPE_CONTROL	0x00
 #define MCTP_TAG_MASK		0x07
 #define SEND_MAX_LEN		64
-
-/*
- * One transport and its libmctp instance, NULL if the bus failed to start.
- * libmctp is not thread-safe: every call into a bus's mctp is made with its
- * lock held.
- */
-struct eval_bus {
-	const char *name;
-	struct mctp *mctp;
-	struct k_mutex *lock;
-	/* The binding's count of packets it dropped, updated under lock */
-	const uint32_t *tx_errors;
-};
 
 MCTP_I3C_TMQ_DT_DEFINE(mctp_i3c0, DT_NODELABEL(i3c0_tmq));
 /* Serializes the I3C rx loop and shell sends on the I3C bus */
@@ -106,7 +94,7 @@ static void stats_add(uint32_t *counter, uint32_t n)
 
 static bool rx_dump = true;
 static bool rx_echo;
-static uint8_t send_tag;
+static atomic_t send_tag;
 
 /*
  * Round-trip benchmark against an echo responder such as the BMC's
@@ -492,6 +480,12 @@ static void mctp_eval_rx(uint8_t src_eid, bool tag_owner, uint8_t msg_tag, void 
 		return;
 	}
 
+#ifdef CONFIG_MCTP_EVAL_PLDM
+	if (mctp_eval_pldm_rx(bus, src_eid, tag_owner, msg_tag, msg, len)) {
+		return;
+	}
+#endif
+
 	key = k_spin_lock(&stats_lock);
 	stats.msgs++;
 	stats.bytes += len;
@@ -514,6 +508,11 @@ static void mctp_eval_rx(uint8_t src_eid, bool tag_owner, uint8_t msg_tag, void 
 	stats_add(&stats.echoed, 1);
 }
 
+uint8_t mctp_eval_next_tag(void)
+{
+	return atomic_inc(&send_tag) & MCTP_TAG_MASK;
+}
+
 static int mctp_eval_bus_init(struct eval_bus *bus, struct mctp_binding *binding)
 {
 	int ret;
@@ -527,13 +526,25 @@ static int mctp_eval_bus_init(struct eval_bus *bus, struct mctp_binding *binding
 	mctp_set_rx_all(bus->mctp, mctp_eval_rx, bus);
 	mctp_set_capture_handler(bus->mctp, mctp_eval_capture, bus);
 
+#ifdef CONFIG_MCTP_EVAL_PLDM
+	ret = mctp_eval_pldm_bus_init(bus);
+	if (ret) {
+		LOG_ERR("%s: adding PLDM message type failed (%d)", bus->name, ret);
+		goto err;
+	}
+#endif
+
 	ret = mctp_register_bus(bus->mctp, binding, CONFIG_MCTP_EVAL_LOCAL_EID);
 	if (ret) {
 		LOG_ERR("%s: mctp_register_bus failed (%d)", bus->name, ret);
-		mctp_destroy(bus->mctp);
-		bus->mctp = NULL;
+		goto err;
 	}
 
+	return 0;
+
+err:
+	mctp_destroy(bus->mctp);
+	bus->mctp = NULL;
 	return ret;
 }
 
@@ -604,6 +615,17 @@ static int mctp_eval_usb_init(void)
 int main(void)
 {
 	int ret;
+
+#ifdef CONFIG_MCTP_EVAL_PLDM
+	/*
+	 * Before the buses: their rx callbacks hand PLDM to it. Without it
+	 * the buses still run, and PLDM messages are handled like any other.
+	 */
+	ret = mctp_eval_pldm_init();
+	if (ret) {
+		LOG_ERR("PLDM responder not started (%d)", ret);
+	}
+#endif
 
 	/* Each bus runs on its own: one failing to start leaves the other up */
 	if (!mctp_eval_bus_init(&bus_i3c, &mctp_i3c0.binding)) {
@@ -774,7 +796,7 @@ static int cmd_send(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	k_mutex_lock(bus->lock, K_FOREVER);
-	tag = send_tag++ & MCTP_TAG_MASK;
+	tag = mctp_eval_next_tag();
 	ret = eval_bus_tx(bus, eid, true, tag, msg, len);
 	k_mutex_unlock(bus->lock);
 
@@ -827,7 +849,7 @@ static int cmd_bench(const struct shell *sh, size_t argc, char **argv)
 		k_sem_reset(&bench_done);
 
 		k_mutex_lock(bus->lock, K_FOREVER);
-		bench.tag = send_tag++ & MCTP_TAG_MASK;
+		bench.tag = mctp_eval_next_tag();
 		bench.active = true;
 		t0 = k_cycle_get_32();
 		/* I3C returns once the bus owner has read every packet; USB once queued */
