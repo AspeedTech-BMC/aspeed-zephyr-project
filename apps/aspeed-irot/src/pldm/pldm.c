@@ -18,12 +18,15 @@
 #include "mctp.h"
 #include <zephyr/logging/log.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/kernel.h>
+#include <errno.h>
 #include "libutil.h"
+#include <mctp_req_worker.h>
 #include "plat_def.h"
 
 LOG_MODULE_REGISTER(pldm, LOG_LEVEL_INF);
@@ -335,29 +338,24 @@ static uint8_t pldm_resp_msg_process(mctp *const mctp_inst, uint8_t *buf, uint32
 	return PLDM_SUCCESS;
 }
 
-uint8_t mctp_pldm_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params)
+static uint8_t pldm_process_request(void *mctp_p, uint8_t *buf, uint32_t len,
+				    mctp_ext_params ext_params)
 {
 	CHECK_NULL_ARG_WITH_RETURN(mctp_p, PLDM_ERROR);
 	CHECK_NULL_ARG_WITH_RETURN(buf, PLDM_ERROR);
 
-	if (!len)
+	if (len < sizeof(pldm_hdr))
 		return PLDM_ERROR;
 
 	mctp *mctp_inst = (mctp *)mctp_p;
 	pldm_hdr *hdr = (pldm_hdr *)buf;
+	if (!hdr->rq)
+		return PLDM_ERROR;
+
 	LOG_DBG("msg_type = %d", hdr->msg_type);
 	LOG_DBG("req_d_id = 0x%x", hdr->req_d_id);
 	LOG_DBG("pldm_type = 0x%x", hdr->pldm_type);
 	LOG_DBG("cmd = 0x%x", hdr->cmd);
-
-	/*
-* The message is a response, check if any callback function should be
-* invoked
-*/
-
-	if (!hdr->rq) {
-		return pldm_resp_msg_process(mctp_inst, buf, len, ext_params);
-	}
 
 	/* the message is a request, find the proper handler to handle it */
 
@@ -420,6 +418,45 @@ send_msg:
 	rc = mctp_send_msg(mctp_inst, resp_buf, resp_len, ext_params);
 	free(resp_buf);
 	return rc;
+}
+
+/* Requests and their synchronous response TX run outside MCTP RX. */
+MCTP_REQ_WORKER_DEFINE(pldm_req_worker, pldm_process_request,
+		       MCTP_REQ_WORKER_QUEUE_SIZE,
+		       MCTP_REQ_WORKER_BUF_SIZE,
+		       MCTP_REQ_WORKER_STACK_SIZE,
+		       MCTP_REQ_WORKER_PRIORITY);
+
+uint8_t mctp_pldm_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params)
+{
+	pldm_hdr *hdr;
+
+	if ((NULL == mctp_p) || (NULL == buf)) {
+		return PLDM_ERROR;
+	}
+
+	if (len < sizeof(pldm_hdr)) {
+		LOG_WRN("Invalid incoming PLDM message length %u", len);
+		return PLDM_ERROR;
+	}
+
+	hdr = (pldm_hdr *)buf;
+	if (!hdr->rq) {
+		/* Firmware data replies include a completion code and header beyond the data. */
+		if ((len < sizeof(pldm_resp_hdr)) ||
+		    (len - sizeof(pldm_hdr) > UINT16_MAX)) {
+			LOG_WRN("Invalid incoming PLDM response length %u", len);
+			return PLDM_ERROR;
+		}
+		return pldm_resp_msg_process((mctp *)mctp_p, buf, len, ext_params);
+	}
+
+	if (mctp_req_worker_dispatch(&pldm_req_worker, mctp_p, buf, len,
+				   ext_params) != MCTP_SUCCESS) {
+		return PLDM_ERROR;
+	}
+
+	return PLDM_SUCCESS;
 }
 
 uint8_t mctp_pldm_send_msg(void *mctp_p, pldm_msg *msg)
@@ -566,4 +603,5 @@ uint8_t get_supported_pldm_commands(PLDM_TYPE type, uint8_t *buf, uint8_t buf_si
 	return PLDM_SUCCESS;
 }
 
+/* Notify waiting callers when a PLDM response does not arrive before its timeout. */
 K_THREAD_DEFINE(pldm_wait_resp_to, 1024, pldm_msg_timeout_monitor, NULL, NULL, NULL, 2, 0, 0);

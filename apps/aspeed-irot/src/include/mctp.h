@@ -260,6 +260,9 @@ mctp_port *plat_get_mctp_port(uint8_t index);
 /* public function */
 mctp *mctp_init(void);
 
+/* Return 0 if mctp_inst is a registered MCTP instance, -ENODEV otherwise. */
+int mctp_validate_inst(const mctp *mctp_inst);
+
 uint8_t mctp_deinit(mctp *mctp_inst);
 
 uint8_t mctp_set_medium_configure(mctp *mctp_inst, MCTP_MEDIUM_TYPE medium_type,
