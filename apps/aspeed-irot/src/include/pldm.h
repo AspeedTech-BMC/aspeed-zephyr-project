@@ -93,6 +93,7 @@ typedef struct _pldm_msg {
 	uint8_t *buf;
 	uint16_t len;
 	mctp_ext_params ext_params;
+	/* Runs in RX; must not block or retain the borrowed response buffer. */
 	void (*recv_resp_cb_fn)(void *, uint8_t *, uint16_t);
 	void *recv_resp_cb_args;
 	uint16_t timeout_ms;
@@ -134,7 +135,7 @@ struct _pldm_ipmi_cmd_resp {
 } __attribute__((packed));
 #endif
 
-/* the pldm command handler */
+/* Complete responses in RX; copy and queue incoming requests. */
 uint8_t mctp_pldm_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_params ext_params);
 
 /* send the pldm command message through mctp */

@@ -25,6 +25,7 @@ target_sources(app
 
 	mctp/mctp.c
 	mctp/mctp_init.c
+	mctp/mctp_req_worker.c
 	mctp/mctp_ctrl.c
 	mctp/mctp_ipc.c
 	mctp/hal_ipm.c

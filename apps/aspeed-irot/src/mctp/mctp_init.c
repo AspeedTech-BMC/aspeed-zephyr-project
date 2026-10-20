@@ -19,8 +19,25 @@
 #endif
 
 #include <mctp_vdm_pci.h>
+#include <mctp_req_worker.h>
 
 LOG_MODULE_REGISTER(mctp_init);
+
+#if defined(CONFIG_SPDM_RESPONDER)
+MCTP_REQ_WORKER_DEFINE(spdm_req_worker, mctp_spdm_cmd_handler,
+		       MCTP_REQ_WORKER_QUEUE_SIZE,
+		       MCTP_REQ_WORKER_BUF_SIZE,
+		       MCTP_REQ_WORKER_STACK_SIZE,
+		       MCTP_REQ_WORKER_PRIORITY);
+#endif
+
+#if defined(CONFIG_COMPOSITE_EAT)
+MCTP_REQ_WORKER_DEFINE(eat_req_worker, mctp_vdm_pci_cmd_handler,
+		       MCTP_REQ_WORKER_QUEUE_SIZE,
+		       MCTP_REQ_WORKER_BUF_SIZE,
+		       MCTP_REQ_WORKER_STACK_SIZE,
+		       MCTP_REQ_WORKER_PRIORITY);
+#endif
 
 static mctp_port mctp_bus_port[] = {
 #if defined(CONFIG_IPM)
@@ -62,12 +79,14 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 	case MCTP_MSG_TYPE_SPDM:
 	/* libspdm's MCTP transport decodes both; secured ones carry the session */
 	case MCTP_MSG_TYPE_SECURED_SPDM:
-		mctp_spdm_cmd_handler(mctp_p, buf, len, ext_params);
+		mctp_req_worker_dispatch(&spdm_req_worker, mctp_p, buf,
+				       len, ext_params);
 		break;
 #endif
 #if defined(CONFIG_COMPOSITE_EAT)
 	case MCTP_MSG_TYPE_VEN_DEF_PCI:
-		mctp_vdm_pci_cmd_handler(mctp_p, buf, len, ext_params);
+		mctp_req_worker_dispatch(&eat_req_worker, mctp_p, buf,
+				       len, ext_params);
 		break;
 #endif
 	default:
@@ -105,6 +124,21 @@ int load_mctp_support_types(uint8_t *type_len, uint8_t *types, uint8_t max_types
 	*type_len = ARRAY_SIZE(supported);
 
 	return 0;
+}
+
+int mctp_validate_inst(const mctp *mctp_inst)
+{
+	if (mctp_inst == NULL) {
+		return -ENODEV;
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(mctp_bus_port); i++) {
+		if (mctp_bus_port[i].mctp_inst == mctp_inst) {
+			return 0;
+		}
+	}
+
+	return -ENODEV;
 }
 
 int mctp_init_app()
