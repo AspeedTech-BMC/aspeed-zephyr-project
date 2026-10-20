@@ -7,6 +7,56 @@
  * the i3c0_tmq label.
  */
 
+/*
+ * Boot SPI flash, one partition per PLDM component:
+ * - 0x0001: the signed boot bundle (Caliptra, SSMCU runtime and this
+ *   Cortex-M4 image, the "aspeed-manifest-flash-image") at 0x50000; the next
+ *   boot authenticates it. The partition ends where aspeed-pfr's active
+ *   region does.
+ * - 0x0002: the SSMCU XIP ROM (ssmcu-rom-xip.bin) at 0, up to the bundle.
+ *   Nothing authenticates it, and a reset while it is half written leaves a
+ *   chip that doesn't boot.
+ * - 0x0003: the SSMCU's emulated external OTP at 0x280000
+ *   (AST1040_EXT_OTP_PARTITION), which holds the IDevID certificates: the
+ *   ECC-384 DER padded with 0xff to 1024 bytes, then the ML-DSA-87 DER. The
+ *   SSMCU installs them into Caliptra at boot.
+ * A 0x0001 update downloads into the staging partition, the top 1 MiB, and
+ * is copied into place once it verifies; it can be at most that size. The
+ * cert-store's fixed place keeps it from being as large as the bundle's.
+ */
+&fmc_cs0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		pldm_rom_partition: partition@0 {
+			label = "ssmcu-rom";
+			reg = <0x0 0x50000>;
+		};
+
+		pldm_update_partition: partition@50000 {
+			label = "boot-bundle";
+			reg = <0x50000 0x170000>;
+		};
+
+		pldm_cert_partition: partition@280000 {
+			label = "cert-store";
+			reg = <0x280000 0x80000>;
+		};
+
+		pldm_staging_partition: partition@300000 {
+			label = "staging";
+			reg = <0x300000 0x100000>;
+		};
+	};
+};
+
+/* sys_reboot() resets the chip through wdt0 */
+&wdt0 {
+	status = "okay";
+};
+
 &i3c0 {
 	status = "okay";
 	/* DSP0233: MCTP over I3C devices report DCR 0xCC */

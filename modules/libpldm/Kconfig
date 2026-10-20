@@ -1,0 +1,17 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: MIT
+#
+# Additions to the libpldm module (modules/lib/libpldm). The module itself
+# provides CONFIG_PLDM and the encode/decode library.
+
+config PLDM_RESPONDER
+	bool "libpldm control (type 0) and firmware device (type 5) responders"
+	depends on PLDM
+	# Both responders are in libpldm's testing ABI
+	select PLDM_ABI_TESTING
+	help
+	  Build libpldm's PLDM control responder (GetTID, GetPLDMVersion,
+	  GetPLDMTypes, GetPLDMCommands) and firmware update device
+	  responder, which the module's own CMake leaves out. Allocate their
+	  state statically with PLDM_SIZEOF_PLDM_CONTROL and
+	  PLDM_SIZEOF_PLDM_FD from <libpldm/sizes.h>.

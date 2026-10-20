@@ -35,6 +35,80 @@ config MCTP_EVAL_USB_PID
 
 endif # MCTP_EVAL_USB
 
+config MCTP_EVAL_PLDM
+	bool "PLDM responder (types 0 and 5)"
+	depends on PLDM_RESPONDER
+	default y
+	help
+	  Answer PLDM over MCTP on every bus with libpldm's control (type 0)
+	  and firmware device (type 5) responders. Firmware updates are
+	  programmed into flash (MCTP_EVAL_PLDM_FLASH) or go to a sink.
+
+if MCTP_EVAL_PLDM
+
+config MCTP_EVAL_PLDM_UUID
+	string "Firmware device UUID descriptor"
+	default "a3f1c2d4-1080-4e6a-9b30-6d6374706576"
+	help
+	  The UUID descriptor QueryDeviceIdentifiers reports. A firmware
+	  update package must list it for the update agent to pick this
+	  device.
+
+config MCTP_EVAL_PLDM_VERSION
+	string "Firmware component version"
+	default "1.0"
+	help
+	  Appended to "mctp-eval <board>" to form the active component
+	  version GetFirmwareParameters reports.
+
+config MCTP_EVAL_PLDM_FLASH
+	bool "Program updates into flash"
+	select FLASH
+	select FLASH_MAP
+	help
+	  Write the component image into the fixed partition labelled
+	  pldm_update_partition and verify it by reading it back. If the
+	  board also defines pldm_staging_partition, the image downloads
+	  there and is copied into pldm_update_partition at apply, once it
+	  has verified. Without it, updates only go to a sink that counts
+	  and CRC32s the image.
+	  Nothing authenticates the update agent, so any MCTP peer on any
+	  bus can write the partition: turn it on only where the boot
+	  authenticates what it loads from there, or on a development
+	  board.
+
+config MCTP_EVAL_PLDM_UNSAFE_COMPONENTS
+	bool "Also offer the SSMCU XIP ROM and IDevID certificates for update"
+	depends on MCTP_EVAL_PLDM_FLASH
+	help
+	  Report components 0x0002 (pldm_rom_partition, the SSMCU XIP ROM)
+	  and 0x0003 (pldm_cert_partition, the IDevID certificate store)
+	  too, where the board defines them. Nothing authenticates either
+	  the update agent or these images: any MCTP peer on any bus can
+	  replace the ROM, and a ROM left half written doesn't boot, or
+	  substitute the device identity. For provisioning development
+	  boards only.
+
+config MCTP_EVAL_PLDM_REBOOT
+	bool "Reboot on ActivateFirmware"
+	depends on MCTP_EVAL_PLDM_FLASH
+	select REBOOT
+	help
+	  Cold-reboot shortly after a successful ActivateFirmware, so the
+	  device boots the image just programmed.
+
+config MCTP_EVAL_PLDM_TRANSFER_SIZE
+	int "Largest firmware data chunk to request"
+	range 32 1019
+	default 512
+	help
+	  Upper bound on RequestFirmwareData lengths; the update agent's
+	  own maximum applies too. A chunk and its 5 bytes of MCTP type,
+	  PLDM header and completion code must fit
+	  CONFIG_MCTP_MAX_MESSAGE_SIZE.
+
+endif # MCTP_EVAL_PLDM
+
 endmenu
 
 source "Kconfig.zephyr"

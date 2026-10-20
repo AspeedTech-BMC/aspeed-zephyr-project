@@ -10,6 +10,8 @@ manifest:
       url-base: https://github.com/AspeedTech-BMC
     - name: zephyrproject
       url-base: https://github.com/zephyrproject-rtos
+    - name: openbmc
+      url-base: https://github.com/openbmc
 
   projects:
     - name: zephyr
@@ -33,3 +35,8 @@ manifest:
       remote: zephyrproject
       revision: b6be45dfc5c67c43c3a5e12589ae3845ea00ab5e
       path: modules/lib/libmctp
+    - name: libpldm
+      remote: openbmc
+      # v0.17.0
+      revision: 6ea218c28b3bedfe6bdb19a09964c59ac7839d6b
+      path: modules/lib/libpldm
