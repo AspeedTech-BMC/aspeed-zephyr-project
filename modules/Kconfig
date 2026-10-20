@@ -3,4 +3,5 @@
 
 menu "Modules"
 rsource "Cerberus/Kconfig"
+rsource "libmctp/Kconfig"
 endmenu
