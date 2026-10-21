@@ -295,8 +295,15 @@ int tamper_init(int step, int diff)
  * tamper.h, shared with sdram_ast2700.c's sdramc_pll_reset().
  */
 #define MPLL_REFCLK_HZ		25000000U
+#ifdef ENABLE_TAMPER
+#define MPLL_SHMOO_STEPS	128
+#define MPLL_DEFAULT_M		1024U
+#define MPLL_DEFAULT_NR		16U
+#else
+#define MPLL_SHMOO_STEPS	10
 #define MPLL_DEFAULT_M		0x40U
 #define MPLL_DEFAULT_NR		1U
+#endif
 #define MPLL_DEFAULT_OD		1U
 #define MPLL_STEP_HZ		(MPLL_REFCLK_HZ / MPLL_DEFAULT_NR)	/* Hz per M count */
 #define MPLL_DEFAULT_FREQ_HZ	(MPLL_STEP_HZ * MPLL_DEFAULT_M)	/* 1600MHz */
@@ -307,8 +314,7 @@ int tamper_init(int step, int diff)
 /* upper bound on how many 1-count M steps a single band-edge search leg may
  * take before giving up (no trip found).
  */
-#define MPLL_SHMOO_STEPS	10
-#define MPLL_SETTLE_US		500000
+#define MPLL_SETTLE_US		10000
 
 #define MPLL_M_TO_MHZ(m)	((MPLL_STEP_HZ * (uint32_t)(m)) / 1000000U)
 #define MPLL_M_TO_KHZ_FRAC(m)	(((MPLL_STEP_HZ * (uint32_t)(m)) / 1000U) % 1000U)
@@ -342,6 +348,8 @@ static int mpll_program_nf(uint32_t reg_val)
  */
 static int mpll_reconfigure(uint32_t pll_para)
 {
+	uint32_t reg;
+
 	sys_write32(pll_para | MPLL_RESET_BIT | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
 	k_busy_wait(MPLL_SETTLE_US);
 	sys_write32(pll_para | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
@@ -349,7 +357,8 @@ static int mpll_reconfigure(uint32_t pll_para)
 	sys_write32(pll_para, MPLL_CTRL_REG);
 	k_busy_wait(MPLL_SETTLE_US);
 
-	return (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT) ? 0 : -1;
+	return readl_poll_timeout(MPLL_STATUS_REG, reg, (reg & MPLL_LOCK_BIT),
+				   MPLL_LOCK_TIMEOUT_US);
 }
 
 /*
