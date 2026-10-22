@@ -77,7 +77,7 @@ static int irot_quote_pcrs(const uint8_t *nonce, struct cptra_quote_pcrs_oa *out
 			       &nonce[(words - 1 - i) * sizeof(uint32_t)], sizeof(uint32_t));
 	}
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_QUOTE_PCRS, (uint32_t *)&input, sizeof(input),
+	ret = cptra_api_transfer(CPTRA_IPCCMD_QUOTE_PCRS, (uint32_t *)&input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL, (uint32_t *)output, sizeof(*output));
 	if (ret) {
 		LOG_ERR("caliptra_quote_pcrs is failure, ret:0x%x", ret);
@@ -377,7 +377,7 @@ uint32_t cptra_get_certify_key_leaf_cert(uint8_t *cert, size_t cert_max_size)
 	memset(output, 0, sizeof(*output));
 
 	/* All-zero request: default context handle, flags 0, FORMAT_X509, empty label */
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
 				 (uint32_t *)&input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint32_t *)output, sizeof(*output));
@@ -444,7 +444,7 @@ void cptra_invoke_dpe_get_certificate_chain(void **cert_chain, uint32_t *chain_s
 		get_certificate_chain_input->size =
 			sizeof(get_certificate_chain_output->cert_chain);
 
-		ret = cptra_ipc_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
+		ret = cptra_api_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
 					 (uint32_t *)&input, sizeof(input),
 					 CPTRA_IPC_RX_TYPE_EXTERNAL,
 					 (uint32_t *)&output, sizeof(output));

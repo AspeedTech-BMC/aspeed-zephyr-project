@@ -24,6 +24,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
+#include <cptra/cptra_api.h>
 
 LOG_MODULE_DECLARE(spdm_secret);
 
@@ -72,7 +73,7 @@ static bool cptra_ecdsa_sign(const uint8_t *message_hash, size_t hash_size,
 
 	LOG_HEXDUMP_DBG(sign_input->digest, digest_len, "digest to sign:");
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
 				 (uint8_t *)&input, sizeof(struct cptra_invoke_dpe_command_ia),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint8_t *)&output, sizeof(struct cptra_invoke_dpe_command_oa));

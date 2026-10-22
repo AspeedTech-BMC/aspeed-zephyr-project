@@ -12,6 +12,7 @@
 
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
+#include <cptra/cptra_api.h>
 #include <zephyr/drivers/misc/aspeed/otp_ast27xx.h>
 
 #include <qcbor/qcbor_encode.h>
@@ -128,7 +129,7 @@ static int irot_get_pcr_quote(struct cptra_quote_pcrs_oa *output)
 	memset(&input, 0, sizeof(input));
 	memset(output, 0, sizeof(*output));
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_QUOTE_PCRS, &input, sizeof(input),
+	ret = cptra_api_transfer(CPTRA_IPCCMD_QUOTE_PCRS, &input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL, output, sizeof(*output));
 	if (ret) {
 		LOG_ERR("caliptra_quote_pcrs is failure, ret:0x%x", ret);
