@@ -42,7 +42,7 @@
 #include "aspeed_psp_ipc.h"
 #include "mctp_eval.h"
 
-LOG_MODULE_REGISTER(mctp_eval_spdm, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(mctp_eval_spdm, CONFIG_MCTP_EVAL_LOG_LEVEL);
 
 #define MCTP_MSG_TYPE_SPDM		0x05
 #define MCTP_MSG_TYPE_SECURED_SPDM	0x06

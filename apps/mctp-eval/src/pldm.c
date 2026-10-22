@@ -62,7 +62,7 @@
 #include <libpldm/sizes.h>
 #include "mctp_eval.h"
 
-LOG_MODULE_REGISTER(mctp_eval_pldm, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(mctp_eval_pldm, CONFIG_MCTP_EVAL_LOG_LEVEL);
 
 /* PLDM message buffers, after the MCTP message type byte */
 #define PLDM_MSG_MAX		(CONFIG_MCTP_MAX_MESSAGE_SIZE - 1)
