@@ -4,13 +4,14 @@
 #include <zephyr/drivers/ipm.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
 #include <zephyr/logging/log.h>
+#include <cptra/cptra_api.h>
 
 LOG_MODULE_REGISTER(cptra_mbedtls, LOG_LEVEL_DBG);
 
-int mbedtls_ecdsa_verify_cptra(mbedtls_ecp_group *grp,
-			     const unsigned char *buf, size_t blen,
-			     const mbedtls_ecp_point *Q,
-			     const mbedtls_mpi *r, const mbedtls_mpi *s)
+static int ecdsa_verify_internal(mbedtls_ecp_group *grp,
+		const unsigned char *buf, size_t blen,
+		const mbedtls_ecp_point *Q,
+		const mbedtls_mpi *r, const mbedtls_mpi *s)
 {
 	ARG_UNUSED(grp);
 	uint8_t *p8_bmcu_in = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
@@ -96,4 +97,19 @@ int mbedtls_ecdsa_verify_cptra(mbedtls_ecp_group *grp,
 	}
 
 	return 0;
+}
+
+int mbedtls_ecdsa_verify_cptra(mbedtls_ecp_group *grp,
+		const unsigned char *buf, size_t blen,
+		const mbedtls_ecp_point *Q,
+		const mbedtls_mpi *r, const mbedtls_mpi *s)
+{
+	int ret;
+
+	/* The request is built in the shared memory before trigger */
+	cptra_api_lock();
+	ret = ecdsa_verify_internal(grp, buf, blen, Q, r, s);
+	cptra_api_unlock();
+
+	return ret;
 }

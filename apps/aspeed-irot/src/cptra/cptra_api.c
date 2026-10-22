@@ -16,8 +16,39 @@
 
 LOG_MODULE_REGISTER(cptra_api, LOG_LEVEL_INF);
 
+static K_MUTEX_DEFINE(cptra_api_mutex);
+
+void cptra_api_lock(void)
+{
+	const char *name = k_thread_name_get(k_current_get());
+
+	LOG_DBG("%s: lock wait", name);
+	k_mutex_lock(&cptra_api_mutex, K_FOREVER);
+	LOG_DBG("%s: locked", name);
+}
+
+void cptra_api_unlock(void)
+{
+	LOG_DBG("%s: unlock", k_thread_name_get(k_current_get()));
+	k_mutex_unlock(&cptra_api_mutex);
+}
+
+int cptra_api_transfer(enum cptra_ipc_cmd cmd, void *input,
+		       int input_size, enum cptra_ipc_rx_type type,
+		       void *output, int output_size)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = cptra_ipc_transfer(cmd, input, input_size, type, output,
+				 output_size);
+	cptra_api_unlock();
+
+	return ret;
+}
+
 // Refactor this function into init, update and final function.
-int cptra_sha384_init(void)
+static int sha384_init_internal(void)
 {
 	uint8_t *p8_bmcu_out = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_OUT_ADDR;
 	uint8_t *p8_bmcu_in = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
@@ -57,7 +88,7 @@ end:
 
 }
 
-int cptra_sha384_update(const char *msg, int msg_size)
+static int sha384_update_internal(const char *msg, int msg_size)
 {
 	uint8_t *p8_bmcu_out = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_OUT_ADDR;
 	uint8_t *p8_bmcu_in = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
@@ -100,7 +131,7 @@ end:
 	return ret;
 }
 
-int cptra_sha384_final(uint8_t *output, int output_size)
+static int sha384_final_internal(uint8_t *output, int output_size)
 {
 	uint8_t *p8_bmcu_out = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_OUT_ADDR;
 	uint8_t *p8_bmcu_in = (uint8_t *)IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
@@ -141,7 +172,8 @@ end:
 	return ret;
 }
 
-int cptra_sha384(const char *msg, int msg_size, uint8_t *output, int output_size)
+static int sha384_internal(const char *msg, int msg_size,
+			   uint8_t *output, int output_size)
 {
 #if defined(CONFIG_SKIP_CPTRA_FW_VERIFICATION)
 	// using mbedtls sha384 implementation to replace cptra sha384 for testing purpose when fw verification is skipped.
@@ -237,7 +269,7 @@ int cptra_verify_ecdsa_hashed(
 	return 0;
 }
 
-int cptra_verify_ecdsa(
+static int verify_ecdsa_internal(
 		const uint8_t *pubx, const uint8_t *puby,
 		const uint8_t *msg, size_t msg_len,
 		const uint8_t *sig_r, const uint8_t *sig_s)
@@ -340,7 +372,7 @@ int cptra_verify_lms_hashed(
 	return 0;
 }
 
-int cptra_verify_lms(
+static int verify_lms_internal(
 		const uint8_t *public_key,
 		const uint8_t *msg, size_t msg_len,
 		const uint8_t *signature)
@@ -367,6 +399,78 @@ int cptra_verify_lms(
 	}
 
 	return 0;
+}
+
+/* Public SHA384 and verify calls hold the lock for all steps */
+int cptra_sha384_init(void)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = sha384_init_internal();
+	cptra_api_unlock();
+
+	return ret;
+}
+
+int cptra_sha384_update(const char *msg, int msg_size)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = sha384_update_internal(msg, msg_size);
+	cptra_api_unlock();
+
+	return ret;
+}
+
+int cptra_sha384_final(uint8_t *output, int output_size)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = sha384_final_internal(output, output_size);
+	cptra_api_unlock();
+
+	return ret;
+}
+
+int cptra_sha384(const char *msg, int msg_size, uint8_t *output,
+		 int output_size)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = sha384_internal(msg, msg_size, output, output_size);
+	cptra_api_unlock();
+
+	return ret;
+}
+
+int cptra_verify_ecdsa(const uint8_t *pubx, const uint8_t *puby,
+		       const uint8_t *msg, size_t msg_len,
+		       const uint8_t *sig_r, const uint8_t *sig_s)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = verify_ecdsa_internal(pubx, puby, msg, msg_len, sig_r,
+				    sig_s);
+	cptra_api_unlock();
+
+	return ret;
+}
+
+int cptra_verify_lms(const uint8_t *public_key, const uint8_t *msg,
+		     size_t msg_len, const uint8_t *signature)
+{
+	int ret;
+
+	cptra_api_lock();
+	ret = verify_lms_internal(public_key, msg, msg_len, signature);
+	cptra_api_unlock();
+
+	return ret;
 }
 
 int cptra_get_cert_chain(void **cert_chain, size_t *cert_chain_size)
@@ -399,7 +503,7 @@ int cptra_set_auth_manifest(const struct cptra_set_auth_manifest_ia *input)
 	memcpy(input_buf, input, sizeof(*input_buf));
 	memset(output_buf, 0, sizeof(*output_buf));
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_SET_AUTH_MANIFEST,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_SET_AUTH_MANIFEST,
 				 input_buf, sizeof(*input_buf),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 output_buf, sizeof(*output_buf));
@@ -448,7 +552,7 @@ int cptra_authorize_and_stash(uint32_t fw_id, uint8_t digest[48], bool skip_stas
 		input->flags |= BIT(0); // SKIP_STASH
 	}
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_AUTHORIZE_AND_STASH,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_AUTHORIZE_AND_STASH,
 				 input, sizeof(*input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 output, sizeof(*output));
@@ -496,7 +600,7 @@ static void cptra_get_rt_alias_cert(struct cert_info *cached_cert)
 	memset(&input, 0, sizeof(struct cptra_get_rt_alias_cert_ia));
 	memset(&output, 0, sizeof(struct cptra_get_rt_alias_cert_oa));
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_GET_RT_ALIAS_CERT,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_GET_RT_ALIAS_CERT,
 				 (uint32_t *)&input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint32_t *)&output, sizeof(output));
@@ -531,7 +635,7 @@ static void cptra_get_fmc_alias_cert(struct cert_info *cached_cert)
 	memset(&input, 0, sizeof(struct cptra_get_fmc_alias_cert_ia));
 	memset(&output, 0, sizeof(struct cptra_get_fmc_alias_cert_oa));
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_GET_FMC_ALIAS_CERT,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_GET_FMC_ALIAS_CERT,
 				 (uint32_t *)&input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint32_t *)&output, sizeof(output));
@@ -566,7 +670,7 @@ static void cptra_get_ldev_cert(struct cert_info *cached_cert)
 	memset(&input, 0, sizeof(struct cptra_get_ldev_cert_ia));
 	memset(&output, 0, sizeof(struct cptra_get_ldev_cert_oa));
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_GET_LDEV_CERT,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_GET_LDEV_CERT,
 				 (uint32_t *)&input, sizeof(input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint32_t *)&output, sizeof(output));
@@ -753,7 +857,7 @@ static int cptra_get_dpe_cert_chain(uint8_t *chain, uint32_t capacity, uint32_t 
 		chain_input->offset = offset;
 		chain_input->size = sizeof(chain_output->cert_chain);
 
-		ret = cptra_ipc_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
+		ret = cptra_api_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
 					 (uint32_t *)input, sizeof(*input),
 					 CPTRA_IPC_RX_TYPE_EXTERNAL,
 					 (uint32_t *)output, sizeof(*output));
@@ -900,7 +1004,7 @@ int cptra_get_dpe_leaf_certificate(void **cert_data, uint32_t *cert_size)
 	memset(output, 0, sizeof(*output));
 
 	/* All-zero request: default context handle, flags 0, FORMAT_X509, empty label */
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_CERTIFY_KEY_EXTENDED,
 				 (uint32_t *)input, sizeof(*input),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint32_t *)output, sizeof(*output));

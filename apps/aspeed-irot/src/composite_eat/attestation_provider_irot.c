@@ -182,7 +182,7 @@ int sign_es384_digest(void *context, void *identity_handle,
 
 	LOG_HEXDUMP_INF(sign_input->digest, 48, "Signing digest:");
 
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
+	ret = cptra_api_transfer(CPTRA_IPCCMD_INVOKE_DPE_COMMAND,
 				 (uint8_t *)input, sizeof(struct cptra_invoke_dpe_command_ia),
 				 CPTRA_IPC_RX_TYPE_EXTERNAL,
 				 (uint8_t *)output, sizeof(struct cptra_invoke_dpe_command_oa));
