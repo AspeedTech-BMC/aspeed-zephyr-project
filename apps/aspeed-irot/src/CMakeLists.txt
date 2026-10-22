@@ -16,6 +16,7 @@ target_sources(app
 	image/caliptra_soc_manifest_v1.c
 
 	cptra/cptra_sample.c
+	cptra/cptra_pq_sample.c
 	cptra/cptra_idevid.c
 	cptra/cptra_vendor_key.c
 
