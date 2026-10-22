@@ -30,7 +30,7 @@
 #include <mctp/mctp_usb.h>
 #endif
 
-LOG_MODULE_REGISTER(mctp_eval, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(mctp_eval, CONFIG_MCTP_EVAL_LOG_LEVEL);
 
 /* DSP0236 reserves EIDs 1-7, and 255 is the broadcast EID */
 BUILD_ASSERT(CONFIG_MCTP_EVAL_LOCAL_EID == 0 || CONFIG_MCTP_EVAL_LOCAL_EID >= 8,
@@ -93,7 +93,8 @@ static void stats_add(uint32_t *counter, uint32_t n)
 	k_spin_unlock(&stats_lock, key);
 }
 
-static bool rx_dump = true;
+/* Packet trace: debug level, off until "mctp dump 1" */
+static bool rx_dump;
 static bool rx_echo;
 static atomic_t send_tag;
 
@@ -447,18 +448,18 @@ static void mctp_eval_capture(struct mctp_pktbuf *pkt, bool outgoing, void *user
 	const uint8_t *hdr = (const uint8_t *)mctp_pktbuf_hdr(pkt);
 	size_t len = mctp_pktbuf_size(pkt);
 
-	if (!rx_dump) {
+	if (!IS_ENABLED(CONFIG_MCTP_EVAL_LOG_LEVEL_DBG) || !rx_dump) {
 		return;
 	}
 
 	if (len < sizeof(struct mctp_hdr)) {
-		LOG_INF("%s %s %zu-byte runt", bus->name, outgoing ? "tx" : "rx", len);
+		LOG_DBG("%s %s %zu-byte runt", bus->name, outgoing ? "tx" : "rx", len);
 		return;
 	}
 
-	LOG_INF("%s %s pkt %zu bytes: dst 0x%02x src 0x%02x flags 0x%02x", bus->name,
+	LOG_DBG("%s %s pkt %zu bytes: dst 0x%02x src 0x%02x flags 0x%02x", bus->name,
 		outgoing ? "tx" : "rx", len, hdr[1], hdr[2], hdr[3]);
-	LOG_HEXDUMP_INF(hdr, len, outgoing ? "tx" : "rx");
+	LOG_HEXDUMP_DBG(hdr, len, outgoing ? "tx" : "rx");
 }
 
 /* Called from inside mctp_bus_rx(), with the bus lock held */
@@ -498,7 +499,7 @@ static void mctp_eval_rx(uint8_t src_eid, bool tag_owner, uint8_t msg_tag, void 
 	stats.bytes += len;
 	k_spin_unlock(&stats_lock, key);
 
-	LOG_INF("%s rx msg from eid 0x%02x: type 0x%02x, %zu bytes, %s tag %u", bus->name,
+	LOG_DBG("%s rx msg from eid 0x%02x: type 0x%02x, %zu bytes, %s tag %u", bus->name,
 		src_eid, type, len, tag_owner ? "request" : "response", msg_tag);
 
 	/* Echo requests only, never responses, so two echoing ends can't loop */
@@ -741,6 +742,10 @@ static int cmd_stats(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_dump(const struct shell *sh, size_t argc, char **argv)
 {
+	if (!IS_ENABLED(CONFIG_MCTP_EVAL_LOG_LEVEL_DBG)) {
+		shell_error(sh, "packet dump needs CONFIG_MCTP_EVAL_LOG_LEVEL_DBG=y");
+		return -ENOTSUP;
+	}
 	rx_dump = strtoul(argv[1], NULL, 0) != 0;
 	shell_print(sh, "packet dump %s", rx_dump ? "on" : "off");
 

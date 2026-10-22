@@ -138,6 +138,10 @@ config MCTP_EVAL_SPDM_ACK_TIMEOUT_MS
 	  shared window. Without one, the bridge leaves the request buffer
 	  alone and resynchronizes the channel before its next request.
 
+module = MCTP_EVAL
+module-str = MCTP eval
+source "subsys/logging/Kconfig.template.log_config"
+
 endmenu
 
 source "Kconfig.zephyr"
