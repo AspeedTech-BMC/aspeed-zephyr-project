@@ -18,7 +18,7 @@
 #define MPLL_CLKNR_MASK	GENMASK(18, 13)	/* NR - 1 */
 #define MPLL_CLKOD_MASK	GENMASK(22, 19)	/* OD - 1 */
 #define MPLL_LOCK_BIT		BIT(31)
-#define MPLL_LOCK_TIMEOUT_US	500000
+#define MPLL_LOCK_TIMEOUT_US	100000
 
 int tamper_init(int step, int diff);
 int tamper_check(void);
