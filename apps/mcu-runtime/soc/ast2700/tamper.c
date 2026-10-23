@@ -324,41 +324,80 @@ static uint32_t mpll_reg_for_m(int m)
 	return (MPLL_DEFAULT_REG_VAL & ~MPLL_CLKNF_MASK) | ((uint32_t)m & MPLL_CLKNF_MASK);
 }
 
+/* consecutive lock reads required before the MPLL counts as locked */
+#define MPLL_LOCK_STABLE_CNT	100
+
+/*
+ * Polls the MPLL lock bit until it reads locked MPLL_LOCK_STABLE_CNT times
+ * in a row, so a lock bit that is still toggling while the PLL settles is
+ * not taken as locked. Any unlocked read restarts the count. Returns 0 once
+ * locked, -ETIMEDOUT if that is not reached within timeout_us.
+ */
+static int mpll_wait_lock(uint32_t timeout_us)
+{
+	uint32_t start = k_cycle_get_32();
+	uint32_t timeout = k_us_to_cyc_ceil32(timeout_us);
+	int cnt = 0;
+
+	for (;;) {
+		if (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT) {
+			if (++cnt >= MPLL_LOCK_STABLE_CNT)
+				return 0;
+		} else {
+			cnt = 0;
+		}
+
+		if ((k_cycle_get_32() - start) > timeout)
+			return -ETIMEDOUT;
+
+		k_busy_wait(1);
+	}
+}
+
 /* Programs the full MPLL control word (M/NR/OD all preserved from the
  * caller), clearing only reset/bypass, and waits for re-lock.
  */
 static int mpll_program_nf(uint32_t reg_val)
 {
-	uint32_t reg;
-
 	sys_write32(reg_val, MPLL_CTRL_REG);
 
 	/* wait for the setting to propagate through the PLL and for the lock detector to see it */
 	k_busy_wait(2000);
 
-	return readl_poll_timeout(MPLL_STATUS_REG, reg, (reg & MPLL_LOCK_BIT),
-				   MPLL_LOCK_TIMEOUT_US);
+	return mpll_wait_lock(MPLL_LOCK_TIMEOUT_US);
 }
 
 /*
  * Reconfigures the full MPLL control word (new NF/NR/OD) via reset+bypass,
- * settling MPLL_SETTLE_US between each step, then confirms lock. Used both
- * to bring the PLL to its default operating point here and by
- * sdram_ast2700.c's sdramc_pll_reset() for a full table-driven reconfigure.
+ * settling MPLL_SETTLE_US between each step. Lock is confirmed after the
+ * reset is released while the PLL is still bypassed, so an unlocked PLL is
+ * never switched onto the MPLL output, and again after leaving bypass.
+ * Returns 0 when locked, -ETIMEDOUT otherwise (left in bypass if the PLL
+ * never locked out of reset).
  */
 static int mpll_reconfigure(uint32_t pll_para)
 {
-	uint32_t reg;
-
 	sys_write32(pll_para | MPLL_RESET_BIT | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
 	k_busy_wait(MPLL_SETTLE_US);
 	sys_write32(pll_para | MPLL_BYPASS_BIT, MPLL_CTRL_REG);
 	k_busy_wait(MPLL_SETTLE_US);
+
+	if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US)) {
+		LOG_ERR("pll reset: not locked after reset release, ctrl=0x%08x status=0x%08x",
+			sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
+		return -ETIMEDOUT;
+	}
+
 	sys_write32(pll_para, MPLL_CTRL_REG);
 	k_busy_wait(MPLL_SETTLE_US);
 
-	return readl_poll_timeout(MPLL_STATUS_REG, reg, (reg & MPLL_LOCK_BIT),
-				   MPLL_LOCK_TIMEOUT_US);
+	if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US)) {
+		LOG_ERR("pll reset: lock lost after bypass release, ctrl=0x%08x status=0x%08x",
+			sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
+		return -ETIMEDOUT;
+	}
+
+	return 0;
 }
 
 /*
@@ -409,7 +448,7 @@ static int mpll_try_m(int m, const char *phase)
  * fatal). Used to bring the PLL back to its default operating frequency
  * gradually - one count at a time - instead of jumping the control word
  * directly, which would otherwise re-glitch through any band edge in
- * between. Returns 0 if still locked at target_m, -1 otherwise.
+ * between. Returns 0 if still locked at target_m, -ETIMEDOUT otherwise.
  */
 static int mpll_step_to(int start_m, int target_m, const char *leg)
 {
@@ -421,7 +460,7 @@ static int mpll_step_to(int start_m, int target_m, const char *leg)
 		mpll_try_m(m, leg);
 	}
 
-	return (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT) ? 0 : -1;
+	return mpll_wait_lock(MPLL_LOCK_TIMEOUT_US);
 }
 
 int pll_calibration(int step, int diff)
@@ -430,15 +469,19 @@ int pll_calibration(int step, int diff)
 
 	LOG_INF("PLL calibration start");
 
-	if (!(sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT)) {
-		LOG_WRN("Power on pll is not locked");
-		k_busy_wait(MPLL_SETTLE_US);
-	}
+	/*
+	 * Give the power-on PLL time to lock. Not fatal: the reset below
+	 * reprograms it from scratch, the status is only reported.
+	 */
+	if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US))
+		LOG_WRN("Power on pll is not locked, ctrl=0x%08x status=0x%08x",
+			sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
 
-	// init pll to the default 1600MHz operating point via reset+bypass.
-	if (mpll_reconfigure(MPLL_DEFAULT_REG_VAL)) {
-		LOG_ERR("pll is not locking");
-		return -1;
+	/* init pll to the default 1600MHz operating point via reset+bypass. */
+	ret = mpll_reconfigure(MPLL_DEFAULT_REG_VAL);
+	if (ret) {
+		LOG_ERR("pll is not locking, err=%d", ret);
+		return ret;
 	}
 
 	/*
@@ -486,13 +529,13 @@ int pll_calibration(int step, int diff)
 
 	LOG_INF("PLL calibration done");
 
-	if (sys_read32(MPLL_STATUS_REG) & MPLL_LOCK_BIT) {
-		LOG_INF("PLL lock OK");
-		ret = 0;
-	} else {
-		LOG_ERR("PLL lock failed");
-		return -1;
+	ret = mpll_wait_lock(MPLL_LOCK_TIMEOUT_US);
+	if (ret) {
+		LOG_ERR("PLL lock failed, ctrl=0x%08x status=0x%08x",
+			sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
+		return ret;
 	}
+	LOG_INF("PLL lock OK");
 
 	tamper_init(step, diff);
 	if (sys_read32(TAMPER_STATUS_REG) & TAMPER_ALERT) {
