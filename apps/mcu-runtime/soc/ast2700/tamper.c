@@ -43,18 +43,37 @@ LOG_MODULE_REGISTER(tamper, CONFIG_SOC_FMC_LOG_LEVEL);
 #define MBUS_TEST_PAT_B			0x12345678U
 #define MBUS_TEST_PAT_C			0x89abcdefU
 
-/* The SCU scratch register is used to store the tamper retry count, tamper count, and unlock count.
- * The register is located at address 0x14c021a0. The tamper retry count is stored in bits [7:0],
- * the tamper count is stored in bits [15:8], and the unlock count is stored in bits [23:16].
- * The masks and shifts for each field are defined below.
+/* Word 8 of the 32-word SCU1_IO_SCRATCH firmware scratch pool (see
+ * SCU1_IO_SCRATCH_01.._32 in scu_ast2700.h), surviving a warm reset so it
+ * can be inspected post-mortem. One saturating byte counter per PLL
+ * lock-loss case, each independent of the others:
+ *  - power-on: MPLL was already unlocked when pll_calibration() started.
+ *  - reset: mpll_reconfigure() didn't relock after reset+bypass+program.
+ *  - step: number of mpll_step_to() legs in the shmoo sweep that lost lock.
  */
-#define SCU_SCRATCH_REG		0x14c021a0
-#define TAMPER_RETRY_CNT_SHIFT	0
-#define TAMPER_RETRY_CNT_MASK	(0xffU << TAMPER_RETRY_CNT_SHIFT)
-#define TAMPER_CNT_SHIFT	8
-#define TAMPER_CNT_MASK		(0xffU << TAMPER_CNT_SHIFT)
-#define UNLOCK_CNT_SHIFT	16
-#define UNLOCK_CNT_MASK		(0xffU << UNLOCK_CNT_SHIFT)
+#define SCU_PLL_LOCK_SCRATCH_REG	0x14c021a0
+#define PLL_POWERON_UNLOCK_CNT_SHIFT	0
+#define PLL_POWERON_UNLOCK_CNT_MASK	(0xffU << PLL_POWERON_UNLOCK_CNT_SHIFT)
+#define PLL_RESET_UNLOCK_CNT_SHIFT	8
+#define PLL_RESET_UNLOCK_CNT_MASK	(0xffU << PLL_RESET_UNLOCK_CNT_SHIFT)
+#define PLL_STEP_UNLOCK_CNT_SHIFT	16
+#define PLL_STEP_UNLOCK_CNT_MASK	(0xffU << PLL_STEP_UNLOCK_CNT_SHIFT)
+
+/* Adds delta to an 8-bit saturating counter field of a scratch register. */
+static void scratch_cnt_add(uint32_t reg, uint32_t mask, uint32_t shift, uint32_t delta)
+{
+	uint32_t scratch = sys_read32(reg);
+	uint32_t cnt = (scratch & mask) >> shift;
+
+	cnt = MIN(cnt + delta, 0xffU);
+	scratch = (scratch & ~mask) | (cnt << shift);
+	sys_write32(scratch, reg);
+}
+
+static void scratch_cnt_inc(uint32_t reg, uint32_t mask, uint32_t shift)
+{
+	scratch_cnt_add(reg, mask, shift, 1);
+}
 
 #define readl_poll_timeout(addr, val, cond, timeout_us) \
 ({ \
@@ -196,29 +215,13 @@ int tamper_check(void)
 	phyunlock = sys_read32(DDRPHY_UNLOCK_STATUS_REG);
 
 	if (tamper & TAMPER_ALERT) {
-		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
-		uint32_t cnt = (scratch & TAMPER_CNT_MASK) >> TAMPER_CNT_SHIFT;
-
 		LOG_WRN("Tamper Attention!!!");
 		LOG_INF("SCU_3b0=0x%x", sys_read32(FREQ_COUNTER_READBACK));
-
-		if (cnt < 0xff)
-			cnt++;
-		scratch = (scratch & ~TAMPER_CNT_MASK) | (cnt << TAMPER_CNT_SHIFT);
-		sys_write32(scratch, SCU_SCRATCH_REG);
 	}
 
 	if (phyunlock & UNLOCK_ALERT) {
-		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
-		uint32_t cnt = (scratch & UNLOCK_CNT_MASK) >> UNLOCK_CNT_SHIFT;
-
 		LOG_WRN("DDRPHY Unlock Attention!!!");
 		LOG_INF("SOC MPLL setting=0x%x, status=0x%08x", sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
-
-		if (cnt < 0xff)
-			cnt++;
-		scratch = (scratch & ~UNLOCK_CNT_MASK) | (cnt << UNLOCK_CNT_SHIFT);
-		sys_write32(scratch, SCU_SCRATCH_REG);
 
 		// clear ddrphy unlock status.
 		sys_write32(BIT(0), DDRPHY_UNLOCK_CLEAR_REG);
@@ -271,14 +274,6 @@ int tamper_init(int step, int diff)
 				sys_read32(FREQ_COUNTER_CTRL_REG),
 				sys_read32(FREQ_COUNTER_READBACK));
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
-
-		uint32_t scratch = sys_read32(SCU_SCRATCH_REG);
-		uint32_t cnt = (scratch & TAMPER_RETRY_CNT_MASK) >> TAMPER_RETRY_CNT_SHIFT;
-
-		if (cnt < 0xff)
-			cnt++;
-		scratch = (scratch & ~TAMPER_RETRY_CNT_MASK) | (cnt << TAMPER_RETRY_CNT_SHIFT);
-		sys_write32(scratch, SCU_SCRATCH_REG);
 	}
 
 	return reg & TAMPER_ALERT;
@@ -466,6 +461,7 @@ static int mpll_step_to(int start_m, int target_m, const char *leg)
 int pll_calibration(int step, int diff)
 {
 	int ret = 0;
+	uint32_t cnt = 0;
 
 	LOG_INF("PLL calibration start");
 
@@ -473,14 +469,17 @@ int pll_calibration(int step, int diff)
 	 * Give the power-on PLL time to lock. Not fatal: the reset below
 	 * reprograms it from scratch, the status is only reported.
 	 */
-	if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US))
+	if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US)) {
 		LOG_WRN("Power on pll is not locked, ctrl=0x%08x status=0x%08x",
 			sys_read32(MPLL_CTRL_REG), sys_read32(MPLL_STATUS_REG));
+		scratch_cnt_inc(SCU_PLL_LOCK_SCRATCH_REG, PLL_POWERON_UNLOCK_CNT_MASK, PLL_POWERON_UNLOCK_CNT_SHIFT);
+	}
 
 	/* init pll to the default 1600MHz operating point via reset+bypass. */
 	ret = mpll_reconfigure(MPLL_DEFAULT_REG_VAL);
 	if (ret) {
 		LOG_ERR("pll is not locking, err=%d", ret);
+		scratch_cnt_inc(SCU_PLL_LOCK_SCRATCH_REG, PLL_RESET_UNLOCK_CNT_MASK, PLL_RESET_UNLOCK_CNT_SHIFT);
 		return ret;
 	}
 
@@ -497,35 +496,55 @@ int pll_calibration(int step, int diff)
 		if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M + i, "up1")) {
 			LOG_WRN("pll failed to i=%d:up1 upper frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
+			if (cnt < 0xff)
+				cnt++;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M + i, (int)MPLL_DEFAULT_M, "down1")) {
 			LOG_WRN("pll failed to i=%d:down1 default frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
+			if (cnt < 0xff)
+				cnt++;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M - i, "down2")) {
 			LOG_WRN("pll failed to i=%d:down2 lower frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
+			if (cnt < 0xff)
+				cnt++;
 		}
 		if (mpll_step_to((int)MPLL_DEFAULT_M - i, (int)MPLL_DEFAULT_M, "up2")) {
 			LOG_WRN("pll failed to i=%d:up2 default frequency", i);
 			LOG_INF("pll lock status=0x%x", sys_read32(MPLL_STATUS_REG));
+			if (cnt < 0xff)
+				cnt++;
 		}
 	}
 
 #elif defined(PLL_ALL_BAND_SCAN_DOWNUP)
 	if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M - MPLL_SHMOO_STEPS, "down2")) {
 		LOG_WRN("pll failed to down2 lower frequency");
+		if (cnt < 0xff)
+			cnt++;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M - MPLL_SHMOO_STEPS, (int)MPLL_DEFAULT_M, "up2")) {
 		LOG_WRN("pll failed to up2 default frequency");
+		if (cnt < 0xff)
+			cnt++;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M, (int)MPLL_DEFAULT_M + MPLL_SHMOO_STEPS, "up1")) {
 		LOG_WRN("pll failed to up1 upper frequency");
+		if (cnt < 0xff)
+			cnt++;
 	}
 	if (mpll_step_to((int)MPLL_DEFAULT_M + MPLL_SHMOO_STEPS, (int)MPLL_DEFAULT_M, "down1")) {
 		LOG_WRN("pll failed to down1 default frequency");
+		if (cnt < 0xff)
+			cnt++;
 	}
 #endif
+
+	if (cnt)
+		scratch_cnt_add(SCU_PLL_LOCK_SCRATCH_REG, PLL_STEP_UNLOCK_CNT_MASK,
+				 PLL_STEP_UNLOCK_CNT_SHIFT, cnt);
 
 	LOG_INF("PLL calibration done");
 
