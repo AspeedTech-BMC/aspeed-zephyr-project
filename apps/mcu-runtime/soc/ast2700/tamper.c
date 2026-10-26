@@ -398,7 +398,9 @@ static int mpll_reconfigure(uint32_t pll_para)
 /*
  * Program M=m, wait for the glitch detector to observe the new frequency,
  * and report/clear a trip. Returns 0 if the step passed cleanly, -1 if the
- * PLL dropped lock or the tamper glitch detector tripped.
+ * PLL dropped lock (or a tamper alert got stuck and couldn't be cleared),
+ * -2 if a tamper trip occurred but cleared normally - expected when
+ * crossing a band edge, and not fatal to the caller.
  */
 static int mpll_try_m(int m, const char *phase)
 {
@@ -408,26 +410,28 @@ static int mpll_try_m(int m, const char *phase)
 	tamper_init(0, 8);
 
 	if (mpll_program_nf(reg)) {
-		LOG_INF("PLL shmoo (%s): lock lost at M=%d (%u.%03uMHz)",
+		LOG_WRN("PLL sweep (%s): lock lost at M=%d (%u.%03uMHz)",
 		       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 		return -1;
 	}
 
 	if (sys_read32(TAMPER_STATUS_REG) & TAMPER_ALERT) {
-		LOG_INF("PLL shmoo (%s): tamper trip at M=%d (%u.%03uMHz)",
+		LOG_WRN("PLL sweep (%s): tamper trip at M=%d (%u.%03uMHz)",
 		       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
 		if (readl_poll_timeout(TAMPER_STATUS_REG, reg, !(reg & TAMPER_ALERT),
-				       TAMPER_CLEAR_TIMEOUT_US))
-			LOG_INF("PLL shmoo (%s): tamper alert stuck at M=%d", phase, m);
-		return -1;
+				       TAMPER_CLEAR_TIMEOUT_US)) {
+			LOG_ERR("PLL sweep (%s): tamper alert stuck at M=%d", phase, m);
+			return -1;
+		}
+		return -2;
 	}
 
-	LOG_INF("PLL shmoo (%s): M=%d (%u.%03uMHz) OK",
+	LOG_INF("PLL sweep (%s): M=%d (%u.%03uMHz) OK",
 	       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 #else
 	if (mpll_program_nf(reg)) {
-		LOG_INF("PLL shmoo (%s): lock lost at M=%d (%u.%03uMHz)",
+		LOG_WRN("PLL sweep (%s): lock lost at M=%d (%u.%03uMHz)",
 		       phase, m, MPLL_M_TO_MHZ(m), MPLL_M_TO_KHZ_FRAC(m));
 		return -1;
 	}
@@ -438,24 +442,32 @@ static int mpll_try_m(int m, const char *phase)
 
 /*
  * Steps M by 1 count per iteration from start_m to target_m (inclusive),
- * settling and checking lock at each step via mpll_try_m() (trips crossed
- * along the way are expected re-entering band 1 and are only logged, not
- * fatal). Used to bring the PLL back to its default operating frequency
- * gradually - one count at a time - instead of jumping the control word
- * directly, which would otherwise re-glitch through any band edge in
- * between. Returns 0 if still locked at target_m, -ETIMEDOUT otherwise.
+ * settling and checking lock at each step via mpll_try_m(). An expected
+ * tamper trip that clears normally (-2) is only logged, but a real lock
+ * loss at any step (-1), or at the final target_m, fails the whole leg.
+ * Used to bring the PLL back to its default operating frequency gradually
+ * - one count at a time - instead of jumping the control word directly,
+ * which would otherwise re-glitch through any band edge in between.
+ * Checks the final position even when start_m == target_m (no stepping).
+ * Returns 0 if every step and the final position stayed locked, -1
+ * otherwise.
  */
 static int mpll_step_to(int start_m, int target_m, const char *leg)
 {
 	int direction = (target_m >= start_m) ? 1 : -1;
 	int m = start_m;
+	int err = 0;
 
 	while (m != target_m) {
 		m += direction;
-		mpll_try_m(m, leg);
+		if (mpll_try_m(m, leg) == -1)
+			err = -1;
 	}
 
-	return mpll_wait_lock(MPLL_LOCK_TIMEOUT_US);
+	if (mpll_wait_lock(MPLL_LOCK_TIMEOUT_US))
+		err = -1;
+
+	return err;
 }
 
 int pll_calibration(int step, int diff)
