@@ -5,6 +5,7 @@
 # path before this file runs. Export the same headers to C sources.
 zephyr_include_directories(include)
 
+add_subdirectory(soc/ast27xx)
 add_subdirectory(drivers)
 
 # The libraries and modules the repository root module provides on the vendor

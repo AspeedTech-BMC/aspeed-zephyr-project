@@ -1,0 +1,9 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+if SOC_AST2700_BOOTMCU
+
+configdefault REBOOT
+	default y
+
+endif # SOC_AST2700_BOOTMCU
