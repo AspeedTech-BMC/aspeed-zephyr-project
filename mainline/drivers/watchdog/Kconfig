@@ -1,0 +1,13 @@
+# Copyright (c) 2023 ASPEED Technology Inc. <chin-ting_kuo@aspeedtech.com>
+# SPDX-License-Identifier: Apache-2.0
+
+if WATCHDOG
+
+config WDT_ASPEED
+	bool "ASPEED WDT Driver"
+	default y
+	depends on DT_HAS_ASPEED_AST2700_WATCHDOG_ENABLED
+	help
+	  Enable ASPEED AST2700 WDT controller driver.
+
+endif # WATCHDOG
