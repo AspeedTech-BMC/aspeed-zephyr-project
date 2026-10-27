@@ -16,4 +16,7 @@ config SCU_POLICY_CTRL
 	  If enabled, the SCU Policy Control driver will be initialized
 	  during system boot.
 
+configdefault CRYPTO
+	default y if DT_HAS_ASPEED_CPTRA_ECDSA_ENABLED && DT_HAS_ASPEED_CPTRA_LMS_ENABLED
+
 endif # SOC_AST2700_BOOTMCU
