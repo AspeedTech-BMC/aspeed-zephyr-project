@@ -5,6 +5,8 @@
 # path before this file runs. Export the same headers to C sources.
 zephyr_include_directories(include)
 
+add_subdirectory(drivers)
+
 # The libraries and modules the repository root module provides on the vendor
 # Zephyr tree. The root module is not loaded with upstream Zephyr, because its
 # board root holds boards for SoCs upstream Zephyr does not define.

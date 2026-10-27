@@ -8,5 +8,7 @@ config ASPEED_ZEPHYR_MAINLINE
 	  Application code uses it only where upstream Zephyr lacks an interface
 	  the vendor Zephyr tree has.
 
+rsource "drivers/Kconfig"
+
 # The library options of the repository root module.
 rsource "../Kconfig"
