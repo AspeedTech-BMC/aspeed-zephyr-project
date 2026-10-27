@@ -1,0 +1,9 @@
+# Copyright (c) 2025 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config OTP_AST27XX
+	bool "ASPEED AST27XX OTP"
+	default y
+	depends on DT_HAS_ASPEED_AST27XX_OTP_ENABLED
+	help
+	  Enable the OTP utility for ASPEED AST27XX SoCs.
