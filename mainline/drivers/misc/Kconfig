@@ -7,3 +7,11 @@ config OTP_AST27XX
 	depends on DT_HAS_ASPEED_AST27XX_OTP_ENABLED
 	help
 	  Enable the OTP utility for ASPEED AST27XX SoCs.
+
+config PRIVILEGE_CTRL
+	bool "Enable ASPEED privilege control"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_PRICTRL_ENABLED
+	help
+	  This option enables privilege control for aspeed
+	  board isolation.
