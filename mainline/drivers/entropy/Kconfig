@@ -1,0 +1,31 @@
+# Copyright (c) 2023 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# The vendor A2 board enables both entropy devices. Express those defaults
+# through enabled DT nodes, since upstream's board does not know these drivers.
+configdefault ENTROPY_GENERATOR
+	default y if DT_HAS_ASPEED_HWRNG_ENABLED || DT_HAS_ASPEED_AST2700_NISTTRNG_ENABLED
+
+if ENTROPY_GENERATOR
+
+config ENTROPY_ASPEED_TRNG
+	bool "Aspeed TRNG driver"
+	default y
+	depends on DT_HAS_ASPEED_HWRNG_ENABLED
+	select ENTROPY_HAS_DRIVER
+	help
+	  This option enables the true random number generator
+	  driver based on the SCU HWRNG.
+
+config ENTROPY_ASPEED_NISTTRNG
+	bool "Aspeed AST2700 NIST TRNG driver"
+	default y
+	depends on DT_HAS_ASPEED_AST2700_NISTTRNG_ENABLED
+	select ENTROPY_HAS_DRIVER
+	help
+	  Enable the NIST SP 800-90A compliant CTR_DRBG (AES-256) TRNG
+	  driver for the AST2700 SoC. This driver uses the dedicated NIST
+	  TRNG hardware block, which is distinct from the legacy SCU HWRNG
+	  used by ENTROPY_ASPEED_TRNG.
+
+endif # ENTROPY_GENERATOR
