@@ -1,0 +1,14 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+if CLOCK_CONTROL
+
+# Upstream's CLOCK_CONTROL_AST27XX controls SCU1 only.
+config CLOCK_CONTROL_AST27XX_SCU0
+	bool "ASPEED AST27XX SCU0 clock control driver"
+	default y
+	depends on DT_HAS_ASPEED_AST27XX_SCU0_CLOCK_ENABLED
+	help
+	  Enable the SCU0 clock driver for ASPEED AST27XX series SoCs.
+
+endif # CLOCK_CONTROL
