@@ -1,0 +1,37 @@
+# Copyright (c) 2021 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Selecting SPI here avoids a dependency cycle through entropy over SPI,
+# CSPRNG, PSA crypto, FLASH_MAP and FLASH_HAS_DRIVER_ENABLED.
+config SPI_ASPEED
+	bool "ASPEED SPI(FMC) driver"
+	depends on DT_HAS_ASPEED_AST2700_SPI_LITE_CONTROLLER_ENABLED
+	depends on FLASH
+	select SPI
+	select SPI_NOR_MULTI_DEV
+	help
+	  Enable ASPEED SPI(FMC) controller driver.
+
+config SPI_DMA_SUPPORT_ASPEED
+	bool "Enable ASPEED SPI DMA"
+	depends on SPI_ASPEED
+	default n
+	help
+	  Enable ASPEED SPI DMA. Both flash and RAM start addresses must
+	  be 4-byte aligned.
+
+config SPI_DMA_WRITE_SUPPORT_ASPEED
+	bool "Enable ASPEED SPI write DMA"
+	depends on SPI_ASPEED && SPI_DMA_SUPPORT_ASPEED
+	default n
+	help
+	  Enable ASPEED SPI write DMA.
+
+config SPI_ASPEED_DMA_POLLING_MODE
+	bool
+	depends on SPI_ASPEED && SPI_DMA_SUPPORT_ASPEED
+	depends on DT_HAS_ASPEED_AST2700_SPI_LITE_CONTROLLER_ENABLED
+	default y
+	help
+	  Force polling mode for ASPEED SPI DMA on BootMCU.
+

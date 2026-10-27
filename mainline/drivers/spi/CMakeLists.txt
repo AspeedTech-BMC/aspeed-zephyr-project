@@ -1,0 +1,8 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+if(CONFIG_SPI_ASPEED)
+  zephyr_library()
+  zephyr_library_include_directories(${ZEPHYR_BASE}/drivers/spi)
+  zephyr_library_sources(spi_aspeed.c spi_aspeed_pin_config.c)
+endif()
