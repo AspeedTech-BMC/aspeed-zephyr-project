@@ -1,0 +1,12 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Zephyr module for building the applications of this repository with
+# upstream Zephyr. Builds with the vendor Zephyr tree use the module at the
+# repository root instead and never load this one.
+name: aspeed-mainline
+build:
+  kconfig: Kconfig
+  cmake: .
+  settings:
+    dts_root: .

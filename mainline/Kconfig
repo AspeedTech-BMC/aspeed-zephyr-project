@@ -1,0 +1,12 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config ASPEED_ZEPHYR_MAINLINE
+	def_bool y
+	help
+	  Set when the application builds with upstream Zephyr and this module.
+	  Application code uses it only where upstream Zephyr lacks an interface
+	  the vendor Zephyr tree has.
+
+# The library options of the repository root module.
+rsource "../Kconfig"
