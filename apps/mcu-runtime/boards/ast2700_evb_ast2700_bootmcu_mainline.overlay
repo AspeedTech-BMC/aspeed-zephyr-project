@@ -1,0 +1,137 @@
+#include <aspeed/ast27xx_bootmcu_app.dtsi>
+
+/ {
+	chosen {
+		zephyr,console = &uart12;
+		zephyr,shell-uart = &uart12;
+		zephyr,custom-stack = &loader_stack;
+		aspeed,peri-desc = &peri_desc;
+		aspeed,dma-pool = &dma_pool;
+		aspeed,usb-desc = &usb_desc;
+	};
+
+	/* sized to CONFIG_MAIN_STACK_SIZE (16KB), top kept at 0x14bbd000 */
+	loader_stack: stack@14bb9000 {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bb9000 0x4000>;
+		zephyr,memory-region = "CUSTOM_STACK";
+	};
+
+	dma_pool: memory@14bbd0e0 {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bbd0e0 0x1000>;
+		zephyr,memory-region = "DMA_POOL";
+	};
+
+	peri_desc: memory@14bbe700 {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bbe700 0x520>;
+		zephyr,memory-region = "PERI_DESC";
+	};
+
+	usb_desc: memory@14bbed4c {
+		compatible = "zephyr,memory-region";
+		reg = <0x14bbed4c 0x154>;
+		zephyr,memory-region = "USB_DESC";
+	};
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		espi_mmbi_memory: espi-mmbi-memory@a8000000 {
+			reg = <0xa8000000 0x4000000>;
+			no-map;
+		};
+
+		ssp_memory: ssp-memory@ac000000 {
+			reg = <0xac000000 0x2000000>;
+			no-map;
+			bootph-all;
+		};
+
+		tsp_memory: tsp-memory@ae000000 {
+			reg = <0xae000000 0x2000000>;
+			no-map;
+			bootph-all;
+		};
+
+		atf: trusted-firmware-a@b0000000 {
+			reg = <0xb0000000 0x80000>;
+			no-map;
+			bootph-all;
+		};
+
+		optee_core: optee-core@b0080000 {
+			reg = <0xb0080000 0x1000000>;
+			no-map;
+			bootph-all;
+		};
+
+		ipc_ssp_share: ipc-ssp-share@b1080000 {
+			reg = <0xb1080000 0x800000>;
+			no-map;
+			bootph-all;
+		};
+
+		vbios_base0: vbios-base0@b1bb0000 {
+			reg = <0xb1bb0000 0x10000>;
+			no-map;
+			bootph-all;
+		};
+
+		vbios_base1: vbios-base1@b1bc0000 {
+			reg = <0xb1bc0000 0x10000>;
+			no-map;
+			bootph-all;
+		};
+
+		mctp0_reserved: mctp0-reserved@b1bd0000 {
+			reg = <0xb1bd0000 0x10000>;
+			no-map;
+		};
+
+		mctp1_reserved: mctp1-reserved@b1be0000 {
+			reg = <0xb1be0000 0x10000>;
+			no-map;
+		};
+
+		mctp2_reserved: mctp2-reserved@b1bf0000 {
+			reg = <0xb1bf0000 0x10000>;
+			no-map;
+		};
+	};
+};
+
+/* grow RAM up to loader_stack */
+&sram {
+	reg = <0x14b80000 0x39000>;
+};
+
+&emmc {
+	status = "okay";
+};
+
+&fmc {
+	status = "okay";
+	timing-calibration-disabled;
+};
+
+&fmc_cs0 {
+	status = "okay";
+	spi-max-buswidth = <1>;
+	spi-max-frequency = <25000000>;
+};
+
+&pin_fwspics0  { drive-strength = <2>; };
+&pin_fwspiclk  { drive-strength = <2>; };
+&pin_fwspimosi { drive-strength = <2>; };
+&pin_fwspimiso { drive-strength = <2>; };
+&pin_fwspidq2  { drive-strength = <2>; };
+&pin_fwspidq3  { drive-strength = <2>; };
+
+/* boot watchdog, enabled by the mcu-runtime and never fed */
+&wdt0 {
+	status = "okay";
+};

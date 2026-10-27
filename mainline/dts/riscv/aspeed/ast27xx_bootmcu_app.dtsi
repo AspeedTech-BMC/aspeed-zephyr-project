@@ -1,0 +1,564 @@
+/*
+ * Copyright (c) 2024 Aspeed Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* App additions to the upstream AST2700 BootMCU devicetree.
+ * Selected from the vendor ast27xx.dtsi and AST2700 BootMCU board DTS,
+ * using the mcu-runtime A2 build snapshot. Keep the vendor compatibles.
+ */
+#include <dt-bindings/clock/ast27xx_app_clock.h>
+#include <dt-bindings/memory-controller/ast27xx-mpu.h>
+#include <dt-bindings/misc/ast27xx_prictrl.h>
+#include <dt-bindings/reset/ast27xx_reset.h>
+#include <dt-bindings/pinctrl/ast27xx-soc1-pinctrl-groups.h>
+#include <dt-bindings/pinctrl/ast27xx-soc1-pinctrl.h>
+
+/ {
+	chosen {
+		zephyr,entropy = &rng;
+	};
+
+	aliases {
+		systick = &mtimer;
+		emmc = &emmc;
+	};
+
+	ca35_s: ca35-s {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "ca35-s";
+		protect-start = <0x30000000>;
+		protect-end = <0x31080000>;
+		allow = <MPU_ID_CA35 S_READWRITE>, < MPU_ID_SLIM S_READWRITE>;
+		status = "okay";
+	};
+
+	ssp: ssp {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "ssp";
+		protect-start = <0x2c000000>;
+		protect-end = <0x2d000000>;
+		allow = <MPU_ID_SSP_INST S_READONLY>,
+			<MPU_ID_SSP_DATA S_READWRITE>,
+			<MPU_ID_SLIM S_READWRITE>;
+
+		sli_port {
+			allow = <MPU_ID_BOOTMCU S_READWRITE>;
+		};
+
+		status = "okay";
+	};
+
+	tsp: tsp {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "tsp";
+		protect-start = <0x2e000000>;
+		protect-end = <0x30000000>;
+		allow = <MPU_ID_TSP_INST S_READONLY>,
+			<MPU_ID_TSP_DATA S_READWRITE>,
+			<MPU_ID_SLIM S_READWRITE>;
+		status = "okay";
+	};
+
+	share_1: share-1 {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "share-1";
+		protect-start = <0x31080000>;
+		protect-end = <0x31480000>;
+		allow = <MPU_ID_SSP_DATA S_READONLY>,
+			<MPU_ID_CA35 S_READWRITE>;
+		status = "okay";
+	};
+
+	share_2: share-2 {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "share-2";
+		protect-start = <0x31480000>;
+		protect-end = <0x31880000>;
+		allow = <MPU_ID_SSP_DATA S_READONLY>,
+			<MPU_ID_CA35 NS_READWRITE>;
+		status = "okay";
+	};
+
+	share_3: share-3 {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "share-3";
+		protect-start = <0x31880000>;
+		protect-end = <0x31b30000>;
+		allow = <MPU_ID_SLIM S_READWRITE>,
+			<MPU_ID_CA35 NS_READWRITE>;
+		status = "okay";
+	};
+
+	vb: v-bios {
+		compatible = "aspeed,ast27xx-mpu";
+		#mpu-cells = <0>;
+		protect-name = "v-bios";
+		protect-start = <0x31bb0000>;
+		protect-end = <0x31bd0000>;
+		allow = <MPU_ID_E2M S_READONLY>,
+			<MPU_ID_E2M1 S_READONLY>,
+			<MPU_ID_SLIM S_READWRITE>;
+		status = "okay";
+	};
+
+	prictrl_bootmcu: prictrl-bootmcu {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <IO_S_I_PRICTRL WRITE_PROT>,
+			      <C_S_C_PRICTRL WRITE_PROT>,
+			      <IO_S_I_SRAM WRITE_PROT>;
+		status = "okay";
+	};
+
+	prictrl_ssp: prictrl-ssp {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <>;
+		status = "okay";
+	};
+
+	prictrl_tsp: prictrl-tsp {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <>;
+		status = "okay";
+	};
+
+	prictrl_s_ca35: prictrl-secure-ca35 {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <>;
+		status = "okay";
+	};
+
+	prictrl_ns_ca35: prictrl-non-secure-ca35 {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <>;
+		status = "okay";
+	};
+
+	prictrl_dp: prictrl-dp {
+		compatible = "aspeed,prictrl-prot";
+		protect-dev = <>;
+		status = "okay";
+	};
+
+	/* Configuration nodes without MMIO ranges belong outside simple-bus. */
+	pcie0: pcie0 {
+		compatible = "aspeed,ast27xx-pcie";
+		vga = "MSI";
+		ehci = "INTx";
+		xhci = "INTx";
+	};
+
+	pcie1: pcie1 {
+		compatible = "aspeed,ast27xx-pcie";
+		vga = "MSI";
+		ehci = "INTx";
+		xhci = "INTx";
+	};
+
+	soc {
+
+		emmc: sdhci@12090000 {
+			compatible = "aspeed,sdhci";
+			reg = <0x12090000 0x200>;
+			clocks = <&sysclk0 SCU0_CLK_GATE_EMMCCLK>;
+			resets = <&sysrst0 SCU0_RESET_EMMC>;
+			status = "disabled";
+		};
+
+		sdrammc: memory-controller@12c00000 {
+			compatible = "aspeed,ast27xx-sdrammc";
+			reg = <0x12c00000 0x1000>;
+			status = "disabled";
+		};
+
+		syscon0: syscon@12c02000 {
+			compatible = "syscon";
+			reg = <0x12c02000 0x1000>;
+
+			sysrst0: reset-controller {
+				compatible = "aspeed,ast27xx-reset";
+				#reset-cells = <1>;
+			};
+
+			sysclk0: system-clock {
+				compatible = "aspeed,ast27xx-scu0-clock";
+				#clock-cells = <1>;
+			};
+		};
+
+		ufs: ufshc@12c08000 {
+			compatible = "aspeed,ast2700-ufs";
+			reg = <0x12c08000 0x100>;
+			clocks = <&sysclk0 SCU0_CLK_GATE_UFSCLK>;
+			resets = <&sysrst0 SCU0_RESET_UFS>;
+			status = "disabled";
+		};
+
+		prictrl0: prictrl@12140000 {
+			compatible = "aspeed,prictrl";
+			reg = <0x12140000 0x400>;
+			aspeed,scu = <&syscon0>;
+			mlist1 = <C_M_SSP_S_USER RW_PROT>, <C_M_SSP_S_PRI RW_PROT>;
+			mlist2 = <C_M_TSP_S_USER RW_PROT>, <C_M_TSP_S_PRI RW_PROT>;
+			mlist3 = <C_M_CPU_S_PRI RW_PROT>, <C_M_CPU_S_USER RW_PROT>;
+			mlist4 = <C_M_CPU_NS_PRI RW_PROT>, <C_M_CPU_NS_USER RW_PROT>;
+			mlist5 = <C_M_DP_MCU RW_PROT>;
+			status = "disabled";
+		};
+
+		usb0: usb@12010000 {
+			compatible = "aspeed,ast27xx-usb";
+			reg = <0x12010000 0xC0>, <0x12011000 0x820>, <0x12061800 0x90>;
+			reg-names = "phy3", "phy2", "ehci";
+			usb-function = "EHCI_VHUB_AND_XHCI_PHY";
+		};
+
+		usb1: usb@12020000 {
+			compatible = "aspeed,ast27xx-usb";
+			reg = <0x12020000 0xC0>, <0x12021000 0x820>, <0x12063800 0x90>;
+			reg-names = "phy3", "phy2", "ehci";
+			usb-function = "EHCI_VHUB_AND_XHCI_PHY";
+		};
+
+		fmc: spi@14000000 {
+			compatible = "aspeed,ast2700-spi-lite-controller";
+			reg = <0x14000000 0x200>, <0x20000000 0x10000000>;
+			reg-names = "ctrl_reg", "spi_mmap";
+			clocks = <&sysclk1 ASPEED_VENDOR_SCU1_CLK_AHB>;
+			num-cs = <3>;
+			ctrl-type = "bspi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			spi-ctrl-caps-mask = <0x000e0e0c>;
+			pinctrl-0 = <pinctrl_fwspi_default pinctrl_fwspi_quad_default>;
+			pinctrl-names = "default";
+
+			fmc_cs0: fmc@0 {
+				compatible = "jedec,spi-nor";
+				reg = <0>;
+				spi-max-buswidth = <1>;
+				spi-max-frequency = <25000000>;
+				jedec-id = [];
+				write-block-size = <4096>;
+			};
+		};
+
+		edaf_bridge_cfg: edaf-bridge-cfg@140ec100 {
+			compatible = "aspeed,ast2700-edaf-bridge-cfg";
+			reg = <0x140ec100 0x100>;
+		};
+
+		rng: hwrng@14c020f0 {
+			compatible = "aspeed,hwrng";
+			reg = <0x14c020f0 0x8>;
+		};
+
+		nisttrng: nisttrng@14c3b000 {
+			compatible = "aspeed,ast2700-nisttrng";
+			reg = <0x14c3b000 0x40>;
+			status = "disabled";
+		};
+
+		otp: otp@14c07000 {
+			compatible = "aspeed,ast27xx-otp";
+			reg = <0x14c07000 0x1000>;
+			aspeed,scu = <&syscon1>;
+			status = "disabled";
+		};
+
+		edaf_bridge0: edaf-bridge@14c38000 {
+			compatible = "aspeed,edaf-bridge";
+			reg = <0x14c38000 0x200>;
+			aspeed,scu = <&syscon1>;
+			aspeed,edaf_bridge_cfg= <&edaf_bridge_cfg>;
+			status = "disabled";
+		};
+
+		edaf_bridge1: edaf-bridge@14c38200 {
+			compatible = "aspeed,edaf-bridge";
+			reg = <0x14c38200 0x200>;
+			aspeed,scu = <&syscon1>;
+			aspeed,edaf_bridge_cfg= <&edaf_bridge_cfg>;
+			status = "disabled";
+		};
+
+		ipc1: bus@14c39000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "simple-bus";
+			ranges = <0 0x14c39000 0x1000>;
+
+			ipc1_ns_ca35: ipc1@200 {
+				compatible = "aspeed,bootmcu-ipc";
+				reg = <0x200 0x200>;
+				reg-tx-offset = <0x100>;
+				reg-rx-offset = <0x0>;
+				status = "disabled";
+			};
+
+			ipc1_ssp: ipc1@400 {
+				compatible = "aspeed,bootmcu-ipc";
+				reg = <0x400 0x200>;
+				reg-tx-offset = <0x100>;
+				reg-rx-offset = <0x0>;
+				status = "disabled";
+			};
+
+		};
+
+		cptra_mbox: cptra-mbox@14c60000 {
+			compatible = "aspeed,cptra-mbox";
+			reg = <0x14c60000 0x1000>;
+			aspeed,scu = <&syscon1>;
+			aspeed,cptra-ifc = <&cptra_ifc>;
+
+			cptra_ecdsa: cptra-ecdsa {
+				compatible = "aspeed,cptra-ecdsa";
+				status = "disabled";
+			};
+
+			cptra_lms: cptra-lms {
+				compatible = "aspeed,cptra-lms";
+				status = "disabled";
+			};
+
+			cptra_update: cptra-update {
+				compatible = "aspeed,cptra-update";
+				status = "disabled";
+			};
+
+			cptra_dice: cptra-dice {
+				compatible = "aspeed,cptra-dice";
+				status = "disabled";
+			};
+
+			cptra_misc: cptra-misc {
+				compatible = "aspeed,cptra-misc";
+				status = "disabled";
+			};
+		};
+
+		cptra_sha: cptra-sha@14c61000 {
+			compatible = "aspeed,cptra-sha";
+			reg = <0x14c61000 0x1000>;
+			aspeed,scu = <&syscon1>;
+			status = "disabled";
+		};
+
+		cptra_ifc: cptra-ifc@14c70000 {
+			compatible = "aspeed,cptra-ifc";
+			reg = <0x14c70000 0x1000>;
+		};
+
+		wdt0: wdt@14c37000 {
+			compatible = "aspeed,ast2700-watchdog";
+			reg = <0x14c37000 0x80>;
+			aspeed,scu0 = <&syscon0>;
+			aspeed,scu1 = <&syscon1>;
+			reset-mask = <0x8207ff79 0x000003f6 0x000093ec 0x40303803 0x00320000>;
+			status = "disabled";
+		};
+
+		prictrl1: prictrl@14100000 {
+			compatible = "aspeed,prictrl";
+			reg = <0x14100000 0x400>;
+			aspeed,scu = <&syscon0>;
+			mlist0 = <IO_M_MCU0_D RW_PROT>;
+			status = "disabled";
+		};
+	};
+};
+
+&syscon1 {
+	sysrst1: reset-controller {
+		compatible = "aspeed,ast27xx-reset";
+		#reset-cells = <1>;
+	};
+
+	pinctrl1: pinctrl {
+		compatible = "aspeed,g7-soc1-pinctrl";
+
+		/omit-if-no-ref/ pin_fwspics0: pin_fwspics0 {
+			ball = <C25>;
+			drive-strength-desc = <PINCFG_DESC(0x4e0, 0, 2)>;
+		};
+
+		/omit-if-no-ref/ pin_fwspiclk: pin_fwspiclk {
+			ball = <C24>;
+			drive-strength-desc = <PINCFG_DESC(0x4e0, 6, 2)>;
+		};
+
+		/omit-if-no-ref/ pin_fwspimosi: pin_fwspimosi {
+			ball = <A17>;
+			drive-strength-desc = <PINCFG_DESC(0x4e0, 8, 2)>;
+		};
+
+		/omit-if-no-ref/ pin_fwspimiso: pin_fwspimiso {
+			ball = <A16>;
+			drive-strength-desc = <PINCFG_DESC(0x4e0, 10, 2)>;
+		};
+
+		/omit-if-no-ref/ pin_fwspidq2: pin_fwspidq2 {
+			ball = <M16>;
+			sig_descs = <SIG_DESC(0x450, 24, 1)>;
+			drive-strength-desc = <PINCFG_DESC(0x4e0, 12, 2)>;
+			bias-disable-desc = <PINCFG_DESC(0x494, 6, 1)>;
+		};
+
+		/omit-if-no-ref/ pin_fwspidq3: pin_fwspidq3 {
+			ball = <A15>;
+			sig_descs = <SIG_DESC(0x450, 28, 1)>;
+			drive-strength-desc = <PINCFG_DESC(0x4e0, 14, 2)>;
+			bias-disable-desc = <PINCFG_DESC(0x494, 7, 1)>;
+		};
+	};
+};
+
+/* Reserve the app stack separately, as in the vendor A2 board layout. */
+&sram {
+	reg = <0x14b80000 0x2b000>;
+};
+
+&sdrammc {
+	status = "okay";
+
+	/*
+	 * Example of dram ECC enable
+	 * The max ECC size = ((Capacity - VGA size) * 8) / 9;
+	 * ecc-size for customization, if not set, it will be dynamic detected.
+	 * For example, to reserve 853MB ecc-size for dual node.
+	 */
+	//ecc-enable;
+	//ecc-size = <0x35500000>; /* 853MB */
+
+	/*
+	 * Hard-lock the DRAMC config registers after init (blocks further
+	 * writes until power cycle). Off by default; enable per-customer.
+	 */
+	//hard-lock;
+
+	mpus = <&ca35_s>, <&ssp>, <&tsp>, <&share_1>, <&share_2>, <&share_3>, <&vb>;
+};
+
+&prictrl0 {
+	status = "okay";
+};
+
+&prictrl1 {
+	status = "okay";
+};
+
+&sysclk0 {
+	psp = <>;
+	sec-psp = <>;
+	ssp = <>;
+	tsp = <>;
+	psp-ssp = <>;
+	ssp-tsp = <>;
+	bmcu = <>;
+};
+
+&sysrst0 {
+	psp = <>;
+	sec-psp = <>;
+	ssp = <>;
+	tsp = <>;
+	psp-ssp = <>;
+	ssp-tsp = <>;
+	bmcu = <>;
+};
+
+&sysrst1 {
+	psp = <>;
+	sec-psp = <>;
+	ssp = <>;
+	tsp = <>;
+	psp-ssp = <>;
+	ssp-tsp = <>;
+	bmcu = <>;
+};
+
+&ufs {
+	status = "okay";
+};
+
+&ipc1_ns_ca35 {
+	status = "okay";
+};
+
+&ipc1_ssp {
+	status = "okay";
+};
+
+&cptra_ecdsa {
+	status = "okay";
+};
+
+&cptra_sha {
+	status = "okay";
+};
+
+&cptra_lms {
+	status = "okay";
+};
+
+&cptra_update {
+	status = "okay";
+};
+
+&cptra_dice {
+	status = "okay";
+};
+
+&cptra_misc {
+	status = "okay";
+};
+
+&otp {
+	status = "okay";
+};
+
+&nisttrng {
+	status = "okay";
+};
+
+&edaf_bridge0 {
+	status = "okay";
+	espi-base = <0x14c05000>;
+#if 0 //DDR mode using edaf0 reserved memory
+	edaf-ddr-mode;
+	edaf-erase-with-1;
+	mem-base = <0x4 0x28000000>; //edaf0 reserved memory
+#else //Flash mode using SPI0
+	mem-base = <0x1 0x80000000>; //SPI0
+	ctl-base = <0x14010000>;
+	cmd-read = <0x130401>;
+	cmd-write-enable = <0x6041e>;
+	cmd-write = <0x120403>;
+	cmd-read-status = <0x50415>;
+	cmd-erase-4k = <0x21040e>;
+	cmd-erase-32k = <0x5c040e>;
+	cmd-erase-64k = <0xdc040e>;
+#endif
+};
+
+&edaf_bridge1 {
+	status = "okay";
+	espi-base = <0x14c06000>;
+	mem-base = <0x2 0x00000000>; //SPI1
+	ctl-base = <0x14020000>;
+	cmd-read = <0x130401>;
+	cmd-write-enable = <0x6041e>;
+	cmd-write = <0x120402>;
+	cmd-read-status = <0x50415>;
+	cmd-erase-4k = <0x21040e>;
+	cmd-erase-32k = <0x5c040e>;
+	cmd-erase-64k = <0xdc040e>;
+};
