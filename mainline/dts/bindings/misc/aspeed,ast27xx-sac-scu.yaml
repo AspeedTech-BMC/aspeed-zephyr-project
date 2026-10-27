@@ -1,0 +1,40 @@
+# Copyright (c) 2026 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: ASPEED AST27XX SCU access policy configuration
+
+compatible: "aspeed,ast27xx-sac-scu"
+
+include: base.yaml
+
+child-binding:
+  description: SCU1 clock gate access policies by master group
+  properties:
+    psp:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by PSP
+    sec-psp:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by secure PSP
+    ssp:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by SSP
+    tsp:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by TSP
+    psp-ssp:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by PSP and SSP
+    ssp-tsp:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by SSP and TSP
+    bmcu:
+      type: array
+      required: true
+      description: Clock gate IDs accessible by BootMCU

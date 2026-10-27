@@ -6,4 +6,14 @@ if SOC_AST2700_BOOTMCU
 configdefault REBOOT
 	default y
 
+config SCU_POLICY_CTRL
+	bool "Enable SCU Policy Control"
+	default y
+	depends on DT_HAS_ASPEED_AST27XX_SAC_SCU_ENABLED
+	help
+	  Enable support for ASPEED SCU Policy Control.
+
+	  If enabled, the SCU Policy Control driver will be initialized
+	  during system boot.
+
 endif # SOC_AST2700_BOOTMCU

@@ -25,6 +25,20 @@
 		emmc = &emmc;
 	};
 
+	sac_scu: sac-scu {
+		compatible = "aspeed,ast27xx-sac-scu";
+
+		scu1-clock {
+			psp = <>;
+			sec-psp = <>;
+			ssp = <>;
+			tsp = <>;
+			psp-ssp = <>;
+			ssp-tsp = <>;
+			bmcu = <>;
+		};
+	};
+
 	ca35_s: ca35-s {
 		compatible = "aspeed,ast27xx-mpu";
 		#mpu-cells = <0>;
