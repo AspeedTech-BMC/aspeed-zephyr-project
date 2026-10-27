@@ -1,0 +1,27 @@
+# Copyright (c) 2023 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+if CRYPTO
+
+config CPTRA_ECDSA
+	bool "ASPEED CPTRA ECDSA engine driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_ECDSA_ENABLED
+	help
+	  This option enables the Caliptra ECDSA driver for ASPEED SoCs.
+
+config CPTRA_SHA
+	bool "ASPEED CPTRA SHA engine driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_SHA_ENABLED
+	help
+	  This option enables the Caliptra SHA driver for ASPEED SoCs.
+
+config CPTRA_LMS
+	bool "ASPEED CPTRA LMS engine driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_LMS_ENABLED
+	help
+	  This option enables the Caliptra LMS driver for ASPEED SoCs.
+
+endif # CRYPTO
