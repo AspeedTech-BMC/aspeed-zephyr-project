@@ -4,17 +4,9 @@
 	chosen {
 		zephyr,console = &uart12;
 		zephyr,shell-uart = &uart12;
-		zephyr,custom-stack = &loader_stack;
 		aspeed,peri-desc = &peri_desc;
 		aspeed,dma-pool = &dma_pool;
 		aspeed,usb-desc = &usb_desc;
-	};
-
-	/* sized to CONFIG_MAIN_STACK_SIZE (16KB), top kept at 0x14bbd000 */
-	loader_stack: stack@14bb9000 {
-		compatible = "zephyr,memory-region";
-		reg = <0x14bb9000 0x4000>;
-		zephyr,memory-region = "CUSTOM_STACK";
 	};
 
 	dma_pool: memory@14bbd0e0 {
@@ -102,11 +94,6 @@
 			no-map;
 		};
 	};
-};
-
-/* grow RAM up to loader_stack */
-&sram {
-	reg = <0x14b80000 0x39000>;
 };
 
 &emmc {

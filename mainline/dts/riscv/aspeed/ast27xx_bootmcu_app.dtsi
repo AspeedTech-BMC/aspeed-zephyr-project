@@ -435,11 +435,6 @@
 	};
 };
 
-/* Reserve the app stack separately, as in the vendor A2 board layout. */
-&sram {
-	reg = <0x14b80000 0x2b000>;
-};
-
 &sdrammc {
 	status = "okay";
 
