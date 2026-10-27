@@ -1,0 +1,17 @@
+# Copyright (c) 2024 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: ASPEED CPTRA SHA Engine
+
+compatible: "aspeed,cptra-sha"
+
+include: base.yaml
+
+properties:
+    reg:
+      required: true
+
+    aspeed,scu:
+      type: phandle
+      required: true
+      description: phandle to SCU device tree node

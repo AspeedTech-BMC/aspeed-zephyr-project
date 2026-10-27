@@ -1,0 +1,43 @@
+# Copyright (c) Aspeed Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+description: Aspeed pin control
+
+compatible: "aspeed,g7-soc1-pinctrl"
+
+include: base.yaml
+
+child-binding:
+  description: Aspeed pin configuration nodes
+  include:
+    - name: pincfg-node.yaml
+
+  properties:
+    sig_descs:
+      type: int
+      description: |
+        Omit for a pin that only carries pincfg (drive-strength /
+        bias-disable) and has no pinmux to select.
+    ball:
+      required: true
+      type: int
+    bias-disable-desc:
+      type: int
+      description: |
+        PINCFG_DESC() location of the bias/pull-disable control bit for
+        this ball. Combined with the generic "bias-disable" property
+        (from pincfg-node.yaml) to decide whether to write it.
+    pull-up-disable-desc:
+      type: int
+      description: |
+        PINCFG_DESC() location of a second, independent pull-up disable
+        bit, for balls whose pull-up and pull-down each have their own
+        disable control (e.g. AST10x0-G2's DIS_PU/DIS_PD). Written
+        alongside bias-disable-desc whenever "bias-disable" is set; omit
+        on balls with a single combined disable bit.
+    drive-strength-desc:
+      type: int
+      description: |
+        PINCFG_DESC() location of the drive-strength field for this
+        ball. Combined with the generic "drive-strength" property (from
+        pincfg-node.yaml) for the value to write.

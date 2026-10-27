@@ -1,0 +1,36 @@
+# sdrammc.yaml
+
+description: Binding for SDRAMMC with MPU region configuration
+
+compatible: "aspeed,ast27xx-sdrammc"
+
+include: base.yaml
+
+properties:
+  mpus:
+    type: phandle-array
+    required: false
+    description: Reference to MPU region
+  ecc-enable:
+    type: boolean
+    required: false
+    description: Enable ECC for SDRAM
+  ecc-size:
+    type: int
+    required: false
+    description: Size of ECC memory in bytes
+  aes-enable:
+    type: boolean
+    required: false
+    description: Enable AES encryption for SDRAM
+  aes-size:
+    type: int
+    required: false
+    description: Size of AES encryption in bytes
+  hard-lock:
+    type: boolean
+    required: false
+    description: >
+      Hard-lock the DRAMC configuration registers (DRAMC_HARD_LOCK_KEY) once
+      DRAM init completes, permanently blocking further register writes
+      until the next power cycle. Left to the customer to enable.
