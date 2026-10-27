@@ -1,0 +1,17 @@
+# Copyright (c) 2022 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+if RESET
+
+config RESET_AST27XX
+	bool "ASPEED ast27xx reset driver"
+	default y
+	depends on DT_HAS_ASPEED_AST27XX_RESET_ENABLED
+	help
+	  This option enables the reset driver for ASPEED AST27XX series SoCs.
+
+# Preserve the vendor BootMCU SoC's reset initialization priority.
+configdefault RESET_INIT_PRIORITY
+	default SYSCON_INIT_PRIORITY if RESET_AST27XX
+
+endif # RESET
