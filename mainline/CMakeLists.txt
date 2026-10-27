@@ -7,6 +7,7 @@ zephyr_include_directories(include)
 
 add_subdirectory(soc/ast27xx)
 add_subdirectory(drivers)
+add_subdirectory(lib/sd)
 
 # The libraries and modules the repository root module provides on the vendor
 # Zephyr tree. The root module is not loaded with upstream Zephyr, because its
