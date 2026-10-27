@@ -1,6 +1,56 @@
 # Copyright (c) 2025 ASPEED Technology Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+config CPTRA_UPDATE
+	bool "ASPEED CPTRA Update driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_UPDATE_ENABLED
+	help
+	  This option enables the Caliptra update driver for ASPEED SoCs.
+
+config CPTRA_IFC
+	bool "ASPEED CPTRA IFC driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_IFC_ENABLED
+	help
+	  This option enables the Caliptra ifc driver for ASPEED SoCs.
+
+config CPTRA_MBOX
+	bool "ASPEED CPTRA MBOX driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_MBOX_ENABLED
+	help
+	  This option enables the Caliptra mbox driver for ASPEED SoCs.
+
+config CPTRA_DICE
+	bool "ASPEED CPTRA DICE driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_DICE_ENABLED
+	help
+	  This option enables the Caliptra dice driver for ASPEED SoCs.
+
+config CPTRA_MISC
+	bool "ASPEED CPTRA MISC driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && DT_HAS_ASPEED_CPTRA_MISC_ENABLED
+	help
+	  This option enables the Caliptra misc driver for ASPEED SoCs.
+
+config CPTRA_IPC
+	bool "ASPEED CPTRA IPC driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && IPM_BOOTMCU
+	depends on CPTRA_ECDSA && CPTRA_SHA && CPTRA_LMS
+	depends on CPTRA_UPDATE && CPTRA_DICE && CPTRA_MISC
+	help
+	  This option enables the Caliptra ipc driver for ASPEED SoCs.
+
+if CPTRA_IPC
+module = MISC_ASPEED
+module-str = misc-aspeed
+source "subsys/logging/Kconfig.template.log_config"
+endif
+
 config OTP_AST27XX
 	bool "ASPEED AST27XX OTP"
 	default y
