@@ -100,13 +100,13 @@ static void pcie_init_node(struct ast2700_scu0 *scu,
 int pci_init(struct ast_chip *chip)
 {
 	struct ast2700_scu0 *scu = chip->scu0;
-	uint8_t pcie0_en = PCIE_CONF(DT_PATH(soc0, pcie0));
-	uint8_t pcie1_en = PCIE_CONF(DT_PATH(soc0, pcie1));
-	uint8_t pcie0_intx = PCIE_INTx(DT_PATH(soc0, pcie0));
-	uint8_t pcie1_intx = PCIE_INTx(DT_PATH(soc0, pcie1));
-	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_PATH(soc0, pcie1));
-	bool pcie0_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_PATH(soc0, pcie0));
-	bool pcie1_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_PATH(soc0, pcie1));
+	uint8_t pcie0_en = PCIE_CONF(DT_NODELABEL(pcie0));
+	uint8_t pcie1_en = PCIE_CONF(DT_NODELABEL(pcie1));
+	uint8_t pcie0_intx = PCIE_INTx(DT_NODELABEL(pcie0));
+	uint8_t pcie1_intx = PCIE_INTx(DT_NODELABEL(pcie1));
+	uint8_t pcie1_alt = PCIE_ALT_NODE(DT_NODELABEL(pcie1));
+	bool pcie0_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_NODELABEL(pcie0));
+	bool pcie1_bridge_aliasing = PCIE_BRIDGE_ALIASING(DT_NODELABEL(pcie1));
 
 	if ((scu->modrst2_ctrl & (SCU0_RST2_E2M1 | SCU0_RST2_E2M0)) == 0) {
 		LOG_DBG("%s: PCIE already initialized\n", __func__);
