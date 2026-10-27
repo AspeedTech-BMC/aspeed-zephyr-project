@@ -1,0 +1,34 @@
+# Copyright (c) 2023 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# The vendor BootMCU SoC enables the pinctrl framework by default.
+configdefault PINCTRL
+	default y if DT_HAS_ASPEED_G7_SOC1_PINCTRL_ENABLED
+
+if PINCTRL
+
+config PINCTRL_ASPEED_G7
+	bool "Pin controller driver for Aspeed G7 SOCs"
+	default y
+	depends on DT_HAS_ASPEED_G7_SOC1_PINCTRL_ENABLED
+	depends on SYSCON
+	help
+	  Enable pin controller driver for Aspeed G7 SoCs.
+
+config PINCTRL_ASPEED_G7_CONFLICT_CHECK
+	bool "Check for Aspeed G7 pin conflicts"
+	depends on PINCTRL_ASPEED_G7
+	help
+	  Track the signal assigned to each ball and reject conflicting pin
+	  configurations. Leave disabled to save the RAM used by the ball
+	  ownership table. When disabled, later configurations can overwrite
+	  an earlier pinmux selection for the same ball.
+
+config PINCTRL_ASPEED_STRING_NAME
+	bool "Store the pin name in a string"
+	default n
+	depends on PINCTRL_ASPEED_G7
+	help
+	  Enable storing the pin name for debugging.
+
+endif # PINCTRL
