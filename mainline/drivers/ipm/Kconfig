@@ -1,0 +1,17 @@
+# Copyright (c) 2023 ASPEED Technology Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# The vendor A2 board enables IPM for its BootMCU IPC nodes.
+configdefault IPM
+	default y if DT_HAS_ASPEED_BOOTMCU_IPC_ENABLED
+
+if IPM
+
+config IPM_BOOTMCU
+	bool "ASPEED IPC driver"
+	default y
+	depends on DT_HAS_ASPEED_BOOTMCU_IPC_ENABLED
+	help
+	  Enable the IPC driver for ASPEED BootMCU.
+
+endif # IPM
