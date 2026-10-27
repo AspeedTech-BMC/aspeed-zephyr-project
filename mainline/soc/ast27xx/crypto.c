@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-#include <zephyr/device.h>
-#include <zephyr/init.h>
-#include <zephyr/sys/sys_io.h>
-
 #if defined(CONFIG_MBEDTLS)
 #if !defined(CONFIG_MBEDTLS_CFG_FILE)
 #include "mbedtls/config.h"
@@ -21,12 +17,12 @@
 
 #ifdef CONFIG_ECDSA_ASPEED
 #define ECDSA_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_ecdsa))
-#elif DT_HAS_COMPAT_STATUS_OKAY(aspeed_cptra_ecdsa)
+#elif CONFIG_CPTRA_ECDSA
 #define ECDSA_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_cptra_ecdsa))
 #define HASH_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_cptra_sha))
 #endif
 
-#if DT_HAS_COMPAT_STATUS_OKAY(aspeed_cptra_lms)
+#ifdef CONFIG_CPTRA_LMS
 #define LMS_DRV_NAME		DEVICE_DT_NAME(DT_INST(0, aspeed_cptra_lms))
 #endif
 
@@ -36,6 +32,7 @@
 #include <aspeed/lms_structs.h>
 #include <zephyr/crypto/crypto.h>
 #include <zephyr/crypto/hash.h>
+#include <aspeed/cptra.h>
 #include "crypto.h"
 #include <zephyr/sys/byteorder.h>
 
@@ -43,8 +40,6 @@
 LOG_MODULE_REGISTER(crypto, CONFIG_CRYPTO_LOG_LEVEL);
 
 #define SCU1_REG			DT_REG_ADDR(DT_NODELABEL(syscon1))
-#define SCU1_CPTRA			0x130
-#define   SCU1_CPTRA_RDY_FOR_RT		BIT(18)
 #define SCU1_HWSTRAP1			0x10
 #define	 SCU1_HWSTRAP1_DIS_CPTRA	BIT(30)
 
@@ -140,7 +135,7 @@ static int mbedtls_ecdsa_test(const struct ecdsa_testvec *tv, int tv_size)
 }
 #endif
 
-#if DT_HAS_COMPAT_STATUS_OKAY(aspeed_cptra_ecdsa)
+#ifdef CONFIG_CPTRA_ECDSA
 static int hw_gen_sha(uint8_t *msg, int msg_size, uint8_t *d, int d_size)
 {
 	const struct device *dev = device_get_binding(HASH_DRV_NAME);
@@ -195,7 +190,7 @@ static int hw_ecdsa_test(const struct ecdsa_testvec *tv, int tv_size)
 	LOG_DBG("Start...");
 	for (int i = 0; i < tv_size; i++) {
 		/* Doing hash first for Caliptra secure IP case */
-#if DT_HAS_COMPAT_STATUS_OKAY(aspeed_cptra_ecdsa)
+#ifdef CONFIG_CPTRA_ECDSA
 		hw_gen_sha((uint8_t *)tv[i].raw, tv[i].raw_size,
 			   (uint8_t *)tv[i].m, tv[i].m_size);
 #endif

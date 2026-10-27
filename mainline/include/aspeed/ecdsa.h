@@ -28,8 +28,8 @@
  * @{
  */
 
-#ifndef ZEPHYR_INCLUDE_CRYPTO_ECDSA_H_
-#define ZEPHYR_INCLUDE_CRYPTO_ECDSA_H_
+#ifndef ASPEED_ECDSA_H_
+#define ASPEED_ECDSA_H_
 
 #include <zephyr/device.h>
 #include <errno.h>
@@ -150,4 +150,4 @@ static inline int ecdsa_verify(struct ecdsa_ctx *ctx,
  * @}
  */
 
-#endif /* ZEPHYR_INCLUDE_CRYPTO_ECDSA_H_ */
+#endif /* ASPEED_ECDSA_H_ */

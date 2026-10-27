@@ -14,8 +14,8 @@
  * as a part of ongoing development.
  */
 
-#ifndef ZEPHYR_INCLUDE_CRYPTO_ECDSA_STRUCTS_H_
-#define ZEPHYR_INCLUDE_CRYPTO_ECDSA_STRUCTS_H_
+#ifndef ASPEED_ECDSA_STRUCTS_H_
+#define ASPEED_ECDSA_STRUCTS_H_
 
 /* Curves IDs */
 #define ECC_CURVE_NIST_P192	0x0001
@@ -107,4 +107,4 @@ struct ecdsa_pkt {
 /**
  * @}
  */
-#endif /* ZEPHYR_INCLUDE_CRYPTO_ECDSA_STRUCTS_H_ */
+#endif /* ASPEED_ECDSA_STRUCTS_H_ */

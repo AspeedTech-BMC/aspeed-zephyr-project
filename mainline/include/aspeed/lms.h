@@ -14,8 +14,8 @@
  * as a part of ongoing development.
  */
 
-#ifndef ZEPHYR_INCLUDE_CRYPTO_LMS_H_
-#define ZEPHYR_INCLUDE_CRYPTO_LMS_H_
+#ifndef ASPEED_LMS_H_
+#define ASPEED_LMS_H_
 
 #include <zephyr/device.h>
 #include <zephyr/sys/util.h>
@@ -141,4 +141,4 @@ static inline int lms_verify(struct lms_ctx *ctx,
  * @}
  */
 
-#endif /* ZEPHYR_INCLUDE_CRYPTO_LMS_H_ */
+#endif /* ASPEED_LMS_H_ */

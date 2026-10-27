@@ -14,8 +14,8 @@
  * as a part of ongoing development.
  */
 
-#ifndef ZEPHYR_INCLUDE_CRYPTO_LMS_STRUCTS_H_
-#define ZEPHYR_INCLUDE_CRYPTO_LMS_STRUCTS_H_
+#ifndef ASPEED_LMS_STRUCTS_H_
+#define ASPEED_LMS_STRUCTS_H_
 
 /**
  * @addtogroup crypto_lms
@@ -115,4 +115,4 @@ struct lms_pkt {
 /**
  * @}
  */
-#endif /* ZEPHYR_INCLUDE_CRYPTO_LMS_STRUCTS_H_ */
+#endif /* ASPEED_LMS_STRUCTS_H_ */
