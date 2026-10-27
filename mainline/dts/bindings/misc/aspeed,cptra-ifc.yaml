@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: ASPEED Caliptra SoC interface register block
+
+compatible: "aspeed,cptra-ifc"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: ASPEED AST2700 EDAF bridge global configuration register block
+
+compatible: "aspeed,ast2700-edaf-bridge-cfg"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true

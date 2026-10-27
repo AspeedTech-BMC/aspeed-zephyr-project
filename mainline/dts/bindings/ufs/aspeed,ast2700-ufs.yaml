@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: ASPEED AST2700 UFS host controller
+
+compatible: "aspeed,ast2700-ufs"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true
+
+  clocks:
+    required: true
+
+  resets:
+    type: phandle-array
+    required: true

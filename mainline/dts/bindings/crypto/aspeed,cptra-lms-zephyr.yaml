@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# The vendor aspeed,cptra-lms.yaml uses a different schema and does not match
+# Zephyr nodes. The A2 node is a mailbox child with no reg property.
+description: ASPEED Caliptra LMS
+
+compatible: "aspeed,cptra-lms"
+
+include: base.yaml
