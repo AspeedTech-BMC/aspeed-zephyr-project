@@ -14,6 +14,7 @@
 #include <ssp_tsp.h>
 #include <manifest.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
+#include <zephyr/drivers/misc/aspeed/otp_ipc.h>
 #include <chip.h>
 
 LOG_MODULE_REGISTER(ast_board, CONFIG_SOC_FMC_LOG_LEVEL);
@@ -211,6 +212,24 @@ static int board_init_f(struct ast_chip	*chip, struct ast_board *board)
 	return err;
 }
 
+#if defined(CONFIG_CPTRA_IPC) || defined(CONFIG_OTP_IPC)
+static int board_runtime_loop(void)
+{
+	int err = 0;
+
+	/* CPTRA IPC can be disabled via hwstrap; honor it even when the Kconfig is on */
+	if (IS_ENABLED(CONFIG_CPTRA_IPC) &&
+	    !(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA))
+		err = cptra_ipc_enable();
+
+	/* OTP IPC is a standalone channel, independent of CPTRA IPC and its hwstrap */
+	if (IS_ENABLED(CONFIG_OTP_IPC))
+		otp_ipc_enable();
+
+	return err;
+}
+#endif
+
 struct ast_board *ast_create_board(struct ast_chip *chip)
 {
 	struct ast_board *board;
@@ -234,10 +253,9 @@ struct ast_board *ast_create_board(struct ast_chip *chip)
 	board->load_image = board_load_image;
 	board->boot = board_prepare_for_boot;
 
-	if (!(sys_read32(SCU1_HWSTRAP1) & SCU1_HWSTRAP1_DIS_CPTRA)) {
-		if (IS_ENABLED(CONFIG_CPTRA_IPC))
-			board->runtime_loop = cptra_ipc_enable;
-	}
+#if defined(CONFIG_CPTRA_IPC) || defined(CONFIG_OTP_IPC)
+	board->runtime_loop = board_runtime_loop;
+#endif
 
 	chip->board = board;
 
