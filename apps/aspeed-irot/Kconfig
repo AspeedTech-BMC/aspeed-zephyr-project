@@ -1,6 +1,17 @@
 # Copyright (c) 2026 ASPEED Technology Inc.
 # SPDX-License-Identifier: MIT
 
+config IROT_PSP_RESET
+	bool "PSP reset detection"
+	depends on DT_HAS_ASPEED_AST2700_SSP_PSP_RESET_NOTIFY_ENABLED
+	select PSP_RESET_NOTIFY_ASPEED
+	default n
+	help
+	  Enable PSP reset detection. After the CA35 is released, the iRoT
+	  arms the PSP reset notification interrupt; when the PSP resets,
+	  a RESET_DETECTED event is sent to the iRoT state machine, which
+	  moves back to VERIFY to re-verify and reload the PSP images.
+
 rsource "Kconfig.cptra"
 rsource "Kconfig.spdm"
 rsource "Kconfig.pldm"
