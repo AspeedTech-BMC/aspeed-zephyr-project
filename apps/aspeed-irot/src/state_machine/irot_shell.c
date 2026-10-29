@@ -31,7 +31,8 @@ SHELL_SUBCMD_DICT_SET_CREATE(sub_event, cmd_irot_send_event,
 	(ARMING_FAILED, ARMING_FAILED, "Arming Failed"),
 	(UPDATE_REQUESTED, UPDATE_REQUESTED, "Update Requested"),
 	(UPDATE_COMPLETED, UPDATE_COMPLETED, "Update Completed"),
-	(UPDATE_FAILED, UPDATE_FAILED, "Update Failed")
+	(UPDATE_FAILED, UPDATE_FAILED, "Update Failed"),
+	(RESET_DETECTED, RESET_DETECTED, "Reset Detected")
 );
 
 

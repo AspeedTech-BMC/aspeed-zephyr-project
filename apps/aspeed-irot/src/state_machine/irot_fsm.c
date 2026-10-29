@@ -260,6 +260,9 @@ static void irot_fsm_thread_entry(void *arg1, void *arg2, void *arg3)
 				case UPDATE_REQUESTED:
 					next_state = &irot_fsm_states[UPDATE];
 					break;
+				case RESET_DETECTED:
+					next_state = &irot_fsm_states[VERIFY];
+					break;
 				default:
 					break;
 			}

@@ -9,7 +9,18 @@
 #include <zephyr/drivers/flash.h>
 #include <psp/abr.h>
 
+#if defined(CONFIG_IROT_PSP_RESET)
+#include <zephyr/drivers/misc/aspeed/psp_reset_notify.h>
+
+#include <state_machine/irot_fsm.h>
+#endif
+
 LOG_MODULE_REGISTER(psp_loader, LOG_LEVEL_DBG);
+
+#if defined(CONFIG_IROT_PSP_RESET)
+static const struct device *const psp_reset_dev =
+	DEVICE_DT_GET(DT_NODELABEL(psp_reset_notify));
+#endif
 
 #define writel(value, addr)	(*(volatile uint32_t *)(addr) = (value))
 #define readl(addr)		(*(volatile uint32_t *)(addr))
@@ -42,6 +53,20 @@ struct image_info image_tbl[] = {
 	{"TEE",   0x04080000, 0x00310000, 0x80000},    // 512KB
 };
 
+#if defined(CONFIG_IROT_PSP_RESET)
+/* Runs in ISR context; the driver has already masked the interrupt. */
+static void psp_reset_interrupt(const struct device *dev, void *user_data)
+{
+	ARG_UNUSED(dev);
+	ARG_UNUSED(user_data);
+
+	// level trigger interrupt
+	// psp_reset_notify_irq_disable(psp_reset_dev);
+
+	irot_send_event(RESET_DETECTED, NULL);
+}
+#endif
+
 void aspeed_prepare_for_boot(void)
 {
 	/* Given CA35 reset vector */
@@ -61,6 +86,16 @@ void aspeed_prepare_for_boot(void)
 
 	/* Release CA35 */
 	writel(1, (void *)ASPEED_CPU_CA35_REL);
+#if defined(CONFIG_IROT_PSP_RESET)
+	/* Arm PSP reset detection, re-armed on every boot after RESET_DETECTED */
+	if (!device_is_ready(psp_reset_dev)) {
+		LOG_ERR("psp_reset_notify device not ready");
+		return;
+	}
+	psp_reset_notify_set_callback(psp_reset_dev, psp_reset_interrupt, NULL);
+	psp_reset_notify_irq_enable(psp_reset_dev);
+#endif
+
 }
 
 /*
