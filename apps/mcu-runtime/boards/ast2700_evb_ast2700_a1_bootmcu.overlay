@@ -5,9 +5,10 @@
 		zephyr,custom-stack = &loader_stack;
 	};
 
-	loader_stack: stack@14bad400 {
+	/* sized to CONFIG_MAIN_STACK_SIZE (24KB), top kept at 0x14bbf400 */
+	loader_stack: stack@14bb9400 {
 		compatible = "zephyr,memory-region";
-		reg = <0x14bad400 0x12000>;
+		reg = <0x14bb9400 0x6000>;
 		zephyr,memory-region = "CUSTOM_STACK";
 	};
 
@@ -78,6 +79,11 @@
 			no-map;
 		};
 	};
+};
+
+/* grow RAM up to loader_stack */
+&sram {
+	reg = <0x14b80a00 0x38a00>;
 };
 
 &emmc {
