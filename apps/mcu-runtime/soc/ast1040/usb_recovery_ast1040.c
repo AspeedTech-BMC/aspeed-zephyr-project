@@ -522,8 +522,7 @@ struct usb_vhub_config {
 
 struct bootusb_priv {
 	bool is_dnload_done;
-	uint32_t *dfu_dst_addr;
-	uint32_t dfu_max_len;
+	struct ast_loader_sink *dfu_sink;
 	uint32_t dfu_recv_len;
 	uint8_t *ep0_ctrl_buf;
 	enum usb_state usb_fsm_state;
@@ -660,21 +659,23 @@ static uint8_t vhub_ep0_in(struct bootusb_priv *hci)
 		hci->usb_fsm_state = IDLE;
 		if (hci->dfu_data.state == dfuDNLOAD_IDLE) {
 			offset = hci->usb_req_ctx.block_nr * DRAM_BLOCK_SIZE;
-			if (hci->dfu_max_len > offset) {
-				if (safe_memcpy((uint8_t *)hci->dfu_dst_addr + offset,
-						hci->dfu_max_len - offset,
-						hci->ep0_ctrl_buf,
-						hci->usb_req_ctx.length))
-					return (hci->usb_fsm_state << 4 | STS_MEMCPY_FAIL);
-
-				hci->dfu_recv_len = offset + hci->usb_req_ctx.length;
-			} else {
-				/* This address is out of max. length of FW size, so do not copy to SRAM.
-				 * Also repot DFU bStatus Error-8 for DFU_GETSTATUS Request
-				 */
-
+			if (!hci->dfu_sink) {
+				/* no load in progress (late DNLOAD after done) */
 				hci->dfu_data.state = dfuERROR;
 				hci->dfu_data.status = errADDRESS;
+			} else if (hci->dfu_sink->write(hci->dfu_sink, offset,
+							hci->ep0_ctrl_buf,
+							hci->usb_req_ctx.length)) {
+				/* Sink rejected the block (out of range or
+				 * non-sequential; a re-send of the last block
+				 * is accepted and overwrites it), report DFU
+				 * bStatus Error-8
+				 * for DFU_GETSTATUS Request
+				 */
+				hci->dfu_data.state = dfuERROR;
+				hci->dfu_data.status = errADDRESS;
+			} else {
+				hci->dfu_recv_len = offset + hci->usb_req_ctx.length;
 			}
 
 			vhub_req_cleanup(hci);
@@ -1156,7 +1157,6 @@ static int usb_init(struct device *dev)
 
 	hci->ep0_ctrl_buf = (uint8_t *)USB_DMA_BUF_ADDR + CPU_SRAM_SIZE - USB_DFU_MAX_XFER_SIZE;
 	hci->usb_fsm_state = IDLE;
-	hci->dfu_max_len = UINT32_MAX;
 	hci->dfu_data.state = dfuIDLE;
 	hci->dfu_data.status = statusOK;
 	hci->dfu_data.bwPollTimeout = USB_DFU_DEFAULT_POLLTIMEOUT;
@@ -1199,7 +1199,7 @@ static int usb_init(struct device *dev)
 	return 0;
 }
 
-static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
+static int usb_load(struct device *dev, struct ast_loader_sink *sink, uint32_t *len)
 {
 	struct bootusb_priv *hci = dev->data;
 	uint32_t reg;
@@ -1210,13 +1210,14 @@ static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
 	hci->usb_fsm_state = IDLE;
 	hci->dfu_data.state = dfuIDLE;
 	hci->dfu_data.status = statusOK;
-	
+	hci->dfu_recv_len = 0;
+
 	/* Read usb_vhub_port again. */
 	reg = sys_read32(SCU1_HWSTRAP1);
 	hci->usb_vhub_port = FIELD_GET(SCU1_HWSTRAP1_RECOVERY_USB_PORT, reg);
 
-	/* Save this time DFU destination and max. length */
-	hci->dfu_dst_addr = dst;
+	/* Save this time DFU data sink */
+	hci->dfu_sink = sink;
 	
 	LOG_DBG("USB Recovery waiting for download on port %d\n", hci->usb_vhub_port);
 	
@@ -1227,6 +1228,8 @@ static int usb_load(struct device *dev, uint32_t *dst, uint32_t *len)
 			break;
 		}
 	}
+	/* sink lives on the caller's stack, drop it before returning */
+	hci->dfu_sink = NULL;
 	*len = hci->dfu_recv_len;
 	LOG_DBG("USB load completed [len = %d, ret = %d]\n", *len, ret);
 	return ret;

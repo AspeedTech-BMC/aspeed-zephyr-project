@@ -36,12 +36,17 @@ enum y_state {
 	YS_WAIT_FINAL_HDR
 };
 
+/* Called for each received payload chunk; ofst is the running byte offset.
+ * Return 0 to continue, non-zero to abort the transfer.
+ */
+typedef int (*ymodem_sink_t)(void *ctx, uint32_t ofst, const uint8_t *data, uint32_t len);
+
 int readc(uint8_t *buf, uint32_t len, uint32_t timeout_ms);
 void writec(char y);
-enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
-				       uint8_t *buf,
-				       uint32_t *out_size,
-				       char *out_name, uint32_t name_cap);
+enum ymodem_status ymodem_receive_stream(struct ymodem_port *port,
+					 ymodem_sink_t sink, void *sink_ctx,
+					 uint32_t *out_size,
+					 char *out_name, uint32_t name_cap);
 int ymodem_open(struct device *dev);
 int ymodem_close(void);
 

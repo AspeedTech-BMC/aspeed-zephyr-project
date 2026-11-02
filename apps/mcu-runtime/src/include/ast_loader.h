@@ -26,10 +26,21 @@ struct udevice {
 struct ast_chip;
 struct ast_loader;
 
+/*
+ * Streaming data sink for recovery interfaces: transports push received
+ * payload chunks (append-only, ofst must equal total bytes pushed so far)
+ * instead of writing the whole image into one buffer.
+ */
+struct ast_loader_sink {
+        int (*write)(struct ast_loader_sink *sink, uint32_t ofst,
+                     const uint8_t *data, uint32_t len);
+        void *priv;
+};
+
 struct ast_loader_ops {
         int (*init)(struct ast_loader *loader);
         int (*copy)(struct ast_loader *loader, uint32_t *dst, uint32_t src, uint32_t len);
-        int (*load)(struct ast_loader *loader, uint32_t *dst, uint32_t *len);
+        int (*load)(struct ast_loader *loader, struct ast_loader_sink *sink, uint32_t *len);
         int (*deinit)(struct ast_loader *loader);
 };
 
@@ -41,8 +52,13 @@ struct ast_loader {
 
         struct ast_loader_ops *ops;
 
-        int (*load)(struct ast_loader *loader, uint32_t type, uint32_t *dst, uint32_t *len);
-        int (*verify)(uint32_t type, uint32_t *message, uint32_t len, uint32_t buf_len);
+        /* streaming load through a sink; set on recovery interfaces */
+        int (*load)(struct ast_loader *loader, uint32_t type,
+                    struct ast_loader_sink *sink, uint32_t *len);
+        /* random-access segment read; set on storage interfaces */
+        int (*load_seg)(struct ast_loader *loader, uint32_t type, uint32_t *dst,
+                        uint32_t img_ofst, uint32_t len);
+        int (*get_size)(struct ast_loader *loader, uint32_t type, uint32_t *len);
 
         int rev_id;
 

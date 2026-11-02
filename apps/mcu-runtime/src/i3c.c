@@ -958,22 +958,16 @@ int i3c_poll_in_forever(struct i3c_hci *hci, uint8_t *data, uint32_t *size)
 	return 0;
 }
 
-/*
- * from: don't care.
- * *dst: destination address to move to
- * len: required length, if not equal, return failre
- */
-static int i3c_recovery(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
+static int i3c_recovery(struct ast_loader *loader, struct ast_loader_sink *sink, uint32_t *len)
 {
 	struct device *dev = loader->dev;
 	struct i3c_hci *hci = DEV_DATA(dev);
 	uint32_t size, packet_size, received_size = 0;
-	uint8_t *io_sram_ptr;
 	struct i3c_recovey_packet const *hdr;
 	int resp_sts = 0;
+	int sink_err = 0;
 	unsigned int key;
 
-	io_sram_ptr = (uint8_t *)dst;
 	/*
 	 * The recovery data is drained by PIO polling. Any preemption from the
 	 * scheduler or timer interrupt while a response is pending can make the
@@ -1010,12 +1004,46 @@ static int i3c_recovery(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 				    OCP_REC_CTRL_ACTIVATE_REC_IMG)
 				break;
 		} else if (hdr->command == OCP_INDIRECT_DATA) {
+			/*
+			 * After a sink error keep draining the host's packets
+			 * until its activate command: returning early would
+			 * leave the rest of this image queued, and the next
+			 * load() would take it as the start of the next image.
+			 */
+			if (sink_err)
+				continue;
+
+			/*
+			 * The first write opens the Caliptra SHA session, whose
+			 * HW-lock poll may k_usleep(); never sleep with IRQs
+			 * locked. Unlock for that write only, between packets
+			 * (no response pending). Later writes may run
+			 * cptra_sha_update() (zephyr drivers/crypto/cptra_sha.c),
+			 * which only does MMIO DLEN/DATAIN writes with no wait or
+			 * sleep, so they stay inside the critical section; the
+			 * cost is ~1K MMIO writes per 4KB flush between polls.
+			 */
+			if (!received_size) {
+				irq_unlock(key);
+				resp_sts = sink->write(sink, received_size, hdr->payload,
+						       packet_size);
+				key = irq_lock();
+			} else {
+				resp_sts = sink->write(sink, received_size, hdr->payload,
+						       packet_size);
+			}
+			if (resp_sts) {
+				sink_err = resp_sts;
+				continue;
+			}
+
 			received_size += packet_size;
-			memcpy(io_sram_ptr, hdr->payload, packet_size);
-			io_sram_ptr += packet_size;
 		}
 	}
 	irq_unlock(key);
+
+	if (sink_err)
+		return sink_err;
 
 	DBG("received_size = %x\n", received_size);
 	*len = received_size;

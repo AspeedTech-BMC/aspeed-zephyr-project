@@ -312,18 +312,14 @@ static int i2c_init(struct ast_loader *loader)
 	return 0;
 }
 
-static int i2c_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
+static int i2c_load(struct ast_loader *loader, struct ast_loader_sink *sink, uint32_t *len)
 {
 	struct device *dev = loader->dev;
 	struct i2c_hci *hci = DEV_DATA(dev);
 	uint32_t size, received_size = 0;
-	uint8_t *io_sram_ptr = NULL;
 	int ret = 0;
 	struct i2c_recovey_packet const *hdr;
 
-	io_sram_ptr = (uint8_t *)dst;
-
-	DBG("dst: 0x%x, length: %x\n", (uint32_t)dst, len);
 	DBG("i2c buf: 0x%x\n", (uint32_t)i2c_buff);
 
 	/* clear buffer info */
@@ -359,11 +355,18 @@ static int i2c_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 			} else if (hdr->command == OCP_INDIRECT_DATA) {
 				/* if received data bytes would not fit with package length */
 				if (size >= hdr->len) {
+					ret = sink->write(sink, received_size,
+							  hdr->payload, hdr->len);
+					if (ret) {
+						/* same teardown as the activate exit */
+						clear_i2c_cmd_info();
+						i2c_reg_write(I2CS_ADDR_1,
+							      hci->slave_addr_disable);
+						trigger_i2c_slave(hci);
+						break;
+					}
+
 					received_size += hdr->len;
-					// if (received_size > len)
-					//	return REC_ERR_LARGE_IMG_SZ;
-					memcpy(io_sram_ptr, hdr->payload, hdr->len);
-					io_sram_ptr += hdr->len;
 				}
 
 				/* clear buffer info */

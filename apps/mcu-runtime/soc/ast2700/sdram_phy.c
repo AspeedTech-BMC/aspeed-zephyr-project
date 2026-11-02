@@ -11,6 +11,8 @@ LOG_MODULE_REGISTER(sdram_phy, CONFIG_SOC_FMC_LOG_LEVEL);
 
 #define DWC_PHY_IMEM_OFFSET	(0x50000)
 #define DWC_PHY_DMEM_OFFSET	(0x58000)
+/* IMEM/DMEM are 0x8000 PUB addresses each, 2 bus bytes per PUB address */
+#define DWC_PHY_MEM_BUS_SIZE	(2 * 0x8000)
 #define SCU0_DDR_PHY_CLOCK	BIT(11)
 #define SCU0_CLOCK_STOP_CLR_REG	(SCU0_REG + 0x244)
 
@@ -279,7 +281,8 @@ int dwc_ddrphy_phyinit_userCustom_D_loadIMEM(const int train2D)
 
 	fw = (type ? (train2D ? CPTRA_DDR4_2D_IMEM_FW_ID: CPTRA_DDR4_IMEM_FW_ID) : CPTRA_DDR5_IMEM_FW_ID);
 
-	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * imem_base), 0, true);
+	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * imem_base),
+			      DWC_PHY_MEM_BUS_SIZE, true);
 
 	return ret;
 }
@@ -297,7 +300,8 @@ int dwc_ddrphy_phyinit_userCustom_F_loadDMEM(const int pState, const int train2D
 
 	fw = (type ? (train2D ? CPTRA_DDR4_2D_DMEM_FW_ID: CPTRA_DDR4_DMEM_FW_ID) : CPTRA_DDR5_DMEM_FW_ID);
 
-	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * dmem_base), 0, true);
+	ast_loader_load_image(fw, (void *)(DRAMC_PHY_BASE + 2 * dmem_base),
+			      DWC_PHY_MEM_BUS_SIZE, true);
 	return ret;
 }
 
