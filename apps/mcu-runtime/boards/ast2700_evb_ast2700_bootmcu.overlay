@@ -8,9 +8,10 @@
 		aspeed,usb-desc = &usb_desc;
 	};
 
-	loader_stack: stack@14bab000 {
+	/* sized to CONFIG_MAIN_STACK_SIZE (16KB), top kept at 0x14bbd000 */
+	loader_stack: stack@14bb9000 {
 		compatible = "zephyr,memory-region";
-		reg = <0x14bab000 0x12000>;
+		reg = <0x14bb9000 0x4000>;
 		zephyr,memory-region = "CUSTOM_STACK";
 	};
 
@@ -99,6 +100,11 @@
 			no-map;
 		};
 	};
+};
+
+/* grow RAM up to loader_stack */
+&sram {
+	reg = <0x14b80000 0x39000>;
 };
 
 &emmc {

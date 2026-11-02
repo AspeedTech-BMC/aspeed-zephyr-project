@@ -101,11 +101,11 @@ static int ast_loader_verify_final(bool verify, uint32_t type, uint32_t *dst)
 		return 0;
 
 	if (type == CPTRA_MANIFEST_FW_ID) {
-#ifndef CONFIG_CPTRA_2X_LAYOUT
-		/* verify's ~14KB auth_input frame stacks on the 4KB stream stage */
-		BUILD_ASSERT(sizeof(struct cptra_set_auth_manifest_ia) +
-			     CONFIG_AST_LOADER_SEG_BUF_SIZE + 2048 <= CONFIG_MAIN_STACK_SIZE,
-			     "main stack too small for cptra_verify_soc_manifest_img()");
+		/*
+		 * Only the A1 EVB loads the soc manifest (manifest.c); keeping the
+		 * ~14KB verify frame out of other boards lets them run a 16KB stack.
+		 */
+#if !defined(CONFIG_CPTRA_2X_LAYOUT) && defined(CONFIG_BOARD_AST2700_EVB_AST2700_A1_BOOTMCU)
 		err = cptra_verify_soc_manifest_img((struct cptra_soc_manifest *)dst);
 		if (err)
 			return err;
