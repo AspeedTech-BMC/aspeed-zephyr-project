@@ -63,8 +63,9 @@
 #define CPTRA_SSP_HDR_ID          (0x100B)
 #define CPTRA_TSP_HDR_ID          (0x100C)
 
-#define CONFIG_AST_LOADER_TEMP_BUF_SIZE          (0x10000)  // 64k image size limit for SRAM-destined loads
-#define CONFIG_AST_LOADER_DRAM_TEMP_BUF_MAX_SIZE (0x500000) // 5M temp buffer for image loading and verification in DRAM
+#define CONFIG_AST_LOADER_DRAM_TEMP_BUF_MAX_SIZE (0x500000) // 5M image size limit for manifest image loading
+#define CONFIG_AST_LOADER_SEG_BUF_SIZE           (0x1000)   // 4k staging buffer for segmented/streamed image loading
+#define CONFIG_AST_LOADER_SRAM_MAX_SIZE          (0x10000)  // 64k default dst limit when the caller passes none
 
 enum {
 	CPTRA_MANIFEST_FW_ID = 0x00,
@@ -227,20 +228,18 @@ struct cptra_image_context {
 	struct cptra_soc_manifest *soc_manifest;
 };
 
-struct cptra_soc_manifest_verify_buf {
-	struct cptra_soc_manifest manifest;
-	struct cptra_set_auth_manifest_ia auth_input;
-	struct cptra_set_auth_manifest_oa output;
-} __attribute__((__packed__, __aligned__(4)));
-
 uint32_t cptra_manifest_start_offset(void);
 int cptra_verify_abb_loader(void);
 int cptra_load_abb_image(void);
 int cptra_get_abb_imginfo(uint32_t fw_id, uint32_t *ofst, uint32_t *size);
 bool cptra_manifest_sec_en(void);
-int cptra_verify_soc_manifest(struct cptra_soc_manifest_verify_buf *verify_buf, uint32_t verify_buf_size);
+int cptra_verify_soc_manifest_img(struct cptra_soc_manifest *manifest);
 int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest);
 int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id);
+int cptra_verify_image_init(void);
+int cptra_verify_image_update(uint8_t *data, uint32_t size);
+int cptra_verify_image_final(uint32_t fw_id);
+int cptra_verify_image_abort(void);
 void board_manifest_image_post_process(uint32_t fw_id);
 bool is_ast2700_a1(void);
 bool is_ast2700_a2(void);

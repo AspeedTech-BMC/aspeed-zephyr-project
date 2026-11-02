@@ -18,6 +18,8 @@
 
 #define VBIOS0_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base0))
 #define VBIOS1_RESERVED_MEM_BASE DT_REG_ADDR(DT_NODELABEL(vbios_base1))
+#define VBIOS0_RESERVED_MEM_SIZE DT_REG_SIZE(DT_NODELABEL(vbios_base0))
+#define VBIOS1_RESERVED_MEM_SIZE DT_REG_SIZE(DT_NODELABEL(vbios_base1))
 
 #define BIOS_HEADER_TAG 0xaa55
 
@@ -40,13 +42,17 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 {
 	uint32_t vbios_mem_base;
 	void *vbios_base;
+	uint32_t vbios_size;
 	uint32_t vbios_e2m_value;
 	uint32_t arm_dram_base = ASPEED_DRAM_BASE >> 1;
 
-	if (node == 0)
+	if (node == 0) {
 		vbios_base = (void *)VBIOS0_RESERVED_MEM_BASE;
-	else
+		vbios_size = VBIOS0_RESERVED_MEM_SIZE;
+	} else {
 		vbios_base = (void *)VBIOS1_RESERVED_MEM_BASE;
+		vbios_size = VBIOS1_RESERVED_MEM_SIZE;
+	}
 
 	LOG_DBG("vbios%d mem : 0x%p", node, vbios_base);
 
@@ -54,7 +60,7 @@ static int vbios_init(struct ast2700_scu0 *scu, uint8_t node)
 	vbios_mem_base = (uintptr_t)(vbios_base);
 	LOG_DBG("vbios_mem_base : 0x%x", vbios_mem_base);
 
-	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, 0, true);
+	ast_loader_load_image(CPTRA_UEFI_FW_ID, (uint32_t *)vbios_base, vbios_size, true);
 
 	/* Remove riscv Dram base */
 	vbios_mem_base &= ~(ASPEED_DRAM_BASE);

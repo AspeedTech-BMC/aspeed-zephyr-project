@@ -12,6 +12,7 @@
 #define MCU_DMEM_BASE			(MCU_BASE)
 #define MCU_REG_BASE			(MCU_BASE + 0x10000)
 #define MCU_IMEM_BASE			(MCU_BASE + 0x20000)
+#define MCU_IMEM_SIZE			(0x4000)	/* u-boot ast2700.dtsi dp node */
 
 #define MCU_CTRL			(MCU_REG_BASE + 0x00e0)
 #define  MCU_CTRL_AHBS_IMEM_EN		BIT(0)

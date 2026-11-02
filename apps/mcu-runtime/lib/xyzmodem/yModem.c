@@ -88,19 +88,21 @@ void writec(char y)
 }
 
 /**
- * ymodem_receive_into() - receive a file directly into a user buffer
+ * ymodem_receive_stream() - receive a file chunk by chunk through a sink
  * @port: transport + callbacks
- * @buf: destination buffer
+ * @sink: called with each received payload chunk (sequential offsets)
+ * @sink_ctx: opaque context passed to @sink
  * @out_size: returns received size (can be NULL)
  * @out_name: optional, buffer to store file name (can be NULL)
  * @name_cap: size of @out_name
  *
- * Copies the received payload into @buf. If the incoming file exceeds
+ * The payload is truncated to the file size announced in the ymodem
+ * header, so trailing block padding is never handed to @sink.
  */
-enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
-				       uint8_t *buf,
-				       uint32_t *out_size,
-				       char *out_name, uint32_t name_cap)
+enum ymodem_status ymodem_receive_stream(struct ymodem_port *port,
+					 ymodem_sink_t sink, void *sink_ctx,
+					 uint32_t *out_size,
+					 char *out_name, uint32_t name_cap)
 {
 	uint8_t retries, seq;
 	uint32_t to;
@@ -116,7 +118,7 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 	int r;
 	uint8_t dummy;
 
-	if (!port || !port->read || !port->write || !buf)
+	if (!port || !port->read || !port->write || !sink)
 		return YMODEM_ERR_IO;
 
 	retries = port->max_retries ? port->max_retries : 10;
@@ -219,7 +221,12 @@ enum ymodem_status ymodem_receive_into(struct ymodem_port *port,
 				uint32_t to_copy = (fsize && (total + payload_len > fsize)) ?
 						 (fsize - total) : payload_len;
 
-				memcpy(buf + total, payload, to_copy);
+				if (sink(sink_ctx, total, payload, to_copy)) {
+					/* receiver cannot take more data, abort */
+					y_putc(port, CAN);
+					y_putc(port, CAN);
+					return YMODEM_ERR_NOSPACE;
+				}
 
 				total += to_copy;
 				if (out_size)

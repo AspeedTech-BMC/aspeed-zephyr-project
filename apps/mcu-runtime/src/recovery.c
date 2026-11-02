@@ -37,17 +37,18 @@ static struct message_info message[] = {
 	{CPTRA_TSP_FW_ID,		"zephyr-aspeed-tsp.bin"},
 };
 
-static int recovery_load(struct ast_loader *loader, uint32_t type, uint32_t *dst, uint32_t *len)
+static int recovery_load(struct ast_loader *loader, uint32_t type,
+			 struct ast_loader_sink *sink, uint32_t *len)
 {
 	struct ast_loader_ops *ops;
-	uint32_t sz;
+	uint32_t sz = 0;
 	int err = -1;
 
 	printf("Please send \"%s\" through recovery interface.\n", message[type].msg);
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->load)
-		err = ops->load(loader, dst, &sz);
+		err = ops->load(loader, sink, &sz);
 
 	*len = sz;
 
@@ -79,6 +80,9 @@ int recovery_init(struct ast_loader *loader)
 	}
 
 	loader->load = recovery_load;
+	/* recovery interfaces stream the whole image, no random access */
+	loader->load_seg = NULL;
+	loader->get_size = NULL;
 
 	ops = ast_loader_get_ops(loader);
 	if (ops && ops->init)

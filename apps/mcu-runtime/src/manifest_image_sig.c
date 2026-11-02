@@ -108,7 +108,6 @@ static void cptra_preamble_convert(struct cptra_manifest_preamble *preamble,
 	memcpy(preamble->metadata_owner_LMS_sig, aspeed_preamble->metadata_owner_LMS_sig,
 	       sizeof(preamble->metadata_owner_LMS_sig));
 }
-#endif
 
 static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 {
@@ -136,7 +135,6 @@ static int cptra_manifest_sha384(uint8_t *img, uint32_t size, uint8_t *digest)
 	return CPTRA_SUCCESS;
 }
 
-#ifndef CONFIG_CPTRA_2X_LAYOUT
 static int cptra_manifest_ecdsa384(uint8_t *data, uint32_t data_size, uint32_t *x, uint32_t *y,
 				   uint32_t *r, uint32_t *s)
 {
@@ -202,38 +200,38 @@ static int cptra_manifest_lms(uint8_t *data, uint32_t data_size, struct lms_pub_
 	return ret;
 }
 
-int cptra_verify_soc_manifest(struct cptra_soc_manifest_verify_buf *verify_buf, uint32_t verify_buf_size)
+/*
+ * Stack-sensitive: auth_input holds the full metadata_entries array (~14KB)
+ * and sits on top of the loader's 4KB stream stage when called from
+ * ast_loader_verify_final() (BUILD_ASSERT there). Move it off-stack before
+ * shrinking the stack.
+ */
+int cptra_verify_soc_manifest_img(struct cptra_soc_manifest *manifest)
 {
 	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
-	struct cptra_set_auth_manifest_ia *auth_input = &(verify_buf->auth_input);
-	struct cptra_set_auth_manifest_oa *auth_output = &(verify_buf->output);
-	struct cptra_soc_manifest *manifest = &(verify_buf->manifest);
+	struct cptra_set_auth_manifest_ia auth_input;
+	struct cptra_set_auth_manifest_oa auth_output;
+
 	if (!cptra_manifest_sec_en())
 		return CPTRA_SUCCESS;
 
-	if (!verify_buf) {
-		LOG_ERR("manifest verify buf is NULL");
+	if (!manifest) {
+		LOG_ERR("manifest is NULL");
 		return CPTRA_ERR_INVALID_PARAMETER;
 	}
 
-	if (sizeof(struct cptra_soc_manifest_verify_buf) > verify_buf_size) {
-		LOG_ERR("manifest verify buf size is too small, required: %d, provided: %d",
-				sizeof(struct cptra_soc_manifest_verify_buf), verify_buf_size);
-		return CPTRA_ERR_EXCEED_MEMORY_LIMIT;
-	}
+	memset(&auth_input, 0x00, sizeof(auth_input));
+	memset(&auth_output, 0x00, sizeof(auth_output));
 
-	memset(auth_input, 0x00, sizeof(struct cptra_set_auth_manifest_ia));
-	memset(auth_output, 0x00, sizeof(struct cptra_set_auth_manifest_oa));
-
-	auth_input->manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
+	auth_input.manifest_size = sizeof(struct cptra_manifest_preamble) + sizeof(manifest->ime_count) +
 								sizeof(manifest->imc);
-	auth_input->metadata_entry_entry_count = manifest->ime_count;
+	auth_input.metadata_entry_entry_count = manifest->ime_count;
 
 	/* Convert aspeed preamble format to caliptra preamble format*/
-	cptra_preamble_convert(&(auth_input->preamble), &(manifest->preamble));
-	memcpy(&(auth_input->metadata_entries), manifest->imc, sizeof(manifest->imc));
+	cptra_preamble_convert(&(auth_input.preamble), &(manifest->preamble));
+	memcpy(&(auth_input.metadata_entries), manifest->imc, sizeof(manifest->imc));
 
-	return caliptra_set_auth_manifest(dev, auth_input, auth_output);
+	return caliptra_set_auth_manifest(dev, &auth_input, &auth_output);
 }
 
 #define CPTRA_SOC_MANIFEST_VER (0)
@@ -275,12 +273,20 @@ int cptra_verify_soc_manifest_ver(struct cptra_soc_manifest *manifest)
 }
 #endif
 
-int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
+/*
+ * Streaming image verification: hash the image chunk by chunk so the
+ * caller does not need a buffer holding the whole image.
+ */
+static struct {
+	struct hash_ctx ctx;
+	bool active;
+} img_vfy_state;
+
+int cptra_verify_image_init(void)
 {
-	int ret = 0;
-	struct cptra_authorize_and_stash_ia input = {0};
-	struct cptra_authorize_and_stash_oa output = {0};
-	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
+	const struct device *dev;
+
+	img_vfy_state.active = false;
 
 	if (!cptra_manifest_sec_en())
 		return CPTRA_SUCCESS;
@@ -292,10 +298,105 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 	}
 #endif
 
-	ret = cptra_manifest_sha384(img, img_size, (uint8_t *)&input.measurement);
+	dev = device_get_binding(CPTRA_HASH_DRV_NAME);
+
+	memset(&img_vfy_state.ctx, 0, sizeof(img_vfy_state.ctx));
+	img_vfy_state.ctx.flags = crypto_query_hwcaps(dev);
+
+	if (hash_begin_session(dev, &img_vfy_state.ctx, CRYPTO_HASH_ALGO_SHA384)) {
+		LOG_ERR("cptra sha384 session begin fail.");
+		return CPTRA_ERR_SHA384_CAL;
+	}
+
+	img_vfy_state.active = true;
+
+	return CPTRA_SUCCESS;
+}
+
+static int cptra_verify_image_hash(uint8_t *data, uint32_t size)
+{
+	struct hash_pkt pkt = {0};
+
+	pkt.in_buf = data;
+	pkt.in_len = size;
+
+	if (hash_update(&img_vfy_state.ctx, &pkt)) {
+		LOG_ERR("cptra sha384 calcu fail.");
+		cptra_verify_image_abort();
+		return CPTRA_ERR_SHA384_CAL;
+	}
+
+	return CPTRA_SUCCESS;
+}
+
+/*
+ * Chunks must be 4-byte multiples except the final one. An unaligned final
+ * chunk is hashed as its aligned body plus a zero-padded tail word copied
+ * out, so `data` is never written and needs no pad room.
+ */
+int cptra_verify_image_update(uint8_t *data, uint32_t size)
+{
+	uint32_t body = ROUND_DOWN(size, 4);
+	uint32_t tail = 0;
+	int ret;
+
+	if (!img_vfy_state.active)
+		return CPTRA_SUCCESS;
+
+	if (body) {
+		ret = cptra_verify_image_hash(data, body);
+		if (ret)
+			return ret;
+	}
+
+	if (size != body) {
+		LOG_WRN("cptra img size is not 4byte aligned (%d, %d)", size, 4 - (size - body));
+		memcpy(&tail, data + body, size - body);
+		ret = cptra_verify_image_hash((uint8_t *)&tail, sizeof(tail));
+		if (ret)
+			return ret;
+	}
+
+	return CPTRA_SUCCESS;
+}
+
+int cptra_verify_image_abort(void)
+{
+	uint8_t dummy[48];
+	struct hash_pkt pkt = {0};
+
+	if (!img_vfy_state.active)
+		return CPTRA_SUCCESS;
+
+	img_vfy_state.active = false;
+
+	/* run the engine to completion so it releases the HW lock */
+	pkt.out_buf = dummy;
+	hash_compute(&img_vfy_state.ctx, &pkt);
+	hash_free_session(img_vfy_state.ctx.device, &img_vfy_state.ctx);
+
+	return CPTRA_SUCCESS;
+}
+
+int cptra_verify_image_final(uint32_t fw_id)
+{
+	int ret = 0;
+	struct cptra_authorize_and_stash_ia input = {0};
+	struct cptra_authorize_and_stash_oa output = {0};
+	const struct device *dev = device_get_binding(CPTRA_MISC_DRV_NAME);
+	struct hash_pkt pkt = {0};
+
+	if (!img_vfy_state.active)
+		return CPTRA_SUCCESS;
+
+	img_vfy_state.active = false;
+
+	pkt.out_buf = (uint8_t *)&input.measurement;
+	ret = hash_compute(&img_vfy_state.ctx, &pkt);
+	hash_free_session(img_vfy_state.ctx.device, &img_vfy_state.ctx);
 	if (ret) {
 		LOG_ERR("Cptra sha384 calcu fail.");
-		return ret;
+		return CPTRA_ERR_SHA384_CAL;
 	}
 
 	/*
@@ -334,4 +435,19 @@ int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
 	LOG_INF("Verify %s image.. %s (0x%x)", cptra_ime_get_image_name(fw_id),
 		ret ? "fail" : "ok", ret);
 	return ret;
+}
+
+int cptra_verify_image(uint8_t *img, uint32_t img_size, uint32_t fw_id)
+{
+	int ret;
+
+	ret = cptra_verify_image_init();
+	if (ret)
+		return ret;
+
+	ret = cptra_verify_image_update(img, img_size);
+	if (ret)
+		return ret;
+
+	return cptra_verify_image_final(fw_id);
 }

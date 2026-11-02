@@ -27,7 +27,14 @@ static int uart_init(struct ast_loader *loader)
 	return 0;
 }
 
-static int uart_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
+static int uart_ymodem_sink(void *ctx, uint32_t ofst, const uint8_t *data, uint32_t len)
+{
+	struct ast_loader_sink *sink = ctx;
+
+	return sink->write(sink, ofst, data, len);
+}
+
+static int uart_load(struct ast_loader *loader, struct ast_loader_sink *sink, uint32_t *len)
 {
 	struct device *dev = loader->dev;
 	uint32_t out_sz = 0;
@@ -38,7 +45,7 @@ static int uart_load(struct ast_loader *loader, uint32_t *dst, uint32_t *len)
 
 	ymodem_open(dev);
 
-	sts = ymodem_receive_into(&uport, (uint8_t *)dst, &out_sz, NULL, 0);
+	sts = ymodem_receive_stream(&uport, uart_ymodem_sink, sink, &out_sz, NULL, 0);
 	if (sts == YMODEM_OK)
 		*len = out_sz;
 	else
