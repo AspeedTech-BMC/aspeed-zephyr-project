@@ -20,20 +20,24 @@
 #error "aspeed-obmf requires an enabled aspeed,obmf-lstp topology node"
 #endif
 
+#define LSTP_I2C_NODE DT_PHANDLE(LSTP_BACKEND_NODE, i2c_controller)
 #define LSTP_UART_NODE DT_PHANDLE(LSTP_BACKEND_NODE, uart_controller)
 
 #define LSTP_SPI_DEVICE_COUNT DT_PROP_LEN_OR(LSTP_BACKEND_NODE, spi_devices, 0)
 
 #define LSTP_SPI_CHANNEL_NAME  DT_PROP(LSTP_BACKEND_NODE, spi_channel_name)
+#define LSTP_I2C_CHANNEL_NAME  DT_PROP(LSTP_BACKEND_NODE, i2c_channel_name)
 #define LSTP_UART_CHANNEL_NAME DT_PROP(LSTP_BACKEND_NODE, uart_channel_name)
 
 #define LSTP_HAS_SPI_CHANNEL  IS_ENABLED(CONFIG_OBMF_LSTP_SPI_CHANNEL)
+#define LSTP_HAS_I2C_CHANNEL  IS_ENABLED(CONFIG_OBMF_LSTP_I2C_CHANNEL)
 #define LSTP_HAS_UART_CHANNEL 1
 
 /* Keep channel IDs dense: the BMC enumerates 1..num_channels. */
 #define LSTP_MGMT_CHANNEL_ID 0U
 #define LSTP_SLOT_SPI        (LSTP_MGMT_CHANNEL_ID + 1U)
-#define LSTP_SLOT_UART       (LSTP_SLOT_SPI + LSTP_HAS_SPI_CHANNEL)
+#define LSTP_SLOT_I2C        (LSTP_SLOT_SPI + LSTP_HAS_SPI_CHANNEL)
+#define LSTP_SLOT_UART       (LSTP_SLOT_I2C + LSTP_HAS_I2C_CHANNEL)
 
 #define LSTP_NUM_CHANNELS    (LSTP_SLOT_UART + LSTP_HAS_UART_CHANNEL)
 
@@ -41,11 +45,15 @@
 #define LSTP_CHANNEL_ID_NONE 0xFFU
 
 #define LSTP_SPI_CHANNEL_ID  (LSTP_HAS_SPI_CHANNEL ? LSTP_SLOT_SPI : LSTP_CHANNEL_ID_NONE)
+#define LSTP_I2C_CHANNEL_ID  (LSTP_HAS_I2C_CHANNEL ? LSTP_SLOT_I2C : LSTP_CHANNEL_ID_NONE)
 #define LSTP_UART_CHANNEL_ID (LSTP_HAS_UART_CHANNEL ? LSTP_SLOT_UART : LSTP_CHANNEL_ID_NONE)
 
 /* An exported channel needs the topology fields that describe it. */
 #if LSTP_HAS_SPI_CHANNEL && !DT_NODE_HAS_PROP(LSTP_BACKEND_NODE, spi_devices)
 #error "CONFIG_OBMF_LSTP_SPI_CHANNEL requires spi-devices in the topology"
+#endif
+#if LSTP_HAS_I2C_CHANNEL && !DT_NODE_HAS_PROP(LSTP_BACKEND_NODE, i2c_controller)
+#error "CONFIG_OBMF_LSTP_I2C_CHANNEL requires i2c-controller in the topology"
 #endif
 #if !IS_ENABLED(CONFIG_OBMF_LSTP_UART_SHELL) && \
 	!DT_NODE_HAS_PROP(LSTP_BACKEND_NODE, uart_controller)

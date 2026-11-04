@@ -8,6 +8,12 @@ properties:
 # The core and UART are always built. Other channel directories are built when
 # their Kconfig option is set.
 # lstp/lstp_backend.h checks fields required by the enabled backends.
+  i2c-controller:
+    type: phandle
+    description: |
+      I2C controller exported by the LSTP I2C channel. Required with
+      CONFIG_OBMF_LSTP_I2C_CHANNEL.
+
   spi-devices:
     type: phandles
     description: |
@@ -23,6 +29,10 @@ properties:
   spi-channel-name:
     type: string
     default: "SPI"
+
+  i2c-channel-name:
+    type: string
+    default: "I2C"
 
   uart-channel-name:
     type: string

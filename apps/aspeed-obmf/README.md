@@ -13,6 +13,7 @@ directories are built when their Kconfig option is set:
 | `lstp/` | always | LSTP core: USB transport, router, task thread, channel registry |
 | `uart/` | always | UART channel; shell (`CONFIG_OBMF_LSTP_UART_SHELL`) or plain backend |
 | `spi/` | `CONFIG_OBMF_LSTP_SPI_CHANNEL` | Read-only SPI channel served through the flash API |
+| `i2c/` | `CONFIG_OBMF_LSTP_I2C_CHANNEL` | I2C channel |
 | `mtd/` | `CONFIG_OBMF_LSTP_MTD_CLIENT` | Remote MTD client over LSTP SPI and its shell |
 
 `main.c` and the `obmf` shell root (`obmf_shell.c`) stay at the top of `src/`.
@@ -53,18 +54,38 @@ Bus 001 Device 002: ID 0955:cf11 ASPEED OBMF-USB
 dmesg | grep lstp
 ```
 
+- Expected output should include lines similar to:
+
+```text
+[    3.622569] usbcore: registered new interface driver lstp
+[    4.126144] lstp 1-1:1.0: lstp_init_channels: LSTP v1: device Management discovered with 3 channels
+[    4.212402] lstp 1-1:1.0: lstp_spi_init: ch_1: Initialized
+[    5.119588] lstp 1-1:1.0: lstp_i2c_start: I2C channel 2 registered as Management_I2C6
+...
+[    5.130496] lstp 1-1:1.0: lstp_probe: LSTP device initialized successfully
+[    5.776016] i2c i2c-22: lstp_i2c_write: ch_2: Write request to addr=0x48 failed (-5)
+[    5.877128] i2c i2c-22: lstp_i2c_write: ch_2: Write request to addr=0x49 failed (-5)
+```
+
 ## Boards, channels and shell
 
 The boards export these channels:
 
 | Board (`west build -b`) | Channels after management (ch0) |
 | ----------------------- | -------------------------------- |
-| `ast1040_evb/ast1040/cm4` | SPI (ch1), UART (ch2, uart0 on CON5 through UDMA) |
-| `ast1030_evb/ast1030` | SPI (ch1), UART (ch2, uart3) |
+| `ast1040_evb/ast1040/cm4` | SPI (ch1), I2C (ch2), UART (ch3, uart0 on CON5 through UDMA) |
+| `ast1030_evb/ast1030` | SPI (ch1), I2C (ch2), UART (ch3, uart3) |
 
 Channel IDs are dense, so turning a channel on or off with
-`CONFIG_OBMF_LSTP_SPI_CHANNEL` shifts the IDs after it; update the
+`CONFIG_OBMF_LSTP_{SPI,I2C}_CHANNEL` shifts the IDs after it; update the
 BMC device-tree IDs to match.
+
+Known limitation: the I2C SMBus block read (`READ_RECV_LEN`) clocks a fixed
+1 + 32 bytes and returns only the 1 + count the target announced. Zephyr has
+no receive-length read and the Aspeed controller driver always ends the last
+message with STOP, so the read cannot stop at the count. Targets whose reads
+have side effects (FIFOs, mailboxes, PMBus block reads with PEC) see the extra
+bytes consumed.
 
 With `CONFIG_SHELL`, commands are grouped under `obmf`:
 
@@ -78,3 +99,29 @@ Use `obmf <group> --help` for syntax. `mtd` requires `CONFIG_OBMF_LSTP_MTD_CLIEN
 `CONFIG_OBMF_LSTP_SPI_CHANNEL=y`; the remote MTD client is opt-in and defaults
 to off. `uart` requires `CONFIG_OBMF_LSTP_UART_SHELL`. On the
 EVB only `obmf stats` and `obmf mtd` exist.
+
+## Validation
+
+- Read the LM75 register from AST2700 through the LSTP I2C channel:
+
+```sh
+i2cget -y 22 -a 0x4d 2
+```
+
+- Expected result:
+
+```text
+0x4b
+```
+
+- Verify the same value directly on AST1030 I2C6:
+
+```sh
+iic read_byte I2C_6 0x4d 2
+```
+
+- Expected result:
+
+```text
+Output: 0x4b
+```

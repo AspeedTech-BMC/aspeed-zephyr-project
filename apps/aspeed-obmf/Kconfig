@@ -23,6 +23,15 @@ config OBMF_LSTP_MTD_CLIENT
 	  Disabled by default because any shell user can program and erase the
 	  peer's flash when this client is enabled.
 
+config OBMF_LSTP_I2C_CHANNEL
+	bool "Export the LSTP I2C channel"
+	default y
+	depends on I2C
+	help
+	  Export the I2C controller named by the aspeed,obmf-lstp topology as an
+	  LSTP I2C channel. When disabled the BMC no longer registers an I2C
+	  adapter for this device.
+
 config OBMF_LSTP_UART_SHELL
 	bool "Back the LSTP UART channel with shell commands"
 	depends on SHELL
