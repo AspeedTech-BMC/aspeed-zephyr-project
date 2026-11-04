@@ -11,6 +11,7 @@
 
 		espi-controller = <&espi0>;
 		snoop-controller = <&snoop>;
+		mmio-channel;
 		status = "okay";
 	};
 };

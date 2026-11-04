@@ -80,3 +80,7 @@ properties:
     type: int
     default: 0
     description: Number of eSPI virtual wires appended to the GPIO channel
+
+  mmio-channel:
+    type: boolean
+    description: Export the AST1040 eSPI MMIO extension channel

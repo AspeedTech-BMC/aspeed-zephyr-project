@@ -14,6 +14,31 @@ config OBMF_ESPI_BRIDGE
 	  the SAFS flash behind the MMIO window needs TAF. Direct LSTP
 	  peripheral channels do not depend on this extension.
 
+config OBMF_ESPI_MMIO
+	bool "Expose the eSPI MMIO extension channel"
+	default y
+	depends on OBMF_ESPI_BRIDGE
+	help
+	  Add the MMIO channel described by the aspeed,obmf-lstp topology.
+
+config OBMF_ESPI_MMIO_RESET
+	bool "Allow the host to reboot the AST1040 over the MMIO channel"
+	depends on OBMF_ESPI_MMIO
+	select REBOOT
+	help
+	  Lets the host cold-reboot the AST1040 by writing offset 0xFFFFFFFC
+	  with no data. There is no authorization: any USB host speaking LSTP
+	  can trigger it. Rejected when disabled.
+
+config OBMF_ESPI_MMIO_SAFS_WRITE
+	bool "Allow the host to write the emulated SAFS flash over MMIO"
+	depends on OBMF_ESPI_MMIO
+	help
+	  Lets the host load the RAM-backed SAFS flash that the eSPI host
+	  boots from, through MMIO writes at offset 0x10000 and above. There
+	  is no authorization: any USB host speaking LSTP can rewrite it.
+	  Reads stay available; writes are rejected when disabled.
+
 config OBMF_ESPI_UART_VUART
 	bool "Bridge Host 0x3F8 through the hardware VUART0"
 	depends on OBMF_ESPI_BRIDGE
