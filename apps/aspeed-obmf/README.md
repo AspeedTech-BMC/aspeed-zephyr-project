@@ -14,6 +14,7 @@ directories are built when their Kconfig option is set:
 | `uart/` | always | UART channel; shell (`CONFIG_OBMF_LSTP_UART_SHELL`) or plain backend |
 | `spi/` | `CONFIG_OBMF_LSTP_SPI_CHANNEL` | Read-only SPI channel served through the flash API |
 | `i2c/` | `CONFIG_OBMF_LSTP_I2C_CHANNEL` | I2C channel |
+| `gpio/` | `CONFIG_OBMF_LSTP_GPIO_CHANNEL` | GPIO channel |
 | `mtd/` | `CONFIG_OBMF_LSTP_MTD_CLIENT` | Remote MTD client over LSTP SPI and its shell |
 
 `main.c` and the `obmf` shell root (`obmf_shell.c`) stay at the top of `src/`.
@@ -73,12 +74,20 @@ The boards export these channels:
 
 | Board (`west build -b`) | Channels after management (ch0) |
 | ----------------------- | -------------------------------- |
-| `ast1040_evb/ast1040/cm4` | SPI (ch1), I2C (ch2), UART (ch3, uart0 on CON5 through UDMA) |
-| `ast1030_evb/ast1030` | SPI (ch1), I2C (ch2), UART (ch3, uart3) |
+| `ast1040_evb/ast1040/cm4` | SPI (ch1), I2C (ch2), GPIO (ch3), UART (ch4, uart0 on CON5 through UDMA) |
+| `ast1030_evb/ast1030` | SPI (ch1), I2C (ch2), GPIO (ch3, SGPIO, read-only), UART (ch4, uart3) |
 
 Channel IDs are dense, so turning a channel on or off with
-`CONFIG_OBMF_LSTP_{SPI,I2C}_CHANNEL` shifts the IDs after it; update the
+`CONFIG_OBMF_LSTP_{SPI,I2C,GPIO}_CHANNEL` shifts the IDs after it; update the
 BMC device-tree IDs to match.
+
+The BMC cannot change a GPIO's direction; it uses the direction this firmware
+reports. `gpio-controllers` exports whole 32-pin banks, so outputs are an
+allow-list: only pins in `gpio-output-lines` can be driven. Every other direct
+GPIO is reported as an input and is never reconfigured; `gpio-input-lines`
+marks the inputs that are configured at init and can take an IRQ (the EVB
+drives GPIO108 and reads it back on GPIO113 through a jumper on J48 pins 1-2).
+The AST1030 EVB lists no outputs, so its SGPIO pins are read-only.
 
 Known limitation: the I2C SMBus block read (`READ_RECV_LEN`) clocks a fixed
 1 + 32 bytes and returns only the 1 + count the target announced. Zephyr has

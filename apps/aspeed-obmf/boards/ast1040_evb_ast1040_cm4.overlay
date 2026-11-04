@@ -3,6 +3,12 @@
 		compatible = "aspeed,obmf-lstp";
 		i2c-controller = <&i2c0>;
 		spi-devices = <&spi0_cs0>;
+		gpio-controllers = <&gpio0_0_31 &gpio0_32_63
+				    &gpio0_64_95 &gpio0_96_127
+				    &gpio0_128_159 &gpio0_160_191>;
+		/* J48 pins 1-2 loop GPIO108 (output) back into GPIO113. */
+		gpio-input-lines = <113>;
+		gpio-output-lines = <108>;
 		/* uart0 on F3/G5 reaches CON5 through J74 13-14/15-16 and U29. */
 		uart-controller = <&uart0>;
 		spi-channel-name = "SPI0";
@@ -81,7 +87,7 @@
 	status = "disabled";
 };
 
-/* SGPIOM is unused on the EVB. */
+/* The GPIO channel uses the direct gpio0 banks; SGPIOM is unused. */
 /delete-node/ &sgpiom0;
 /delete-node/ &sgpiom1;
 

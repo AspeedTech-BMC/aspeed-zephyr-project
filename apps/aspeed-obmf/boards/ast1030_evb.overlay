@@ -3,6 +3,8 @@
 		compatible = "aspeed,obmf-lstp";
 		i2c-controller = <&i2c6>;
 		spi-devices = <&spi1_cs0>;
+		gpio-controllers = <&sgpiom_a_d &sgpiom_e_h
+				    &sgpiom_i_l &sgpiom_m_p>;
 		uart-controller = <&uart3>;
 		spi-channel-name = "SPI1";
 		i2c-channel-name = "I2C6";

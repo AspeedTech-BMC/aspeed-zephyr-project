@@ -41,6 +41,15 @@ config OBMF_LSTP_UART_SHELL
 	  kept for "obmf uart recv", and "obmf uart send" writes a
 	  line back. The topology then needs no uart-controller.
 
+config OBMF_LSTP_GPIO_CHANNEL
+	bool "Export the LSTP GPIO channel"
+	default y
+	depends on GPIO
+	help
+	  Export the GPIO banks named by the
+	  aspeed,obmf-lstp topology as an LSTP GPIO channel. When disabled no
+	  GPIO IRQ events are forwarded and the BMC registers no gpiochip.
+
 endmenu
 
 source "Kconfig.zephyr"
