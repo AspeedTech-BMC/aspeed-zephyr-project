@@ -10,3 +10,6 @@ target_sources(app PRIVATE
     lstp_router.c
     lstp_task.c
 )
+
+# Firmware-initiated requests; the remote MTD client is the only user.
+target_sources_ifdef(CONFIG_OBMF_LSTP_MTD_CLIENT app PRIVATE lstp_transaction.c)

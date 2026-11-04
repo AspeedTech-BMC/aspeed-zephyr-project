@@ -20,6 +20,7 @@
 #include "lstp_router.h"
 #include "lstp_usb.h"
 #include "lstp_task.h"
+#include "lstp_transaction.h"
 
 LOG_MODULE_REGISTER(lstp_router, LOG_LEVEL_ERR);
 
@@ -67,6 +68,7 @@ static lstp_status_t write_channel_config_helper(uint8_t channel_id,
 void lstp_router_init(void)
 {
 	LOG_INF("Initializing OBMF Router");
+	lstp_transaction_init();
 
 	channels[LSTP_MGMT_CHANNEL_ID] = &mgmt_channel;
 	STRUCT_SECTION_FOREACH(lstp_channel, ch) {
@@ -232,8 +234,9 @@ int lstp_router_receive(uint8_t *buffer, size_t len)
 	}
 
 	if (hdr->cmd_status_code & LSTP_RESPONSE_BIT) {
-		/* The firmware sends no requests of its own, so none is awaited. */
-		LOG_DBG("Unexpected response packet on channel %u", hdr->channel_id);
+		if (!lstp_transaction_handle_response(buffer, len)) {
+			LOG_DBG("Unmatched response packet on channel %u", hdr->channel_id);
+		}
 		return 0;
 	}
 
@@ -248,6 +251,17 @@ int lstp_router_receive(uint8_t *buffer, size_t len)
 	const uint8_t req_channel_id = hdr->channel_id;
 
 	LOG_DBG("Routing packet for channel %d", hdr->channel_id);
+
+	/*
+	 * Legacy Flashrom uses channel 0 for SPI opcodes 0x0..0x7 and matches the
+	 * reply on channel 0, so only the request is rerouted.
+	 */
+	if (LSTP_HAS_SPI_CHANNEL && hdr->channel_id == LSTP_MGMT_CHANNEL_ID &&
+	    (hdr->cmd_status_code & LSTP_SPI_CMD_CODE_MASK) <= LSTP_SPI_CMD_END) {
+		hdr->channel_id = LSTP_SPI_CHANNEL_ID;
+		LOG_DBG("Backward compat: routing ch0 cmd 0x%02x to SPI",
+			hdr->cmd_status_code & LSTP_SPI_CMD_CODE_MASK);
+	}
 
 	if (hdr->channel_id == LSTP_MGMT_CHANNEL_ID) {
 		/* Static: this runs in the USB controller ISR, one packet at a time. */

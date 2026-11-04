@@ -8,11 +8,21 @@ properties:
 # The core and UART are always built. Other channel directories are built when
 # their Kconfig option is set.
 # lstp/lstp_backend.h checks fields required by the enabled backends.
+  spi-devices:
+    type: phandles
+    description: |
+      The one SPI flash exported as LSTP chip-select 0; list exactly one
+      phandle. Required with CONFIG_OBMF_LSTP_SPI_CHANNEL.
+
   uart-controller:
     type: phandle
     description: |
       UART device exported by the LSTP UART channel. Not needed when
       CONFIG_OBMF_LSTP_UART_SHELL backs the channel with shell commands.
+
+  spi-channel-name:
+    type: string
+    default: "SPI"
 
   uart-channel-name:
     type: string

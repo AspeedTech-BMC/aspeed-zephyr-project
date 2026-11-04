@@ -40,6 +40,7 @@ int lstp_usb_send_response_in(uint32_t session, const uint8_t *data, size_t len,
 			      k_timeout_t timeout);
 
 int lstp_usb_send_event(const uint8_t *data, size_t len);
+int lstp_usb_send_event_in(uint32_t session, const uint8_t *data, size_t len);
 
 struct lstp_hdr;
 

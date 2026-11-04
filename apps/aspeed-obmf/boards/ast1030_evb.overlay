@@ -1,7 +1,9 @@
 / {
 	obmf_lstp: obmf-lstp {
 		compatible = "aspeed,obmf-lstp";
+		spi-devices = <&spi1_cs0>;
 		uart-controller = <&uart3>;
+		spi-channel-name = "SPI1";
 		uart-channel-name = "UART3";
 		status = "okay";
 	};

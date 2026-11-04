@@ -18,6 +18,7 @@
 #include "lstp_usb.h"
 #include "lstp_router.h"
 #include "lstp_task.h"
+#include "lstp_transaction.h"
 
 LOG_MODULE_REGISTER(lstp_usb, LOG_LEVEL_ERR);
 
@@ -341,6 +342,7 @@ static void lstp_usb_host_gone(void)
 {
 	atomic_clear(&lstp_usb_configured);
 	lstp_usb_tx_drop_pending();
+	lstp_transaction_transport_reset();
 	lstp_router_host_reset();
 }
 
@@ -364,6 +366,7 @@ static void lstp_usb_endpoints_reset(void)
 	(void)usb_dc_ep_configure(&in_cfg);
 	(void)usb_dc_ep_enable(LSTP_IN_EP_ADDR);
 	lstp_usb_tx_drop_pending();
+	lstp_transaction_transport_reset();
 	lstp_router_host_reset();
 	atomic_set(&lstp_usb_configured, 1);
 	lstp_usb_tx_kick_after(K_NO_WAIT);
@@ -521,9 +524,13 @@ int lstp_usb_send_response_in(uint32_t session, const uint8_t *data, size_t len,
 
 int lstp_usb_send_event(const uint8_t *data, size_t len)
 {
+	return lstp_usb_send_event_in(lstp_usb_session(), data, len);
+}
+
+int lstp_usb_send_event_in(uint32_t session, const uint8_t *data, size_t len)
+{
 	return lstp_usb_enqueue(&lstp_usb_event_slab, &lstp_usb_event_queue, data, len, NULL,
-				0U, K_NO_WAIT, &lstp_usb_event_drops,
-				atomic_get(&lstp_usb_tx_session));
+				0U, K_NO_WAIT, &lstp_usb_event_drops, (atomic_val_t)session);
 }
 
 int lstp_usb_send_event_parts(const struct lstp_hdr *hdr, const void *payload,
