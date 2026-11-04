@@ -26,6 +26,8 @@ static int cmd_lstp_stats(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "  RX ring overflow: %u", uart.rx_dropped_bytes);
 	shell_print(sh, "  RX FIFO overruns: %u  (LSR.OE events, not bytes)",
 		    uart.rx_fifo_overruns);
+	shell_print(sh, "  TX dropped      : %u  (host not draining VUART)",
+		    uart.tx_dropped_bytes);
 	shell_print(sh, "  TX NAK events   : %u  (host-to-UART writes, backend buffer full)",
 		    uart.tx_nak_events);
 	shell_print(sh, "  RX fwd dropped  : %u  (bytes, no host or host reset)",

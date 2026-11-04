@@ -15,8 +15,9 @@
 
 /*
  * Private interface between lstp_uart.c and the one UART backend CMakeLists.txt
- * links in: lstp_uart_shell.c when CONFIG_OBMF_LSTP_UART_SHELL is set,
- * lstp_uart_plain.c otherwise. Every backend also defines the lstp_uart_tx_bytes() declared in
+ * links in: lstp_uart_vuart.c when CONFIG_OBMF_ESPI_UART_VUART is set,
+ * lstp_uart_shell.c when CONFIG_OBMF_LSTP_UART_SHELL is, lstp_uart_plain.c
+ * otherwise. Every backend also defines the lstp_uart_tx_bytes() declared in
  * lstp_uart.h.
  */
 

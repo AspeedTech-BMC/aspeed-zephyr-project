@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Aspeed AST1040 interposer board configuration
+#
+# Copyright (c) 2026 ASPEED Technology Inc.
+
+config BOARD_AST1040_INTERPOSER
+	select SOC_AST1040_CM4 if BOARD_AST1040_INTERPOSER_AST1040_CM4

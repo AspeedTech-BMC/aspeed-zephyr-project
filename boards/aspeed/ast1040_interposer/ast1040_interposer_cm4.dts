@@ -1,0 +1,20 @@
+/*
+ * Copyright (c) 2026 ASPEED Technology Inc.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * The interposer is the AST1040 EVB plus a host eSPI connection, so reuse
+ * the EVB board description and only add what the eSPI link brings.
+ */
+#include <../boards/aspeed/ast1040_evb/ast1040_evb_cm4.dts>
+
+/ {
+	model = "Aspeed AST1040 Interposer board";
+	compatible = "aspeed,ast1040-interposer", "aspeed,ast1040-evb";
+};
+
+&espi0 {
+	status = "okay";
+};

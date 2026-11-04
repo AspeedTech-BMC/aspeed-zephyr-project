@@ -9,10 +9,10 @@
  */
 
 /*
- * LSTP UART backend that drives the ordinary UART named by the
- * aspeed,obmf-lstp uart-controller phandle, buffering RX in a ring that a
- * delayable work item drains onto the router. Built unless
- * CONFIG_OBMF_LSTP_UART_SHELL is set.
+ * LSTP UART backend for parts without the AST1040 host VUART (AST1030). It
+ * drives the ordinary UART named by the aspeed,obmf-lstp uart-controller
+ * phandle, buffering RX in a ring that a delayable work item drains onto the
+ * router. Built when CONFIG_OBMF_ESPI_UART_VUART is off.
  */
 
 #include <zephyr/device.h>

@@ -26,9 +26,11 @@
 #define LSTP_SPI_DEVICE_COUNT DT_PROP_LEN_OR(LSTP_BACKEND_NODE, spi_devices, 0)
 #define LSTP_GPIO_BANK_COUNT  DT_PROP_LEN_OR(LSTP_BACKEND_NODE, gpio_controllers, 0)
 #define LSTP_DIRECT_GPIO_NUM  (LSTP_GPIO_BANK_COUNT * 32U)
-/* Lines a virtual-wire provider may append after the direct banks; none yet. */
-#define LSTP_VWIRE_GPIO_BASE  LSTP_DIRECT_GPIO_NUM
-#define LSTP_VWIRE_GPIO_COUNT 0U
+#define LSTP_VWIRE_GPIO_BASE  DT_PROP(LSTP_BACKEND_NODE, vwire_gpio_base)
+/* Virtual wires are GPIO-channel lines fed by the eSPI bridge; need both. */
+#define LSTP_VWIRE_GPIO_COUNT \
+	((IS_ENABLED(CONFIG_OBMF_ESPI_BRIDGE) && IS_ENABLED(CONFIG_OBMF_LSTP_GPIO_CHANNEL)) ? \
+	 DT_PROP(LSTP_BACKEND_NODE, vwire_gpio_count) : 0U)
 #define LSTP_GPIO_NUM         (LSTP_DIRECT_GPIO_NUM + LSTP_VWIRE_GPIO_COUNT)
 
 #define LSTP_SPI_CHANNEL_NAME  DT_PROP(LSTP_BACKEND_NODE, spi_channel_name)
@@ -71,6 +73,17 @@
 	!DT_NODE_HAS_PROP(LSTP_BACKEND_NODE, uart_controller)
 #error "The UART channel requires uart-controller unless CONFIG_OBMF_LSTP_UART_SHELL"
 #endif
+#if IS_ENABLED(CONFIG_OBMF_ESPI_BRIDGE) && \
+	!(DT_NODE_HAS_PROP(LSTP_BACKEND_NODE, espi_controller) && \
+	  DT_NODE_HAS_PROP(LSTP_BACKEND_NODE, snoop_controller))
+#error "CONFIG_OBMF_ESPI_BRIDGE requires espi-controller and snoop-controller"
+#endif
+
+#if LSTP_VWIRE_GPIO_COUNT > 0
+#if LSTP_VWIRE_GPIO_BASE != LSTP_DIRECT_GPIO_NUM
+#error "eSPI virtual wires must be appended after the direct GPIO banks"
+#endif
+#endif
 
 BUILD_ASSERT(LSTP_SPI_DEVICE_COUNT <= 1U,
 	     "LSTP SPI channel exports one device: spi-devices takes at most one phandle");
@@ -82,5 +95,7 @@ BUILD_ASSERT(LSTP_NUM_CHANNELS <= LSTP_CHANNEL_ID_NONE,
 	     "LSTP channel IDs must stay distinct from LSTP_CHANNEL_ID_NONE");
 BUILD_ASSERT(LSTP_GPIO_NUM <= UINT8_MAX,
 	     "LSTP GPIO descriptor uses an 8-bit GPIO count");
+BUILD_ASSERT(LSTP_VWIRE_GPIO_COUNT <= 16U,
+	     "AST1040 VWire GPIO backend supports at most 16 logical pins");
 
 #endif /* LSTP_BACKEND_H */

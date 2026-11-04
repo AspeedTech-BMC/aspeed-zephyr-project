@@ -10,8 +10,8 @@
 
 /*
  * Parts of the LSTP UART channel that do not depend on how the host UART is
- * reached. The other half lives in lstp_uart_plain.c or lstp_uart_shell.c;
- * see lstp_uart_backend.h.
+ * reached. The other half lives in lstp_uart_vuart.c, lstp_uart_plain.c or
+ * lstp_uart_shell.c; see lstp_uart_backend.h.
  */
 
 #include <zephyr/kernel.h>
@@ -92,7 +92,7 @@ static lstp_status_t lstp_uart_receive(uint8_t channel_id,
 	} else if (payload != NULL) {
 		lstp_uart_set_host_active(true);
 
-		/* The shell backend NAKs when full; the plain one blocks instead. */
+		/* VUART and shell backends NAK when full; the plain one blocks instead. */
 		int ret = lstp_uart_tx_bytes(payload, payload_len);
 
 		if (ret == -EBUSY) {

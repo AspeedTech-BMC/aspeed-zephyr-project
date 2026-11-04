@@ -25,3 +25,5 @@ add_subdirectory_ifdef(CONFIG_OBMF_LSTP_SPI_CHANNEL src/spi)
 add_subdirectory_ifdef(CONFIG_OBMF_LSTP_I2C_CHANNEL src/i2c)
 add_subdirectory_ifdef(CONFIG_OBMF_LSTP_GPIO_CHANNEL src/gpio)
 add_subdirectory_ifdef(CONFIG_OBMF_LSTP_MTD_CLIENT src/mtd)
+# AST1040-only bridge extension. CONFIG_ESPI alone is not an OBMF capability.
+add_subdirectory_ifdef(CONFIG_OBMF_ESPI_BRIDGE src/espi)

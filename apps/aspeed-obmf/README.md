@@ -11,16 +11,18 @@ directories are built when their Kconfig option is set:
 | Directory | Built when | Contents |
 | --------- | ---------- | -------- |
 | `lstp/` | always | LSTP core: USB transport, router, task thread, channel registry |
-| `uart/` | always | UART channel; shell (`CONFIG_OBMF_LSTP_UART_SHELL`) or plain backend |
+| `uart/` | always | UART channel; VUART (`CONFIG_OBMF_ESPI_UART_VUART`), shell (`CONFIG_OBMF_LSTP_UART_SHELL`) or plain backend |
 | `spi/` | `CONFIG_OBMF_LSTP_SPI_CHANNEL` | Read-only SPI channel served through the flash API |
 | `i2c/` | `CONFIG_OBMF_LSTP_I2C_CHANNEL` | I2C channel |
-| `gpio/` | `CONFIG_OBMF_LSTP_GPIO_CHANNEL` | GPIO channel |
+| `gpio/` | `CONFIG_OBMF_LSTP_GPIO_CHANNEL` | GPIO channel, including eSPI virtual-wire pins |
 | `mtd/` | `CONFIG_OBMF_LSTP_MTD_CLIENT` | Remote MTD client over LSTP SPI and its shell |
+| `espi/` | `CONFIG_OBMF_ESPI_BRIDGE` | AST1040 eSPI bridge, OOB, SAFS, `obmf espi` shell |
 
 `main.c` and the `obmf` shell root (`obmf_shell.c`) stay at the top of `src/`.
 
 Dependencies only point down: `lstp/` includes nothing outside itself, the
-channel directories include only `lstp/`. A header from another directory is included with its directory
+channel directories include only `lstp/`, and `espi/` may also use `uart/`
+and `gpio/`. A header from another directory is included with its directory
 (`#include "lstp/lstp_router.h"`), so the dependency is visible at the include
 site.
 
@@ -70,11 +72,14 @@ dmesg | grep lstp
 
 ## Boards, channels and shell
 
-The boards export these channels:
+Two AST1040 boards are supported. The interposer is the EVB plus a host eSPI
+link (`boards/aspeed/ast1040_interposer` in this repository), and only it
+builds the eSPI bridge:
 
 | Board (`west build -b`) | Channels after management (ch0) |
 | ----------------------- | -------------------------------- |
 | `ast1040_evb/ast1040/cm4` | SPI (ch1), I2C (ch2), GPIO (ch3), UART (ch4, uart0 on CON5 through UDMA) |
+| `ast1040_interposer/ast1040/cm4` | UART (ch1, host VUART 0x3F8) |
 | `ast1030_evb/ast1030` | SPI (ch1), I2C (ch2), GPIO (ch3, SGPIO, read-only), UART (ch4, uart3) |
 
 Channel IDs are dense, so turning a channel on or off with
@@ -100,11 +105,15 @@ With `CONFIG_SHELL`, commands are grouped under `obmf`:
 
 | Group | Commands |
 | ----- | -------- |
+| `obmf espi` | Status, capabilities, vwire/vGPIO reads, register/Port I/O dumps, snoop, monitor, memtrace |
 | `obmf stats` | LSTP drop/queue counters |
+| `obmf vuart` | LSTP VUART registers |
 | `obmf uart` | send, recv |
 | `obmf mtd` | Remote MTD read/write/erase over LSTP SPI |
 
-Use `obmf <group> --help` for syntax. `mtd` requires `CONFIG_OBMF_LSTP_MTD_CLIENT=y` together with
+Use `obmf <group> --help` for syntax. `espi` requires `CONFIG_OBMF_ESPI_BRIDGE`;
+`vuart` requires `CONFIG_OBMF_ESPI_UART_VUART`.
+`mtd` requires `CONFIG_OBMF_LSTP_MTD_CLIENT=y` together with
 `CONFIG_OBMF_LSTP_SPI_CHANNEL=y`; the remote MTD client is opt-in and defaults
 to off. `uart` requires `CONFIG_OBMF_LSTP_UART_SHELL`. On the
 EVB only `obmf stats` and `obmf mtd` exist.

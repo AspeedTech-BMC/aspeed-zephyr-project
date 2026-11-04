@@ -29,7 +29,8 @@ properties:
   uart-controller:
     type: phandle
     description: |
-      UART device exported by the LSTP UART channel. Not needed when
+      UART device exported by the LSTP UART channel: the hardware VUART with
+      CONFIG_OBMF_ESPI_UART_VUART, otherwise a plain UART. Not needed when
       CONFIG_OBMF_LSTP_UART_SHELL backs the channel with shell commands.
 
   spi-channel-name:
@@ -43,6 +44,16 @@ properties:
   uart-channel-name:
     type: string
     default: "UART"
+
+  espi-controller:
+    type: phandle
+    description: eSPI controller used by the AST1040 bridge. Required with
+      CONFIG_OBMF_ESPI_BRIDGE.
+
+  snoop-controller:
+    type: phandle
+    description: eSPI snoop controller used by the AST1040 bridge. Required
+      with CONFIG_OBMF_ESPI_BRIDGE.
 
   gpio-input-lines:
     type: array
@@ -59,3 +70,13 @@ properties:
       is reported as an input and SetValue on it is rejected. A pin on neither
       list is never reconfigured; gpio-input-lines pins are made inputs at init.
       A pin must not be in both lists.
+
+  vwire-gpio-base:
+    type: int
+    default: 0
+    description: First logical GPIO index reserved for eSPI virtual wires
+
+  vwire-gpio-count:
+    type: int
+    default: 0
+    description: Number of eSPI virtual wires appended to the GPIO channel
