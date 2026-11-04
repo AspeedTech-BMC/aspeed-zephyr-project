@@ -16,7 +16,7 @@ directories are built when their Kconfig option is set:
 | `i2c/` | `CONFIG_OBMF_LSTP_I2C_CHANNEL` | I2C channel |
 | `gpio/` | `CONFIG_OBMF_LSTP_GPIO_CHANNEL` | GPIO channel, including eSPI virtual-wire pins |
 | `mtd/` | `CONFIG_OBMF_LSTP_MTD_CLIENT` | Remote MTD client over LSTP SPI and its shell |
-| `espi/` | `CONFIG_OBMF_ESPI_BRIDGE` | AST1040 eSPI bridge, OOB, SAFS and the MMIO (`CONFIG_OBMF_ESPI_MMIO`) channel, `obmf espi` shell |
+| `espi/` | `CONFIG_OBMF_ESPI_BRIDGE` | AST1040 eSPI bridge, OOB, SAFS, MMIO (`CONFIG_OBMF_ESPI_MMIO`) and IPMI/MMBI (`CONFIG_OBMF_ESPI_IPMI`) channels, `obmf espi`/`mmbi` shell |
 
 `main.c` and the `obmf` shell root (`obmf_shell.c`) stay at the top of `src/`.
 
@@ -79,7 +79,7 @@ builds the eSPI bridge:
 | Board (`west build -b`) | Channels after management (ch0) |
 | ----------------------- | -------------------------------- |
 | `ast1040_evb/ast1040/cm4` | SPI (ch1), I2C (ch2), GPIO (ch3), UART (ch4, uart0 on CON5 through UDMA) |
-| `ast1040_interposer/ast1040/cm4` | UART (ch1, host VUART 0x3F8), MMIO (ch2) |
+| `ast1040_interposer/ast1040/cm4` | UART (ch1, host VUART 0x3F8), MMIO (ch2), IPMI (ch3) |
 | `ast1030_evb/ast1030` | SPI (ch1), I2C (ch2), GPIO (ch3, SGPIO, read-only), UART (ch4, uart3) |
 
 Channel IDs are dense, so turning a channel on or off with
@@ -106,13 +106,15 @@ With `CONFIG_SHELL`, commands are grouped under `obmf`:
 | Group | Commands |
 | ----- | -------- |
 | `obmf espi` | Status, capabilities, vwire/vGPIO reads, register/Port I/O dumps, snoop, monitor, memtrace |
+| `obmf mmbi` | status, trace, dump, desc, intr, reset |
 | `obmf stats` | LSTP drop/queue counters |
 | `obmf vuart` | LSTP VUART registers |
 | `obmf uart` | send, recv |
 | `obmf mtd` | Remote MTD read/write/erase over LSTP SPI |
 
 Use `obmf <group> --help` for syntax. `espi` requires `CONFIG_OBMF_ESPI_BRIDGE`;
-`vuart` requires `CONFIG_OBMF_ESPI_UART_VUART`.
+`vuart` requires `CONFIG_OBMF_ESPI_UART_VUART`. `mmbi` also requires
+`CONFIG_OBMF_ESPI_IPMI`.
 `mtd` requires `CONFIG_OBMF_LSTP_MTD_CLIENT=y` together with
 `CONFIG_OBMF_LSTP_SPI_CHANNEL=y`; the remote MTD client is opt-in and defaults
 to off. `uart` requires `CONFIG_OBMF_LSTP_UART_SHELL`. On the
@@ -142,4 +144,40 @@ iic read_byte I2C_6 0x4d 2
 
 ```text
 Output: 0x4b
+```
+
+## IPMI over eSPI MMBI (interposer)
+
+`Host → eSPI MMBI → AST1040 → LSTP IPMI → AST2700 /dev/ipmi-lstp0`
+
+The bridge never raises the host interrupt and does not accept the host doorbell,
+so host software must poll, as `MmbiV1Toolx64.efi` does. The interrupt types in the
+descriptor are only advertised because the host rejects type 0.
+
+Set the overlay's `perif-mcyc-src-addr` to the host's eSPI LGMR base
+(BIOS `EspiLgmrBaseAddr`). For a base of `0xEC000000`:
+
+```dts
+&espi0 {
+	perif-mcyc-enable;
+	perif-mcyc-src-addr = <0x0 0xec000000>;
+	perif-mcyc-size = <0x0 0x00010000>;
+};
+```
+
+The 64 KiB window holds MMBI at offsets `0x0000..0x7fff` and OBMF mirrors
+from `0x8000`. Check the window and traffic on AST1040:
+
+```text
+obmf espi mcyc
+obmf mmbi desc
+obmf mmbi status
+obmf espi memtrace wr
+```
+
+On AST2700, run an IPMI bridged `/usr/libexec/kcsbridged -c ipmi-lstp0 &`. On the host:
+
+```text
+Shell> MmbiV1Toolx64.efi -i
+Shell> MmbiV1Toolx64.efi -p 1 -g 0x18 0x1
 ```

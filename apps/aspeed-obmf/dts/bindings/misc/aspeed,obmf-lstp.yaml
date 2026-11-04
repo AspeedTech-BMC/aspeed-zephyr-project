@@ -84,3 +84,7 @@ properties:
   mmio-channel:
     type: boolean
     description: Export the AST1040 eSPI MMIO extension channel
+
+  ipmi-channel:
+    type: boolean
+    description: Export the AST1040 eSPI MMBI IPMI channel

@@ -1064,6 +1064,9 @@ static void espi_service_work_handler(struct k_work *work)
 	}
 
 	espi_service_peripheral();
+#if IS_ENABLED(CONFIG_OBMF_ESPI_IPMI)
+	espi_mmbi_poll();
+#endif
 	espi_service_oob();
 	k_work_reschedule_for_queue(&espi_bridge_workq, &espi_service_work,
 				    ESPI_SERVICE_PERIOD);
@@ -1186,6 +1189,12 @@ static int espi_bridge_init(void)
 		if (rc != 0) {
 			init_rc = rc;
 		}
+#if IS_ENABLED(CONFIG_OBMF_ESPI_IPMI)
+		rc = espi_mmbi_init();
+		if (rc != 0 && rc != -ENOTSUP) {
+			LOG_ERR("MMBI init failed: %d", rc);
+		}
+#endif
 	}
 	k_work_reschedule_for_queue(&espi_bridge_workq, &espi_monitor_work, K_MSEC(100));
 	k_work_reschedule_for_queue(&espi_bridge_workq, &espi_service_work, K_MSEC(100));
