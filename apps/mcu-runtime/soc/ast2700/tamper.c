@@ -568,14 +568,5 @@ int pll_calibration(int step, int diff)
 	}
 	LOG_INF("PLL lock OK");
 
-	tamper_init(step, diff);
-	if (sys_read32(TAMPER_STATUS_REG) & TAMPER_ALERT) {
-		LOG_WRN("Tamper alert after pll_calibration!! FREQ_COUNTER_CTRL_REG=0x%08x, FREQ_COUNTER_READBACK=0x%08x",
-				sys_read32(FREQ_COUNTER_CTRL_REG),
-				sys_read32(FREQ_COUNTER_READBACK));
-		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
-		ret = -1;
-	}
-
-	return ret;
+	return tamper_init(step, diff);
 }
