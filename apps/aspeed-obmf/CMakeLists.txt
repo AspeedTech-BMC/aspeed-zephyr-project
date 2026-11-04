@@ -21,3 +21,5 @@ target_sources_ifdef(CONFIG_SHELL app PRIVATE src/obmf_shell.c)
 # their Kconfig option is set.
 add_subdirectory(src/lstp)
 add_subdirectory(src/uart)
+add_subdirectory_ifdef(CONFIG_OBMF_LSTP_SPI_CHANNEL src/spi)
+add_subdirectory_ifdef(CONFIG_OBMF_LSTP_MTD_CLIENT src/mtd)

@@ -1,8 +1,10 @@
 / {
 	obmf_lstp: obmf-lstp {
 		compatible = "aspeed,obmf-lstp";
+		spi-devices = <&spi0_cs0>;
 		/* uart0 on F3/G5 reaches CON5 through J74 13-14/15-16 and U29. */
 		uart-controller = <&uart0>;
+		spi-channel-name = "SPI0";
 		uart-channel-name = "UART0";
 		status = "okay";
 	};

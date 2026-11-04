@@ -2,6 +2,27 @@
 
 menu "OBMF LSTP peripheral channels"
 
+config OBMF_LSTP_SPI_CHANNEL
+	bool "Export the LSTP SPI channel"
+	default y
+	depends on FLASH_JESD216_API && FLASH_PAGE_LAYOUT
+	help
+	  Export the SPI flash listed in the aspeed,obmf-lstp topology
+	  (spi-devices takes exactly one) as a read-only LSTP SPI channel.
+	  The BMC's opcodes are served through the flash API (JEDEC ID, SFDP
+	  and the 03h/13h/0Bh/0Ch reads); nothing is driven on the SPI bus
+	  directly.
+
+config OBMF_LSTP_MTD_CLIENT
+	bool "Remote MTD client over LSTP SPI"
+	default n
+	depends on OBMF_LSTP_SPI_CHANNEL
+	help
+	  Enable firmware-initiated access to the peer's SPI flash and, with
+	  CONFIG_SHELL, the "obmf mtd" commands.
+	  Disabled by default because any shell user can program and erase the
+	  peer's flash when this client is enabled.
+
 config OBMF_LSTP_UART_SHELL
 	bool "Back the LSTP UART channel with shell commands"
 	depends on SHELL

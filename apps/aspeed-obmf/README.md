@@ -12,6 +12,8 @@ directories are built when their Kconfig option is set:
 | --------- | ---------- | -------- |
 | `lstp/` | always | LSTP core: USB transport, router, task thread, channel registry |
 | `uart/` | always | UART channel; shell (`CONFIG_OBMF_LSTP_UART_SHELL`) or plain backend |
+| `spi/` | `CONFIG_OBMF_LSTP_SPI_CHANNEL` | Read-only SPI channel served through the flash API |
+| `mtd/` | `CONFIG_OBMF_LSTP_MTD_CLIENT` | Remote MTD client over LSTP SPI and its shell |
 
 `main.c` and the `obmf` shell root (`obmf_shell.c`) stay at the top of `src/`.
 
@@ -20,7 +22,8 @@ channel directories include only `lstp/`. A header from another directory is inc
 (`#include "lstp/lstp_router.h"`), so the dependency is visible at the include
 site.
 
-The core does not name any channel. A channel module defines a
+Apart from the legacy channel-0 SPI reroute and the SPI-backed remote MTD
+transaction, the core does not name any channel. A channel module defines a
 `struct lstp_channel` with `LSTP_CHANNEL_DEFINE()` (`lstp/lstp_channel.h`),
 giving its `LSTP_*_CHANNEL_ID` from `lstp/lstp_backend.h` and its init,
 config, request and poll hooks; the router collects them at start-up. A
@@ -56,8 +59,12 @@ The boards export these channels:
 
 | Board (`west build -b`) | Channels after management (ch0) |
 | ----------------------- | -------------------------------- |
-| `ast1040_evb/ast1040/cm4` | UART (ch1, uart0 on CON5 through UDMA) |
-| `ast1030_evb/ast1030` | UART (ch1, uart3) |
+| `ast1040_evb/ast1040/cm4` | SPI (ch1), UART (ch2, uart0 on CON5 through UDMA) |
+| `ast1030_evb/ast1030` | SPI (ch1), UART (ch2, uart3) |
+
+Channel IDs are dense, so turning a channel on or off with
+`CONFIG_OBMF_LSTP_SPI_CHANNEL` shifts the IDs after it; update the
+BMC device-tree IDs to match.
 
 With `CONFIG_SHELL`, commands are grouped under `obmf`:
 
@@ -65,6 +72,9 @@ With `CONFIG_SHELL`, commands are grouped under `obmf`:
 | ----- | -------- |
 | `obmf stats` | LSTP drop/queue counters |
 | `obmf uart` | send, recv |
+| `obmf mtd` | Remote MTD read/write/erase over LSTP SPI |
 
-Use `obmf <group> --help` for syntax. `uart` requires `CONFIG_OBMF_LSTP_UART_SHELL`. On the
-EVB only `obmf stats` exists.
+Use `obmf <group> --help` for syntax. `mtd` requires `CONFIG_OBMF_LSTP_MTD_CLIENT=y` together with
+`CONFIG_OBMF_LSTP_SPI_CHANNEL=y`; the remote MTD client is opt-in and defaults
+to off. `uart` requires `CONFIG_OBMF_LSTP_UART_SHELL`. On the
+EVB only `obmf stats` and `obmf mtd` exist.
