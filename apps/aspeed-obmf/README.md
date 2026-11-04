@@ -16,7 +16,7 @@ directories are built when their Kconfig option is set:
 | `i2c/` | `CONFIG_OBMF_LSTP_I2C_CHANNEL` | I2C channel |
 | `gpio/` | `CONFIG_OBMF_LSTP_GPIO_CHANNEL` | GPIO channel, including eSPI virtual-wire pins |
 | `mtd/` | `CONFIG_OBMF_LSTP_MTD_CLIENT` | Remote MTD client over LSTP SPI and its shell |
-| `espi/` | `CONFIG_OBMF_ESPI_BRIDGE` | AST1040 eSPI bridge, OOB, SAFS, `obmf espi` shell |
+| `espi/` | `CONFIG_OBMF_ESPI_BRIDGE` | AST1040 eSPI bridge, OOB, SAFS and the MMIO (`CONFIG_OBMF_ESPI_MMIO`) channel, `obmf espi` shell |
 
 `main.c` and the `obmf` shell root (`obmf_shell.c`) stay at the top of `src/`.
 
@@ -79,7 +79,7 @@ builds the eSPI bridge:
 | Board (`west build -b`) | Channels after management (ch0) |
 | ----------------------- | -------------------------------- |
 | `ast1040_evb/ast1040/cm4` | SPI (ch1), I2C (ch2), GPIO (ch3), UART (ch4, uart0 on CON5 through UDMA) |
-| `ast1040_interposer/ast1040/cm4` | UART (ch1, host VUART 0x3F8) |
+| `ast1040_interposer/ast1040/cm4` | UART (ch1, host VUART 0x3F8), MMIO (ch2) |
 | `ast1030_evb/ast1030` | SPI (ch1), I2C (ch2), GPIO (ch3, SGPIO, read-only), UART (ch4, uart3) |
 
 Channel IDs are dense, so turning a channel on or off with
