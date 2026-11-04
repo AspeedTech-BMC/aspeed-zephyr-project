@@ -7,6 +7,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/sys/util.h>
 
+#include "gpio/lstp_gpio.h"
 #include "uart/lstp_uart.h"
 #include "lstp/lstp_usb.h"
 
@@ -36,6 +37,12 @@ static int cmd_lstp_stats(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "  rx drops        : %u", usb.rx_drops);
 	shell_print(sh, "  write errors    : %u", usb.write_errors);
 	shell_print(sh, "  tx queue peak   : %u", usb.tx_high_water);
+	if (IS_ENABLED(CONFIG_OBMF_LSTP_GPIO_CHANNEL)) {
+		shell_print(sh, "LSTP GPIO");
+		shell_print(sh, "  gpio irq drops  : %u", lstp_gpio_get_irq_drops());
+		shell_print(sh, "  gpio event drops: %u  (sent but rejected by USB)",
+			    lstp_gpio_get_event_drops());
+	}
 
 	return 0;
 }

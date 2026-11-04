@@ -20,6 +20,12 @@ properties:
       The one SPI flash exported as LSTP chip-select 0; list exactly one
       phandle. Required with CONFIG_OBMF_LSTP_SPI_CHANNEL.
 
+  gpio-controllers:
+    type: phandles
+    description: |
+      GPIO banks ordered by the LSTP logical GPIO index. Required with
+      CONFIG_OBMF_LSTP_GPIO_CHANNEL.
+
   uart-controller:
     type: phandle
     description: |
@@ -37,3 +43,19 @@ properties:
   uart-channel-name:
     type: string
     default: "UART"
+
+  gpio-input-lines:
+    type: array
+    description: |
+      LSTP GPIO indices reported to the BMC as inputs that can take an IRQ
+      configuration. They are made inputs at init.
+
+  gpio-output-lines:
+    type: array
+    description: |
+      LSTP GPIO indices the BMC may drive. This is an allow-list: the
+      gpio-controllers banks export whole 32-pin ports, and a pin left off
+      this list (a pinmuxed UART/I2C pin, a strap, a reset or power enable)
+      is reported as an input and SetValue on it is rejected. A pin on neither
+      list is never reconfigured; gpio-input-lines pins are made inputs at init.
+      A pin must not be in both lists.
