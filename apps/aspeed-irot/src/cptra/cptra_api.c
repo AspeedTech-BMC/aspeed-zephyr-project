@@ -56,6 +56,7 @@ static int sha384_init_internal(void)
 	int ipccmd = CPTRA_IPCCMD_SHA384_DIGEST;
 	struct cptra_hash_ctx ctx;
 	uint32_t data[2];
+	uint32_t rsp;	/* bootmcu writes no data for init/update */
 	int ret;
 	/* Prepare tx data to bootmcu */
 	data[0] = IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
@@ -79,9 +80,15 @@ static int sha384_init_internal(void)
 			goto end;
 		} else
 			LOG_DBG("cptra_ipc_trigger:0x%x is successful", ipccmd);
-		cptra_ipc_receive(CPTRA_IPC_RX_TYPE_EXTERNAL, &ret, sizeof(ret));
+		ret = cptra_ipc_receive(CPTRA_IPC_RX_TYPE_EXTERNAL,
+					&rsp, sizeof(rsp));
+		if (ret) {
+			LOG_ERR("cptra_ipc_receive 0x%x failed: 0x%x",
+				ipccmd, ret);
+			goto end;
+		}
 	}
-	
+
 	return 0;
 end:
 	return ret;
@@ -96,6 +103,7 @@ static int sha384_update_internal(const char *msg, int msg_size)
 	int ipccmd = CPTRA_IPCCMD_SHA384_DIGEST;
 	struct cptra_hash_ctx ctx;
 	uint32_t data[2];
+	uint32_t rsp;	/* bootmcu writes no data for init/update */
 	int ret;
 	/* Prepare tx data to bootmcu */
 	data[0] = IPC_CHANNEL_1_BOOTMCU_IN_ADDR;
@@ -122,7 +130,13 @@ static int sha384_update_internal(const char *msg, int msg_size)
 			goto end;
 		} else
 			LOG_DBG("cptra_ipc_trigger:0x%x is successful", ipccmd);
-		cptra_ipc_receive(CPTRA_IPC_RX_TYPE_EXTERNAL, &ret, sizeof(ret));
+		ret = cptra_ipc_receive(CPTRA_IPC_RX_TYPE_EXTERNAL,
+					&rsp, sizeof(rsp));
+		if (ret) {
+			LOG_ERR("cptra_ipc_receive 0x%x failed: 0x%x",
+				ipccmd, ret);
+			goto end;
+		}
 		offset += current_chunk_size;
 	}
 	
@@ -163,7 +177,13 @@ static int sha384_final_internal(uint8_t *output, int output_size)
 		goto end;
 	} else
 		LOG_DBG("cptra_ipc_trigger:0x%x is successful", ipccmd);
-	cptra_ipc_receive(CPTRA_IPC_RX_TYPE_EXTERNAL, output, output_size);
+	ret = cptra_ipc_receive(CPTRA_IPC_RX_TYPE_EXTERNAL, output,
+				output_size);
+	if (ret) {
+		LOG_ERR("cptra_ipc_receive 0x%x failed: 0x%x",
+			ipccmd, ret);
+		goto end;
+	}
 
 	LOG_DBG("%s", __func__);
 
