@@ -1,5 +1,35 @@
 # SPDX-License-Identifier: Apache-2.0
 
+config OBMF_ESPI_BRIDGE
+	bool "OBMF eSPI bridge extension"
+	default y
+	depends on ESPI && ESPI_OOB_CHANNEL && ESPI_OOB_CHANNEL_RX_ASYNC
+	depends on ESPI_TAF
+	# The bridge calls the v2 OOB/perif API and registers a snoop callback.
+	depends on ESPI_ASPEED_V2 && SNOOP_ASPEED
+	depends on DT_HAS_ASPEED_ESPI_AST1040_ENABLED
+	help
+	  Enable the AST1040-only eSPI bridge services. The OOB bridge requires
+	  asynchronous RX so it can be the channel's sole receive owner, and
+	  the SAFS flash behind the MMIO window needs TAF. Direct LSTP
+	  peripheral channels do not depend on this extension.
+
+config OBMF_ESPI_UART_VUART
+	bool "Bridge Host 0x3F8 through the hardware VUART0"
+	depends on OBMF_ESPI_BRIDGE
+	depends on $(dt_nodelabel_enabled,vuart0)
+	default y
+	help
+	  Serve the LSTP UART channel from the AST1040 hardware VUART0 at
+	  0x74c30000, which claims Host eSPI port 0x3F8 with a full
+	  bidirectional FIFO on SerIRQ 4 (src/uart/lstp_uart_vuart.c).
+
+	  Turning this off does not disable the UART channel -- it is always
+	  exported. It selects src/uart/lstp_uart_plain.c instead, which
+	  drives the ordinary UART named by the aspeed,obmf-lstp
+	  uart-controller phandle (AST1030), or the shell backend when
+	  CONFIG_OBMF_LSTP_UART_SHELL is set.
+
 menu "OBMF LSTP peripheral channels"
 
 config OBMF_LSTP_SPI_CHANNEL
@@ -34,7 +64,7 @@ config OBMF_LSTP_I2C_CHANNEL
 
 config OBMF_LSTP_UART_SHELL
 	bool "Back the LSTP UART channel with shell commands"
-	depends on SHELL
+	depends on SHELL && !OBMF_ESPI_UART_VUART
 	help
 	  Serve the LSTP UART channel with no UART behind it
 	  (src/uart/lstp_uart_shell.c). What the BMC writes to its ttyLSTP is
@@ -46,7 +76,7 @@ config OBMF_LSTP_GPIO_CHANNEL
 	default y
 	depends on GPIO
 	help
-	  Export the GPIO banks named by the
+	  Export the GPIO banks and eSPI virtual wires named by the
 	  aspeed,obmf-lstp topology as an LSTP GPIO channel. When disabled no
 	  GPIO IRQ events are forwarded and the BMC registers no gpiochip.
 

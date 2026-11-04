@@ -1,0 +1,8 @@
+board:
+  name: ast1040_interposer
+  vendor: aspeed
+  socs:
+    - name: ast1040
+      variants:
+        - name: cm4
+          cpucluster: cm4

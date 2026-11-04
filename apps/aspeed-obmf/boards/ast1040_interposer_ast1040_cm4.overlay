@@ -1,0 +1,128 @@
+/ {
+	obmf_lstp: obmf-lstp {
+		compatible = "aspeed,obmf-lstp";
+		/*
+		 * SPI, I2C and GPIO channels are off (see the .conf). i2c0, spi0
+		 * and sgpiom0 stay enabled below for the local flash/i2c debug
+		 * shells only; they are not exported to the BMC.
+		 */
+		uart-controller = <&vuart0>;
+		uart-channel-name = "VUART0";
+
+		espi-controller = <&espi0>;
+		snoop-controller = <&snoop>;
+		status = "okay";
+	};
+};
+
+&espi0 {
+	status = "okay";
+	flash-edaf-mode = <1>;
+	perif-mcyc-enable;
+	/*
+	 * Host-side decode address for the peripheral memory window. It must
+	 * equal the base the host's PCH programs into the eSPI LGMR BAR
+	 * (Legacy Generic Memory Range) -- that is the only host address range
+	 * forwarded to eSPI. Anything else, host DRAM included, is never
+	 * claimed by this controller.
+	 *
+	 * PROVISIONAL. The BIOS prints the real value at boot as
+	 * "EspiLgmrBaseAddr"; put that here. 0xEC000000 is only what
+	 * MmbiV1Toolx64.efi compiles in as its default, and that default comes
+	 * from a PCIe MMBI platform (its instance spans tens of MB, far past
+	 * the 64 KiB an eSPI LGMR window can cover).
+	 *
+	 * Must stay aligned to perif-mcyc-size: the hardware decodes on
+	 * addr & ~(size - 1).
+	 */
+	perif-mcyc-src-addr = <0x0 0xec000000>;
+	perif-mcyc-size = <0x0 0x00010000>;
+};
+
+&snoop {
+	status = "okay";
+	port = <0x80>, <0x81>;
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&vuart0 {
+	status = "okay";
+};
+
+&tach {
+	status = "disabled";
+};
+
+&spi1 {
+	status = "disabled";
+};
+
+&spi1_cs0 {
+	status = "disabled";
+};
+
+&spi1_cs1 {
+	status = "disabled";
+};
+
+&i2c3 {
+	status = "disabled";
+};
+
+&pwm {
+	status = "disabled";
+};
+
+&spi0 {
+	status = "okay";
+};
+
+&spi0_cs0 {
+	status = "okay";
+};
+
+&spi0_cs1 {
+	status = "okay";
+};
+
+&sgpiom0 {
+	status = "okay";
+
+	sgpiom0_0_31 {
+		status = "okay";
+	};
+
+	sgpiom0_32_63 {
+		status = "okay";
+	};
+
+	sgpiom0_64_95 {
+		status = "okay";
+	};
+
+	sgpiom0_96_127 {
+		status = "okay";
+	};
+};
+
+&dram_ro_region {
+	reg = <0x0 DT_SIZE_K(512)>;
+};
+
+/* Recreated rather than patched, so the unit address matches the new base. */
+/delete-node/ &dram_rw_region;
+
+/ {
+	chosen {
+		zephyr,sram = &dram_rw_region;
+	};
+
+	dram_rw_region: memory@80000 {
+		device_type = "memory";
+		reg = <0x80000 DT_SIZE_K(14336 - 512 - 512)>;
+	};
+};
+

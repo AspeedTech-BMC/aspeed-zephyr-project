@@ -10,8 +10,8 @@
 #include <stdint.h>
 
 /*
- * Virtual-wire pins a provider may append after the direct GPIO banks; it
- * registers these ops, and pin is relative to the first appended line.
+ * Virtual-wire pins appended after the direct GPIO banks. Whoever owns the
+ * eSPI virtual wires registers these; pin is relative to vwire-gpio-base.
  */
 struct lstp_gpio_vwire_ops {
 	int (*get_pin)(uint16_t pin);
@@ -19,7 +19,7 @@ struct lstp_gpio_vwire_ops {
 };
 
 /*
- * Callers such as the obmf shell are built whether or not the GPIO
+ * Callers (the obmf shell, the eSPI bridge) are built whether or not the GPIO
  * channel is; without it these are no-ops, so they never depend on the
  * optimizer dropping a reference to a function that was not compiled.
  */
