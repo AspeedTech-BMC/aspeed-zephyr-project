@@ -39,6 +39,13 @@ config OBMF_ESPI_MMIO_SAFS_WRITE
 	  is no authorization: any USB host speaking LSTP can rewrite it.
 	  Reads stay available; writes are rejected when disabled.
 
+config OBMF_ESPI_IPMI
+	bool "Expose the eSPI MMBI IPMI extension channel"
+	default n
+	depends on OBMF_ESPI_BRIDGE
+	help
+	  Bridge Host eSPI MMBI IPMI commands to AST2700 LSTP IPMI Channel.
+
 config OBMF_ESPI_UART_VUART
 	bool "Bridge Host 0x3F8 through the hardware VUART0"
 	depends on OBMF_ESPI_BRIDGE

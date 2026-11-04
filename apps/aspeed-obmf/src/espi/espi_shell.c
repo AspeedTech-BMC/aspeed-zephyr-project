@@ -570,6 +570,296 @@ static int cmd_espi_snoop_stats(const struct shell *sh, size_t argc, char **argv
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_OBMF_ESPI_IPMI)
+#include "espi_mmbi.h"
+
+static int cmd_mmbi_status(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	uint32_t hrop_low = 0, hrop_high = 0;
+	uint32_t hrwp_low = 0, hrwp_high = 0;
+
+	(void)espi_perif_mem_read(MMBI_HROP_OFFSET, &hrop_low, sizeof(hrop_low));
+	(void)espi_perif_mem_read(MMBI_HROP_OFFSET + 4, &hrop_high, sizeof(hrop_high));
+	(void)espi_perif_mem_read(MMBI_HRWP_OFFSET, &hrwp_low, sizeof(hrwp_low));
+	(void)espi_perif_mem_read(MMBI_HRWP_OFFSET + 4, &hrwp_high, sizeof(hrwp_high));
+
+	hrop_low = sys_le32_to_cpu(hrop_low);
+	hrop_high = sys_le32_to_cpu(hrop_high);
+	hrwp_low = sys_le32_to_cpu(hrwp_low);
+	hrwp_high = sys_le32_to_cpu(hrwp_high);
+
+	uint32_t b2h_wp = hrop_low & MMBI_PTR_MASK;
+	uint32_t h2b_rp = hrop_high & MMBI_PTR_MASK;
+	uint32_t h2b_wp = hrwp_low & MMBI_PTR_MASK;
+	uint32_t b2h_rp = hrwp_high & MMBI_PTR_MASK;
+	bool host_up = (hrwp_low & MMBI_HRWS0_H_UP) != 0;
+	bool host_ready = (hrwp_high & MMBI_HRWS1_H_RDY) != 0;
+	bool host_reset = (hrwp_low & MMBI_HRWS0_H_RST) != 0;
+
+	bool h2b_valid = h2b_wp < MMBI_H2B_CB_SIZE && h2b_rp < MMBI_H2B_CB_SIZE;
+	bool b2h_valid = b2h_wp < MMBI_B2H_CB_SIZE && b2h_rp < MMBI_B2H_CB_SIZE;
+
+	struct espi_mmbi_stats stats;
+	espi_mmbi_get_stats(&stats);
+
+	shell_print(sh, "=== eSPI MMBI (Host <-> AST1040 <-> AST2700) Status ===");
+	shell_print(sh, "  Registers in Perif Mem:");
+	shell_print(sh, "    HROP (0x%04x)       : 0x%08x 0x%08x",
+		    MMBI_HROP_OFFSET, hrop_low, hrop_high);
+	shell_print(sh, "      - b2h_wp (BMC->Host WP) : 0x%x (%u)", b2h_wp, b2h_wp);
+	shell_print(sh, "      - h2b_rp (Host->BMC RP) : 0x%x (%u)", h2b_rp, h2b_rp);
+	shell_print(sh, "    HRWP (0x%04x)       : 0x%08x 0x%08x",
+		    MMBI_HRWP_OFFSET, hrwp_low, hrwp_high);
+	shell_print(sh, "      - h2b_wp (Host->BMC WP) : 0x%x (%u)", h2b_wp, h2b_wp);
+	shell_print(sh, "      - b2h_rp (BMC->Host RP) : 0x%x (%u)", b2h_rp, b2h_rp);
+	shell_print(sh, "      - Host Up (H_UP)        : %s", host_up ? "YES" : "NO");
+	shell_print(sh, "      - Host Ready (H_RDY)    : %s", host_ready ? "YES (READY)" : "NO (NOT READY)");
+	shell_print(sh, "      - Host Reset (H_RST)    : %s", host_reset ? "YES (RESETTING)" : "NO");
+	shell_print(sh, "  Buffers:");
+	if (h2b_valid) {
+		uint32_t avail = (h2b_wp >= h2b_rp) ? (h2b_wp - h2b_rp)
+						 : (MMBI_H2B_CB_SIZE - h2b_rp + h2b_wp);
+
+		shell_print(sh, "    H2B (Host->BMC @ 0x%04x, size %u B): %u unread bytes available",
+			    MMBI_H2B_CB_OFFSET, MMBI_H2B_CB_SIZE, avail);
+	} else {
+		shell_error(sh, "    H2B pointer out of range (size 0x%x)", MMBI_H2B_CB_SIZE);
+	}
+	if (b2h_valid) {
+		uint32_t free_space = (b2h_wp >= b2h_rp) ?
+			(MMBI_B2H_CB_SIZE - 1 - (b2h_wp - b2h_rp)) : (b2h_rp - b2h_wp - 1);
+
+		shell_print(sh, "    B2H (BMC->Host @ 0x%04x, size %u B): %u bytes free",
+			    MMBI_B2H_CB_OFFSET, MMBI_B2H_CB_SIZE, free_space);
+	} else {
+		shell_error(sh, "    B2H pointer out of range (size 0x%x)", MMBI_B2H_CB_SIZE);
+	}
+	shell_print(sh, "  Statistics & Diagnostic:");
+	shell_print(sh, "    - Host Requests Forwarded : %u", stats.req_count);
+	shell_print(sh, "    - BMC Responses Received  : %u", stats.resp_count);
+	shell_print(sh, "    - Dropped / Invalid Pkts  : %u", stats.drop_count);
+	shell_print(sh, "    - Host Reset Events       : %u", stats.host_reset_cnt);
+	shell_print(sh, "    - Last Req NetFn / Cmd    : 0x%02x / 0x%02x",
+		    stats.last_req_netfn, stats.last_req_cmd);
+	shell_print(sh, "    - Last Resp NetFn/Cmd/CC  : 0x%02x / 0x%02x / CC=0x%02x",
+		    stats.last_resp_netfn, stats.last_resp_cmd, stats.last_resp_cc);
+	shell_print(sh, "    - Framing Mode            : %s",
+		    stats.is_mmbi10 ? "MMBI 1.0 (12-byte header, IANA 343)" : "Legacy (4-byte header)");
+	shell_print(sh, "    - Trace Logging           : %s", stats.trace_enabled ? "ENABLED" : "DISABLED");
+	return 0;
+}
+
+static int cmd_mmbi_trace(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc < 2) {
+		shell_print(sh, "MMBI trace is currently %s",
+			    espi_mmbi_get_trace() ? "ENABLED" : "DISABLED");
+		return 0;
+	}
+
+	if (strcmp(argv[1], "on") == 0 || strcmp(argv[1], "1") == 0 || strcmp(argv[1], "enable") == 0) {
+		espi_mmbi_set_trace(true);
+		shell_print(sh, "MMBI trace logging ENABLED");
+	} else if (strcmp(argv[1], "off") == 0 || strcmp(argv[1], "0") == 0 || strcmp(argv[1], "disable") == 0) {
+		espi_mmbi_set_trace(false);
+		shell_print(sh, "MMBI trace logging DISABLED");
+	} else {
+		shell_error(sh, "Usage: mmbi trace <on|off>");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int cmd_mmbi_dump(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc < 2) {
+		shell_error(sh, "Usage: mmbi dump <h2b|b2h> [offset] [len]");
+		return -EINVAL;
+	}
+
+	uint32_t base_offset;
+	uint32_t buf_size;
+	const char *name;
+
+	if (strcmp(argv[1], "h2b") == 0) {
+		base_offset = MMBI_H2B_CB_OFFSET;
+		buf_size = MMBI_H2B_CB_SIZE;
+		name = "H2B";
+	} else if (strcmp(argv[1], "b2h") == 0) {
+		base_offset = MMBI_B2H_CB_OFFSET;
+		buf_size = MMBI_B2H_CB_SIZE;
+		name = "B2H";
+	} else {
+		shell_error(sh, "Invalid buffer: %s (choose 'h2b' or 'b2h')", argv[1]);
+		return -EINVAL;
+	}
+
+	uint32_t offset = 0;
+	uint32_t len = 64;
+
+	if (argc >= 3) {
+		if (parse_u32(argv[2], &offset) || offset >= buf_size) {
+			shell_error(sh, "Invalid offset: %s", argv[2]);
+			return -EINVAL;
+		}
+	}
+	if (argc >= 4) {
+		if (parse_u32(argv[3], &len) || len == 0) {
+			shell_error(sh, "Invalid length: %s", argv[3]);
+			return -EINVAL;
+		}
+	}
+
+	len = MIN(len, buf_size - offset);
+	len = MIN(len, 256U); /* Limit dump size to 256 bytes per command */
+
+	shell_print(sh, "=== Dump MMBI %s buffer @ offset 0x%04x (%u bytes) ===", name, offset, len);
+	uint8_t chunk[16];
+	for (uint32_t i = 0; i < len; i += 16) {
+		size_t cur = MIN(16U, len - i);
+		(void)espi_perif_mem_read(base_offset + offset + i, chunk, cur);
+		shell_fprintf(sh, SHELL_NORMAL, "  %04x: ", offset + i);
+		for (size_t j = 0; j < cur; j++) {
+			shell_fprintf(sh, SHELL_NORMAL, "%02x ", chunk[j]);
+		}
+		shell_fprintf(sh, SHELL_NORMAL, "\n");
+	}
+	return 0;
+}
+
+static int cmd_mmbi_desc(const struct shell *sh, size_t argc, char **argv)
+{
+	struct mmbi_cap_desc desc;
+	uint32_t hros0 = 0, hros1 = 0, hrws0 = 0, hrws1 = 0;
+	uint32_t base = espi_perif_mem_get_base_addr() + MMBI_DESCRIPTOR_OFFSET;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	if (espi_perif_mem_read(MMBI_DESCRIPTOR_OFFSET, &desc, sizeof(desc)) != 0) {
+		shell_error(sh, "cannot read MMBI descriptor");
+		return -EIO;
+	}
+	(void)espi_perif_mem_read(MMBI_HROP_OFFSET, &hros0, sizeof(hros0));
+	(void)espi_perif_mem_read(MMBI_HROP_OFFSET + 4, &hros1, sizeof(hros1));
+	(void)espi_perif_mem_read(MMBI_HRWP_OFFSET, &hrws0, sizeof(hrws0));
+	(void)espi_perif_mem_read(MMBI_HRWP_OFFSET + 4, &hrws1, sizeof(hrws1));
+
+	hros0 = sys_le32_to_cpu(hros0);
+	hros1 = sys_le32_to_cpu(hros1);
+	hrws0 = sys_le32_to_cpu(hrws0);
+	hrws1 = sys_le32_to_cpu(hrws1);
+
+	bool sig_ok = memcmp(desc.signature, MMBI_SIGNATURE, sizeof(desc.signature)) == 0;
+
+	shell_print(sh, "MmbiBase            - 0x%08x   (pass this to the host tool's -b)", base);
+	shell_print(sh, "Signature           - %c%c%c%c%c%c %s",
+		    desc.signature[0], desc.signature[1], desc.signature[2],
+		    desc.signature[3], desc.signature[4], desc.signature[5],
+		    sig_ok ? "" : "<-- INVALID");
+	shell_print(sh, "Version             - 0x%02x", desc.version);
+	shell_print(sh, "OsUse               - 0x%02x", desc.os_use);
+	shell_print(sh, "BufferType          - 0x%02x", desc.buffer_type);
+	shell_print(sh, "Bmc2HostBaseAddress - 0x%08x (0x%08x)", sys_le32_to_cpu(desc.b2h_ba),
+		    base + (sys_le32_to_cpu(desc.b2h_ba) << 3));
+	shell_print(sh, "Host2BmcBaseAddress - 0x%08x (0x%08x)", sys_le32_to_cpu(desc.h2b_ba),
+		    base + (sys_le32_to_cpu(desc.h2b_ba) << 3));
+	shell_print(sh, "Bmc2HostLength      - 0x%08x", sys_le32_to_cpu(desc.b2h_l));
+	shell_print(sh, "Host2BmcLength      - 0x%08x", sys_le32_to_cpu(desc.h2b_l));
+	shell_print(sh, "HostRop             - 0x%08x (0x%08x)",
+		    sys_le32_to_cpu(desc.bt_desc.h_ros_p),
+		    base + (sys_le32_to_cpu(desc.bt_desc.h_ros_p) << 3));
+	shell_print(sh, "HostRwp             - 0x%08x (0x%08x)",
+		    sys_le32_to_cpu(desc.bt_desc.h_rws_p),
+		    base + (sys_le32_to_cpu(desc.bt_desc.h_rws_p) << 3));
+	shell_print(sh, "HostInterruptType   - 0x%02x%s", desc.bt_desc.h_int_t,
+		    desc.bt_desc.h_int_t ? "" : "  <-- host rejects type 0");
+	shell_print(sh, "BmcInterruptType    - 0x%02x%s", desc.bt_desc.bmc_int_t,
+		    desc.bt_desc.bmc_int_t ? "" : "  <-- host rejects type 0");
+	shell_print(sh, "BmcInterruptLocation- 0x%08x (0x%08x)",
+		    sys_le32_to_cpu(desc.bt_desc.bmc_int_l),
+		    base + sys_le32_to_cpu(desc.bt_desc.bmc_int_l));
+	shell_print(sh, "BmcInterruptValue   - 0x%02x", desc.bt_desc.bmc_int_v);
+	shell_print(sh, "");
+	shell_print(sh, "HROS  0x%08x 0x%08x  B_RST=%d B_UP=%d B_RDY=%d b2h_wp=0x%x h2b_rp=0x%x",
+		    hros0, hros1, (hros0 & MMBI_HROS0_B_RST) ? 1 : 0,
+		    (hros0 & MMBI_HROS0_B_UP) ? 1 : 0, (hros1 & MMBI_HROS1_B_RDY) ? 1 : 0,
+		    hros0 & MMBI_PTR_MASK, hros1 & MMBI_PTR_MASK);
+	shell_print(sh, "HRWS  0x%08x 0x%08x  H_RST=%d H_UP=%d H_RDY=%d h2b_wp=0x%x b2h_rp=0x%x",
+		    hrws0, hrws1, (hrws0 & MMBI_HRWS0_H_RST) ? 1 : 0,
+		    (hrws0 & MMBI_HRWS0_H_UP) ? 1 : 0, (hrws1 & MMBI_HRWS1_H_RDY) ? 1 : 0,
+		    hrws0 & MMBI_PTR_MASK, hrws1 & MMBI_PTR_MASK);
+
+	return sig_ok ? 0 : -EINVAL;
+}
+
+static int cmd_mmbi_intr(const struct shell *sh, size_t argc, char **argv)
+{
+	uint8_t h_int_t, bmc_int_t;
+	uint32_t host_type, bmc_type;
+	int rc;
+
+	if (argc == 1) {
+		espi_mmbi_get_intr(&h_int_t, &bmc_int_t);
+		shell_print(sh, "HostInterruptType 0x%02x, BmcInterruptType 0x%02x",
+			    h_int_t, bmc_int_t);
+		return 0;
+	}
+	if (argc != 3) {
+		shell_error(sh, "Usage: mmbi intr <host_int_type> <bmc_int_type>");
+		shell_print(sh, "Type 0 is rejected by the host; the PCIe reference uses 1 for both.");
+		return -EINVAL;
+	}
+
+	if (parse_u32(argv[1], &host_type) || parse_u32(argv[2], &bmc_type) ||
+	    host_type == 0 || host_type > 0xFF || bmc_type == 0 || bmc_type > 0xFF) {
+		shell_error(sh, "Interrupt types must be in the range 1..0xFF");
+		return -EINVAL;
+	}
+	h_int_t = (uint8_t)host_type;
+	bmc_int_t = (uint8_t)bmc_type;
+	rc = espi_mmbi_set_intr(h_int_t, bmc_int_t);
+	if (rc != 0) {
+		shell_error(sh, "Cannot change MMBI interrupts: %d (H_RDY must be clear)", rc);
+		return rc;
+	}
+	shell_print(sh, "Descriptor republished: HostInterruptType 0x%02x, BmcInterruptType 0x%02x",
+		    h_int_t, bmc_int_t);
+	return 0;
+}
+
+static int cmd_mmbi_reset(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	int rc = espi_mmbi_init();
+
+	if (rc != 0) {
+		shell_error(sh, "Cannot reset MMBI: %d (H_RDY must be clear)", rc);
+		return rc;
+	}
+	espi_mmbi_reset_stats();
+	shell_print(sh, "MMBI subsystem and stats have been reset to default state");
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_espi_mmbi,
+	SHELL_CMD_ARG(status, NULL, "Show MMBI pointers, buffer state, and statistics", cmd_mmbi_status, 1, 0),
+	SHELL_CMD_ARG(trace, NULL, "Enable/disable live MMBI packet trace: <on|off>", cmd_mmbi_trace, 1, 1),
+	SHELL_CMD_ARG(dump, NULL, "Dump MMBI buffer memory: <h2b|b2h> [offset] [len]", cmd_mmbi_dump, 2, 2),
+	SHELL_CMD_ARG(desc, NULL, "Show the published MMBI capability descriptor and pointers", cmd_mmbi_desc, 1, 0),
+	SHELL_CMD_ARG(intr, NULL, "Get/set descriptor interrupt types: <host> <bmc>", cmd_mmbi_intr, 1, 2),
+	SHELL_CMD_ARG(reset, NULL, "Reset MMBI buffer pointers and counters", cmd_mmbi_reset, 1, 0),
+	SHELL_SUBCMD_SET_END
+);
+
+SHELL_SUBCMD_ADD((obmf), mmbi, &sub_espi_mmbi, "eSPI MMBI diagnostics", NULL, 1, 0);
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_espi,
 	SHELL_CMD_ARG(status, NULL, "Show read-only controller status", cmd_espi_status, 1, 0),
 	SHELL_CMD_ARG(dev_sts, NULL, "Read ESPI030 (ESPI_DEV_STS)", cmd_espi_dev_status, 1, 0),

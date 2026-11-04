@@ -9,3 +9,4 @@ target_sources(app PRIVATE
 target_sources_ifdef(CONFIG_SHELL app PRIVATE espi_shell.c)
 
 target_sources_ifdef(CONFIG_OBMF_ESPI_MMIO app PRIVATE lstp_mmio.c)
+target_sources_ifdef(CONFIG_OBMF_ESPI_IPMI app PRIVATE espi_mmbi.c)
