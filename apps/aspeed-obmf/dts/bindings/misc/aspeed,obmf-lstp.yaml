@@ -1,0 +1,19 @@
+description: ASPEED OBMF LSTP backend topology
+
+compatible: "aspeed,obmf-lstp"
+
+include: base.yaml
+
+properties:
+# The core and UART are always built. Other channel directories are built when
+# their Kconfig option is set.
+# lstp/lstp_backend.h checks fields required by the enabled backends.
+  uart-controller:
+    type: phandle
+    description: |
+      UART device exported by the LSTP UART channel. Not needed when
+      CONFIG_OBMF_LSTP_UART_SHELL backs the channel with shell commands.
+
+  uart-channel-name:
+    type: string
+    default: "UART"

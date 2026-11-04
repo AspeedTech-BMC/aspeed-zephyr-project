@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+
+menu "OBMF LSTP peripheral channels"
+
+config OBMF_LSTP_UART_SHELL
+	bool "Back the LSTP UART channel with shell commands"
+	depends on SHELL
+	help
+	  Serve the LSTP UART channel with no UART behind it
+	  (src/uart/lstp_uart_shell.c). What the BMC writes to its ttyLSTP is
+	  kept for "obmf uart recv", and "obmf uart send" writes a
+	  line back. The topology then needs no uart-controller.
+
+endmenu
+
+source "Kconfig.zephyr"

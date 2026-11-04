@@ -1,0 +1,101 @@
+/ {
+	obmf_lstp: obmf-lstp {
+		compatible = "aspeed,obmf-lstp";
+		/* uart0 on F3/G5 reaches CON5 through J74 13-14/15-16 and U29. */
+		uart-controller = <&uart0>;
+		uart-channel-name = "UART0";
+		status = "okay";
+	};
+};
+
+&uart0 {
+	pinctrl-0 = <pinctrl_uart0_default>;
+	pinctrl-names = "default";
+	clock-frequency = <1846153>;
+	current-speed = <115200>;
+	/*
+	 * RX through UDMA: the 16-byte FIFO overruns whenever the ISR is held
+	 * off for ~0.7 ms, the 1 KB DMA ring rides out ~89 ms.
+	 */
+	dma = <1>;
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	/delete-node/ eeprom@40;
+	/delete-node/ ipmb@60;
+};
+
+&tach {
+	status = "disabled";
+};
+
+&spi1 {
+	status = "disabled";
+};
+
+&spi1_cs0 {
+	status = "disabled";
+};
+
+&spi1_cs1 {
+	status = "disabled";
+};
+
+&i2c3 {
+	status = "disabled";
+};
+
+&pwm {
+	status = "disabled";
+};
+
+&spi0 {
+	status = "okay";
+};
+
+&spi0_cs0 {
+	status = "okay";
+};
+
+/* CS0's 256 MiB flash fills spi0's whole decode window; CS1 cannot map. */
+&spi0_cs1 {
+	status = "disabled";
+};
+
+/*
+ * No SPI monitor on spi0: it filters the opcodes spi_nor_multi_dev needs at
+ * probe (31h for the QE bit) and its address table only covers 64 MiB, so
+ * reads past that come back as 0xdd.
+ */
+&spi0_filter {
+	status = "disabled";
+};
+
+&spi0_spif {
+	status = "disabled";
+};
+
+/* SGPIOM is unused on the EVB. */
+/delete-node/ &sgpiom0;
+/delete-node/ &sgpiom1;
+
+&dram_ro_region {
+	reg = <0x0 DT_SIZE_K(512)>;
+};
+
+/* Recreated rather than patched, so the unit address matches the new base. */
+/delete-node/ &dram_rw_region;
+
+/ {
+	chosen {
+		zephyr,sram = &dram_rw_region;
+	};
+
+	dram_rw_region: memory@80000 {
+		device_type = "memory";
+		reg = <0x80000 DT_SIZE_K(14336 - 512 - 512)>;
+	};
+};
+
