@@ -8,6 +8,9 @@
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/crypto/hash.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/init.h>
+#include <zephyr/sys/sys_io.h>
 #include <image/caliptra_soc_manifest.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/md.h>
@@ -1243,3 +1246,43 @@ int cptra_get_cached_certificate(int cert, void** cert_data, uint32_t *cert_size
 	return 0;
 }
 
+#define SCU1_HWSTRAP1			0x010
+#define SCU1_HWSTRAP1_EN_SECBOOT	BIT(5)
+
+static bool cptra_secure_boot = true;
+
+/*
+ * Read the strap once before CA35 runs, so a later change of the
+ * register cannot turn off the checks for firmware update.
+ */
+static int cptra_secure_boot_latch(void)
+{
+	uintptr_t scu1 = DT_REG_ADDR(DT_NODELABEL(syscon1));
+
+	cptra_secure_boot = sys_read32(scu1 + SCU1_HWSTRAP1) &
+			    SCU1_HWSTRAP1_EN_SECBOOT;
+	LOG_INF("Secure boot %s",
+		cptra_secure_boot ? "enabled" : "disabled");
+
+	return 0;
+}
+
+SYS_INIT(cptra_secure_boot_latch, APPLICATION,
+	 CONFIG_APPLICATION_INIT_PRIORITY);
+
+static bool cptra_secure_boot_enabled(void)
+{
+	return cptra_secure_boot;
+}
+
+int cptra_secure_boot_check(int ret, const char *check)
+{
+	if (cptra_secure_boot_enabled())
+		return ret;
+
+	if (ret)
+		LOG_WRN("%s failed (%d), secure boot disabled, continue",
+			check, ret);
+
+	return 0;
+}

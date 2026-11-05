@@ -347,7 +347,8 @@ static int cptra_authorize_bundle_image_v1(const uint8_t *bundle, size_t bundle_
 	if (ret) {
 		LOG_ERR("Caliptra authorization failed for fw_id=0x%08X ret=%08X",
 			entry->firmware_id, ret);
-		return -EACCES;
+		return cptra_secure_boot_check(-EACCES,
+					       "Authorize and stash");
 	}
 
 	return 0;
@@ -403,7 +404,10 @@ int cptra_validate_bundle_v1(const uint8_t *bundle, size_t bundle_size)
 	ret = cptra_set_auth_manifest_v1(manifest_preamble, imc);
 	if (ret) {
 		LOG_ERR("set_auth_manifest failed");
-		return ret;
+		ret = cptra_secure_boot_check(ret,
+					      "Set auth manifest");
+		if (ret)
+			return ret;
 	}
 
 	for (uint32_t i = 0; i < imc->count; i++) {
@@ -735,8 +739,11 @@ static int load_image(const struct device *firmware_device,
 		LOG_ERR("HACE Digest mismatch for fw_id=0x%08X", firmware_id);
 		LOG_HEXDUMP_ERR(calculated_digest, 48, "HACE Calculated:");
 		LOG_HEXDUMP_ERR(expect_digest, 48, "Expected:");
-		ret = -EACCES;
-		goto err;
+		/* Boot only; update still rejects it */
+		ret = cptra_secure_boot_check(-EACCES,
+					      "Image digest");
+		if (ret)
+			goto err;
 	} else {
 		LOG_HEXDUMP_INF(calculated_digest, 48, "HACE Calculated:");
 		LOG_HEXDUMP_INF(expect_digest, 48, "Expected:");
@@ -758,16 +765,21 @@ static int load_image(const struct device *firmware_device,
 		LOG_ERR("Digest mismatch for fw_id=0x%08X", firmware_id);
 		LOG_HEXDUMP_ERR(calculated_digest, 48, "Calculated:");
 		LOG_HEXDUMP_ERR(expect_digest, 48, "Expected:");
-		ret = -EACCES;
-		goto err;
+		/* Boot only; update still rejects it */
+		ret = cptra_secure_boot_check(-EACCES,
+					      "Image digest");
+		if (ret)
+			goto err;
 	}
 #endif
 
 	ret = cptra_authorize_and_stash(firmware_id, calculated_digest, false);
 	if (ret) {
 		LOG_ERR("Image authorization failed, ret: %d", ret);
-		ret = -EACCES;
-		goto err;
+		ret = cptra_secure_boot_check(-EACCES,
+					      "Authorize and stash");
+		if (ret)
+			goto err;
 	}
 
 	ret = 0;
@@ -817,7 +829,9 @@ int cptra_verify_manifest_v1(
 	ret = cptra_verify_manifest_imc_signature_v1(manifest_preamble, imc);
 	if (ret) {
 		LOG_ERR("Manifest IMC signature verification failed");
-		return ret;
+		ret = cptra_secure_boot_check(ret, "IMC signature");
+		if (ret)
+			return ret;
 	}
 
 	for (uint32_t i = 0; i < imc->count; i++) {

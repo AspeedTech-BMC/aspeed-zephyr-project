@@ -14,6 +14,7 @@
 #include <zephyr/sys/util.h>
 
 #include "image/caliptra_soc_manifest_v1.h"
+#include "cptra/cptra_api.h"
 #include "cptra/cptra_vendor_key.h"
 #include "pldm_fw_update_sd_ast2700_image.h"
 
@@ -104,7 +105,9 @@ uint8_t pldm_sd_ast2700_image_verify(void *fw_update_param)
 		ast2700_image_state.size);
 	if (ret) {
 		LOG_ERR("AST2700 vendor key validation failed, ret=%d", ret);
-		return PLDM_FW_UPDATE_GENERIC_ERROR;
+		ret = cptra_secure_boot_check(ret, "Vendor key hash");
+		if (ret)
+			return PLDM_FW_UPDATE_GENERIC_ERROR;
 	}
 
 	ret = cptra_validate_bundle_v1((const uint8_t *)ast2700_image_state.buffer,
