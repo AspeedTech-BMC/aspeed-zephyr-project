@@ -53,6 +53,9 @@ static int mmc_init(struct ast_loader *loader)
 	/* config gpio18 a0 to A5 to emmc mode */
 	sys_write32(0xff, 0x12c02400);
 
+	/* desired bus width; MMC stack switches via CMD6 if host supports it */
+	card.bus_width = 4;
+
 	ret = sd_init(dev, &card);
 	if (ret) {
 		LOG_ERR("cannot get BLK driver\n");
