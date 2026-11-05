@@ -59,3 +59,12 @@ int cptra_get_cached_certificate(int cert, void** cert_data, uint32_t *cert_size
  * definition. The caller frees *cert_data.
  */
 int cptra_get_dpe_leaf_certificate(void **cert_data, uint32_t *cert_size);
+
+/*
+ * Image authentication checks are enforced only when secure boot is
+ * enabled (SCU1 HWSTRAP1[5], latched at boot). Otherwise a failed
+ * check is logged as a warning and the boot or update goes on.
+ *
+ * Returns ret when the check must stop the caller, 0 otherwise.
+ */
+int cptra_secure_boot_check(int ret, const char *check);
