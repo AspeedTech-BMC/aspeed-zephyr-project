@@ -110,6 +110,19 @@ static libspdm_return_t spdm_device_receive_message(void *spdm_context, size_t *
 	libspdm_get_data(spdm_context, LIBSPDM_DATA_APP_CONTEXT_DATA, &parameter, &app_context, &mctp_p_size);
 
 	if (app_context->recv_buffer != NULL && app_context->recv_buffer_size > 0) {
+		/* On input *message_size is the capacity of libspdm's receive buffer */
+		if (app_context->recv_buffer_size > *message_size) {
+			/* A remote peer can trigger this at will: keep it quiet */
+			static uint32_t oversized;
+
+			if (is_power_of_two(++oversized))
+				LOG_WRN("SPDM request too large: %zu > %zu (%u dropped)",
+					app_context->recv_buffer_size, *message_size, oversized);
+			free(app_context->recv_buffer);
+			app_context->recv_buffer = NULL;
+			app_context->recv_buffer_size = 0;
+			return LIBSPDM_STATUS_RECEIVE_FAIL;
+		}
 		*message_size = app_context->recv_buffer_size;
 		memcpy(*message, app_context->recv_buffer, app_context->recv_buffer_size);
 
@@ -438,7 +451,16 @@ uint8_t mctp_spdm_cmd_handler(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext
 
 	libspdm_return_t ret = libspdm_responder_dispatch_message(spdm_context);
 	if (LIBSPDM_STATUS_IS_ERROR(ret)) {
-		LOG_ERR("libspdm_responder_dispatch_message ret=%08x", ret);
+		/*
+		 * Requests libspdm drops without a reply (e.g. a secured message for an
+		 * unknown session, or an MCTP header with IC set) end up here. A peer
+		 * can trigger this at will, so rate-limit to powers of two.
+		 */
+		static uint32_t failures;
+
+		if (is_power_of_two(++failures))
+			LOG_WRN("SPDM dispatch failed, MCTP type 0x%02x ret=%08x (%u failures)",
+				buf[0], ret, failures);
 		return MCTP_ERROR;
 	}
 

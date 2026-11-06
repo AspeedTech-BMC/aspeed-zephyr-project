@@ -93,6 +93,15 @@ enum message_type {
 	TYPE_MAX_SIZE,
 };
 
+/* Capacity of the Get Message Type Support list (load_mctp_support_types) */
+#define MCTP_MAX_SUPPORTED_MSG_TYPES 8
+
+/*
+ * Fill types[] with the supported MCTP message type codes, at most max_types
+ * of them. Returns 0, or a negative errno if the list does not fit.
+ */
+int load_mctp_support_types(uint8_t *type_len, uint8_t *types, uint8_t max_types);
+
 struct _get_message_type_resp {
 	uint8_t completion_code;
 	uint8_t type_count;

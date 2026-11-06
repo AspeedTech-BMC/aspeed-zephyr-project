@@ -44,7 +44,7 @@ static K_MUTEX_DEFINE(wait_recv_resp_mutex);
 
 static sys_slist_t wait_recv_resp_list = SYS_SLIST_STATIC_INIT(&wait_recv_resp_list);
 
-__weak int load_mctp_support_types(uint8_t *type_len, uint8_t *types)
+__weak int load_mctp_support_types(uint8_t *type_len, uint8_t *types, uint8_t max_types)
 {
 	return -1;
 }
@@ -155,10 +155,10 @@ uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, ui
 	struct _get_message_type_resp *p = (struct _get_message_type_resp *)resp;
 
 	uint8_t type_len = 0;
-	uint8_t *types = malloc(sizeof(TYPE_MAX_SIZE));
+	uint8_t types[MCTP_MAX_SUPPORTED_MSG_TYPES];
 	int ret = 0;
 
-	ret = load_mctp_support_types(&type_len, types);
+	ret = load_mctp_support_types(&type_len, types, ARRAY_SIZE(types));
 
 	if (ret < 0) {
 		LOG_ERR("Command not supported, %d", ret);
@@ -169,7 +169,6 @@ uint8_t mctp_ctrl_cmd_get_message_type_support(void *mctp_inst, uint8_t *buf, ui
 		memcpy(p->type_number, types, type_len);
 	}
 
-	free(types);
 	*resp_len = (p->completion_code == MCTP_CTRL_CC_SUCCESS) ? (sizeof(*p) + type_len) : 1;
 
 	return MCTP_SUCCESS;
