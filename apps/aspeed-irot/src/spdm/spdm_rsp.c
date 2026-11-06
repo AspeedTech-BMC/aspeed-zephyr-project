@@ -297,43 +297,33 @@ static void *spdm_server_init(void *app_context)
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-	data32 = 0 |
-		SPDM_ALGORITHMS_MEASUREMENT_HASH_ALGO_TPM_ALG_SHA_256 |
-		SPDM_ALGORITHMS_MEASUREMENT_HASH_ALGO_TPM_ALG_SHA_384 |
-		0;
+	/*
+	 * Advertise only what can be served: Caliptra signs with ECDSA P-384 over
+	 * SHA-384, the certificate chain and RootHash are built for SHA-384, and
+	 * libspdm/mbedTLS are configured for secp384r1 only.
+	 */
+	data32 = SPDM_ALGORITHMS_MEASUREMENT_HASH_ALGO_TPM_ALG_SHA_384;
 	libspdm_set_data (spdm_ctx, LIBSPDM_DATA_MEASUREMENT_HASH_ALGO, &parameter, &data32, sizeof(data32));
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-	data32 = 0 | \
-		SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P256 |
-		SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384 |
-		0;
+	data32 = SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384;
 	libspdm_set_data (spdm_ctx, LIBSPDM_DATA_BASE_ASYM_ALGO, &parameter, &data32, sizeof(data32));
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-	data32 = 0 | \
-		SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_256 |
-		SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_384 |
-		0;
+	data32 = SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_384;
 	libspdm_set_data (spdm_ctx, LIBSPDM_DATA_BASE_HASH_ALGO, &parameter, &data32, sizeof(data32));
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-	data16 = 0 |
-		SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P256 |
-		SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384 |
-		0;
+	data16 = SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384;
 	libspdm_set_data(spdm_ctx, LIBSPDM_DATA_REQ_BASE_ASYM_ALG, &parameter,
 		  &data16, sizeof(data16));
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-	data16 = 0 |
-		SPDM_ALGORITHMS_DHE_NAMED_GROUP_SECP_256_R1 |
-		SPDM_ALGORITHMS_DHE_NAMED_GROUP_SECP_384_R1 |
-		0;
+	data16 = SPDM_ALGORITHMS_DHE_NAMED_GROUP_SECP_384_R1;
 	libspdm_set_data (spdm_ctx, LIBSPDM_DATA_DHE_NAME_GROUP, &parameter, &data16, sizeof(data16));
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));

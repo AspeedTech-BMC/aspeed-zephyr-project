@@ -49,9 +49,19 @@ if (CONFIG_DMTF_LIBSPDM_OS_STUB_CRYPTLIB_MBEDTLS)
 		libspdm/os_stub/cryptlib_mbedtls/pk/rsa_ext.c
 		libspdm/os_stub/cryptlib_mbedtls/pk/x509.c
 		libspdm/os_stub/cryptlib_mbedtls/rand/rand.c
-		libspdm/os_stub/cryptlib_mbedtls/sys_call/crt_wrapper_host.c
+		# crt_wrapper_host.c is left out: it redefines mbedtls_platform_zeroize
+		# and printf hooks that Zephyr's mbedTLS build already provides.
 		libspdm/os_stub/cryptlib_mbedtls/sys_call/mem_allocation.c
+		# Entropy for rand.c (libspdm_get_random_number_64) from the Zephyr CSPRNG
+		os_stub/rand_zephyr.c
 	)
+	if (CONFIG_DMTF_LIBSPDM_APP_ECDSA_SIGN)
+		# Keep the software signer reachable as libspdm_ecdsa_sign_mbedtls()
+		set_source_files_properties(
+			libspdm/os_stub/cryptlib_mbedtls/pk/ec.c
+			PROPERTIES COMPILE_DEFINITIONS
+			"libspdm_ecdsa_sign=libspdm_ecdsa_sign_mbedtls")
+	endif()
 elseif(CONFIG_DMTF_LIBSPDM_OS_STUB_CRYPTLIB_NULL)
 	zephyr_library_sources(
 		libspdm/os_stub/cryptlib_null/pk/rsa_ext.c
@@ -72,7 +82,9 @@ elseif(CONFIG_DMTF_LIBSPDM_OS_STUB_CRYPTLIB_NULL)
 		libspdm/os_stub/cryptlib_null/hmac/hmac_sha.c
 		libspdm/os_stub/cryptlib_null/hmac/hmac_sha3.c
 		libspdm/os_stub/cryptlib_null/der/der.c
-		libspdm/os_stub/cryptlib_null/rand/rand.c
+		# The NULL rand.c leaves the buffer untouched (zero nonces); use the
+		# Zephyr CSPRNG instead.
+		os_stub/rand_zephyr.c
 		libspdm/os_stub/cryptlib_null/cipher/aead_aes_gcm.c
 		libspdm/os_stub/cryptlib_null/cipher/aead_sm4_gcm.c
 		libspdm/os_stub/cryptlib_null/cipher/aead_chacha20_poly1305.c

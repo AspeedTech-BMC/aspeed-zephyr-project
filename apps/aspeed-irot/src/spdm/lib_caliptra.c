@@ -21,6 +21,8 @@
 
 #include <stdlib.h>
 
+#include "spdm/irot_ec.h"
+
 LOG_MODULE_REGISTER(spdm_secret);
 
 #if LIBSPDM_ENABLE_CAPABILITY_MEAS_CAP
@@ -307,9 +309,10 @@ bool libspdm_responder_data_sign(
 {
     /*
      * Signing is delegated to Caliptra, which owns the private key, so there is
-     * no local asym context to allocate or release here.
+     * no local asym context to allocate or release here; the marker routes the
+     * request to Caliptra in ec.c.
      */
-    void *context = NULL;
+    void *context = &irot_caliptra_identity_key;
     bool result;
 
     if (is_data_hash) {
