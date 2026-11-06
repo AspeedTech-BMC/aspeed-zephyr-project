@@ -68,7 +68,9 @@ typedef enum {
 	MCTP_MSG_TYPE_NCSI,
 	MCTP_MSG_TYPE_ETH,
 	MCTP_MSG_TYPE_NVME,
-	MCTP_MSG_TYPE_SPDM,
+	MCTP_MSG_TYPE_SPDM = 0x05,
+	/* DSP0275: SPDM secured messages (encrypted/authenticated session traffic) */
+	MCTP_MSG_TYPE_SECURED_SPDM = 0x06,
 	MCTP_MSG_TYPE_CCI = 0x08,
 	MCTP_MSG_TYPE_VEN_DEF_PCI = 0x7E,
 	MCTP_MSG_TYPE_VEN_DEF_IANA = 0x7F

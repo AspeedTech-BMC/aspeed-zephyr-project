@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <errno.h>
+#include <string.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/util.h>
 
 #include <mctp.h>
 #include <mctp_ctrl.h>
@@ -57,6 +60,8 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 #endif
 #if defined(CONFIG_SPDM_RESPONDER)
 	case MCTP_MSG_TYPE_SPDM:
+	/* libspdm's MCTP transport decodes both; secured ones carry the session */
+	case MCTP_MSG_TYPE_SECURED_SPDM:
 		mctp_spdm_cmd_handler(mctp_p, buf, len, ext_params);
 		break;
 #endif
@@ -73,23 +78,31 @@ static uint8_t mctp_msg_recv(void *mctp_p, uint8_t *buf, uint32_t len, mctp_ext_
 	return MCTP_SUCCESS;
 } 
 
-int load_mctp_support_types(uint8_t *type_len, uint8_t *types)
+int load_mctp_support_types(uint8_t *type_len, uint8_t *types, uint8_t max_types)
 {
-	*type_len = 0;
-	types[*type_len] = MCTP_MSG_TYPE_CTRL;
-	(*type_len)++;
+	static const uint8_t supported[] = {
+		MCTP_MSG_TYPE_CTRL,
 #if defined(CONFIG_PLDM)
-	types[*type_len] = MCTP_MSG_TYPE_PLDM;
-	(*type_len)++;
+		MCTP_MSG_TYPE_PLDM,
 #endif
 #if defined(CONFIG_SPDM_RESPONDER)
-	types[*type_len] = MCTP_MSG_TYPE_SPDM;
-	(*type_len)++;
+		MCTP_MSG_TYPE_SPDM,
+		MCTP_MSG_TYPE_SECURED_SPDM,
 #endif
 #if defined(CONFIG_COMPOSITE_EAT)
-	types[*type_len] = MCTP_MSG_TYPE_VEN_DEF_PCI;
-	(*type_len)++;
+		MCTP_MSG_TYPE_VEN_DEF_PCI,
 #endif
+	};
+
+	BUILD_ASSERT(ARRAY_SIZE(supported) <= MCTP_MAX_SUPPORTED_MSG_TYPES,
+		     "raise MCTP_MAX_SUPPORTED_MSG_TYPES");
+
+	*type_len = 0;
+	if (ARRAY_SIZE(supported) > max_types)
+		return -ENOMEM;
+
+	memcpy(types, supported, sizeof(supported));
+	*type_len = ARRAY_SIZE(supported);
 
 	return 0;
 }
