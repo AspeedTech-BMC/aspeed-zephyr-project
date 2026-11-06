@@ -351,7 +351,7 @@ static void *spdm_server_init(void *app_context)
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
 	data16 = 0 | \
-		SPDM_ALGORITHMS_KEY_SCHEDULE_HMAC_HASH |
+		SPDM_ALGORITHMS_KEY_SCHEDULE_SPDM |
 		0;
 	libspdm_set_data (spdm_ctx, LIBSPDM_DATA_KEY_SCHEDULE, &parameter, &data16, sizeof(data16));
 

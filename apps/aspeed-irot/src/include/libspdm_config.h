@@ -1,6 +1,6 @@
 /**
  *  Copyright Notice:
- *  Copyright 2021-2024 DMTF. All rights reserved.
+ *  Copyright 2021-2026 DMTF. All rights reserved.
  *  License: BSD 3-Clause License. For full text see link: https://github.com/DMTF/libspdm/blob/main/LICENSE.md
  **/
 
@@ -82,11 +82,8 @@
 #define LIBSPDM_ENABLE_CAPABILITY_SET_KEY_PAIR_INFO_CAP 0
 #endif
 
-/* Includes SPDM 1.3 features for CSR messages. If enabled then LIBSPDM_ENABLE_CAPABILITY_CSR_CAP
- * must also be enabled.
- */
-#ifndef LIBSPDM_ENABLE_CAPABILITY_CSR_CAP_EX
-#define LIBSPDM_ENABLE_CAPABILITY_CSR_CAP_EX 0
+#ifndef LIBSPDM_ENABLE_CAPABILITY_ENDPOINT_INFO_CAP
+#define LIBSPDM_ENABLE_CAPABILITY_ENDPOINT_INFO_CAP 0
 #endif
 
 /* If 1 then endpoint supports sending GET_CERTIFICATE and GET_DIGESTS requests.
@@ -113,18 +110,33 @@
 #define LIBSPDM_EVENT_RECIPIENT_SUPPORT 0
 #endif
 
+/* If 1 then endpoint supports sending the GET_ENDPOINT_INFO request.
+ * If enabled and endpoint is a Responder then LIBSPDM_ENABLE_CAPABILITY_ENCAP_CAP
+ * must also be enabled.
+ */
+#ifndef LIBSPDM_SEND_GET_ENDPOINT_INFO_SUPPORT
+#define LIBSPDM_SEND_GET_ENDPOINT_INFO_SUPPORT 0
+#endif
+
 /* When LIBSPDM_RESPOND_IF_READY_SUPPORT is 0 then
  *      - For a Requester, if the Responder sends a ResponseNotReady ERROR response then the error
  *        is immediately returned to the Integrator. The Requester cannot send a RESPOND_IF_READY
  *        request.
- *      - For a Responder, it cannot send a RESPOND_IF_READY ERROR response and does not support
+ *      - For a Responder, it cannot send a ResponseNotReady ERROR response and does not support
  *        RESPOND_IF_READY.
+ *      - For a Responder in an encapsulated flow, if the Requester delivers an encapsulated
+ *        ResponseNotReady ERROR then the flow ends, as with any other encapsulated ErrorCode.
  * When LIBSPDM_RESPOND_IF_READY_SUPPORT is 1 then
  *      - For a Requester, if the Responder sends a ResponseNotReady ERROR response then libspdm
  *        waits an amount of time, as specified by the RDTExponent parameter, before sending
  *        RESPOND_IF_READY.
  *      - For a Responder, if its response state is NOT_READY then it will send a ResponseNotReady
  *        ERROR response to the Requester, and will accept a subsequent RESPOND_IF_READY request.
+ *      - For a Responder in an encapsulated flow, if the Requester delivers an encapsulated
+ *        ResponseNotReady ERROR then libspdm retains the outstanding request and reissues it
+ *        as an encapsulated RESPOND_IF_READY when the Requester next sends
+ *        GET_ENCAPSULATED_REQUEST. The encapsulated flow handler is not called to reissue the
+ *        request.
  */
 #ifndef LIBSPDM_RESPOND_IF_READY_SUPPORT
 #define LIBSPDM_RESPOND_IF_READY_SUPPORT 1
@@ -137,7 +149,7 @@
 
 /* Enables assertions and debug printing. When `LIBSPDM_DEBUG_ENABLE` is defined it overrides or
  * sets the values of `LIBSPDM_DEBUG_PRINT_ENABLE`, `LIBSPDM_DEBUG_ASSERT_ENABLE`, and
- * `LIBSPDM_BLOCK_ENABLE` to the value of `LIBSPDM_DEBUG_ENABLE`.
+ * `LIBSPDM_DEBUG_BLOCK_ENABLE` to the value of `LIBSPDM_DEBUG_ENABLE`.
  *
  * Note that if this file is used with CMake and `DTARGET=Release` is defined, then all debugging
  * is disabled.
@@ -171,46 +183,11 @@
 #endif
 #endif /* LIBSPDM_ENABLE_CAPABILITY_PSK_CAP */
 
-/* libspdm allows an Integrator to specify multiple root certificates as trust anchors when
- * verifying certificate chains from an endpoint. This value specifies the maximum number of root
- * certificates that libspdm can support.
- */
-#ifndef LIBSPDM_MAX_ROOT_CERT_SUPPORT
-#define LIBSPDM_MAX_ROOT_CERT_SUPPORT 4
-#endif
-
 /* If the Responder supports it a Requester is allowed to establish multiple secure sessions with
  * the Responder. This value specifies the maximum number of sessions libspdm can support.
  */
 #ifndef LIBSPDM_MAX_SESSION_COUNT
 #define LIBSPDM_MAX_SESSION_COUNT 2
-#endif
-
-/* This value specifies the maximum size, in bytes, of a certificate chain that can be stored in a
- * libspdm context.
- */
-#ifndef LIBSPDM_MAX_CERT_CHAIN_SIZE
-#define LIBSPDM_MAX_CERT_CHAIN_SIZE 0x2000
-#endif
-
-#ifndef LIBSPDM_MAX_MEASUREMENT_RECORD_SIZE
-#define LIBSPDM_MAX_MEASUREMENT_RECORD_SIZE 0x1000
-#endif
-
-/* Partial certificates can be retrieved from a Requester or Responder and through multiple messages
- * the complete certificate chain can be constructed. This value specifies the maximum size,
- * in bytes, of a partial certificate that can be sent or received.
- */
-#ifndef LIBSPDM_MAX_CERT_CHAIN_BLOCK_LEN
-#define LIBSPDM_MAX_CERT_CHAIN_BLOCK_LEN 1024
-#endif
-
-/* Partial measurement extension log (MEL) can be retrieved from a Responder and through multiple
- * messages the complete MEL can be constructed. This value specifies the maximum size, in bytes, of
- * a partial MEL that can be sent or received.
- */
-#ifndef LIBSPDM_MAX_MEL_BLOCK_LEN
-#define LIBSPDM_MAX_MEL_BLOCK_LEN 1024
 #endif
 
 /* To ensure integrity in communication between the Requester and the Responder libspdm calculates
@@ -336,12 +313,121 @@
 #define LIBSPDM_SM3_256_SUPPORT 0
 #endif
 
+#ifndef LIBSPDM_ML_DSA_44_SUPPORT
+#define LIBSPDM_ML_DSA_44_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_ML_DSA_65_SUPPORT
+#define LIBSPDM_ML_DSA_65_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_ML_DSA_87_SUPPORT
+#define LIBSPDM_ML_DSA_87_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHA2_128S_SUPPORT
+#define LIBSPDM_SLH_DSA_SHA2_128S_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHAKE_128S_SUPPORT
+#define LIBSPDM_SLH_DSA_SHAKE_128S_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHA2_128F_SUPPORT
+#define LIBSPDM_SLH_DSA_SHA2_128F_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHAKE_128F_SUPPORT
+#define LIBSPDM_SLH_DSA_SHAKE_128F_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHA2_192S_SUPPORT
+#define LIBSPDM_SLH_DSA_SHA2_192S_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHAKE_192S_SUPPORT
+#define LIBSPDM_SLH_DSA_SHAKE_192S_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHA2_192F_SUPPORT
+#define LIBSPDM_SLH_DSA_SHA2_192F_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHAKE_192F_SUPPORT
+#define LIBSPDM_SLH_DSA_SHAKE_192F_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHA2_256S_SUPPORT
+#define LIBSPDM_SLH_DSA_SHA2_256S_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHAKE_256S_SUPPORT
+#define LIBSPDM_SLH_DSA_SHAKE_256S_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHA2_256F_SUPPORT
+#define LIBSPDM_SLH_DSA_SHA2_256F_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_SLH_DSA_SHAKE_256F_SUPPORT
+#define LIBSPDM_SLH_DSA_SHAKE_256F_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_ML_KEM_512_SUPPORT
+#define LIBSPDM_ML_KEM_512_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_ML_KEM_768_SUPPORT
+#define LIBSPDM_ML_KEM_768_SUPPORT 0
+#endif
+
+#ifndef LIBSPDM_ML_KEM_1024_SUPPORT
+#define LIBSPDM_ML_KEM_1024_SUPPORT 0
+#endif
+
+/*
+ * As upstream, these context buffer sizes only exist when transcript data is
+ * recorded; LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT is 0 here.
+ */
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+
+/* This value specifies the maximum size, in bytes, of a certificate chain that can be stored in a
+ * libspdm context. */
+#ifndef LIBSPDM_MAX_CERT_CHAIN_SIZE
+/*
+ * Fixed for this ECDSA P-384 responder. Upstream raises it to 0x8000 for ML-DSA
+ * and 0x28000 for SLH-DSA; revisit if PQC is enabled.
+ */
+#define LIBSPDM_MAX_CERT_CHAIN_SIZE 0x2000
+#endif /* LIBSPDM_MAX_CERT_CHAIN_SIZE */
+
+/* This value specifies the maximum size, in bytes, of the MEASUREMENTS.MeasurementRecord field. */
+#ifndef LIBSPDM_MAX_MEASUREMENT_RECORD_SIZE
+#define LIBSPDM_MAX_MEASUREMENT_RECORD_SIZE 0x1000
+#endif
+
+/* This value specifies the maximum size, in bytes, of a endpoint info that can be stored in a
+ * libspdm context. */
+#ifndef LIBSPDM_MAX_ENDPOINT_INFO_LENGTH
+#define LIBSPDM_MAX_ENDPOINT_INFO_LENGTH 1024
+#endif
+
+#endif /* LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT */
+
 /* If 1 then endpoint supports parsing X.509 certificate chains. */
 #ifndef LIBSPDM_CERT_PARSE_SUPPORT
 #define LIBSPDM_CERT_PARSE_SUPPORT 1
 #endif
 
-
+#if LIBSPDM_CERT_PARSE_SUPPORT
+/* libspdm allows an Integrator to specify multiple root certificates as trust anchors when
+ * verifying certificate chains from an endpoint. This value specifies the maximum number of root
+ * certificates that libspdm can support.
+ */
+#ifndef LIBSPDM_MAX_ROOT_CERT_SUPPORT
+#define LIBSPDM_MAX_ROOT_CERT_SUPPORT 4
+#endif
+#endif /* LIBSPDM_CERT_PARSE_SUPPORT */
 
 /*
  * MinDataTransferSize = 42
@@ -360,10 +446,10 @@
  * |  Command                 |   Size                                   |MaxChunk |
  * +==========================+==========================================+=========+
  * | GET_VERSION              | 4                                        | 1       |
- * | VERSION {1.0, 1.1, 1.2}  | 6 + 2 * 3 = 12                           | 1       |
+ * | VERSION {1.0 ~ 1.4}      | 6 + 2 * 5 = 16                           | 1       |
  * +--------------------------+------------------------------------------+---------+
- * | GET_CAPABILITIES 1.2     | 20                                       | 1       |
- * | CAPABILITIES 1.2         | 20                                       | 1       |
+ * | GET_CAPABILITIES 1.4     | 20                                       | 1       |
+ * | CAPABILITIES 1.4         | 20 [+ 30 + 4 * 6] = 74                   | 1       |
  * +--------------------------+------------------------------------------+---------+
  * | ERROR                    | 4                                        | 1       |
  * | ERROR(ResponseTooLarge)  | 4 + 4 = 8                                | 1       |
@@ -373,38 +459,38 @@
  * | CHUNK_SEND header        | 12 + L0 (0 or 4)                         | 1       |
  * | CHUNK_RESPONSE header    | 12 + L0 (0 or 4)                         | 1       |
  * +==========================+==========================================+=========+
- * | NEGOTIATE_ALGORITHMS 1.2 | 32 + 4 * 4 = 48                          | 2       |
- * | ALGORITHMS 1.2           | 36 + 4 * 4 = 52                          | 2       |
+ * | NEGOTIATE_ALGORITHMS 1.4 | 32 + 4 * 6 = 56                          | 2       |
+ * | ALGORITHMS 1.4           | 36 + 4 * 6 = 60                          | 2       |
  * +--------------------------+------------------------------------------+---------+
- * | GET_DIGESTS 1.2          | 4                                        | 1       |
- * | DIGESTS 1.2              | 4 + H * SlotNum = [36, 516]              | [1, 18] |
+ * | GET_DIGESTS 1.4          | 4                                        | 1       |
+ * | DIGESTS 1.4              | 4 + (H [+ 4]) * SlotNum = [36, 548]      | [1, 18] |
  * +--------------------------+------------------------------------------+---------+
- * | GET_CERTIFICATE 1.2      | 8                                        | 1       |
- * | CERTIFICATE 1.2          | 8 + PortionLen                           | [1, ]   |
+ * | GET_CERTIFICATE 1.4      | 16                                       | 1       |
+ * | CERTIFICATE 1.4          | 16 + PortionLen                          | [1, ]   |
  * +--------------------------+------------------------------------------+---------+
- * | CHALLENGE 1.2            | 40                                       | 1       |
- * | CHALLENGE_AUTH 1.2       | 38 + H * 2 + S [+ O] = [166, 678]        | [6, 23] |
+ * | CHALLENGE 1.4            | 44                                       | 1       |
+ * | CHALLENGE_AUTH 1.4       | 46 + H * 2 + S [+ O] = [166, 678]        | [6, 23] |
  * +--------------------------+------------------------------------------+---------+
- * | GET_MEASUREMENTS 1.2     | 5 + Nonce (0 or 32)                      | 1       |
- * | MEASUREMENTS 1.2         | 42 + MeasRecLen (+ S) [+ O] = [106, 554] | [4, 19] |
+ * | GET_MEASUREMENTS 1.4     | 13 + Nonce (0 or 32)                     | 1       |
+ * | MEASUREMENTS 1.4         | 50 + MeasRecLen (+ S) [+ O] = [106, 554] | [4, 19] |
  * +--------------------------+------------------------------------------+---------+
- * | KEY_EXCHANGE 1.2         | 42 + D [+ O] = [106, 554]                | [4, 19] |
- * | KEY_EXCHANGE_RSP 1.2     | 42 + D + H + S (+ H) [+ O] = [234, 1194] | [8, 40] |
+ * | KEY_EXCHANGE 1.4         | 42 + D [+ O] = [106, 554]                | [4, 19] |
+ * | KEY_EXCHANGE_RSP 1.4     | 42 + D + H + S (+ H) [+ O] = [234, 1194] | [8, 40] |
  * +--------------------------+------------------------------------------+---------+
- * | FINISH 1.2               | 4 (+ S) + H = [100, 580]                 | [4, 20] |
- * | FINISH_RSP 1.2           | 4 (+ H) = [36, 69]                       | [1, 3]  |
+ * | FINISH 1.4               | 6 (+ S) + H [+ O] = [100, 580]           | [4, 20] |
+ * | FINISH_RSP 1.4           | 6 (+ H) [+ O] = [36, 69]                 | [1, 3]  |
  * +--------------------------+------------------------------------------+---------+
- * | PSK_EXCHANGE 1.2         | 12 [+ PSKHint] + R [+ O] = 44            | 2       |
- * | PSK_EXCHANGE_RSP 1.2     | 12 + R + H (+ H) [+ O] = [108, 172]      | [4, 6]  |
+ * | PSK_EXCHANGE 1.4         | 12 [+ PSKHint] + R [+ O] = 44            | 2       |
+ * | PSK_EXCHANGE_RSP 1.4     | 12 + R + H (+ H) [+ O] = [108, 172]      | [4, 6]  |
  * +--------------------------+------------------------------------------+---------+
- * | PSK_FINISH 1.2           | 4 + H = [36, 68]                         | [1, 3]  |
- * | PSK_FINISH_RSP 1.2       | 4                                        | 1       |
+ * | PSK_FINISH 1.4           | 6 + H [+ O] = [36, 68]                   | [1, 3]  |
+ * | PSK_FINISH_RSP 1.4       | 6 [+ O]                                  | 1       |
  * +--------------------------+------------------------------------------+---------+
- * | GET_CSR 1.2              | 8 + RequesterInfoLen [+ O]               | [1, ]   |
- * | CSR 1.2                  | 8 + CSRLength                            | [1, ]   |
+ * | GET_CSR 1.4              | 8 + RequesterInfoLen [+ O]               | [1, ]   |
+ * | CSR 1.4                  | 8 + CSRLength                            | [1, ]   |
  * +--------------------------+------------------------------------------+---------+
- * | SET_CERTIFICATE 1.2      | 4 + CertChainLen                         | [1, ]   |
- * | SET_CERTIFICATE_RSP 1.2  | 4                                        | 1       |
+ * | SET_CERTIFICATE 1.4      | 4 + CertChainLen                         | [1, ]   |
+ * | SET_CERTIFICATE_RSP 1.4  | 4                                        | 1       |
  * +==========================+==========================================+=========+
  */
 
@@ -426,27 +512,6 @@
  */
 #ifndef LIBSPDM_CHECK_SPDM_CONTEXT
 #define LIBSPDM_CHECK_SPDM_CONTEXT 1
-#endif
-
-/* Enable passing the SPDM context to HAL functions.
- * This macro will be removed when libspdm 4.0 is released.
- */
-#ifndef LIBSPDM_HAL_PASS_SPDM_CONTEXT
-#define LIBSPDM_HAL_PASS_SPDM_CONTEXT 0
-#endif
-
-/* Enable additional checks for certificates.
- * This macro will be removed when libspdm 4.0 is released.
- */
-#ifndef LIBSPDM_ADDITIONAL_CHECK_CERT
-#define LIBSPDM_ADDITIONAL_CHECK_CERT 0
-#endif
-
-/* Enable passing additional parameters to libspdm_write_certificate_to_nvm and libspdm_gen_csr*.
- * This macro will be removed when libspdm 4.0 is released.
- */
-#ifndef LIBSPDM_SET_CERT_CSR_PARAMS
-#define LIBSPDM_SET_CERT_CSR_PARAMS 0
 #endif
 
 #endif /* SPDM_LIB_CONFIG_H */

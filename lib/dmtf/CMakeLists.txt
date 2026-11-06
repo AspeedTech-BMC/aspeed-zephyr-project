@@ -22,6 +22,9 @@ if (CONFIG_DMTF_LIBSPDM_CONFIG_FILE)
 endif()
 
 # os_stub
+# The libspdm 4.0 PQC cryptlib sources (der/pem/x509_pqc.c, pk/mldsa_*.c,
+# pk/slhdsa_*.c, pk/mlkem.c) are not listed: PQC is disabled in the app config.
+# Add them here when enabling ML-DSA, SLH-DSA or ML-KEM.
 if (CONFIG_DMTF_LIBSPDM_OS_STUB_CRYPTLIB_MBEDTLS)
 	zephyr_library_sources(
 		libspdm/os_stub/cryptlib_mbedtls/cipher/aead_aes_gcm.c
@@ -94,6 +97,7 @@ zephyr_library_sources(
 	libspdm/library/spdm_common_lib/libspdm_com_context_data_session.c
 	libspdm/library/spdm_common_lib/libspdm_com_crypto_service_session.c
 	libspdm/library/spdm_common_lib/libspdm_com_opaque_data.c
+	libspdm/library/spdm_common_lib/libspdm_com_event.c
 )
 
 
@@ -106,7 +110,9 @@ zephyr_library_sources(
 	libspdm/library/spdm_crypt_lib/libspdm_crypt_hkdf.c
 	libspdm/library/spdm_crypt_lib/libspdm_crypt_hmac.c
 	libspdm/library/spdm_crypt_lib/libspdm_crypt_rng.c
-	libspdm/library/spdm_crypt_lib/libspdm_crypt_aead.c
+	libspdm/library/spdm_crypt_lib/libspdm_crypt_key_schedule.c
+	libspdm/library/spdm_crypt_lib/libspdm_crypt_pqc_asym.c
+	libspdm/library/spdm_crypt_lib/libspdm_crypt_pqc_kem.c
 )
 
 if (CONFIG_DMTF_LIBSPDM_REQUESTER)
@@ -118,7 +124,7 @@ if (CONFIG_DMTF_LIBSPDM_REQUESTER)
 		libspdm/library/spdm_requester_lib/libspdm_req_encap_challenge_auth.c
 		libspdm/library/spdm_requester_lib/libspdm_req_encap_digests.c
 		libspdm/library/spdm_requester_lib/libspdm_req_encap_error.c
-		libspdm/library/spdm_requester_lib/libspdm_req_encap_key_update.c
+		libspdm/library/spdm_requester_lib/libspdm_req_encap_key_update_ack.c
 		libspdm/library/spdm_requester_lib/libspdm_req_encap_request.c
 		libspdm/library/spdm_requester_lib/libspdm_req_end_session.c
 		libspdm/library/spdm_requester_lib/libspdm_req_finish.c
@@ -126,7 +132,7 @@ if (CONFIG_DMTF_LIBSPDM_REQUESTER)
 		libspdm/library/spdm_requester_lib/libspdm_req_get_certificate.c
 		libspdm/library/spdm_requester_lib/libspdm_req_get_csr.c
 		libspdm/library/spdm_requester_lib/libspdm_req_get_digests.c
-		libspdm/library/spdm_requester_lib/libspdm_req_get_event_types.c
+		libspdm/library/spdm_requester_lib/libspdm_req_get_supported_event_types.c
 		libspdm/library/spdm_requester_lib/libspdm_req_get_key_pair_info.c
 		libspdm/library/spdm_requester_lib/libspdm_req_get_measurement_extension_log.c
 		libspdm/library/spdm_requester_lib/libspdm_req_get_measurements.c
@@ -142,7 +148,13 @@ if (CONFIG_DMTF_LIBSPDM_REQUESTER)
 		libspdm/library/spdm_requester_lib/libspdm_req_set_certificate.c
 		libspdm/library/spdm_requester_lib/libspdm_req_set_key_pair_info.c
 		libspdm/library/spdm_requester_lib/libspdm_req_subscribe_event_types.c
-		libspdm/library/spdm_requester_lib/libspdm_req_vendor_request.c
+		libspdm/library/spdm_requester_lib/libspdm_req_vendor_defined_request.c
+		libspdm/library/spdm_requester_lib/libspdm_req_encap_endpoint_info.c
+		libspdm/library/spdm_requester_lib/libspdm_req_encap_event_ack.c
+		libspdm/library/spdm_requester_lib/libspdm_req_encap_subscribe_event_types_ack.c
+		libspdm/library/spdm_requester_lib/libspdm_req_encap_supported_event_types.c
+		libspdm/library/spdm_requester_lib/libspdm_req_get_endpoint_info.c
+		libspdm/library/spdm_requester_lib/libspdm_req_send_event.c
 	)
 endif()
 
@@ -152,7 +164,7 @@ if (CONFIG_DMTF_LIBSPDM_RESPONDER)
 		libspdm/library/spdm_responder_lib/libspdm_rsp_capabilities.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_certificate.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_challenge_auth.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_chunk_get.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_chunk_response.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_chunk_send_ack.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_common.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_communication.c
@@ -163,26 +175,31 @@ if (CONFIG_DMTF_LIBSPDM_RESPONDER)
 		libspdm/library/spdm_responder_lib/libspdm_rsp_encap_get_digests.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_encap_key_update.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_encap_response.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_end_session.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_end_session_ack.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_error.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_finish.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_get_key_pair_info.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_finish_rsp.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_key_pair_info.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_handle_response_state.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_heartbeat.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_key_exchange.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_key_update.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_heartbeat_ack.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_key_exchange_rsp.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_key_update_ack.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_measurement_extension_log.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_measurements.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_psk_exchange.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_psk_finish.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_psk_exchange_rsp.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_psk_finish_rsp.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_receive_send.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_respond_if_ready.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_set_certificate.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_set_certificate_rsp.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_set_key_pair_info_ack.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_subscribe_event_types_ack.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_supported_event_types.c
-		libspdm/library/spdm_responder_lib/libspdm_rsp_vendor_response.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_vendor_defined_response.c
 		libspdm/library/spdm_responder_lib/libspdm_rsp_version.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_encap_get_endpoint_info.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_encap_respond_if_ready.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_encap_send_event.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_endpoint_info.c
+		libspdm/library/spdm_responder_lib/libspdm_rsp_event_ack.c
 	)
 endif()
 
@@ -190,6 +207,7 @@ zephyr_library_sources(
 	libspdm/library/spdm_secured_message_lib/libspdm_secmes_context_data.c
 	libspdm/library/spdm_secured_message_lib/libspdm_secmes_encode_decode.c
 	libspdm/library/spdm_secured_message_lib/libspdm_secmes_key_exchange.c
+	libspdm/library/spdm_secured_message_lib/libspdm_secmes_key_exchange_pqc.c
 	libspdm/library/spdm_secured_message_lib/libspdm_secmes_session.c
 
 	libspdm/library/spdm_transport_mctp_lib/libspdm_mctp_common.c
@@ -202,6 +220,7 @@ zephyr_library_sources(
 	libspdm/os_stub/memlib/zero_mem.c
 
 	libspdm/os_stub/spdm_crypt_ext_lib/spdm_crypt_ext.c
+	libspdm/os_stub/spdm_crypt_ext_lib/spdm_crypt_ext_pqc.c
 )
 
 zephyr_library_link_libraries(dmtf_libspdm)
