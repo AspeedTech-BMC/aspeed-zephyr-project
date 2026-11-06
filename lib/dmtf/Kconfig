@@ -14,6 +14,16 @@ config DMTF_LIBSPDM_OS_STUB_CRYPTLIB_MBEDTLS
 	bool "Use mbedTLS in OS stub for LIBSPDM"
 	default n
 
+config DMTF_LIBSPDM_APP_ECDSA_SIGN
+	bool "Application supplies libspdm_ecdsa_sign()"
+	depends on DMTF_LIBSPDM_OS_STUB_CRYPTLIB_MBEDTLS
+	help
+	  For devices whose signing key lives in a hardware root of trust. The
+	  mbedTLS implementation is kept under the name
+	  libspdm_ecdsa_sign_mbedtls() so the application's libspdm_ecdsa_sign()
+	  can sign with the hardware key and fall back to software for any EC
+	  context libspdm creates itself.
+
 config DMTF_LIBSPDM_OS_STUB_CRYPTLIB_NULL
 	bool "Use NULL CryptLib in OS stub for LIBSPDM"
 	default n
