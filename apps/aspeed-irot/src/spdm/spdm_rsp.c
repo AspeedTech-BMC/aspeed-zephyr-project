@@ -255,9 +255,13 @@ static void *spdm_server_init(void *app_context)
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
 	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
-	spdm_version[0] = SPDM_MESSAGE_VERSION_10 << SPDM_VERSION_NUMBER_SHIFT_BIT;
-	spdm_version[1] = SPDM_MESSAGE_VERSION_11 << SPDM_VERSION_NUMBER_SHIFT_BIT;
-	spdm_version[2] = SPDM_MESSAGE_VERSION_12 << SPDM_VERSION_NUMBER_SHIFT_BIT;
+	/*
+	 * SPDM 1.2 is the floor: the measurement manifest index (0xFD) that carries
+	 * the Caliptra PCR quote is defined from 1.2 onwards.
+	 */
+	spdm_version[0] = SPDM_MESSAGE_VERSION_12 << SPDM_VERSION_NUMBER_SHIFT_BIT;
+	spdm_version[1] = SPDM_MESSAGE_VERSION_13 << SPDM_VERSION_NUMBER_SHIFT_BIT;
+	spdm_version[2] = SPDM_MESSAGE_VERSION_14 << SPDM_VERSION_NUMBER_SHIFT_BIT;
 	libspdm_set_data(spdm_ctx, LIBSPDM_DATA_SPDM_VERSION, &parameter, &spdm_version, sizeof(spdm_version));
 
 	libspdm_zero_mem(&parameter, sizeof(parameter));
@@ -379,6 +383,16 @@ static void *spdm_server_init(void *app_context)
 	libspdm_set_data(spdm_ctx,
 			LIBSPDM_DATA_LOCAL_PUBLIC_CERT_CHAIN,
 			&parameter, data, data_size);
+
+	/*
+	 * SPDM 1.3+ DIGESTS reports SupportedSlotMask in Param1 and requires the
+	 * provisioned mask (Param2) to be a subset of it. Only slot 0 is used.
+	 */
+	libspdm_zero_mem(&parameter, sizeof(parameter));
+	parameter.location = LIBSPDM_DATA_LOCATION_LOCAL;
+	data8 = BIT(0);
+	libspdm_set_data(spdm_ctx, LIBSPDM_DATA_LOCAL_SUPPORTED_SLOT_MASK, &parameter,
+			 &data8, sizeof(data8));
 
 	#if 0
 	libspdm_register_get_response_func(

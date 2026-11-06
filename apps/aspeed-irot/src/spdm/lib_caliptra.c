@@ -24,6 +24,88 @@
 LOG_MODULE_REGISTER(spdm_secret);
 
 #if LIBSPDM_ENABLE_CAPABILITY_MEAS_CAP
+/*
+ * The only measurement reported over SPDM is index 0xFD, the measurement
+ * manifest: the complete Caliptra QUOTE_PCRS response (PCR[0..31], nonce,
+ * digest, reset counters and the ECDSA signature by Caliptra's FMC Alias key,
+ * the key Caliptra signs PCR quotes with) as a raw freeform manifest, so a
+ * verifier can check the Caliptra-signed quote on its own.
+ *
+ * The block is always raw (type bit 7 set), whatever RawBitStreamRequested
+ * says: request_attribute is ignored on purpose, because a manifest has no
+ * digest form.
+ */
+#define IROT_MANIFEST_INDEX	SPDM_MEASUREMENT_BLOCK_MEASUREMENT_INDEX_MEASUREMENT_MANIFEST
+#define IROT_MANIFEST_TYPE	(SPDM_MEASUREMENT_BLOCK_MEASUREMENT_TYPE_MEASUREMENT_MANIFEST | \
+				 SPDM_MEASUREMENT_BLOCK_MEASUREMENT_TYPE_RAW_BIT_STREAM)
+#define IROT_MANIFEST_BLOCK_SIZE \
+	(sizeof(spdm_measurement_block_dmtf_t) + sizeof(struct cptra_quote_pcrs_oa))
+#define IROT_MEASUREMENT_COUNT	1
+
+BUILD_ASSERT(sizeof(((struct cptra_quote_pcrs_ia *)0)->nonce) == SPDM_NONCE_SIZE,
+	     "QUOTE_PCRS nonce must carry the SPDM requester nonce");
+BUILD_ASSERT(sizeof(struct cptra_quote_pcrs_oa) <= UINT16_MAX - sizeof(spdm_measurement_block_dmtf_header_t),
+	     "Quote does not fit in one DMTF measurement block");
+
+/*
+ * Ask Caliptra for a signed PCR quote. When the requester supplied a nonce
+ * (signed GET_MEASUREMENTS) it is bound into the quote; otherwise it is zero.
+ */
+static int irot_quote_pcrs(const uint8_t *nonce, struct cptra_quote_pcrs_oa *output)
+{
+	struct cptra_quote_pcrs_ia input;
+	int ret;
+
+	memset(&input, 0, sizeof(input));
+	memset(output, 0, sizeof(*output));
+
+	/*
+	 * Caliptra hashes the nonce with its eight 32-bit words in reverse order:
+	 * digest = SHA384(PCR[0..31] || word-reversed nonce). Pre-reverse the words
+	 * so the quote digest is a plain SHA384(PCR[0..31] || requester nonce).
+	 * The nonce field Caliptra echoes in the quote is therefore word-reversed.
+	 */
+	if (nonce) {
+		const size_t words = sizeof(input.nonce) / sizeof(uint32_t);
+
+		for (size_t i = 0; i < words; i++)
+			memcpy(&input.nonce[i * sizeof(uint32_t)],
+			       &nonce[(words - 1 - i) * sizeof(uint32_t)], sizeof(uint32_t));
+	}
+
+	ret = cptra_ipc_transfer(CPTRA_IPCCMD_QUOTE_PCRS, (uint32_t *)&input, sizeof(input),
+				 CPTRA_IPC_RX_TYPE_EXTERNAL, (uint32_t *)output, sizeof(*output));
+	if (ret) {
+		LOG_ERR("caliptra_quote_pcrs is failure, ret:0x%x", ret);
+		return -1;
+	}
+
+	if (output->fips_status != 0) {
+		LOG_ERR("FIPS error from caliptra, status:0x%x", output->fips_status);
+		return -1;
+	}
+
+	LOG_DBG("caliptra_quote_pcrs is successful");
+	return 0;
+}
+
+/* Write the 0xFD manifest block holding the whole quote; return its size. */
+static size_t irot_fill_manifest_block(uint8_t *buf, const struct cptra_quote_pcrs_oa *quote)
+{
+	spdm_measurement_block_dmtf_t *block = (spdm_measurement_block_dmtf_t *)buf;
+
+	block->measurement_block_common_header.index = IROT_MANIFEST_INDEX;
+	block->measurement_block_common_header.measurement_specification =
+		SPDM_MEASUREMENT_SPECIFICATION_DMTF;
+	block->measurement_block_common_header.measurement_size =
+		sizeof(spdm_measurement_block_dmtf_header_t) + sizeof(*quote);
+	block->measurement_block_dmtf_header.dmtf_spec_measurement_value_type = IROT_MANIFEST_TYPE;
+	block->measurement_block_dmtf_header.dmtf_spec_measurement_value_size = sizeof(*quote);
+	memcpy(buf + sizeof(*block), quote, sizeof(*quote));
+
+	return IROT_MANIFEST_BLOCK_SIZE;
+}
+
 libspdm_return_t libspdm_measurement_collection(
 		void *spdm_context,
 		const uint32_t *session_id,
@@ -41,79 +123,50 @@ libspdm_return_t libspdm_measurement_collection(
 		void *device_measurement,
 		size_t *device_measurement_size)
 {
+	struct cptra_quote_pcrs_oa quote;
+	size_t size;
 
-	struct cptra_quote_pcrs_ia input;
-	struct cptra_quote_pcrs_oa output;
-	int ret;
-	uint32_t total_size_needed = 0;
-	uint8_t *output_buffer = (uint8_t *)device_measurement;
+	/*
+	 * libspdm does not initialize this and ORs it into MEASUREMENTS Param2
+	 * of signed 1.2+ responses. Measurements are read live from Caliptra on
+	 * every request and changes between requests are not tracked, so report
+	 * "no detection" (00b) rather than claiming that nothing changed.
+	 */
+	if (content_changed != NULL)
+		*content_changed = SPDM_MEASUREMENTS_RESPONSE_CONTENT_CHANGE_NO_DETECTION;
 
-	memset(&input, 0, sizeof(struct cptra_quote_pcrs_ia));
-	memset(&output, 0, sizeof(struct cptra_quote_pcrs_oa));
-
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_QUOTE_PCRS, (uint32_t *)&input, sizeof(input),
-				 CPTRA_IPC_RX_TYPE_EXTERNAL, (uint32_t *)&output, sizeof(output));
-	if (ret) {
-		LOG_ERR("caliptra_quote_pcrs is failure, ret:0x%x", ret);
-		return LIBSPDM_STATUS_BUSY_PEER;
-	} else
-		LOG_DBG("caliptra_quote_pcrs is successful");
-
-	switch(mesurements_index) {
+	switch (mesurements_index) {
 	case SPDM_GET_MEASUREMENTS_REQUEST_MEASUREMENT_OPERATION_TOTAL_NUMBER_OF_MEASUREMENTS:
-		*device_measurement_count = 32;
-		break;
+		/* Count only: no need to ask Caliptra for a quote */
+		*device_measurement_count = IROT_MEASUREMENT_COUNT;
+		return LIBSPDM_STATUS_SUCCESS;
 	case SPDM_GET_MEASUREMENTS_REQUEST_MEASUREMENT_OPERATION_ALL_MEASUREMENTS:
-		*device_measurement_count = 32;
-		total_size_needed = ARRAY_SIZE(output.PCRs)*(sizeof(PcrValue) + sizeof(spdm_measurement_block_dmtf_t));
-
-		if (total_size_needed > *device_measurement_size) {
-			LOG_ERR("buffer too small");
-			return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
-		}
-
-		*device_measurement_size = total_size_needed;
-		for (uint8_t i = 0; i < ARRAY_SIZE(output.PCRs); i++) {
-			spdm_measurement_block_dmtf_t *measurement_block_dmtf = (spdm_measurement_block_dmtf_t *)output_buffer;
-			measurement_block_dmtf->measurement_block_common_header.index = i + 1;
-			measurement_block_dmtf->measurement_block_common_header.measurement_specification = SPDM_MEASUREMENT_SPECIFICATION_DMTF;
-			measurement_block_dmtf->measurement_block_common_header.measurement_size = sizeof(PcrValue) + sizeof(spdm_measurement_block_dmtf_header_t);
-			measurement_block_dmtf->measurement_block_dmtf_header.dmtf_spec_measurement_value_type = 0x01; //	
-			measurement_block_dmtf->measurement_block_dmtf_header.dmtf_spec_measurement_value_size = sizeof(PcrValue);
-			output_buffer += sizeof(spdm_measurement_block_dmtf_t);
-			memcpy(output_buffer, &output.PCRs[i], sizeof(PcrValue));
-			output_buffer += sizeof(PcrValue);
-		}
-		LOG_HEXDUMP_INF(device_measurement, total_size_needed, "Measurement Block:");
-		break;
-	case 1 ... 32:
-		// PCR[0] ~ PCR[31]
-		*device_measurement_count = 1;
-
-		total_size_needed = sizeof(output.PCRs[0]) + sizeof(spdm_measurement_block_dmtf_t);
-
-		if (total_size_needed > *device_measurement_size) {
-			LOG_ERR("buffer too small");
-			return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
-		}
-
-		*device_measurement_size = total_size_needed;
-		spdm_measurement_block_dmtf_t *measurement_block_dmtf = (spdm_measurement_block_dmtf_t *)output_buffer;
-		measurement_block_dmtf->measurement_block_common_header.index = mesurements_index;
-		measurement_block_dmtf->measurement_block_common_header.measurement_specification = SPDM_MEASUREMENT_SPECIFICATION_DMTF;
-		measurement_block_dmtf->measurement_block_common_header.measurement_size = sizeof(output.PCRs[0]) + sizeof(spdm_measurement_block_dmtf_header_t);
-		measurement_block_dmtf->measurement_block_dmtf_header.dmtf_spec_measurement_value_type = 0x01; //	
-		measurement_block_dmtf->measurement_block_dmtf_header.dmtf_spec_measurement_value_size = sizeof(output.PCRs[0]);
-		output_buffer += sizeof(spdm_measurement_block_dmtf_t);
-		memcpy(output_buffer, &output.PCRs[mesurements_index - 1], sizeof(output.PCRs[0]));
-
-		LOG_HEXDUMP_INF(device_measurement, total_size_needed, "Measurement Block:");
+	case IROT_MANIFEST_INDEX:
 		break;
 	default:
 		return LIBSPDM_STATUS_MEAS_INVALID_INDEX;
-		break;
 	}
 
+	if (IROT_MANIFEST_BLOCK_SIZE > *device_measurement_size) {
+		LOG_ERR("buffer too small: need %zu, have %zu", IROT_MANIFEST_BLOCK_SIZE,
+			*device_measurement_size);
+		return LIBSPDM_STATUS_BUFFER_TOO_SMALL;
+	}
+
+	/*
+	 * libspdm turns any error other than MEAS_INVALID_INDEX into
+	 * ERROR(Unspecified); the specific status here is only for the log.
+	 */
+	if (irot_quote_pcrs(requester_nonce, &quote))
+		return LIBSPDM_STATUS_BUSY_PEER;
+
+	size = irot_fill_manifest_block(device_measurement, &quote);
+	*device_measurement_count = IROT_MEASUREMENT_COUNT;
+	*device_measurement_size = size;
+
+	LOG_INF("Measurement index 0x%02x: manifest %zu bytes, nonce %s",
+		mesurements_index, size, requester_nonce ? "bound" : "zero");
+	LOG_HEXDUMP_DBG(device_measurement, size, "Measurement Block:");
 
 	return LIBSPDM_STATUS_SUCCESS;
 }
@@ -135,6 +188,22 @@ bool libspdm_measurement_opaque_data(
 	return true;
 }
 
+/*
+ * MeasurementSummaryHash per DSP0274: the hash, with the negotiated base hash
+ * algorithm, of the concatenated measurement blocks exactly as GET_MEASUREMENTS
+ * encodes them.
+ *
+ * The 0xFD manifest is the only measurement, so TCB and ALL both hash that one
+ * block: every reported value is Caliptra PCR state, which is all TCB. It is
+ * built from a quote with a zero nonce, i.e. the block an unsigned
+ * GET_MEASUREMENTS returns, so a verifier can reproduce the summary.
+ *
+ * That only holds while Caliptra's quote signature is deterministic for a given
+ * input (RFC 6979 style, as observed on hardware) and the PCRs and reset
+ * counters do not change. If Caliptra moves to hedged/randomized ECDSA, the
+ * block changes on every quote and this summary can no longer be reproduced.
+ * Each call costs one Caliptra QUOTE_PCRS (quote + sign).
+ */
 bool libspdm_generate_measurement_summary_hash(
 		void *spdm_context,
 		spdm_version_number_t spdm_version,
@@ -145,28 +214,38 @@ bool libspdm_generate_measurement_summary_hash(
 		uint8_t  *measurement_summary_hash,
 		uint32_t measurement_summary_hash_size)
 {
-	struct cptra_quote_pcrs_ia input;
-	struct cptra_quote_pcrs_oa output;
-	int ret;
+	struct cptra_quote_pcrs_oa quote;
+	uint8_t *block;
+	size_t size;
+	bool result;
 
-	memset(&input, 0, sizeof(struct cptra_quote_pcrs_ia));
-	memset(&output, 0, sizeof(struct cptra_quote_pcrs_oa));
-
-	ret = cptra_ipc_transfer(CPTRA_IPCCMD_QUOTE_PCRS, (uint32_t *)&input, sizeof(input),
-				 CPTRA_IPC_RX_TYPE_EXTERNAL, (uint32_t *)&output, sizeof(output));
-	if (ret) {
-		LOG_ERR("caliptra_quote_pcrs is failure, ret:0x%x", ret);
+	if (measurement_summary_hash_type != SPDM_REQUEST_TCB_COMPONENT_MEASUREMENT_HASH &&
+	    measurement_summary_hash_type != SPDM_REQUEST_ALL_MEASUREMENTS_HASH)
 		return false;
-	} else
-		LOG_DBG("caliptra_quote_pcrs is successful");
 
-	if (measurement_summary_hash_size < sizeof(output.digest)) {
-		LOG_ERR("buffer too small");
+	if (measurement_summary_hash_size != libspdm_get_hash_size(base_hash_algo)) {
+		LOG_ERR("summary hash size %u does not match hash algo 0x%x",
+			measurement_summary_hash_size, base_hash_algo);
 		return false;
 	}
-	memcpy(measurement_summary_hash, output.digest, sizeof(output.digest));
 
-	return true;
+	if (irot_quote_pcrs(NULL, &quote))
+		return false;
+
+	block = malloc(IROT_MANIFEST_BLOCK_SIZE);
+	if (!block) {
+		LOG_ERR("Failed to allocate measurement summary buffer");
+		return false;
+	}
+
+	size = irot_fill_manifest_block(block, &quote);
+	result = libspdm_hash_all(base_hash_algo, block, size, measurement_summary_hash);
+	free(block);
+
+	if (!result)
+		LOG_ERR("Failed to hash measurement block");
+
+	return result;
 }
 #endif /* LIBSPDM_ENABLE_CAPABILITY_MEAS_CAP */
 
