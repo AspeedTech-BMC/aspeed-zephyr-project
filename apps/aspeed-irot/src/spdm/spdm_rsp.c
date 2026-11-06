@@ -377,15 +377,18 @@ static void *spdm_server_init(void *app_context)
 	/* certificate */
 	void *data = NULL;
 	size_t data_size = 0;
-	libspdm_read_responder_public_certificate_chain(
+	if (libspdm_read_responder_public_certificate_chain(
 			SPDM_ALGORITHMS_BASE_HASH_ALGO_TPM_ALG_SHA_384,
 			SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384,
 			&data, &data_size,
-			NULL, NULL);
-	parameter.additional_data[0] = 0;
-	libspdm_set_data(spdm_ctx,
-			LIBSPDM_DATA_LOCAL_PUBLIC_CERT_CHAIN,
-			&parameter, data, data_size);
+			NULL, NULL)) {
+		parameter.additional_data[0] = 0;
+		libspdm_set_data(spdm_ctx,
+				LIBSPDM_DATA_LOCAL_PUBLIC_CERT_CHAIN,
+				&parameter, data, data_size);
+	} else {
+		LOG_ERR("No certificate chain for slot 0; certificate-based requests will fail");
+	}
 
 	/*
 	 * SPDM 1.3+ DIGESTS reports SupportedSlotMask in Param1 and requires the

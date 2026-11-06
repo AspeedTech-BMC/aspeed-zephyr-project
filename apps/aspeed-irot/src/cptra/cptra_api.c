@@ -10,6 +10,9 @@
 #include <zephyr/crypto/hash.h>
 #include <image/caliptra_soc_manifest.h>
 #include <mbedtls/sha512.h>
+#include <mbedtls/md.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/x509_crt.h>
 
 LOG_MODULE_REGISTER(cptra_api, LOG_LEVEL_INF);
 
@@ -961,12 +964,65 @@ static void cptra_load_static_cert(struct cert_info *cached_cert, const uint8_t 
 }
 
 /*
+ * Accept extensions mbedTLS does not know, including critical DICE ones: only
+ * the signature is checked here, not the certificate's policy.
+ */
+static int cptra_x509_accept_ext(void *ctx, mbedtls_x509_crt const *crt,
+				 mbedtls_x509_buf const *oid, int critical,
+				 const unsigned char *p, const unsigned char *end)
+{
+	ARG_UNUSED(ctx);
+	ARG_UNUSED(crt);
+	ARG_UNUSED(oid);
+	ARG_UNUSED(critical);
+	ARG_UNUSED(p);
+	ARG_UNUSED(end);
+	return 0;
+}
+
+/* True if issuer_der's public key verifies the signature on cert_der. */
+static bool cptra_cert_signed_by(const uint8_t *cert_der, uint32_t cert_len,
+				 const uint8_t *issuer_der, uint32_t issuer_len)
+{
+	mbedtls_x509_crt cert, issuer;
+	unsigned char hash[MBEDTLS_MD_MAX_SIZE];
+	const mbedtls_md_info_t *md;
+	bool ok = false;
+
+	mbedtls_x509_crt_init(&cert);
+	mbedtls_x509_crt_init(&issuer);
+
+	if (mbedtls_x509_crt_parse_der_with_ext_cb(&cert, cert_der, cert_len, 1,
+						   cptra_x509_accept_ext, NULL) != 0 ||
+	    mbedtls_x509_crt_parse_der_with_ext_cb(&issuer, issuer_der, issuer_len, 1,
+						   cptra_x509_accept_ext, NULL) != 0) {
+		LOG_ERR("Failed to parse certificate for issuer check");
+		goto out;
+	}
+
+	md = mbedtls_md_info_from_type(cert.MBEDTLS_PRIVATE(sig_md));
+	if (md == NULL || mbedtls_md(md, cert.tbs.p, cert.tbs.len, hash) != 0)
+		goto out;
+
+	ok = mbedtls_pk_verify_ext(cert.MBEDTLS_PRIVATE(sig_pk), cert.MBEDTLS_PRIVATE(sig_opts),
+				   &issuer.pk, cert.MBEDTLS_PRIVATE(sig_md), hash,
+				   mbedtls_md_get_size(md), cert.MBEDTLS_PRIVATE(sig).p,
+				   cert.MBEDTLS_PRIVATE(sig).len) == 0;
+out:
+	mbedtls_x509_crt_free(&cert);
+	mbedtls_x509_crt_free(&issuer);
+	return ok;
+}
+
+/*
  * Pick the sub CA that issued this part's IDevID and cache it, so the cached
  * chain reads root CA -> sub CA -> IDevID. The peer sub CAs share an issuer but
  * have distinct subject names, so matching the IDevID issuer against each
  * subject tells them apart. Names are compared as raw DER, which is exact:
  * every certificate here comes out of the same PKI tooling, so the encodings
- * match byte for byte.
+ * match byte for byte. The name match is then confirmed by verifying the
+ * IDevID signature with the candidate's key, so a sub CA re-keyed under the
+ * same name is never picked by mistake.
  */
 static void cptra_select_sub_ca(struct cert_info *cached_cert)
 {
@@ -1002,6 +1058,17 @@ static void cptra_select_sub_ca(struct cert_info *cached_cert)
 
 		if (subject_len != issuer_len || memcmp(subject, issuer, issuer_len) != 0)
 			continue;
+
+		/*
+		 * A matching name is not enough: a re-keyed sub CA can keep its
+		 * subject. Only take the candidate whose key signed the IDevID.
+		 */
+		if (!cptra_cert_signed_by(idev_cert->data, idev_cert->length,
+					  candidate->der, candidate->len)) {
+			LOG_WRN("%s matches the IDevID issuer name but did not sign it",
+				candidate->name);
+			continue;
+		}
 
 		if (candidate->len > sizeof(cached_cert->data)) {
 			LOG_ERR("%s is %u bytes, cache slot holds %u", candidate->name,

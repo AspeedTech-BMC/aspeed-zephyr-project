@@ -18,7 +18,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/cptra.h>
 #include <zephyr/drivers/misc/aspeed/cptra_ipc.h>
+#include <cptra/cptra_api.h>
 
+#include <inttypes.h>
 #include <stdlib.h>
 
 #include "spdm/irot_ec.h"
@@ -499,76 +501,113 @@ exit:
 	free(certificate_chain);
 }
 
+/*
+ * Build the SPDM certificate chain for slot 0 (DSP0274 "Certificate chain
+ * format"):
+ *
+ *   Length | Reserved | RootHash | ASPEED root CA | ASPEED sub CA | IDevID |
+ *   LDevID | FMC Alias | Rt Alias | DPE leaf
+ *
+ * The chain starts at the ASPEED root CA, so it is self-contained, and the sub
+ * CA that issued this part's IDevID is included so a verifier holding only the
+ * ASPEED root can validate every link. RootHash is the hash of the root CA
+ * certificate, which is what a requester matches against its trust anchors.
+ * Both CA certificates come from the cache that cptra_load_certificate()
+ * fills during iRoT init, before MCTP (and so SPDM) starts.
+ *
+ * hash and hash_size are optional.
+ */
 bool libspdm_read_responder_public_certificate_chain(
 		uint32_t base_hash_algo, uint32_t base_asym_algo, void **data,
 		size_t *size, void **hash, size_t *hash_size)
 {
-	/* Get Certificate Chain from Caliptra fisrt */
-	void *cert_chain = NULL;
-	uint32_t cert_chain_size = 0;
+	void *root_ca = NULL, *sub_ca = NULL, *cptra_chain = NULL;
+	uint32_t root_ca_size = 0, sub_ca_size = 0, cptra_chain_size = 0;
+	spdm_cert_chain_t *header;
+	size_t digest_size, total_size;
+	uint8_t *out;
 	bool ret = false;
 
-	cptra_invoke_dpe_get_certificate_chain(&cert_chain, &cert_chain_size);
-	if (cert_chain == NULL || cert_chain_size == 0) {
-		LOG_ERR("Failed to get certificate chain from Caliptra");
+	if (data == NULL || size == NULL)
 		return false;
-	}
-	
-	size_t digest_size = libspdm_get_hash_size(base_hash_algo);
+
+	*data = NULL;
+
+	digest_size = libspdm_get_hash_size(base_hash_algo);
 	if (digest_size == 0) {
 		LOG_ERR("Unsupported hash algorithm: 0x%08X", base_hash_algo);
-		free(cert_chain);
 		return false;
 	}
 
-	/* Output cert should be organize:
-	 * spdm_cert_chain_t + digest + certificate chain
-	 */
-
-	uint8_t cert_digest[64];
-	ret = libspdm_hash_all(base_hash_algo, cert_chain, cert_chain_size, cert_digest);
-	if (!ret) {
-		LOG_ERR("Failed to hash certificate chain");
-		free(cert_chain);
-		return false;
+	if (cptra_get_cached_certificate(CPTRA_CACHED_ASPEED_ROOT_CA_CERT, &root_ca,
+					 &root_ca_size)) {
+		LOG_ERR("ASPEED root CA certificate is not available");
+		goto out;
 	}
 
+	if (cptra_get_cached_certificate(CPTRA_CACHED_ASPEED_SUB_CA_CERT, &sub_ca,
+					 &sub_ca_size)) {
+		LOG_ERR("No ASPEED sub CA matches this part's IDevID issuer");
+		goto out;
+	}
+
+	cptra_invoke_dpe_get_certificate_chain(&cptra_chain, &cptra_chain_size);
+	if (cptra_chain == NULL || cptra_chain_size == 0) {
+		LOG_ERR("Failed to get certificate chain from Caliptra");
+		goto out;
+	}
+
+	total_size = sizeof(spdm_cert_chain_t) + digest_size + root_ca_size + sub_ca_size +
+		     cptra_chain_size;
 	/* Without LARGE_RESP_CAP the Length field on the wire is 16 bits */
-	if (cert_chain_size + sizeof(spdm_cert_chain_t) + digest_size > UINT16_MAX) {
-		LOG_ERR("Certificate chain too large: %u bytes", cert_chain_size);
-		free(cert_chain);
-		return false;
+	if (total_size > UINT16_MAX) {
+		LOG_ERR("Certificate chain too large: %zu bytes", total_size);
+		goto out;
 	}
 
-	// Add space for spdm_cert_chain_t header and digest
-
-	*data = malloc(cert_chain_size + sizeof(spdm_cert_chain_t) + digest_size);
+	*data = malloc(total_size);
 	if (*data == NULL) {
 		LOG_ERR("Failed to allocate memory for output certificate chain");
-		free(cert_chain);
-		return false;
+		goto out;
 	}
-	
-	uint8_t *output_buffer = (uint8_t *)(*data);
-	spdm_cert_chain_t *output_cert_chain_header = (spdm_cert_chain_t *)output_buffer;
+
+	out = (uint8_t *)*data;
+	header = (spdm_cert_chain_t *)out;
 	/*
 	 * libspdm 4.0 models the header as a single 32-bit length. Without
 	 * LARGE_RESP_CAP (not advertised) the wire format is Length(2) + Reserved(2);
 	 * little-endian storage of a value below 64KB yields exactly that.
 	 */
-	output_cert_chain_header->length = cert_chain_size + sizeof(spdm_cert_chain_t) + digest_size;
+	header->length = total_size;
+	out += sizeof(spdm_cert_chain_t);
 
-	output_buffer = output_buffer + sizeof(spdm_cert_chain_t);
+	/* RootHash: hash of the root certificate, not of the whole chain */
+	if (!libspdm_hash_all(base_hash_algo, root_ca, root_ca_size, out)) {
+		LOG_ERR("Failed to hash the root CA certificate");
+		free(*data);
+		*data = NULL;
+		goto out;
+	}
+	if (hash != NULL)
+		*hash = out;
+	if (hash_size != NULL)
+		*hash_size = digest_size;
+	out += digest_size;
 
-	*hash = (uint8_t *)output_buffer;
-	*hash_size = digest_size;
-	memcpy(*hash, cert_digest, digest_size);
+	memcpy(out, root_ca, root_ca_size);
+	out += root_ca_size;
+	memcpy(out, sub_ca, sub_ca_size);
+	out += sub_ca_size;
+	memcpy(out, cptra_chain, cptra_chain_size);
 
-	output_buffer = output_buffer + digest_size;
-	memcpy(output_buffer, cert_chain, cert_chain_size);
-
-	*size = cert_chain_size + sizeof(spdm_cert_chain_t) + digest_size;
-	free(cert_chain);
-
-	return true;
+	*size = total_size;
+	LOG_INF("SPDM certificate chain: %zu bytes (root CA %" PRIu32 ", sub CA %" PRIu32
+		", Caliptra %" PRIu32 ")",
+		total_size, root_ca_size, sub_ca_size, cptra_chain_size);
+	ret = true;
+out:
+	free(root_ca);
+	free(sub_ca);
+	free(cptra_chain);
+	return ret;
 }
