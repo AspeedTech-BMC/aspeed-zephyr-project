@@ -860,9 +860,25 @@ static const uint32_t ram_size_ary[] = {
 	0x20000000, // 8GB
 };
 
+/*
+ * ECC init BIST timeout budget, scaled by the dram size.
+ * ram_size is in 16-byte units, so (ram_size >> 16) is the size in MB.
+ * Budget 2ms per MB (i.e. assume >= 0.5GB/s init throughput, well below
+ * the real write bandwidth) plus a fixed base for small parts:
+ *   256MB ~ 1s, 1GB ~ 2.5s, 2GB ~ 4.6s, 4GB ~ 8.7s, 8GB ~ 16.9s
+ */
+#define ECC_BIST_TIMEOUT_BASE_MS	500
+#define ECC_BIST_TIMEOUT_MS_PER_MB	2
+
+static uint32_t sdramc_ecc_bist_timeout(uint32_t ram_size)
+{
+	return ECC_BIST_TIMEOUT_BASE_MS +
+	       (ram_size >> 16) * ECC_BIST_TIMEOUT_MS_PER_MB;
+}
+
 static int sdramc_ecc_enable(struct sdramc *sdramc)
 {
-	uint32_t ecc_sz, ram_size;
+	uint32_t ecc_sz, ram_size, timeout;
 	struct sdramc_regs *regs = sdramc->regs;
 	uint32_t bistcfg;
 	uint32_t val;
@@ -878,9 +894,10 @@ static int sdramc_ecc_enable(struct sdramc *sdramc)
 
 	/* Initialize the whole dram so the ECC check bytes are consistent */
 	bistcfg = DRAMC_BISTCFG_INIT_MODE | DRAMC_BISTCFG_ENABLE;
-	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, 5000);
+	timeout = sdramc_ecc_bist_timeout(ram_size);
+	err = sdramc_bist(sdramc, 0, ram_size, bistcfg, timeout);
 	if (err) {
-		LOG_ERR("ecc bist failed, err=%d", err);
+		LOG_ERR("ecc bist failed, err=%d (timeout %ums)", err, timeout);
 		return err;
 	}
 
