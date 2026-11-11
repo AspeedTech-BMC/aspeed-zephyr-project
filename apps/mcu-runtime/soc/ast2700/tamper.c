@@ -154,7 +154,8 @@ static void tamper_timer_cb(struct k_timer *timer)
 	tamper = sys_read32(TAMPER_STATUS_REG);
 	phyunlock = sys_read32(DDRPHY_UNLOCK_STATUS_REG);
 
-	LOG_INF("***** Tamper=%ld C, DDRPHY unlock status=0x%x *****", tamper & TAMPER_ALERT, phyunlock);
+	LOG_INF("***** Tamper=%ld C, DDRPHY unlock status=0x%x *****",
+		tamper & TAMPER_ALERT, phyunlock);
 
 	if (tamper & TAMPER_ALERT) {
 		LOG_WRN("Tamper Alert!!!");
@@ -271,8 +272,8 @@ int tamper_init(int step, int diff)
 	reg = sys_read32(TAMPER_STATUS_REG);
 	if (reg & TAMPER_ALERT) {
 		LOG_WRN("Tamper alert!! FREQ_COUNTER_CTRL_REG=0x%08x, FREQ_COUNTER_READBACK=0x%08x",
-				sys_read32(FREQ_COUNTER_CTRL_REG),
-				sys_read32(FREQ_COUNTER_READBACK));
+			sys_read32(FREQ_COUNTER_CTRL_REG),
+			sys_read32(FREQ_COUNTER_READBACK));
 		sys_write32(TAMPER_ALERT, TAMPER_STATUS_REG);
 	}
 
