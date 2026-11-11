@@ -1393,7 +1393,7 @@ int dram_init(struct ast_chip *chip)
 
 	if (err) {
 		LOG_ERR("%s init is failed, err=%d",
-			ac ? ac->desc : "unknow", err);
+			ac ? ac->desc : "unknown", err);
 		return err;
 	}
 
