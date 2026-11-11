@@ -110,7 +110,7 @@ static void scratch_cnt_inc(uint32_t reg, uint32_t mask, uint32_t shift)
 #ifdef ENABLE_TAMPER_TIMER
 static uint32_t counter_to_delay_ps(uint32_t value)
 {
-	return (25000000U / 512) * (value + 1);
+	return (uint32_t)((25000000ULL * (value + 1)) / 512);
 }
 
 static uint32_t cal_src(int src)
