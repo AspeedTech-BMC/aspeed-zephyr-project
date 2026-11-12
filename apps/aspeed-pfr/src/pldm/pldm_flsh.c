@@ -18,6 +18,7 @@ LOG_MODULE_REGISTER(pfr_pldm_flsh, CONFIG_LOG_DEFAULT_LEVEL);
 #define FLSH_SOC_MANIFEST_ID 0x00000001
 #define FLSH_MCU_RUNTIME_ID 0x00000002
 #define FLSH_MAX_IMAGE_COUNT 127
+#define FLSH_MAX_FILENAME_LEN 64
 
 struct flsh_header {
 	uint16_t version;
@@ -30,6 +31,7 @@ struct flsh_image_header {
 	uint32_t identifier;
 	uint32_t offset;
 	uint32_t size;
+	uint8_t filename[FLSH_MAX_FILENAME_LEN];
 	uint32_t image_checksum;
 	uint32_t image_header_checksum;
 } __packed;
