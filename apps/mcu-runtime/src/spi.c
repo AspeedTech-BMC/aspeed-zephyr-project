@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <zephyr/devicetree.h>
 #include <zephyr/logging/log.h>
 
 #include <zephyr/drivers/flash.h>
@@ -43,6 +44,7 @@
 #define   SPI_CS_TO_DIS			BIT(26)
 #define   SPI_UNALGNED_ACCESS		BIT(24)
 #define   SPI_CS_CONTINUOUS		BIT(16)
+#define   SPI_MODE_SEL_MASK		GENMASK(27, 24)
 
 LOG_MODULE_REGISTER(ast_spi, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -125,19 +127,36 @@ static int spi_copy(struct ast_loader *loader, uint32_t *dest, uint32_t src, uin
         return 0;
 }
 
-static void hspi_init(void)
+/*
+ * An enabled eDAF bridge drives a SPI controller only in flash mode,
+ * and the controller it drives is the one at its ctl-base (CBASE).
+ * A bridge in DDR mode is backed by DRAM and drives no controller.
+ */
+#define EDAF_BRIDGE_ON_CTRL(node, base)					\
+	((DT_PROP_OR(node, ctl_base, 0) == (base)) &&			\
+	 !DT_PROP(node, edaf_ddr_mode)) ||
+
+#define SPI_CTRL_HAS_EDAF(base)						\
+	(DT_FOREACH_STATUS_OKAY_VARGS(aspeed_edaf_bridge,		\
+				      EDAF_BRIDGE_ON_CTRL, base) 0)
+
+static void hspi_set_mode(mm_reg_t base, bool edaf)
 {
 	uint32_t reg;
 
-	reg = sys_read32(ASPEED_SPI0_REG_BASE + MISC_CTRL_REG);
-	reg |= SPI_USER_CMD_MODE | SPI_UNALGNED_ACCESS;
-	reg &= ~SPI_CS_CONTINUOUS;
-	sys_write32(reg, ASPEED_SPI0_REG_BASE + MISC_CTRL_REG);
+	reg = sys_read32(base + MISC_CTRL_REG);
+	reg &= ~(SPI_MODE_SEL_MASK | SPI_CS_CONTINUOUS);
+	if (edaf)
+		reg |= SPI_USER_CMD_MODE | SPI_UNALGNED_ACCESS;
+	sys_write32(reg, base + MISC_CTRL_REG);
+}
 
-	reg = sys_read32(ASPEED_SPI1_REG_BASE + MISC_CTRL_REG);
-	reg |= SPI_USER_CMD_MODE | SPI_UNALGNED_ACCESS;
-	reg &= ~SPI_CS_CONTINUOUS;
-	sys_write32(reg, ASPEED_SPI1_REG_BASE + MISC_CTRL_REG);
+static void hspi_init(void)
+{
+	hspi_set_mode(ASPEED_SPI0_REG_BASE,
+		      SPI_CTRL_HAS_EDAF(ASPEED_SPI0_REG_BASE));
+	hspi_set_mode(ASPEED_SPI1_REG_BASE,
+		      SPI_CTRL_HAS_EDAF(ASPEED_SPI1_REG_BASE));
 }
 
 static int spi_init(struct ast_loader *loader)
