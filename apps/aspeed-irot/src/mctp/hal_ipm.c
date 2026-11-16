@@ -35,6 +35,14 @@ static void ipm_cb(const struct device *ipmdev, void *user_data,
 
 	memcpy(&pkt.ipc_hdr, (void *)data, sizeof(pkt.ipc_hdr));
 
+	/* The IPM ISR no longer invalidates the RX shmem for us */
+	ret = ast_ipm_rx_shmem_invd(ipmdev, MCTP_IPC_CHANNEL, 0,
+				    ipc_hdr->msg_len);
+	if (ret < 0) {
+		LOG_ERR("RX shmem invalidate failed, ret=%d", ret);
+		return;
+	}
+
 	ret = ast_ipm_shmem_read(ipmdev, MCTP_IPC_CHANNEL, 0, &hdr_ptr, sizeof(pkt.hdr));
 	if (ret < 0) {
 		LOG_ERR("ast_ipm_shmem_read header failed, ret=%d", ret);

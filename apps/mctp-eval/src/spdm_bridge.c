@@ -31,7 +31,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <zephyr/cache.h>
 #include <zephyr/drivers/ipm.h>
 #include <zephyr/drivers/ipm_ast.h>
 #include <zephyr/kernel.h>
@@ -330,10 +329,10 @@ static int spdm_forward(const uint8_t *msg, size_t len, uint8_t *rsp, size_t *rs
 
 		if (rsp_desc[PSP_SPDM_WORD_OFFSET] != PSP_SPDM_RSP_OFFSET ||
 		    n > PSP_SPDM_MAX_MSG_SIZE ||
+		    ast_ipm_rx_shmem_invd(ipc, PSP_SPDM_IPI, 0, n) < 0 ||
 		    ast_ipm_shmem_read(ipc, PSP_SPDM_IPI, 0, &body, n) < 0) {
 			ret = -EBADMSG;
 		} else {
-			sys_cache_data_invd_range(body, ROUND_UP(n, CONFIG_DCACHE_LINE_SIZE));
 			memcpy(rsp, body, n);
 			*rsp_len = n;
 			stats.answered++;
