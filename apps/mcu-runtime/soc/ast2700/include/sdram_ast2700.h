@@ -326,6 +326,7 @@ struct sdramc {
 	unsigned long clock_rate;
 
 	int sz;
+	uint32_t vga_size;
 
 	bool ecc_enable;
 	uint32_t ecc_size;

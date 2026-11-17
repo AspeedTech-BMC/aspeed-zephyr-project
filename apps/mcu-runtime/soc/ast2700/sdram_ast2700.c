@@ -990,6 +990,7 @@ static int sdramc_size_detect(struct sdramc *sdramc)
 	vga_size = sdramc_get_vga_mem_size(sdramc);
 	if (vga_size < 0)
 		vga_size = 0;
+	sdramc->vga_size = vga_size;
 
 	/*
 	 * Resolve the ECC/AES coverage in bytes now that the dram size is
@@ -1008,6 +1009,37 @@ static int sdramc_size_detect(struct sdramc *sdramc)
 		sdramc->aes_size = sdramc->ecc_enable ? sdramc->ecc_size : available_size;
 
 	return 0;
+}
+
+static void sdramc_print_info(struct sdramc *sdramc)
+{
+	struct sdramc_regs *regs = sdramc->regs;
+	uint32_t cap_mb = ram_size_ary[sdramc->sz] >> 16;
+	uint32_t vga_mb = sdramc->vga_size >> 20;
+	bool ecc_on = sys_read32((uint32_t)&regs->mcfg) & DRAMC_MCFG_ECC_EN;
+	bool aes_on = sys_read32((uint32_t)&regs->enccfg) & DRAMC_ENCCFG_EN;
+	uint32_t ecc_mb = 0, aes_mb = 0;
+
+	if (ecc_on)
+		ecc_mb = (sys_read32((uint32_t)&regs->ecc_addr_range) >> 16) + 1;
+
+	if (aes_on)
+		aes_mb = (sys_read32((uint32_t)&regs->enc_max_addr) >> 16) + 1 -
+			 (sys_read32((uint32_t)&regs->enc_min_addr) >> 16);
+
+	if (ecc_on && aes_on)
+		LOG_INF("DRAM: %u MiB (capacity:%u MiB, VGA:%u MiB, ECC:on, ECC size:%u MiB, "
+			"AES:on, AES size:%u MiB)",
+			sdramc->ecc_size >> 16, cap_mb, vga_mb, ecc_mb, aes_mb);
+	else if (ecc_on)
+		LOG_INF("DRAM: %u MiB (capacity:%u MiB, VGA:%u MiB, ECC:on, ECC size:%u MiB)",
+			sdramc->ecc_size >> 16, cap_mb, vga_mb, ecc_mb);
+	else if (aes_on)
+		LOG_INF("DRAM: %u MiB (capacity:%u MiB, VGA:%u MiB, AES:on, AES size:%u MiB)",
+			cap_mb - vga_mb, cap_mb, vga_mb, aes_mb);
+	else
+		LOG_INF("DRAM: %u MiB (capacity:%u MiB, VGA:%u MiB)",
+			cap_mb - vga_mb, cap_mb, vga_mb);
 }
 
 struct mpu_attr {
@@ -1407,6 +1439,8 @@ int dram_init(struct ast_chip *chip)
 	err = sdramc_aes_enable(sdramc);
 	if (err)
 		return err;
+
+	sdramc_print_info(sdramc);
 
 	sdramc_init_mpu(sdramc);
 	sdramc_mpu_enable(sdramc);
