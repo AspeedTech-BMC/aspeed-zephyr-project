@@ -25,6 +25,19 @@ static uint8_t *mctp_i3c_tmq_pkt_start(struct mctp_pktbuf *pkt)
 	return (uint8_t *)mctp_pktbuf_hdr(pkt);
 }
 
+/*
+ * The target's dynamic address, 0 until the bus controller assigns one.
+ * i3c_target_mqueue has no getter for it, but its driver data starts with the
+ * struct i3c_target_config it registers, whose address the controller driver
+ * (i3c_aspeed, mipi_hci) updates on DAA and SETNEWDA.
+ */
+static uint8_t i3c_target_mqueue_get_address(const struct device *tmq)
+{
+	const struct i3c_target_config *cfg = tmq->data;
+
+	return cfg->address;
+}
+
 /* DSP0233 PEC: CRC-8 over the target's address + R/W bit, then the packet */
 static uint8_t mctp_i3c_tmq_pec(uint8_t addr, uint8_t rnw, const uint8_t *buf, size_t len)
 {
