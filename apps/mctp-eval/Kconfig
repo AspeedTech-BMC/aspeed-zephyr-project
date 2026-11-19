@@ -13,6 +13,17 @@ config MCTP_EVAL_LOCAL_EID
 	  command. Otherwise 8..254: DSP0236 reserves 1-7, and the build
 	  rejects them.
 
+config MCTP_EVAL_I3C
+	bool "MCTP over I3C endpoint"
+	depends on MCTP_I3C_TARGET_MQUEUE
+	depends on $(dt_nodelabel_enabled,i3c0_tmq)
+	default y
+	help
+	  Expose the endpoint as an I3C target on the i3c0_tmq message
+	  queue, with its own libmctp instance. Say n to build the app
+	  without it, for example MCTP over USB only, on a board whose
+	  devicetree enables i3c0_tmq.
+
 config MCTP_EVAL_USB
 	bool "MCTP over USB endpoint"
 	depends on MCTP_USB

@@ -23,8 +23,10 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/sys/byteorder.h>
 #include <libmctp.h>
-#include <mctp/mctp_i3c_tmq.h>
 #include "mctp_eval.h"
+#ifdef CONFIG_MCTP_EVAL_I3C
+#include <mctp/mctp_i3c_tmq.h>
+#endif
 #ifdef CONFIG_MCTP_EVAL_USB
 #include <zephyr/usb/usbd.h>
 #include <mctp/mctp_usb.h>
@@ -41,13 +43,21 @@ BUILD_ASSERT(CONFIG_MCTP_EVAL_LOCAL_EID == 0 || CONFIG_MCTP_EVAL_LOCAL_EID >= 8,
 #define MCTP_TAG_MASK		0x07
 #define SEND_MAX_LEN		64
 
+/*
+ * Defined without CONFIG_MCTP_EVAL_I3C too, never started: its NULL mctp
+ * reads as "not running" wherever the buses are looked at.
+ */
+#ifdef CONFIG_MCTP_EVAL_I3C
 MCTP_I3C_TMQ_DT_DEFINE(mctp_i3c0, DT_NODELABEL(i3c0_tmq));
+#endif
 /* Serializes the I3C rx loop and shell sends on the I3C bus */
 static K_MUTEX_DEFINE(i3c_lock);
 static struct eval_bus bus_i3c = {
 	.name = "i3c",
 	.lock = &i3c_lock,
+#ifdef CONFIG_MCTP_EVAL_I3C
 	.tx_errors = &mctp_i3c0.stats.tx_errors,
+#endif
 };
 
 #ifdef CONFIG_MCTP_EVAL_USB
@@ -652,10 +662,12 @@ int main(void)
 #endif
 
 	/* Each bus runs on its own: one failing to start leaves the other up */
+#ifdef CONFIG_MCTP_EVAL_I3C
 	if (!mctp_eval_bus_init(&bus_i3c, &mctp_i3c0.binding)) {
 		LOG_INF("MCTP eval: i3c endpoint on %s, local eid 0x%02x", mctp_i3c0.tmq->name,
 			CONFIG_MCTP_EVAL_LOCAL_EID);
 	}
+#endif
 
 #ifdef CONFIG_MCTP_EVAL_USB
 	if (!mctp_eval_bus_init(&bus_usb, &mctp_usb0.binding)) {
@@ -682,6 +694,7 @@ int main(void)
 		return 0;
 	}
 
+#ifdef CONFIG_MCTP_EVAL_I3C
 	while (true) {
 		k_mutex_lock(bus_i3c.lock, K_FOREVER);
 		ret = mctp_i3c_tmq_poll(&mctp_i3c0);
@@ -691,6 +704,7 @@ int main(void)
 			k_usleep(RX_POLL_US);
 		}
 	}
+#endif
 
 	return 0;
 }
@@ -705,9 +719,11 @@ static int cmd_stats(const struct shell *sh, size_t argc, char **argv)
 		memset(&stats, 0, sizeof(stats));
 		k_spin_unlock(&stats_lock, key);
 		/* The bindings count under their bus locks */
+#ifdef CONFIG_MCTP_EVAL_I3C
 		k_mutex_lock(bus_i3c.lock, K_FOREVER);
 		memset(&mctp_i3c0.stats, 0, sizeof(mctp_i3c0.stats));
 		k_mutex_unlock(bus_i3c.lock);
+#endif
 #ifdef CONFIG_MCTP_EVAL_USB
 		k_mutex_lock(bus_usb.lock, K_FOREVER);
 		memset(&mctp_usb0.stats, 0, sizeof(mctp_usb0.stats));
@@ -716,11 +732,13 @@ static int cmd_stats(const struct shell *sh, size_t argc, char **argv)
 		return 0;
 	}
 
+#ifdef CONFIG_MCTP_EVAL_I3C
 	shell_print(sh, "i3c binding rx packets: %u", mctp_i3c0.stats.rx_pkts);
 	shell_print(sh, "i3c binding rx drops:   %u", mctp_i3c0.stats.rx_drops);
 	shell_print(sh, "i3c binding rx PEC err: %u", mctp_i3c0.stats.rx_pec_errors);
 	shell_print(sh, "i3c binding tx packets: %u", mctp_i3c0.stats.tx_pkts);
 	shell_print(sh, "i3c binding tx errors:  %u", mctp_i3c0.stats.tx_errors);
+#endif
 #ifdef CONFIG_MCTP_EVAL_USB
 	shell_print(sh, "usb binding rx packets: %u", mctp_usb0.stats.rx_pkts);
 	shell_print(sh, "usb binding rx drops:   %u", mctp_usb0.stats.rx_drops);
