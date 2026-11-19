@@ -204,6 +204,7 @@ int vga_init(struct ast_chip *chip, bool open_codec)
 		retimer_cpu->REG10.value = 0x00030009;
 		packer_io->REG10.value   = 0x00030009;
 		packer_io->REG44.value   = 0x00010002;
+		retimer_io->REG1C.value  = 0x01201001;
 		retimer_io->REG10.value  = 0x00230009;
 		retimer_io->REG44.value  = 0x00100010;
 	}
