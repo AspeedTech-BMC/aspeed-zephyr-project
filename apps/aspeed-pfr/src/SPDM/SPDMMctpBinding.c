@@ -84,7 +84,7 @@ bool spdm_mctp_init_req(void *ctx, SPDM_MEDIUM medium, uint8_t bus, uint8_t dst_
 	case SPDM_MEDIUM_SMBUS:
 		mctp_inst = find_mctp_by_smbus(bus);
 		break;
-#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+#if defined(CONFIG_PFR_MCTP_I3C)
 	case SPDM_MEDIUM_I3C:
 #if defined(CONFIG_PFR_MCTP_I3C_5_0)
 		mctp_inst = mctp_i3c_target_get_by_bus(bus);

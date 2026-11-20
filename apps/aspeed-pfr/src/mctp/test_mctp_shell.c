@@ -66,7 +66,7 @@ static int cmd_mctp_send_msg(const struct shell *shell, size_t argc, char **argv
 	return 0;
 }
 
-#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+#if defined(CONFIG_PFR_MCTP_I3C)
 static int cmd_mctp_send_msg_i3c(const struct shell *shell, size_t argc, char **argv)
 {
 #if !defined(CONFIG_PFR_MCTP_I3C_5_0)
@@ -286,7 +286,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_log_cmds,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_mctp_cmds,
 	SHELL_CMD_ARG(send, NULL, "<bus> <dest_addr> <dest_eid> <msg_type> <rq/d/ins> <cmd_code> <option:payload>", cmd_mctp_send_msg, 7, 255),
-#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+#if defined(CONFIG_PFR_MCTP_I3C)
 	SHELL_CMD_ARG(send_i3c, NULL, "<bmc|cpu> <dest_addr> <dest_eid> <payload>", cmd_mctp_send_msg_i3c, 4, 255),
 #endif
 	SHELL_CMD_ARG(echo, NULL, "<bus> <dest_addr> <dest_eid> <payload_length> <option:default 1 time>", cmd_mctp_echo_test, 5, 1),

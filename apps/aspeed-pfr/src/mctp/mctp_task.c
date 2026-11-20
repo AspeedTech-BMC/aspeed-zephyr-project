@@ -48,7 +48,7 @@ static uint8_t set_thread_name(mctp *mctp_inst)
 		}
 		ret = MCTP_SUCCESS;
 		break;
-#if defined(CONFIG_PFR_MCTP_I3C) && defined(CONFIG_I3C_ASPEED)
+#if defined(CONFIG_PFR_MCTP_I3C)
 	case MCTP_MEDIUM_TYPE_I3C:
 	case MCTP_MEDIUM_TYPE_I3C_TARGET:
 		LOG_INF("medium_type: i3c");
@@ -90,18 +90,14 @@ static uint8_t mctp_medium_init(mctp *mctp_inst, mctp_medium_conf medium_conf)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		ret = mctp_smbus_init(mctp_inst, medium_conf);
 		break;
-#if defined(CONFIG_PFR_MCTP_I3C) && \
-	(defined(CONFIG_I3C_ASPEED) || defined(CONFIG_I3C_MIPI_HCI))
-#if !defined(CONFIG_PFR_MCTP_I3C_5_0)
-	case MCTP_MEDIUM_TYPE_I3C:
-		ret = mctp_i3c_init(mctp_inst, medium_conf);
-		break;
-#endif
 #if defined(CONFIG_PFR_MCTP_I3C_5_0)
 	case MCTP_MEDIUM_TYPE_I3C_TARGET:
 		ret = mctp_i3c_target_init(mctp_inst, medium_conf);
 		break;
-#endif
+#elif defined(CONFIG_PFR_MCTP_I3C)
+	case MCTP_MEDIUM_TYPE_I3C:
+		ret = mctp_i3c_init(mctp_inst, medium_conf);
+		break;
 #endif
 	default:
 		break;
@@ -119,8 +115,7 @@ static uint8_t mctp_medium_deinit(mctp *mctp_inst)
 	case MCTP_MEDIUM_TYPE_SMBUS:
 		mctp_smbus_deinit(mctp_inst);
 		break;
-#if defined(CONFIG_PFR_MCTP_I3C) && \
-	(defined(CONFIG_I3C_ASPEED) || defined(CONFIG_I3C_MIPI_HCI))
+#if defined(CONFIG_PFR_MCTP_I3C)
 	case MCTP_MEDIUM_TYPE_I3C:
 	case MCTP_MEDIUM_TYPE_I3C_TARGET:
 		mctp_i3c_deinit(mctp_inst);
