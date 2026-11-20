@@ -72,9 +72,6 @@ static struct _pldm_handler_query_entry query_tbl[] = {
 #if defined(CONFIG_PLDM_FW_UPDATE)
 	{ PLDM_TYPE_FW_UPDATE, pldm_fw_update_handler_query },
 #endif
-#if defined(CONFIG_PLDM_OEM)
-	{ PLDM_TYPE_OEM, pldm_oem_handler_query },
-#endif
 };
 
 static K_MUTEX_DEFINE(wait_recv_resp_mutex);

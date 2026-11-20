@@ -73,10 +73,4 @@ if (CONFIG_PLDM)
 			pldm/pldm_fw_update_sd_ast2700_image.c
 		)
 	endif()
-	if (CONFIG_PLDM_OEM)
-		target_sources(app
-			PRIVATE
-			pldm/pldm_oem.c
-		)
-	endif()
 endif()

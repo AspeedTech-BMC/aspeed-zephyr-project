@@ -20,10 +20,4 @@ config PLDM_FW_UPDATE
 	default n
 	help
 	  The PLDM Firmware Update component enables support for firmware updates using the Platform Level Data Model (PLDM). It allows the system to perform firmware updates on platform components through PLDM communication, providing a standardized and efficient method for managing firmware across various hardware resources.
-
-config PLDM_OEM
-	bool "PLDM OEM"
-	default n
-	help
-	  The PLDM OEM component provides support for OEM-specific extensions to the Platform Level Data Model (PLDM). It allows manufacturers to implement custom features and functionalities that are not covered by the standard PLDM specification, enabling enhanced management and monitoring capabilities tailored to specific hardware platforms.
 endif
