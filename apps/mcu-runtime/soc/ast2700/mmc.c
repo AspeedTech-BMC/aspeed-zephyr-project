@@ -11,6 +11,10 @@
 #include <zephyr/logging/log.h>
 #include <scu.h>
 #include <zephyr/sd/mmc.h>
+#ifdef CONFIG_ASPEED_ZEPHYR_MAINLINE
+/* Upstream Zephyr's <zephyr/sd/mmc.h> does not declare mmc_switch_part(). */
+#include <aspeed/mmc.h>
+#endif
 #include <ast_loader.h>
 #include <abr.h>
 
