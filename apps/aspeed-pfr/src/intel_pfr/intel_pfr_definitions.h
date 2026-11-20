@@ -152,13 +152,6 @@ typedef enum {
 #define AFM_RECOVERY_PENDING_UPDATE     0x2
 #define AFM_PENDING_UPDATE_STATE        (AFM_ACTIVE_PENDING_UPDATE | AFM_RECOVERY_PENDING_UPDATE)
 
-enum CurveHashType {
-	secp384r1 = 1,
-	secp256r1,
-	hash_sign_algo384,
-	hash_sign_algo256
-};
-
 typedef enum {
 	DECOMPRESSION_STATIC_REGIONS_MASK             = 0b1,
 	DECOMPRESSION_DYNAMIC_REGIONS_MASK            = 0b10,

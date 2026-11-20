@@ -42,5 +42,7 @@ enum {
 #endif
 };
 
-int verify_root_key_entry(struct pfr_manifest *manifest, PFR_AUTHENTICATION_BLOCK1 *block1_buffer);
+int verify_root_key_entry(struct pfr_manifest *manifest);
+int intel_pfr_check_root_key_hash(const uint8_t *digest, uint32_t length,
+				  const uint8_t *key, uint32_t key_length);
 

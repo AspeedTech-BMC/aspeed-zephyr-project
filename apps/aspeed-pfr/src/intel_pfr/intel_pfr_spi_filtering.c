@@ -18,6 +18,7 @@
 #include "intel_pfr/intel_pfr_definitions.h"
 #include "intel_pfr/intel_pfr_spi_filtering.h"
 #include "pfr/pfr_util.h"
+#include "intel_pfr_sig_scheme.h"
 
 #define SPIM_NUM  4
 
@@ -68,11 +69,8 @@ void apply_pfm_protection(int spi_device_id)
 		return;
 	}
 
-	int offset = PFM_SIG_BLOCK_SIZE;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
-
-	if (pfr_manifest->hash_curve == hash_sign_algo384 || pfr_manifest->hash_curve == hash_sign_algo256)
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
+	int offset = intel_pfr_sig_block_size(pfr_manifest);
 
 	uint32_t pfm_region_Start = pfm_read_address + offset + 0x20;
 	int default_region_length = 40;

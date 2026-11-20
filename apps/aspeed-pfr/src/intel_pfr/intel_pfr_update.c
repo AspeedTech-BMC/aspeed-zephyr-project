@@ -24,6 +24,7 @@
 #include "intel_pfr_key_cancellation.h"
 #include "intel_pfr_update.h"
 #include "intel_pfr_svn.h"
+#include "intel_pfr_sig_scheme.h"
 #include "flash/flash_aspeed.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "gpio/gpio_aspeed.h"
@@ -142,10 +143,7 @@ int pfr_staging_verify(struct pfr_manifest *manifest)
 		return Success;
 	}
 
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		manifest->address += LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		manifest->address += PFM_SIG_BLOCK_SIZE;
+	manifest->address += intel_pfr_sig_block_size(manifest);
 
 	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
 	// manifest verification
@@ -430,10 +428,8 @@ int update_afm_image(struct pfr_manifest *manifest, uint32_t flash_select, void 
 	manifest->image_type = BMC_TYPE;
 
 	pc_length = manifest->pc_length;
-	int offset = PFM_SIG_BLOCK_SIZE;
+	int offset = intel_pfr_sig_block_size(manifest);
 
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
 	payload_address = manifest->address + offset;
 
 	LOG_INF("AFM update start payload_address=%08x pc_length=%x", payload_address, pc_length);
@@ -567,9 +563,11 @@ int verify_and_update_cpld_images(struct pfr_manifest *manifest, uint32_t flash_
 		LOG_ERR("Failed to read image size");
 		return Failure;
 	}
-	if ((image_size + PFM_SIG_BLOCK_SIZE) > region_size) {
+	uint32_t sig_size = intel_pfr_sig_block_size_at(manifest->image_type, manifest->address);
+
+	if ((image_size + sig_size) > region_size) {
 		LOG_ERR("Image size %x is bigger than CPLD active region %x",
-				image_size + PFM_SIG_BLOCK_SIZE, region_size);
+				image_size + sig_size, region_size);
 		return Failure;
 	}
 
@@ -633,10 +631,7 @@ int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select, uint32_
 	}
 
 	LOG_INF("ROT update capsule verification success");
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		payload_address = manifest->address + LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		payload_address = manifest->address + PFM_SIG_BLOCK_SIZE;
+	payload_address = manifest->address + intel_pfr_sig_block_size(manifest);
 
 	if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE_DECOMMISSON) {
 		// Decommission validation
@@ -868,7 +863,7 @@ int update_firmware_image(uint32_t image_type, void *AoData, void *EventContext,
 
 	// After staging manifest, Compression header will start
 	area_size = pfr_manifest->update_fw->pc_length -
-		(PFM_SIG_BLOCK_SIZE + pfr_manifest->update_fw->pfm_length);
+		(intel_pfr_sig_block_size(pfr_manifest) + pfr_manifest->update_fw->pfm_length);
 
 	// SVN number validation
 	status = read_statging_area_pfm_svn(pfr_manifest, &staging_svn);

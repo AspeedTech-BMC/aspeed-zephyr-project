@@ -20,6 +20,7 @@
 #include "include/SmbusMailBoxCom.h"
 #include "mctp/mctp_base_protocol.h"
 #include "AspeedStateMachine/AspeedStateMachine.h"
+#include "intel_pfr/intel_pfr_sig_scheme.h"
 
 #define SPDM_REQUESTER_STACK_SIZE 1024
 #define SPDM_REQUESTER_PRIO 3
@@ -120,12 +121,9 @@ int retrieve_afm_list(void)
 	int ret;
 	uint8_t fidx;
 	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
-	int offset = PFM_SIG_BLOCK_SIZE;
+	int offset = intel_pfr_sig_block_size(pfr_manifest);
 	uint32_t magic_num;
 	int afm_offset_idx;
-
-	if (pfr_manifest->hash_curve == hash_sign_algo384 || pfr_manifest->hash_curve == hash_sign_algo256)
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
 
 	for (int dev_idx = 0; dev_idx < CONFIG_PFR_SPDM_ATTESTATION_MAX_DEVICES; dev_idx++, afm_offset_idx++) {
 		if (dev_idx < afm_dev_idx_onboard_first)
@@ -171,10 +169,7 @@ int read_afm_dev_info(uint8_t dev_idx, uint8_t *buffer)
 	int ret;
 	uint8_t flash_id;
 	struct pfr_manifest *manifest = get_pfr_manifest();
-	int offset = PFM_SIG_BLOCK_SIZE;
-
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
+	int offset = intel_pfr_sig_block_size(manifest);
 
 	if (dev_idx < afm_dev_idx_onboard_first)
 		flash_id = ROT_INTERNAL_AFM;
@@ -860,11 +855,7 @@ void spdm_run_attester(void)
 #endif
 
 	uint32_t event = osEventFlagsGet(spdm_attester_event);
-	struct pfr_manifest *pfr_manifest = get_pfr_manifest();
-	int offset = PFM_SIG_BLOCK_SIZE;
 
-	if (pfr_manifest->hash_curve == hash_sign_algo384 || pfr_manifest->hash_curve == hash_sign_algo256)
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
 	if (!(event & SPDM_REQ_EVT_ENABLE)) {
 		LOG_WRN("SPDM Requester not enabled");
 	} else if (!(event & SPDM_REQ_EVT_T0)) {
@@ -891,7 +882,8 @@ void spdm_run_attester(void)
 				continue;
 			}
 			if (magic_num == BLOCK0TAG) {
-				afm_list[i] = (i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET) + offset;
+				afm_list[i] = (i * CONFIG_PFR_SPDM_ATTESTATION_DEVICE_OFFSET) +
+					      intel_pfr_sig_block_size(get_pfr_manifest());
 				LOG_INF("Add afm device offset [%08lx]", afm_list[i]);
 			} else {
 				/* Offset 0x0000 is block0/1 header not AFM device structure,

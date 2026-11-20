@@ -17,6 +17,7 @@
 #include "intel_pfr_verification.h"
 #include "intel_pfr_provision.h"
 #include "common/common.h"
+#include "intel_pfr_sig_scheme.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -74,10 +75,7 @@ int update_active_pfm(struct pfr_manifest *manifest, uint32_t pfm_size)
 		capsule_offset = manifest->staging_address;
 
 	// Adjusting capsule offset size to PFM Signing chain
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256) 
-		capsule_offset += LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		capsule_offset += PFM_SIG_BLOCK_SIZE;
+	capsule_offset += intel_pfr_sig_block_size(manifest);
 
 	// Updating PFM from capsule to active region
 	length_page_align =
@@ -315,10 +313,7 @@ int get_total_pfm_size(struct pfr_manifest *manifest, uint32_t signed_pfm_offset
 			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
 			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
 				cap_pfm_body_offset += sizeof(PFM_SPI_DEFINITION);
-				if ((manifest->hash_curve == secp384r1) || (manifest->hash_curve == hash_sign_algo384))
-					cap_pfm_body_offset += SHA384_SIZE;
-				else
-					cap_pfm_body_offset += SHA256_SIZE;
+				cap_pfm_body_offset += intel_pfr_hash_length(intel_pfr_sig_hash_type(manifest));
 			} else {
 				cap_pfm_body_offset += SPI_REGION_DEF_MIN_SIZE;
 			}
@@ -374,7 +369,8 @@ int get_total_pfm_size(struct pfr_manifest *manifest, uint32_t signed_pfm_offset
 
 		pfr_spi_read(image_type, signed_afm_offset, sizeof(PFR_AUTHENTICATION_BLOCK0),
 				(uint8_t *)&signed_afm);
-		total_pfm_size = afm_start_addr_in_pfm + afm_data_length - PFM_SIG_BLOCK_SIZE;
+		total_pfm_size = afm_start_addr_in_pfm + afm_data_length -
+			(manifest->sig_scheme ? manifest->sig_scheme->afm_pfm_offset_adjustment : PFM_SIG_BLOCK_SIZE);
 		if (signed_afm.Block0Tag == BLOCK0TAG) {
 			LOG_INF("PFM has AFM device data");
 			/* has AFM device data */
@@ -444,10 +440,7 @@ int decompress_fvm_spi_region(struct pfr_manifest *manifest, PBC_HEADER *pbc,
 			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
 			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
 				fvm_body_offset += sizeof(PFM_SPI_DEFINITION);
-				if ((manifest->hash_curve == secp384r1) || (manifest->hash_curve == hash_sign_algo384))
-					fvm_body_offset += SHA384_SIZE;
-				else
-					fvm_body_offset += SHA256_SIZE;
+				fvm_body_offset += intel_pfr_hash_length(intel_pfr_sig_hash_type(manifest));
 			} else {
 				fvm_body_offset += SPI_REGION_DEF_MIN_SIZE;
 			}
@@ -469,19 +462,13 @@ int decompress_fv_capsule(struct pfr_manifest *manifest)
 	int sector_sz = pfr_spi_get_block_size(image_type);
 	bool support_block_erase = (sector_sz == BLOCK_SIZE) ? true : false;
 	uint32_t read_address = manifest->staging_address;
-	uint32_t signed_fvm_offset = read_address + PFM_SIG_BLOCK_SIZE;
-	uint32_t cap_fvm_offset = signed_fvm_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t signed_fvm_offset = read_address + intel_pfr_sig_block_size(manifest);
+	uint32_t cap_fvm_offset = signed_fvm_offset + intel_pfr_sig_block_size(manifest);
 	uint32_t pbc_offset = cap_fvm_offset + manifest->pc_length;
 	PBC_HEADER pbc;
 
 	if (manifest->target_fvm_addr == 0)
 		return Failure;
-
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256) {
-		signed_fvm_offset = read_address + LMS_PFM_SIG_BLOCK_SIZE;
-		cap_fvm_offset = signed_fvm_offset + LMS_PFM_SIG_BLOCK_SIZE;
-		pbc_offset = cap_fvm_offset + manifest->pc_length;
-	}
 
 	// Erase and update active FVM region.
 	pfr_spi_erase_region(image_type, support_block_erase, manifest->target_fvm_addr,
@@ -511,7 +498,7 @@ int decompress_afm_capsule(struct pfr_manifest *pfr_manifest,
 		afm_start_addr - pfr_manifest->active_pfm_addr;
 	uint32_t org_address;
 	PFR_AUTHENTICATION_BLOCK0 block0;
-	uint32_t offset = PFM_SIG_BLOCK_SIZE;
+	uint32_t offset = intel_pfr_sig_block_size(pfr_manifest);
 	uint32_t afm_body_offset;
 	bool afm_device_found = false;
 
@@ -519,11 +506,6 @@ int decompress_afm_capsule(struct pfr_manifest *pfr_manifest,
 		afm_body_offset = BMC_AFM_BODY_OFFSET;
 	else
 		afm_body_offset = CPU0_AFM_BODY_OFFSET;
-
-	if (pfr_manifest->hash_curve == hash_sign_algo384 ||
-		pfr_manifest->hash_curve == hash_sign_algo256) {
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
-	}
 
 	if (pfr_manifest->state == FIRMWARE_RECOVERY)
 		read_address = pfr_manifest->recovery_address + offset;
@@ -605,8 +587,8 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	uint32_t image_type = manifest->image_type;
 	uint32_t read_address = (manifest->state == FIRMWARE_RECOVERY) ?
 		manifest->recovery_address : manifest->staging_address;
-	uint32_t signed_pfm_offset = read_address + PFM_SIG_BLOCK_SIZE;
-	uint32_t cap_pfm_offset = signed_pfm_offset + PFM_SIG_BLOCK_SIZE;
+	uint32_t signed_pfm_offset = read_address + intel_pfr_sig_block_size(manifest);
+	uint32_t cap_pfm_offset = signed_pfm_offset + intel_pfr_sig_block_size(manifest);
 	uint32_t cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE);
 	uint32_t cap_pfm_body_start_addr = cap_pfm_body_offset;
 	uint32_t cap_pfm_body_end_addr;
@@ -615,13 +597,6 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 	PFM_STRUCTURE pfm_header;
 	PFM_SPI_DEFINITION spi_def;
 	PBC_HEADER pbc;
-
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256) {
-		signed_pfm_offset = read_address + LMS_PFM_SIG_BLOCK_SIZE;
-		cap_pfm_offset = signed_pfm_offset + LMS_PFM_SIG_BLOCK_SIZE;
-		cap_pfm_body_offset = cap_pfm_offset + sizeof(PFM_STRUCTURE);
-		cap_pfm_body_start_addr = cap_pfm_body_offset;
-	}
 
 	if (pfr_spi_read(image_type, cap_pfm_offset, sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_header))
 		return Failure;
@@ -687,10 +662,7 @@ int decompress_capsule(struct pfr_manifest *manifest, DECOMPRESSION_TYPE_MASK_EN
 			if (spi_def.HashAlgorithmInfo.SHA256HashPresent ||
 			    spi_def.HashAlgorithmInfo.SHA384HashPresent) {
 				cap_pfm_body_offset += sizeof(PFM_SPI_DEFINITION);
-				if ((manifest->hash_curve == secp384r1) || (manifest->hash_curve == hash_sign_algo384))
-					cap_pfm_body_offset += SHA384_SIZE;
-				else
-					cap_pfm_body_offset += SHA256_SIZE;
+				cap_pfm_body_offset += intel_pfr_hash_length(intel_pfr_sig_hash_type(manifest));
 			} else {
 				cap_pfm_body_offset += SPI_REGION_DEF_MIN_SIZE;
 			}

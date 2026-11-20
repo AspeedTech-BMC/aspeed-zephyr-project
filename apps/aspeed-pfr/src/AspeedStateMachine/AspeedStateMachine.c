@@ -25,6 +25,7 @@
 #include "intel_pfr/intel_pfr_update.h"
 #include "intel_pfr/intel_pfr_verification.h"
 #include "intel_pfr/intel_pfr_spi_filtering.h"
+#include "intel_pfr/intel_pfr_sig_scheme.h"
 #if defined(CONFIG_INTEL_PFR_CPLD_UPDATE)
 #include "intel_pfr/intel_pfr_cpld_utils.h"
 #endif
@@ -1480,6 +1481,7 @@ int handle_recovery_requested(CPLD_STATUS *cpld_status,
 extern uint8_t get_ufm_svn(uint32_t offset);
 int validate_afm_update_type(CPLD_STATUS *cpld_update_status, uint32_t *image_type, uint32_t flash_select, struct event_context *evt_ctx)
 {
+	const struct intel_pfr_sig_scheme *scheme;
 	uint32_t payload_address;
 	uint32_t hrot_svn = 0;
 	int status = 0;
@@ -1493,9 +1495,15 @@ int validate_afm_update_type(CPLD_STATUS *cpld_update_status, uint32_t *image_ty
 	ufm_read(PROVISION_UFM, AFM_STAGING_REGION_OFFSET,
 		(uint8_t *)&payload_address, sizeof(payload_address));
 
-	payload_address += PFM_SIG_BLOCK_SIZE;
+	scheme = intel_pfr_sig_scheme_at(BMC_TYPE, payload_address);
+	if (!scheme) {
+		LOG_ERR("AFM capsule: unsupported signature scheme");
+		*image_type = 0xffffffff;
+		return Failure;
+	}
+	payload_address += scheme->sig_block_size;
 	LOG_INF("AFM update start payload_address=%08x", payload_address );
-	status = pfr_spi_read(BMC_TYPE, payload_address + PFM_SIG_BLOCK_SIZE + 4,
+	status = pfr_spi_read(BMC_TYPE, payload_address + scheme->sig_block_size + 4,
 				sizeof(uint8_t), (uint8_t *)&hrot_svn);
 	if (status != Success) {
 		LOG_ERR("Flash read AFM SVN failed");

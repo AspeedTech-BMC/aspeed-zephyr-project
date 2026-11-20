@@ -11,7 +11,12 @@ target_sources(app PRIVATE
 	intel_pfr_recovery.c
 	intel_pfr_verification.c
 	intel_pfr_svn.c
+	intel_pfr_sig_scheme.c
+	intel_pfr_sig_ecdsa.c
 	)
+
+zephyr_linker_sources(SECTIONS intel_pfr_sig_scheme.ld)
+target_sources_ifdef(CONFIG_MBEDTLS_LMS_C app PRIVATE intel_pfr_sig_lms.c)
 
 if(CONFIG_INTEL_PFR_CPLD_UPDATE)
         target_sources(app PRIVATE intel_pfr_cpld_utils.c)

@@ -14,9 +14,7 @@
 #define KEY_CANCELLATION_CAPSULE        0x100
 
 #define BLOCK0_PCTYPE_ADDRESS           8
-#define CSK_KEY_ID_ADDRESS              160
 #define CSK_KEY_ID_ADDRESS_3K           580
-#define CSK_START_ADDRESS               148
 #define CSK_ENTRY_PC_SIZE               128
 #define KEY_SIZE                        48
 #define KEY_SIZE_3K                     512

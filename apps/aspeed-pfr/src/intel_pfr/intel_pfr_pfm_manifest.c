@@ -18,6 +18,7 @@
 #include "pfr/pfr_util.h"
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr_svn.h"
+#include "intel_pfr_sig_scheme.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -52,10 +53,7 @@ int get_active_pfm_version_details(struct pfr_manifest *manifest, uint32_t addre
 	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
 	// PFM data start address after signature
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		pfm_data_address = address + LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		pfm_data_address = address + PFM_SIG_BLOCK_SIZE;
+	pfm_data_address = address + intel_pfr_sig_block_size(manifest);
 
 	status = pfr_spi_read(manifest->image_type, pfm_data_address, sizeof(PFM_STRUCTURE), buffer);
 	if (status != Success) {
@@ -116,10 +114,7 @@ int get_recover_pfm_version_details(struct pfr_manifest *manifest, uint32_t addr
 	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
 	// PFM data start address after Recovery block and PFM block
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		pfm_data_address = address + LMS_PFM_SIG_BLOCK_SIZE + LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		pfm_data_address = address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
+	pfm_data_address = address + 2 * intel_pfr_sig_block_size(manifest);
 
 	status = pfr_spi_read(manifest->image_type, pfm_data_address, sizeof(PFM_STRUCTURE),
 			buffer);
@@ -250,14 +245,10 @@ int fvm_spi_region_verification(struct pfr_manifest *manifest)
 	uint32_t read_address = manifest->address;
 	FVM_STRUCTURE fvm_data;
 	bool done = false;
-	uint32_t fvm_addr = read_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t fvm_addr = read_address + intel_pfr_sig_block_size(manifest);
 	uint32_t fvm_end_addr;
 	PFM_SPI_DEFINITION spi_definition = { 0 };
 	uint8_t pfm_spi_hash[SHA384_SIZE] = { 0 };
-
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256) {
-		fvm_addr = read_address + LMS_PFM_SIG_BLOCK_SIZE;
-	}
 
 	LOG_INF("Verifying FVM...");
 	if (manifest->base->verify((struct manifest *)manifest, manifest->hash,
@@ -491,7 +482,7 @@ int verify_afm_devices(struct pfr_manifest *manifest)
 		}
 		count++;
 
-		pfr_spi_read(manifest->image_type, manifest->address + PFM_SIG_BLOCK_SIZE,
+		pfr_spi_read(manifest->image_type, manifest->address + intel_pfr_sig_block_size(manifest),
 				sizeof(afm_st), (uint8_t *)&afm_st);
 		if (afm_st.AfmTag != AFM_TAG) {
 			LOG_ERR("Invalid Tag found - %x", afm_st.AfmTag);
@@ -503,7 +494,7 @@ int verify_afm_devices(struct pfr_manifest *manifest)
 					afm_st.Length);
 			return Failure;
 		}
-		pfr_spi_read(manifest->image_type, manifest->address + PFM_SIG_BLOCK_SIZE + sizeof(afm_st),
+		pfr_spi_read(manifest->image_type, manifest->address + intel_pfr_sig_block_size(manifest) + sizeof(afm_st),
 				afm_st.Length, pData);
 		ptr = pData;
 		// Get AFM address definition count
@@ -562,7 +553,7 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 	uint32_t read_address = manifest->address;
 	PFM_STRUCTURE pfm_data;
 	bool done = false;
-	uint32_t pfm_addr = read_address + PFM_SIG_BLOCK_SIZE;
+	uint32_t pfm_addr = read_address + intel_pfr_sig_block_size(manifest);
 	uint32_t pfm_end_addr;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	PFM_FVM_ADDRESS_DEFINITION *fvm_def;
@@ -581,9 +572,6 @@ int pfm_spi_region_verification(struct pfr_manifest *manifest)
 		set_afm_address(manifest, 0);
 	}
 #endif
-
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		pfm_addr = read_address + LMS_PFM_SIG_BLOCK_SIZE;
 
 	if (pfr_spi_read(manifest->image_type, pfm_addr,
 			sizeof(PFM_STRUCTURE), (uint8_t *)&pfm_data))

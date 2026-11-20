@@ -1,0 +1,1 @@
+ITERABLE_SECTION_ROM(intel_pfr_sig_scheme, Z_LINK_ITERABLE_SUBALIGN)

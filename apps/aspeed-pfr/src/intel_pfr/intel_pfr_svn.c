@@ -15,6 +15,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "intel_pfr_svn.h"
+#include "intel_pfr_sig_scheme.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -95,10 +96,7 @@ int read_statging_area_pfm_svn(struct pfr_manifest *manifest, uint8_t *svn_versi
 	uint8_t buffer[sizeof(PFM_STRUCTURE)];
 
 	// PFM data start address after Staging block and PFM block
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		pfm_start_address = manifest->address + LMS_PFM_SIG_BLOCK_SIZE + LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		pfm_start_address = manifest->address + PFM_SIG_BLOCK_SIZE + PFM_SIG_BLOCK_SIZE;
+	pfm_start_address = manifest->address + 2 * intel_pfr_sig_block_size(manifest);
 
 	if (manifest->image_type == AFM_TYPE)
 		status = pfr_spi_read(BMC_TYPE, pfm_start_address, sizeof(PFM_STRUCTURE),

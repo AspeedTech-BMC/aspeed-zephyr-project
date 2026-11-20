@@ -13,6 +13,7 @@
 #include "intel_pfr_definitions.h"
 #include "intel_pfr_key_cancellation.h"
 #include "AspeedStateMachine/common_smc.h"
+#include "intel_pfr_sig_scheme.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -39,7 +40,6 @@ int get_cancellation_policy_offset(uint32_t pc_type)
 
 int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 {
-	uint32_t block1_address = manifest->address + sizeof(PFR_AUTHENTICATION_BLOCK0);
 	uint8_t read_buffer[KCH_CAN_CERT_RESERVED_SIZE] = { 0 };
 	uint32_t reserved_address;
 	uint32_t status = 0;
@@ -49,10 +49,7 @@ int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 	if ((manifest->pc_type == CPLD_CAPSULE_CANCELLATION) || (manifest->pc_type == PCH_PFM_CANCELLATION)
 	    || (manifest->pc_type == PCH_CAPSULE_CANCELLATION) || (manifest->pc_type == BMC_PFM_CANCELLATION)
 	    || (manifest->pc_type == BMC_CAPSULE_CANCELLATION)) {
-		if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-			reserved_address = manifest->address + LMS_PFM_SIG_BLOCK_SIZE + 4;
-		else
-			reserved_address = manifest->address + PFM_SIG_BLOCK_SIZE + 4;
+		reserved_address = manifest->address + intel_pfr_sig_block_size(manifest) + 4;
 		status = pfr_spi_read(manifest->image_type, reserved_address, sizeof(read_buffer), (uint8_t *)read_buffer);
 		if (status != Success) {
 			LOG_ERR("Flash read reserved data failed for key cancellation capsule");
@@ -69,7 +66,9 @@ int validate_key_cancellation_flag(struct pfr_manifest *manifest)
 		manifest->kc_flag = TRUE;
 	} else   {
 		// Read Csk key ID
-		status = pfr_spi_read(manifest->image_type, block1_address + CSK_KEY_ID_ADDRESS, sizeof(key_id), (uint8_t *)&key_id);
+		status = pfr_spi_read(manifest->image_type,
+				      intel_pfr_csk_entry_addr(manifest) + offsetof(struct intel_pfr_key_entry_hdr, key_id),
+				      sizeof(key_id), (uint8_t *)&key_id);
 		if (status != Success) {
 			LOG_ERR("Flash read block1 CSK key Id failed");
 			return Failure;
@@ -135,10 +134,11 @@ int verify_csk_key_id(struct pfr_manifest *manifest, uint8_t key_id)
 
 bool verify_key_unused(uint32_t ufm_offset, uint8_t key_id)
 {
-	uint32_t block1_address;
+	const struct intel_pfr_sig_scheme *scheme;
 	uint32_t image_type;
 	uint32_t base_addr;
 	uint32_t csk_id = 0;
+	bool recovery;
 
 	if (ufm_read(PROVISION_UFM, ufm_offset, (uint8_t *)&base_addr, sizeof(base_addr))) {
 		LOG_ERR("Failed to read UFM");
@@ -146,22 +146,33 @@ bool verify_key_unused(uint32_t ufm_offset, uint8_t key_id)
 	}
 	switch (ufm_offset) {
 	case BMC_RECOVERY_REGION_OFFSET:
-		base_addr += PFM_SIG_BLOCK_SIZE;
 	case BMC_ACTIVE_PFM_OFFSET:
 		image_type = BMC_TYPE;
 		break;
 	case PCH_RECOVERY_REGION_OFFSET:
-		base_addr += PFM_SIG_BLOCK_SIZE;
 	case PCH_ACTIVE_PFM_OFFSET:
 		image_type = PCH_TYPE;
 		break;
 	default:
 		return false;
 	}
+	recovery = (ufm_offset == BMC_RECOVERY_REGION_OFFSET ||
+		    ufm_offset == PCH_RECOVERY_REGION_OFFSET);
 
-	block1_address = base_addr + sizeof(PFR_AUTHENTICATION_BLOCK0);
-	if (pfr_spi_read(image_type, block1_address + CSK_KEY_ID_ADDRESS,
-		      sizeof(csk_id), (uint8_t *)&csk_id)) {
+	scheme = intel_pfr_sig_scheme_at(image_type, base_addr);
+	if (scheme && recovery) {
+		base_addr += scheme->sig_block_size;
+		scheme = intel_pfr_sig_scheme_at(image_type, base_addr);
+	}
+	if (!scheme) {
+		LOG_ERR("Unsupported signature scheme at %x", base_addr);
+		return false;
+	}
+
+	if (pfr_spi_read(image_type, base_addr + sizeof(PFR_AUTHENTICATION_BLOCK0) +
+			 INTEL_PFR_BLOCK1_HDR_SIZE + scheme->root_entry_size +
+			 offsetof(struct intel_pfr_key_entry_hdr, key_id),
+			 sizeof(csk_id), (uint8_t *)&csk_id)) {
 		LOG_ERR("Flash read block1 CSK key Id failed");
 		return false;
 	}

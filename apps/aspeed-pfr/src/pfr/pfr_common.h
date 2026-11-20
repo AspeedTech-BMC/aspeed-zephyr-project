@@ -16,6 +16,8 @@
 /* Flash page size shared by code common to both the intel_pfr and cerberus_pfr backends. */
 #define PFR_PAGE_SIZE 0x1000
 
+struct intel_pfr_sig_scheme;
+
 struct pfr_manifest {
 	// struct manifest_flash *base;
 	struct manifest *base;
@@ -43,7 +45,7 @@ struct pfr_manifest {
 	uint32_t pc_length;                                     // Protected Content Size
 	uint32_t pc_type;                                       // manifest protected content type
 	uint32_t kc_flag;                                       // Key Cancellation flag
-	uint32_t hash_curve;                                    // Hash Curve
+	const struct intel_pfr_sig_scheme *sig_scheme;
 #if defined(CONFIG_SEAMLESS_UPDATE)
 	uint32_t target_fvm_addr;                               // fvm region for seamless update
 #endif

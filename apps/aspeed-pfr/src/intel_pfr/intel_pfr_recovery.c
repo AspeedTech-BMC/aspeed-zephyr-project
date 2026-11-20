@@ -25,6 +25,7 @@
 #include "Smbus_mailbox/Smbus_mailbox.h"
 #include "intel_pfr_svn.h"
 #include "intel_pfr_update.h"
+#include "intel_pfr_sig_scheme.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -53,10 +54,9 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 {
 	uint8_t act_pfm_sig_b0[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
 	uint8_t staging_pfm_sig_b0[sizeof(PFR_AUTHENTICATION_BLOCK0)] = { 0 };
-	uint8_t staging_pfm_sig_b1[256] = { 0 };
 	PFR_AUTHENTICATION_BLOCK0 *act_block0_buffer;
 	PFR_AUTHENTICATION_BLOCK0 *staging_block0_buffer;
-	KEY_ENTRY *RootEntry;
+	const struct intel_pfr_sig_scheme *scheme;
 	uint32_t act_pfm_image_type = 0;
 	uint8_t digest_length = 0;
 	uint32_t staging_address;
@@ -115,7 +115,7 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 		manifest->image_type = BMC_TYPE;
 		staging_address = CONFIG_BMC_INTEL_CPLD_STAGING_OFFSET;
 		act_pfm_image_type = ROT_EXT_CPLD_ACT;
-		act_pfm_offset = PFM_SIG_BLOCK_SIZE;
+		act_pfm_offset = intel_pfr_sig_block_size_at(act_pfm_image_type, 0);
 	}
 #endif
 	else {
@@ -133,9 +133,7 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 	}
 
 	act_block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)act_pfm_sig_b0;
-	int offset = PFM_SIG_BLOCK_SIZE;
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		offset = LMS_PFM_SIG_BLOCK_SIZE;
+	int offset = intel_pfr_sig_block_size(manifest);
 
 	// Staging PFM signature start address after Staging block and capsule signature
 	status = pfr_spi_read(manifest->image_type, staging_address + offset, sizeof(PFR_AUTHENTICATION_BLOCK0), staging_pfm_sig_b0);
@@ -147,33 +145,24 @@ int does_staged_fw_image_match_active_fw_image(struct pfr_manifest *manifest)
 
 	staging_block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)staging_pfm_sig_b0;
 
-	status = pfr_spi_read(manifest->image_type, staging_address + offset + sizeof(PFR_AUTHENTICATION_BLOCK0),
-				offsetof(PFR_AUTHENTICATION_BLOCK1, CskEntry), staging_pfm_sig_b1);
-	if (status != Success) {
+	struct intel_pfr_key_entry_hdr root;
+
+	if (pfr_spi_read(manifest->image_type, staging_address + offset +
+			 sizeof(PFR_AUTHENTICATION_BLOCK0) + INTEL_PFR_BLOCK1_HDR_SIZE,
+			 sizeof(root), (uint8_t *)&root)) {
 		LOG_ERR("Staging pfm block1: Flash read data failed");
 		return Failure;
 	}
 
-	// Move to Root Key entry, ignore tag and reserved block
-	RootEntry = (KEY_ENTRY *)(staging_pfm_sig_b1 + sizeof(uint32_t) + 12);
-
-	switch (RootEntry->PubCurveMagic) {
-		case PUBLIC_SECP256_TAG:
-		case PUBLIC_LMS256_TAG:
-			act_pfm_hash = act_block0_buffer->Sha256Pc;
-			staging_pfm_hash = staging_block0_buffer->Sha256Pc;
-			digest_length = SHA256_DIGEST_LENGTH;
-			break;
-		case PUBLIC_SECP384_TAG:
-		case PUBLIC_LMS384_TAG:
-			act_pfm_hash = act_block0_buffer->Sha384Pc;
-			staging_pfm_hash = staging_block0_buffer->Sha384Pc;
-			digest_length = SHA384_DIGEST_LENGTH;
-			break;
-		default:
-		LOG_ERR("Staging block 1 root entry: Unsupported hash curve, %x", RootEntry->PubCurveMagic);
+	scheme = intel_pfr_sig_scheme_find(root.pubkey_magic);
+	if (!scheme) {
+		LOG_ERR("Staging block 1 root entry: Unsupported hash curve, %x", root.pubkey_magic);
 		return Failure;
 	}
+
+	act_pfm_hash = intel_pfr_block0_pc_hash(act_block0_buffer, scheme->hash_type);
+	staging_pfm_hash = intel_pfr_block0_pc_hash(staging_block0_buffer, scheme->hash_type);
+	digest_length = intel_pfr_hash_length(scheme->hash_type);
 
 	// If the hashes of PFM or AFM match, the active image and staging image must be the same firmware.
 	if (memcmp(act_pfm_hash, staging_pfm_hash, digest_length)) {
@@ -240,10 +229,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 
 		block0_buffer = (PFR_AUTHENTICATION_BLOCK0 *)buffer;
 		manifest->pc_length = block0_buffer->PcLength;
-		if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-			manifest->address += LMS_PFM_SIG_BLOCK_SIZE;
-		else
-			manifest->address += PFM_SIG_BLOCK_SIZE;
+		manifest->address += intel_pfr_sig_block_size(manifest);
 
 		LOG_INF("AFM update start payload_address=%08x pc_length=%x", manifest->address, manifest->pc_length);
 		if (update_afm(AFM_PART_ACT_1, manifest->address, manifest->pc_length))
@@ -308,10 +294,7 @@ int pfr_recover_active_region(struct pfr_manifest *manifest)
 	manifest->staging_address = staging_address;
 	manifest->active_pfm_addr = act_pfm_offset;
 	manifest->address = read_address;
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		manifest->address += LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		manifest->address += PFM_SIG_BLOCK_SIZE;
+	manifest->address += intel_pfr_sig_block_size(manifest);
 
 	if (pfr_spi_read(manifest->image_type, manifest->address,
 			sizeof(PFR_AUTHENTICATION_BLOCK0), buffer)) {
@@ -376,9 +359,11 @@ int pfr_staging_pch_staging(struct pfr_manifest *manifest)
 		LOG_ERR("Failed to read image size");
 		return Failure;
 	}
-	if ((image_size + PFM_SIG_BLOCK_SIZE) > CONFIG_PCH_STAGING_SIZE) {
+	uint32_t sig_size = intel_pfr_sig_block_size_at(manifest->image_type, manifest->address);
+
+	if ((image_size + sig_size) > CONFIG_PCH_STAGING_SIZE) {
 		LOG_ERR("Image size %x is bigger than staging size %x",
-				image_size + PFM_SIG_BLOCK_SIZE, CONFIG_PCH_STAGING_SIZE);
+				image_size + sig_size, CONFIG_PCH_STAGING_SIZE);
 		return Failure;
 	}
 

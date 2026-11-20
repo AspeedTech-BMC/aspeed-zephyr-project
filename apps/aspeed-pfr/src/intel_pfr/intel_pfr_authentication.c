@@ -15,6 +15,7 @@
 #include "intel_pfr_provision.h"
 #include "intel_pfr_pfm_manifest.h"
 #include "pfr/pfr_ufm.h"
+#include "intel_pfr_sig_scheme.h"
 
 LOG_MODULE_DECLARE(pfr, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -70,11 +71,8 @@ int pfr_recovery_verify(struct pfr_manifest *manifest)
 	}
 
 	// Recovery region PFM verification
-	if (manifest->hash_curve == hash_sign_algo384 || manifest->hash_curve == hash_sign_algo256)
-		manifest->address += LMS_PFM_SIG_BLOCK_SIZE;
-	else
-		manifest->address += PFM_SIG_BLOCK_SIZE;
-	LOG_INF("Hash curve = %d", manifest->hash_curve);
+	manifest->address += intel_pfr_sig_block_size(manifest);
+	LOG_INF("Signature scheme = %s", manifest->sig_scheme->name);
 	LOG_INF("Verifying PFM signature, address=0x%08x", manifest->address);
 	// manifest verification
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
