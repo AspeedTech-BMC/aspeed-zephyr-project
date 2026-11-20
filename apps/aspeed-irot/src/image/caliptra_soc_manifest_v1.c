@@ -9,7 +9,6 @@
 #include <zephyr/multi_heap/shared_multi_heap.h>
 
 #include <cptra/cptra_api.h>
-#include <image/caliptra_soc_manifest.h>
 #include <image/caliptra_soc_manifest_v1.h>
 #include <image/firmware_manifest.h>
 #include <psp/abr.h>

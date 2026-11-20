@@ -11,7 +11,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/init.h>
 #include <zephyr/sys/sys_io.h>
-#include <image/caliptra_soc_manifest.h>
+#include <image/caliptra_soc_manifest_common.h>
 #include <mbedtls/sha512.h>
 #include <mbedtls/md.h>
 #include <mbedtls/pk.h>

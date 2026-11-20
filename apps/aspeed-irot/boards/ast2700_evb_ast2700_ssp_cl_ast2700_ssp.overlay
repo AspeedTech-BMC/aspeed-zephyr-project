@@ -2,13 +2,6 @@
 #include <zephyr/dt-bindings/memory-attr/memory-attr.h>
 
 / {
-	bmc_pfm {
-		compatible = "manifest,caliptra";
-		firmware-device = <&fmc_cs0>;
-		manifest-device = <&fmc_cs1>;
-		manifest-offset = <0x00000000>;
-	};
-
 	chosen {
 		zephyr,sram = &dram_rw_region;
 	};
