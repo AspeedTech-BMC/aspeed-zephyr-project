@@ -86,7 +86,11 @@ static const unsigned char D_LEAF_CONSTANT_BYTES[D_CONST_LEN] = { 0x82, 0x82 };
 static const unsigned char D_INTR_CONSTANT_BYTES[D_CONST_LEN] = { 0x83, 0x83 };
 
 #ifdef CONFIG_CRYPTO_ASPEED
-#include <crypto/hash.h>
+#include <zephyr/crypto/crypto.h>
+#include <zephyr/toolchain.h>
+
+BUILD_ASSERT(MBEDTLS_LMS_M_NODE_BYTES_MAX >= 32);
+
 #define HASH_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_hace))    // define hash driver for Aspeed
 static int has_engine_setup = 0;
 static int hw_sha256_abort(const struct device *dev, struct hash_ctx *ini)
@@ -136,7 +140,6 @@ static int create_merkle_leaf_value(const mbedtls_lms_parameters_t *params,
     const struct device *dev = device_get_binding(HASH_DRV_NAME);
     struct hash_pkt pkt;
     pkt.out_buf = temp;
-    pkt.out_buf_max = sizeof(temp);
 #endif
 
 #if (CONFIG_CRYPTO_ASPEED == 0)
@@ -144,7 +147,7 @@ static int create_merkle_leaf_value(const mbedtls_lms_parameters_t *params,
 #endif
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_begin_session(dev, &ini, HASH_SHA256);
+    status = hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA256);
     has_engine_setup = 1;
 #else
     status = psa_hash_setup(&op, PSA_ALG_SHA_256);
@@ -201,7 +204,9 @@ static int create_merkle_leaf_value(const mbedtls_lms_parameters_t *params,
     }
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_final(&ini, &pkt);
+    pkt.in_buf = NULL;
+    pkt.in_len = 0;
+    status = hash_compute(&ini, &pkt);
     output_hash_len = ini.digest_size;
 #else
     status = psa_hash_finish(&op, temp, MBEDTLS_LMS_M_NODE_BYTES_MAX,
@@ -264,7 +269,6 @@ static int create_merkle_internal_value(const mbedtls_lms_parameters_t *params,
     const struct device *dev = device_get_binding(HASH_DRV_NAME);
     struct hash_pkt pkt;
     pkt.out_buf = temp;
-    pkt.out_buf_max = sizeof(temp);
 #endif
 
 #if (CONFIG_CRYPTO_ASPEED == 0)
@@ -272,7 +276,7 @@ static int create_merkle_internal_value(const mbedtls_lms_parameters_t *params,
 #endif
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_begin_session(dev, &ini, HASH_SHA256);
+    status = hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA256);
     has_engine_setup = 1;
 #else
     status = psa_hash_setup(&op, PSA_ALG_SHA_256);
@@ -341,7 +345,9 @@ static int create_merkle_internal_value(const mbedtls_lms_parameters_t *params,
     }
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_final(&ini, &pkt);
+    pkt.in_buf = NULL;
+    pkt.in_len = 0;
+    status = hash_compute(&ini, &pkt);
     output_hash_len = ini.digest_size;
 #else
     status = psa_hash_finish(&op, temp, MBEDTLS_LMS_M_NODE_BYTES_MAX,

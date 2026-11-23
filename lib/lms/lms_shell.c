@@ -4,17 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #if defined(CONFIG_LMS_SHELL)
-#include <random/rand32.h>
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "mbedtls/config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
+#include <zephyr/random/random.h>
+#include "mbedtls/build_info.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <shell/shell.h>
+#include <zephyr/shell/shell.h>
 #include "mbedtls/lms.h"
 #include "lmots.h"
 

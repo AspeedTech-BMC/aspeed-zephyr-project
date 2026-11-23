@@ -133,7 +133,11 @@ static unsigned short lmots_checksum_calculate(const mbedtls_lmots_parameters_t 
 
 
 #ifdef CONFIG_CRYPTO_ASPEED
-#include <crypto/hash.h>
+#include <zephyr/crypto/crypto.h>
+#include <zephyr/toolchain.h>
+
+BUILD_ASSERT(MBEDTLS_LMOTS_N_HASH_LEN_MAX >= 32);
+
 #define HASH_DRV_NAME DEVICE_DT_NAME(DT_INST(0, aspeed_hace))    // define hash driver for Aspeed
 static int has_engine_setup = 0;
 static int hw_sha256_abort(const struct device *dev, struct hash_ctx *ini)
@@ -189,11 +193,10 @@ static int create_digit_array_with_checksum(const mbedtls_lmots_parameters_t *pa
     const struct device *dev = device_get_binding(HASH_DRV_NAME);
     struct hash_pkt pkt;
     pkt.out_buf = temp;
-    pkt.out_buf_max = sizeof(temp);
 #endif
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_begin_session(dev, &ini, HASH_SHA256);
+    status = hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA256);
     has_engine_setup = 1;
 #else
     status = psa_hash_setup(&op, PSA_ALG_SHA_256);
@@ -261,7 +264,9 @@ static int create_digit_array_with_checksum(const mbedtls_lmots_parameters_t *pa
     }
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_final(&ini, &pkt);
+    pkt.in_buf = NULL;
+    pkt.in_len = 0;
+    status = hash_compute(&ini, &pkt);
     output_hash_len = ini.digest_size;
 #else
     status = psa_hash_finish(&op, temp,
@@ -341,7 +346,6 @@ static int hash_digit_array(const mbedtls_lmots_parameters_t *params,
     const struct device *dev = device_get_binding(HASH_DRV_NAME);
     struct hash_pkt pkt;
     pkt.out_buf = tmp_hash;
-    pkt.out_buf_max = sizeof(tmp_hash);
 #endif
 
 
@@ -361,7 +365,7 @@ static int hash_digit_array(const mbedtls_lmots_parameters_t *params,
              j_hash_idx < j_hash_idx_max;
              j_hash_idx++) {
 #if CONFIG_CRYPTO_ASPEED
-            status = hash_begin_session(dev, &ini, HASH_SHA256);
+            status = hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA256);
             has_engine_setup = 1;
 #else
             status = psa_hash_setup(&op, PSA_ALG_SHA_256);
@@ -437,7 +441,9 @@ static int hash_digit_array(const mbedtls_lmots_parameters_t *params,
             }
 
 #if CONFIG_CRYPTO_ASPEED
-            status = hash_final(&ini, &pkt);
+            pkt.in_buf = NULL;
+            pkt.in_len = 0;
+            status = hash_compute(&ini, &pkt);
             output_hash_len = ini.digest_size;
 #else
             status = psa_hash_finish(&op, tmp_hash, sizeof(tmp_hash),
@@ -503,11 +509,10 @@ static int public_key_from_hashed_digit_array(const mbedtls_lmots_parameters_t *
     const struct device *dev = device_get_binding(HASH_DRV_NAME);
     struct hash_pkt pkt;
     pkt.out_buf = temp;
-    pkt.out_buf_max = sizeof(temp);
 #endif
 
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_begin_session(dev, &ini, HASH_SHA256);
+    status = hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA256);
     has_engine_setup = 1;
 #else
     status = psa_hash_setup(&op, PSA_ALG_SHA_256);
@@ -562,7 +567,9 @@ static int public_key_from_hashed_digit_array(const mbedtls_lmots_parameters_t *
         goto exit;
     }
 #if CONFIG_CRYPTO_ASPEED
-    status = hash_final(&ini, &pkt);
+    pkt.in_buf = NULL;
+    pkt.in_len = 0;
+    status = hash_compute(&ini, &pkt);
     output_hash_len = ini.digest_size;
 #else
     status = psa_hash_finish(&op, temp,
@@ -817,7 +824,6 @@ int mbedtls_lmots_generate_private_key(mbedtls_lmots_private_t *ctx,
     const struct device *dev = device_get_binding(HASH_DRV_NAME);
     struct hash_pkt pkt;
     pkt.out_buf = temp;
-    pkt.out_buf_max = sizeof(temp);
 #endif
 
     if (ctx->have_private_key) {
@@ -846,7 +852,7 @@ int mbedtls_lmots_generate_private_key(mbedtls_lmots_private_t *ctx,
          i_digit_idx < MBEDTLS_LMOTS_P_SIG_DIGIT_COUNT(ctx->params.type);
          i_digit_idx++) {
 #if CONFIG_CRYPTO_ASPEED
-        status = hash_begin_session(dev, &ini, HASH_SHA256);
+        status = hash_begin_session(dev, &ini, CRYPTO_HASH_ALGO_SHA256);
         has_engine_setup = 1;
 #else
         status = psa_hash_setup(&op, PSA_ALG_SHA_256);
@@ -918,7 +924,9 @@ int mbedtls_lmots_generate_private_key(mbedtls_lmots_private_t *ctx,
         }
 #if CONFIG_CRYPTO_ASPEED
 //        status = hw_sha256_finish(&ini, &pkt, temp, MBEDTLS_LMOTS_N_HASH_LEN_MAX, &output_hash_len);
-        status = hash_final(&ini, &pkt);
+        pkt.in_buf = NULL;
+        pkt.in_len = 0;
+        status = hash_compute(&ini, &pkt);
         output_hash_len = ini.digest_size;
 #else
         status = psa_hash_finish(&op,temp,
