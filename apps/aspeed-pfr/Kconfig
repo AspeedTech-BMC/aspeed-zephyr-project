@@ -259,6 +259,14 @@ config PFR_SIG_P384_MLDSA87
 	  Accept Intel PFR signature blocks signed with both ECDSA P-384 and
 	  ML-DSA-87 (tools/intel/hybrid_p384_mldsa87_signature_block.md).
 
+config PFR_ROT_UPDATE_CAPSULE
+	bool "Accept Intel PFR ROT update capsules"
+	depends on INTEL_PFR
+	default y
+	help
+	  Disable on platforms whose ROT firmware is updated another way.
+	  Decommission and key cancellation capsules are still accepted.
+
 config OTP_SIM
 	depends on !OTP_ASPEED
 	default n

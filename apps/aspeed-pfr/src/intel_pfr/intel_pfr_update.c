@@ -620,6 +620,12 @@ int ast1060_update(struct pfr_manifest *manifest, uint32_t flash_select, uint32_
 	uint32_t hrot_svn = 0;
 	int status = 0;
 
+	if (pc_type_status == PFR_CPLD_UPDATE_CAPSULE && !IS_ENABLED(CONFIG_PFR_ROT_UPDATE_CAPSULE)) {
+		LOG_ERR("ROT update capsule is not supported");
+		LogUpdateFailure(UPD_NOT_ALLOWED, 1);
+		return Failure;
+	}
+
 	LOG_INF("manifest->address=%x", manifest->address);
 	status = manifest->base->verify((struct manifest *)manifest, manifest->hash,
 			manifest->verification->base, manifest->pfr_hash->hash_out,
