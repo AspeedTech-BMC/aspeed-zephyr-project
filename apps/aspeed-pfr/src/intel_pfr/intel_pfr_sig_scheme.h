@@ -56,3 +56,5 @@ uint32_t intel_pfr_block0_entry_addr(const struct pfr_manifest *manifest);
 
 int intel_pfr_sig_hash(struct pfr_manifest *manifest, const uint8_t *data, size_t len);
 int intel_pfr_sig_hash_block0(struct pfr_manifest *manifest);
+int intel_pfr_ecdsa_verify(struct pfr_manifest *manifest, const uint8_t *r, const uint8_t *s,
+			   bool csk);

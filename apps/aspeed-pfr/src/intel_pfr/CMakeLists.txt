@@ -17,6 +17,7 @@ target_sources(app PRIVATE
 
 zephyr_linker_sources(SECTIONS intel_pfr_sig_scheme.ld)
 target_sources_ifdef(CONFIG_MBEDTLS_LMS_C app PRIVATE intel_pfr_sig_lms.c)
+target_sources_ifdef(CONFIG_PFR_SIG_P384_MLDSA87 app PRIVATE intel_pfr_sig_hybrid.c)
 
 if(CONFIG_INTEL_PFR_CPLD_UPDATE)
         target_sources(app PRIVATE intel_pfr_cpld_utils.c)

@@ -146,6 +146,35 @@ typedef struct _BLOCK0ENTRY_lms {
 	uint8_t Block0Signature[2048];
 } BLOCK0ENTRY_lms;
 
+#define MLDSA87_PUBKEY_SIZE             2592
+#define MLDSA87_SIGNATURE_SIZE          4628
+
+typedef struct _KEY_ENTRY_HYBRID {
+	uint32_t Tag;
+	uint32_t PubCurveMagic;
+	uint32_t KeyPermission;
+	uint32_t KeyId;
+	uint8_t PubKeyX[KEY_SIZE];
+	uint8_t PubKeyY[KEY_SIZE];
+	uint8_t MldsaPubKey[MLDSA87_PUBKEY_SIZE];
+} KEY_ENTRY_HYBRID;
+
+typedef struct _CSKENTRY_HYBRID {
+	KEY_ENTRY_HYBRID CskEntryInitial;
+	uint32_t CskSignatureMagic;
+	uint8_t CskSignatureR[KEY_SIZE];
+	uint8_t CskSignatureS[KEY_SIZE];
+	uint8_t CskMldsaSignature[MLDSA87_SIGNATURE_SIZE];
+} CSKENTRY_HYBRID;
+
+typedef struct _BLOCK0ENTRY_HYBRID {
+	uint32_t TagBlock0Entry;
+	uint32_t Block0SignatureMagic;
+	uint8_t Block0SignatureR[KEY_SIZE];
+	uint8_t Block0SignatureS[KEY_SIZE];
+	uint8_t Block0MldsaSignature[MLDSA87_SIGNATURE_SIZE];
+} BLOCK0ENTRY_HYBRID;
+
 typedef struct _PFR_AUTHENTICATION_BLOCK1_lms {
 	// Block 1
 	uint32_t TagBlock1;

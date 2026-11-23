@@ -21,7 +21,7 @@ static uint32_t key_len(const struct pfr_manifest *manifest)
 	return intel_pfr_hash_length(manifest->sig_scheme->hash_type);
 }
 
-static int verify_rs(struct pfr_manifest *manifest, const uint8_t *r, const uint8_t *s, bool csk)
+int intel_pfr_ecdsa_verify(struct pfr_manifest *manifest, const uint8_t *r, const uint8_t *s, bool csk)
 {
 	struct pfr_pubkey *pubkey = manifest->verification->pubkey;
 	uint32_t len = key_len(manifest);
@@ -109,7 +109,7 @@ static int ecdsa_verify_csk(struct pfr_manifest *manifest, uint32_t addr)
 		return Failure;
 	}
 
-	if (verify_rs(manifest, csk.CskSignatureR, csk.CskSignatureS, true))
+	if (intel_pfr_ecdsa_verify(manifest, csk.CskSignatureR, csk.CskSignatureS, true))
 		return Failure;
 
 	memcpy(manifest->verification->pubkey->x, csk.CskEntryInitial.PubKeyX, key_len(manifest));
@@ -133,7 +133,7 @@ static int ecdsa_verify_block0(struct pfr_manifest *manifest, uint32_t addr)
 	if (intel_pfr_sig_hash_block0(manifest))
 		return Failure;
 
-	if (verify_rs(manifest, entry.Block0SignatureR, entry.Block0SignatureS, false))
+	if (intel_pfr_ecdsa_verify(manifest, entry.Block0SignatureR, entry.Block0SignatureS, false))
 		return Failure;
 
 	return Success;

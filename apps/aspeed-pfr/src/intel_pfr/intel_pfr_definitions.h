@@ -63,6 +63,9 @@
 #define SIGNATURE_LMS384_TAG            0x66600835
 #define SIGNATURE_LMS256_TAG            0x5266b561
 #define LMS_PFM_SIG_BLOCK_SIZE          5120
+#define PUBLIC_P384_MLDSA87_TAG         0x49C7FFDC
+#define SIGNATURE_P384_MLDSA87_TAG      0x2E30EA3F
+#define HYBRID_PFM_SIG_BLOCK_SIZE       0x4000
 #define PUBLIC_RSA2K_TAG                0x7FAD5E14
 #define PUBLIC_RSA3K_TAG                0x684694E6
 #define PUBLIC_RSA4K_TAG                0xB73AA717
