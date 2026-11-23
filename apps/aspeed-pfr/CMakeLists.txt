@@ -21,7 +21,7 @@ zephyr_link_libraries(hrot_hal)
 zephyr_link_libraries(hrot_wrapper)
 zephyr_link_libraries(smf)
 
-if (MBEDTLS_LMS_C)
+if (CONFIG_MBEDTLS_LMS_C)
     zephyr_link_libraries(lms)
 endif()
 
