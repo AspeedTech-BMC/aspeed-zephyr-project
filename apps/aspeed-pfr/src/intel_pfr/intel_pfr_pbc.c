@@ -76,6 +76,7 @@ int update_active_pfm(struct pfr_manifest *manifest, uint32_t pfm_size)
 
 	// Adjusting capsule offset size to PFM Signing chain
 	capsule_offset += intel_pfr_sig_block_size(manifest);
+	pfm_size += intel_pfr_sig_block_size(manifest);
 
 	// Updating PFM from capsule to active region
 	length_page_align =
