@@ -186,6 +186,8 @@ Any failure rejects the structure.
 
 ## 7. Scope on AST1080
 
+- Intel PFR ROT update capsules (`PFR_CPLD_UPDATE_CAPSULE`) are rejected
+  (`CONFIG_PFR_ROT_UPDATE_CAPSULE=n`); AST1080 firmware is updated by PLDM.
 - Decommission capsules and key cancellation certificates use this format.
 
 ## 8. Test vectors

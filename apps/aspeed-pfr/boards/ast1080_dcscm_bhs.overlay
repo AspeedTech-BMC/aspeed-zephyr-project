@@ -24,6 +24,10 @@
 	status = "okay";
 };
 
+&cptra_mci_mldsa {
+	status = "okay";
+};
+
 &i2cfilter {
 	status = "okay";
 };
