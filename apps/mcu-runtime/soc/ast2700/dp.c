@@ -14,6 +14,7 @@
 #include <dp_ast2700.h>
 #include <scu.h>
 #include <chip.h>
+#include <ast_loader.h>
 
 LOG_MODULE_REGISTER(dp, CONFIG_SOC_FMC_LOG_LEVEL);
 
@@ -23,6 +24,7 @@ int dp_init(struct ast_chip *chip)
 	uint32_t mcu_ctrl, val;
 	uintptr_t scu_offset;
 	bool is_mcu_stop = false;
+	int err;
 
 	val = scu->vga_func_ctrl;
 	scu_offset = (((val >> 8) & 0x3) == 1)
@@ -79,7 +81,12 @@ int dp_init(struct ast_chip *chip)
 		mcu_ctrl |= MCU_CTRL_AHBS_IMEM_EN;
 		sys_write32(mcu_ctrl, MCU_CTRL);
 
-		ast_loader_load_image(CPTRA_DP_FW_FW_ID, (uint32_t *)MCU_IMEM_BASE, MCU_IMEM_SIZE, true);
+		err = ast_loader_load_image(CPTRA_DP_FW_FW_ID, (uint32_t *)MCU_IMEM_BASE,
+					    MCU_IMEM_SIZE, true);
+		if (err) {
+			LOG_ERR("%s: DPMCU fw load failed, err=%d", __func__, err);
+			return err;
+		}
 
 		/* release DPMCU internal reset */
 		mcu_ctrl &= ~MCU_CTRL_AHBS_IMEM_EN;
