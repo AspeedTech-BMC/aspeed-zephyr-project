@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- XML file for Block Sign Tool: hybrid ECDSA P-384 + ML-DSA-87 -->
+<blocksign>
+  <version>1</version>
+  <!-- Block 0 -->
+  <block0>
+    <magic>0xB6EAFD19</magic>
+    <pctype>1</pctype>
+  </block0>
+  <!-- Block 1 -->
+  <block1>
+    <magic>0xF27F28D7</magic>
+    <!-- Root key -->
+    <rkey>
+      <magic>0xA757A046</magic>
+      <curvemagic>0x49C7FFDC</curvemagic>
+      <permissions>-1</permissions>
+      <keyid>-1</keyid>
+      <pubkey>hybrid_rk_ec_pub.pem</pubkey>
+      <mldsa_pubkey>hybrid_rk_mldsa_pub.pem</mldsa_pubkey>
+    </rkey>
+    <!-- Code signing key -->
+    <cskey>
+      <magic>0x14711C2F</magic>
+      <curvemagic>0x49C7FFDC</curvemagic>
+      <permissions>1</permissions>
+      <keyid>0</keyid>
+      <pubkey>hybrid_csk_ec_pub.pem</pubkey>
+      <mldsa_pubkey>hybrid_csk_mldsa_pub.pem</mldsa_pubkey>
+      <sigmagic>0x2E30EA3F</sigmagic>
+      <hashalg>sha384</hashalg>
+      <signkey>hybrid_rk_ec_prv.pem</signkey>
+      <mldsa_signkey>hybrid_rk_mldsa_prv.pem</mldsa_signkey>
+    </cskey>
+    <!-- Signature over Block 0 -->
+    <b0_sig>
+      <magic>0x15364367</magic>
+      <sigmagic>0x2E30EA3F</sigmagic>
+      <hashalg>sha384</hashalg>
+      <signkey>hybrid_csk_ec_prv.pem</signkey>
+      <mldsa_signkey>hybrid_csk_mldsa_prv.pem</mldsa_signkey>
+    </b0_sig>
+  </block1>
+  <padding>
+    <!-- Hybrid signature block is 16 KB -->
+    <blockpad>16384</blockpad>
+    <!-- Align total package to 128 bytes -->
+    <align>128</align>
+  </padding>
+</blocksign>
