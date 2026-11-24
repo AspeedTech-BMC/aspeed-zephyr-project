@@ -14,6 +14,10 @@ vendor_base is updated when no conflict is left.
 
 Usage: sync_vendor.py <vendor zephyr repo> [target commit, default HEAD]
                       [--add <module path>=<vendor path> ...]
+                      [--dry-run] [--set-base]
+
+--dry-run reports what a sync would update or leave in conflict. After
+conflicts are resolved by hand, --set-base records the target as vendor_base.
 """
 import argparse
 import subprocess
@@ -86,6 +90,10 @@ def main():
     ap.add_argument("target", nargs="?", default="HEAD")
     ap.add_argument("--add", action="append", default=[],
                     help="<module path>=<vendor path> to copy and add to the map")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="report what would be updated or conflict, write nothing")
+    ap.add_argument("--set-base", action="store_true",
+                    help="record target as vendor_base after conflicts were resolved by hand")
     args = ap.parse_args()
 
     vendor = Path(args.vendor)
@@ -93,6 +101,17 @@ def main():
     target = subprocess.run(["git", "-C", str(vendor), "rev-parse", args.target],
                             capture_output=True, text=True, check=True).stdout.strip()
     pairs = read_map()
+
+    if args.set_base:
+        marked = [m for m, _ in pairs
+                  if (MODULE / m).exists() and "\n<<<<<<< " in (MODULE / m).read_text()]
+        if marked:
+            sys.exit("conflict markers left in: " + " ".join(marked))
+        write_shims(pairs)
+        (HERE / "vendor_base").write_text(target + "\n")
+        print(f"vendor_base -> {target}")
+        return 0
+
     changed, conflicts, gone = [], [], []
 
     for mod, ven in pairs:
@@ -108,10 +127,24 @@ def main():
             t = Path(tmp, "theirs")
             b.write_bytes(old or b"")
             t.write_bytes(new)
-            res = subprocess.run(["git", "merge-file", "-L", "module", "-L",
-                                  f"vendor {base[:12]}", "-L", f"vendor {target[:12]}",
-                                  str(MODULE / mod), str(b), str(t)])
+            cmd = ["git", "merge-file", "-L", "module", "-L", f"vendor {base[:12]}",
+                   "-L", f"vendor {target[:12]}"]
+            if args.dry_run:
+                cmd.append("-p")
+            res = subprocess.run(cmd + [str(MODULE / mod), str(b), str(t)],
+                                 stdout=subprocess.DEVNULL if args.dry_run else None)
         (conflicts if res.returncode != 0 else changed).append(mod)
+
+    if args.dry_run:
+        for mod in changed:
+            print(f"would update   {mod}")
+        for mod in conflicts:
+            print(f"would CONFLICT {mod}")
+        for mod in gone:
+            print(f"REMOVED        {mod} (no longer in vendor tree)")
+        print(f"{len(changed)} to update, {len(conflicts)} conflict(s), {len(gone)} removed "
+              f"({base[:12]} -> {target[:12]})")
+        return 0
 
     for spec in args.add:
         mod, ven = spec.split("=", 1)
@@ -146,7 +179,7 @@ def main():
     for mod in gone:
         print(f"REMOVED   {mod} (no longer in vendor tree)")
     if conflicts:
-        print(f"{len(conflicts)} conflict(s); resolve them, then write {target} to vendor_base")
+        print(f"{len(conflicts)} conflict(s); resolve them, then run again with --set-base")
         return 1
     (HERE / "vendor_base").write_text(target + "\n")
     print(f"vendor_base -> {target}")
