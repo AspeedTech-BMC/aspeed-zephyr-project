@@ -11,6 +11,11 @@
 # The script stops where a person has to decide (a rebase or merge conflict)
 # and prints what to do. Run it again afterwards; finished steps are skipped.
 #
+# aspeed_base records the aspeed-dev commit the *_mainline board files were
+# last checked against, as vendor_base does for the driver copies. Step 1
+# lists the aspeed-dev changes to the board files since then, whoever did the
+# rebase, and a finished run records the new aspeed-dev there.
+#
 # Usage: mainline/scripts/update.sh [options]
 #   --vendor DIR       vendor Zephyr repository (default: ../zephyr next to
 #                      this repository)
@@ -37,7 +42,7 @@ while [ $# -gt 0 ]; do
 	--vendor-ref) VENDOR_REF=$2; shift 2 ;;
 	--no-fetch) FETCH=0; shift ;;
 	--dry-run) DRY=1; shift ;;
-	-h|--help) sed -n '4,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+	-h|--help) sed -n "4,27p" "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 	*) echo "unknown option $1" >&2; exit 2 ;;
 	esac
 done
@@ -88,12 +93,26 @@ echo "vendor:     $(git -C "$VENDOR" rev-list --count "$OLD_BASE".."$TARGET") ne
 
 # Step 1
 say "1. rebase onto $ASPEED_REF"
-# aspeed-dev before this update, to list its board file changes afterwards.
-OLD_HEAD_BASE=$(git merge-base HEAD "$ASPEED_REF")
-if [ -f "$STATE" ] && grep -q '^ASPEED_BASE=' "$STATE"; then
-	OLD_HEAD_BASE=$(sed -n 's/^ASPEED_BASE=//p' "$STATE")
-elif [ $DRY = 0 ]; then
-	echo "ASPEED_BASE=$OLD_HEAD_BASE" >> "$STATE"
+# The aspeed-dev commit the *_mainline board files were last checked
+# against. aspeed_base records it; without that file it is the aspeed-dev
+# base of the newest earlier position of the branch (its reflog) that had a
+# different base, which is where the branch stood before the last rebase.
+ABASE_FILE=$HERE/aspeed_base
+if [ -f "$ABASE_FILE" ]; then
+	OLD_HEAD_BASE=$(cat "$ABASE_FILE")
+	ABASE_FROM=aspeed_base
+else
+	cur_mb=$(git merge-base HEAD "$ASPEED_REF")
+	OLD_HEAD_BASE=$cur_mb
+	ABASE_FROM="merge base (no aspeed_base, no earlier base in the reflog)"
+	for c in $(git reflog --format=%H "refs/heads/$BRANCH" 2>/dev/null | head -100); do
+		mb=$(git merge-base "$c" "$ASPEED_REF" 2>/dev/null) || continue
+		if [ "$mb" != "$cur_mb" ]; then
+			OLD_HEAD_BASE=$mb
+			ABASE_FROM="reflog of $BRANCH"
+			break
+		fi
+	done
 fi
 if git merge-base --is-ancestor "$ASPEED_REF" HEAD; then
 	echo "already on $ASPEED_REF"
@@ -125,11 +144,18 @@ this script again."
 		fi
 	fi
 fi
-echo "aspeed-dev changes to the board files the *_mainline copies may need too:"
-git diff --stat "$OLD_HEAD_BASE" "$ASPEED_REF" -- \
+echo "aspeed-dev changes to the board files the *_mainline copies may need too"
+echo "(${OLD_HEAD_BASE:0:12}..$ASPEED_REF, base from $ABASE_FROM):"
+board=$(git diff --stat "$OLD_HEAD_BASE" "$ASPEED_REF" -- \
 	'apps/mcu-runtime/boards/ast2700_evb_ast2700_bootmcu.conf' \
 	'apps/mcu-runtime/boards/ast2700_evb_ast2700_bootmcu.overlay' 'apps/mcu-runtime/prj.conf' |
-	sed '$d' | sed 's/^/  /'
+	sed '$d')
+if [ -n "$board" ]; then
+	printf '%s\n' "$board" | sed 's/^/  /'
+	echo "  see: git diff ${OLD_HEAD_BASE:0:12} $ASPEED_REF -- apps/mcu-runtime/boards apps/mcu-runtime/prj.conf"
+else
+	echo "  none"
+fi
 echo "app files the mainline branch changes:"
 git diff --stat "$(git merge-base HEAD "$ASPEED_REF")" HEAD -- apps | sed 's/^/  /'
 
@@ -192,8 +218,11 @@ say "next"
 if [ $DRY = 1 ]; then
 	echo "dry run only: nothing was rebased or merged."
 else
-	echo "review 'git status' and 'git diff', mirror what step 3 lists, then commit"
-	echo "the sync as: zephyr: sync the vendor drivers to ${TARGET:0:11}"
+	# The board files are now checked against this aspeed-dev.
+	git rev-parse "$ASPEED_REF" > "$ABASE_FILE"
+	echo "review 'git status' and 'git diff', mirror what steps 1 and 3 list into the"
+	echo "*_mainline board files and the module, then commit the sync together with"
+	echo "mainline/scripts/aspeed_base as: zephyr: sync the vendor drivers to ${TARGET:0:11}"
 	echo "then build against Zephyr main and run the boot test on the board."
 	rm -f "$STATE"
 fi
