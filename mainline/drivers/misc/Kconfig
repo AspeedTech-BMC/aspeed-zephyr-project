@@ -58,6 +58,14 @@ config OTP_AST27XX
 	help
 	  Enable the OTP utility for ASPEED AST27XX SoCs.
 
+config OTP_IPC
+	bool "ASPEED OTP IPC driver"
+	default y
+	depends on SOC_AST2700_BOOTMCU && IPM_BOOTMCU && OTP_AST27XX
+	help
+	  Let the SSP and the Cortex-A35 read and program the OTP over the
+	  BootMCU IPC mailbox, on a command channel of its own.
+
 config PRIVILEGE_CTRL
 	bool "Enable ASPEED privilege control"
 	default y
